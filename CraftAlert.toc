@@ -26,4 +26,5 @@ Core/EventRouter.lua
 Core/PlayerName.lua
 Persistence/Defaults.lua
 Persistence/Schema.lua
+Persistence/SavedState.lua
 Bootstrap.lua
