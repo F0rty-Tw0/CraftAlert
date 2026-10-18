@@ -141,6 +141,40 @@ local function installDefaults()
   })
 end
 
+-- Build stubs per flavor key; project ids and TOC numbers come from flavor-choices.md.
+local PROJECT_IDS = { mainline = 1, classic = 2, tbc = 5, wrath = 11, cata = 14, mists = 19, camelot = 18 }
+local FLAVORS = {
+  retail = { project = "mainline", toc = 120105 },
+  forever = { project = "camelot", toc = 16001 },
+  era = { project = "classic", toc = 11509 },
+  tbc = { project = "tbc", toc = 20506 },
+  wrath = { project = "wrath", toc = 30403 },
+  cata = { project = "cata", toc = 40402 },
+  mop = { project = "mists", toc = 50504 },
+}
+
+function Wow.isFlavor(key)
+  return FLAVORS[key] ~= nil
+end
+
+-- Wow.flavor("tbc") stubs WOW_PROJECT_* and GetBuildInfo as that client reports them
+-- (WOW_PROJECT_CAMELOT exists on Forever only). Call before loading FlavorCompat.
+function Wow.flavor(key)
+  local flavor = FLAVORS[key]
+  assert(flavor, "unknown flavor " .. tostring(key))
+  Wow.stub("WOW_PROJECT_MAINLINE", PROJECT_IDS.mainline)
+  Wow.stub("WOW_PROJECT_CLASSIC", PROJECT_IDS.classic)
+  Wow.stub("WOW_PROJECT_BURNING_CRUSADE_CLASSIC", PROJECT_IDS.tbc)
+  Wow.stub("WOW_PROJECT_WRATH_CLASSIC", PROJECT_IDS.wrath)
+  Wow.stub("WOW_PROJECT_CATACLYSM_CLASSIC", PROJECT_IDS.cata)
+  Wow.stub("WOW_PROJECT_MISTS_CLASSIC", PROJECT_IDS.mists)
+  Wow.stub("WOW_PROJECT_CAMELOT", key == "forever" and PROJECT_IDS.camelot or nil)
+  Wow.stub("WOW_PROJECT_ID", PROJECT_IDS[flavor.project])
+  Wow.stub("GetBuildInfo", function()
+    return "0.0.0", "0", "Jan 1 2026", flavor.toc
+  end)
+end
+
 function Wow.reset()
   for name, record in pairs(saved) do
     rawset(_G, name, record.original)

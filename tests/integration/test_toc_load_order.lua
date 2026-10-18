@@ -12,9 +12,9 @@ return function()
   assert(files[#files] == "Bootstrap.lua", "Bootstrap.lua must be the last file, got " .. tostring(files[#files]))
 
   local savedRequire = require
-  _G.require = function(moduleName)
+  rawset(_G, "require", function(moduleName)
     error("Invalid import: No module with that name exists (" .. tostring(moduleName) .. ")")
-  end
+  end)
 
   local ns = {}
   local ok, err = pcall(function()
@@ -25,7 +25,7 @@ return function()
     end
   end)
 
-  _G.require = savedRequire
+  rawset(_G, "require", savedRequire)
   Wow.reset()
 
   assert(ok, tostring(err))
