@@ -79,7 +79,7 @@ local function newFrame(frameType, name)
 
   table.insert(Wow.frames, frame)
   if name then
-    rawset(_G, name, frame)
+    Wow.stub(name, frame) -- Wow.reset() removes it again
   end
   return frame
 end
