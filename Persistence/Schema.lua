@@ -61,6 +61,10 @@ local function isScalar(value)
   return isNumber(value) or type(value) == "string" or type(value) == "boolean"
 end
 
+local function isAny()
+  return true
+end
+
 local CHECKS = {
   boolean = function(value)
     return type(value) == "boolean"
@@ -132,7 +136,7 @@ local function fixList(list, valueOk)
   end
   local keys = {}
   for key in pairs(list) do
-    if type(key) == "number" then
+    if type(key) == "number" and key >= 1 and key % 1 == 0 and key ~= math.huge then
       keys[#keys + 1] = key
     end
   end
@@ -231,7 +235,8 @@ local function fixUi(ui)
   end
   for key in pairs(UI_FRAMES) do
     if type(ui[key]) == "table" then
-      fixMap(ui[key], isKey, isScalar)
+      -- A newer schema may store nested frame values (e.g. a size table): keep them.
+      fixMap(ui[key], isKey, keepUnknown and isAny or isScalar)
     else
       ui[key] = nil
     end

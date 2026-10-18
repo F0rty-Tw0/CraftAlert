@@ -213,14 +213,25 @@ local function testLedgerRecentIgnoredLeadsUi()
 end
 
 -- A list with a hole (an entry set to nil) keeps every entry after it, in key order.
+-- Keys are written 3 before 2 because Lua 5.1 pairs returns them in that order here.
 local function testListWithHoles()
   local Schema = load()
   local db = Schema.Validate({
-    leads = { [2] = { customer = "A-Realm", time = 10 }, [3] = { customer = "B-Realm", time = 20 } },
+    leads = { [3] = { customer = "B-Realm", time = 20 }, [2] = { customer = "A-Realm", time = 10 } },
+    settings = { intentWords = { [1] = "a", [0] = "zero", [1.5] = "half", foo = "b", [3] = "c" } },
   })
   Assert.equal(#db.leads, 2)
   Assert.equal(db.leads[1].customer, "A-Realm")
   Assert.equal(db.leads[2].customer, "B-Realm")
+  -- Only positive integer keys count as list entries; string keys must not reach table.sort.
+  Assert.same(db.settings.intentWords, { "a", "c" })
+end
+
+local function testNewerSchemaKeepsNestedUiValues()
+  local Schema = load()
+  local db = Schema.Validate({ schema = 2, ui = { window = { point = "TOP", size = { w = 1, h = 2 } } } })
+  Assert.same(db.ui.window.size, { w = 1, h = 2 })
+  Assert.equal(db.ui.window.point, "TOP")
 end
 
 -- Review Focus 5: a newer schema loads, keeps its data, and warns once.
@@ -273,6 +284,7 @@ return function()
   testImportCharacter()
   testLedgerRecentIgnoredLeadsUi()
   testListWithHoles()
+  testNewerSchemaKeepsNestedUiValues()
   testNewerSchema()
   testOlderSchemaIsRaisedAndNoWarning()
   testIdempotent()
