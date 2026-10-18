@@ -30,4 +30,5 @@ Persistence/SavedState.lua
 Model/Tokenizer.lua
 Model/Slang.lua
 Model/ItemKeywords.lua
+Model/ProfessionWords.lua
 Bootstrap.lua
