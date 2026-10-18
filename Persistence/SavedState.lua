@@ -71,10 +71,11 @@ local function pruneRecentGreeted(db, now)
   end
 end
 
--- Binds the global CraftAlertDB and returns it. `isFirstRun` says whether it was absent.
+-- Binds the global CraftAlertDB and returns it. `isFirstRun` says whether it was absent
+-- or unusable (not a table), i.e. whether the player starts from a fresh db.
 function SavedState.Load()
   local stored = _G.CraftAlertDB
-  SavedState.isFirstRun = stored == nil
+  SavedState.isFirstRun = type(stored) ~= "table"
   local db = Schema.Validate(stored == nil and Defaults.Db() or stored)
   local now = _G["time"]()
   pruneLeads(db, now)

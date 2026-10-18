@@ -34,6 +34,15 @@ local function testFirstRun()
   Assert.equal(db.settings.enable, true)
 end
 
+-- A corrupt (non-table) db is replaced by a fresh one, so the first-run hint must show.
+local function testCorruptDbCountsAsFirstRun()
+  local SavedState = load("junk")
+  local db = SavedState.Load()
+  Assert.equal(SavedState.isFirstRun, true)
+  Assert.equal(type(db), "table")
+  Assert.equal(rawget(_G, "CraftAlertDB"), db)
+end
+
 local function testExistingDbIsBoundNotReplaced()
   local existing = { schema = 1, settings = { toastDuration = 30 }, characters = {} }
   local SavedState = load(existing)
@@ -157,6 +166,7 @@ end
 
 return function()
   testFirstRun()
+  testCorruptDbCountsAsFirstRun()
   testExistingDbIsBoundNotReplaced()
   testNeverCallsPlayerName()
   testNewerHandEditedDb()
