@@ -19,4 +19,5 @@
 ## SavedVariables: CraftAlertDB
 
 Core/FlavorCompat.lua
+Core/Constants.lua
 Bootstrap.lua
