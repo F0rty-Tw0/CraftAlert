@@ -21,4 +21,5 @@
 Core/FlavorCompat.lua
 Core/Constants.lua
 Core/Localization.lua
+Core/ChatPrint.lua
 Bootstrap.lua
