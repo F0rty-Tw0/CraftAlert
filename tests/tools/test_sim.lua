@@ -38,12 +38,23 @@ return function()
 
   -- Each chat line reports its normalized sender; --sender applies to the next line only.
   local senders = stepLines(Sim.Run({ "--sender", "Zoë-Kel'Thuzad", "LF belt", "LF boots", "--sender", "Bob-Area 52", "LF ring" }))
-  Assert.same({ senders[1], senders[2], senders[3] }, {
+  Assert.same({ senders[1], senders[3], senders[5] }, {
     "sender: Zoë-Kel'Thuzad",
     "sender: Customer-OtherRealm",
     "sender: Bob-Area52",
   })
   Assert.equal(stepLines(Sim.Run({ "--sender", "Bob", "hi" }))[1], "sender: Bob-OwnRealm")
+
+  -- Until the matcher lands, each line reports the intent prefilter and the Tokenizer buffers.
+  local link = "|cff1eff00|Hitem:2575::::::::60:::::|h[Red Linen Shirt]|h|r"
+  Assert.same(stepLines(Sim.Run({ "LF [Enchant Bracer - Minor Health]", "WTS cheap stuff", "wtb " .. link .. " or |Hitem:19019|h[X]|h" })), {
+    "sender: Customer-OtherRealm",
+    "tokens: lf enchant bracer minor health items=",
+    "sender: Customer-OtherRealm",
+    "prefilter: reject",
+    "sender: Customer-OtherRealm",
+    "tokens: wtb or items=2575,19019",
+  })
 
   local unknownFlag = Sim.Run({ "--nope" })
   Assert.equal(#unknownFlag, 1)

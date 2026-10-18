@@ -178,7 +178,23 @@ local function start(ctx)
   if not ctx.started then
     ctx.started = true
     ctx.ns.PlayerName.Init()
+    -- The default intent list until the matcher exists; then Matcher.SetIndex configures it.
+    ctx.ns.Tokenizer.Configure(ctx.ns.Constants.intentWords)
   end
+end
+
+-- `prefilter: reject`, or the Tokenizer buffers of a line that passed the intent prefilter.
+local function tokenLine(Tokenizer, text)
+  local lower = Tokenizer.Scan(text)
+  if not lower then
+    return "prefilter: reject"
+  end
+  Tokenizer.Tokenize(lower)
+  local ids = {}
+  for i = 1, Tokenizer.itemCount do
+    ids[i] = tostring(Tokenizer.itemIDs[i])
+  end
+  return "tokens: " .. Tokenizer.normalized .. " items=" .. table.concat(ids, ",")
 end
 
 local function count(map)
@@ -211,6 +227,7 @@ function STEPS.line(ctx, step)
   start(ctx)
   ctx.lastLine = { text = step.text, sender = ctx.sender }
   ctx.out[#ctx.out + 1] = "sender: " .. tostring(ctx.ns.PlayerName.Normalize(ctx.sender))
+  ctx.out[#ctx.out + 1] = tokenLine(ctx.ns.Tokenizer, step.text)
   ctx.sender = DEFAULT_SENDER
 end
 
