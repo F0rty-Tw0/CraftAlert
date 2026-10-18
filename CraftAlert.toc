@@ -1,0 +1,27 @@
+## Interface: 120105, 16001
+## Interface-Mainline: 120105
+## Interface-Forever: 16001
+## Interface-Vanilla: 11509
+## Interface-Classic: 11509
+## Interface-TBC: 20506
+## Interface-BCC: 20506
+## Interface-Wrath: 30403
+## Interface-WOTLKC: 30403
+## Interface-Cata: 40402
+## Interface-Mists: 50504
+## Interface-MoP: 50504
+## Title: Craft Alert
+## Notes: Alerts you when someone in trade chat asks for something you can craft.
+## Author: F0rty_tw0
+## Category: Chat
+## IconTexture: Interface\Icons\INV_Misc_Bell_01
+## Version: 0.1.0
+## SavedVariables: CraftAlertDB
+
+Core/FlavorCompat.lua
+Core/Constants.lua
+Core/Localization.lua
+Core/ChatPrint.lua
+Core/EventRouter.lua
+Core/PlayerName.lua
+Bootstrap.lua

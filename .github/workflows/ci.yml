@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run StyLua
+        run: npx --yes @johnnymorganz/stylua-bin@2.5.2 --check .
+
+      - name: Run Luacheck
+        uses: lunarmodules/luacheck@v1
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install lupa
+        run: pip install lupa==2.7
+
+      - name: Install Lua
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends lua5.1
+
+      - name: Run tests
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' test_file; do
+            lua5.1 tests/run.lua "${test_file}"
+          done < <(find tests -type f -name 'test_*.lua' -print0 | sort -z)
+
+      - name: Minify
+        env:
+          LUASRCDIET_REV: e9ceefdd1b3a03bc6c444e8fbb41c506adbbf25f
+        run: |
+          set -euo pipefail
+          MINIFIER_DIR="${RUNNER_TEMP}/luasrcdiet"
+          git clone --quiet https://github.com/jirutka/luasrcdiet.git "${MINIFIER_DIR}"
+          git -C "${MINIFIER_DIR}" checkout --quiet --detach "${LUASRCDIET_REV}"
+          export LUA_PATH="${MINIFIER_DIR}/?.lua;${MINIFIER_DIR}/?/init.lua;;"
+
+          # Folders arrive slice by slice; minify the ones that exist.
+          targets=()
+          for target in Bootstrap.lua Core Model Professions Persistence UI; do
+            if [[ -e "${target}" ]]; then
+              targets+=("${target}")
+            fi
+          done
+
+          while IFS= read -r -d '' file; do
+            lua5.1 "${MINIFIER_DIR}/bin/luasrcdiet" \
+              --basic \
+              --noopt-emptylines \
+              --noopt-locals \
+              --quiet \
+              "${file}" \
+              -o "${file}.min"
+            mv "${file}.min" "${file}"
+          done < <(
+            find "${targets[@]}" \
+              -type f -name '*.lua' -print0
+          )
+
+      - name: Test minified
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' test_file; do
+            lua5.1 tests/run.lua "${test_file}"
+          done < <(find tests -type f -name 'test_*.lua' -print0 | sort -z)

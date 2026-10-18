@@ -1,0 +1,11 @@
+<Bindings>
+  <Binding name="CRAFTALERT_GREET" category="Craft Alert">
+    CraftAlert_GreetLatest()
+  </Binding>
+  <Binding name="CRAFTALERT_DISMISS" category="Craft Alert">
+    CraftAlert_DismissLatest()
+  </Binding>
+  <Binding name="CRAFTALERT_TOGGLE" category="Craft Alert">
+    CraftAlert_ToggleLeads()
+  </Binding>
+</Bindings>
