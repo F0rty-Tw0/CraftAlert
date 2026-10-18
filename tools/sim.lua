@@ -261,8 +261,14 @@ function Sim.Run(argv)
 end
 
 if rawget(_G, "arg") and not rawget(_G, "CRAFTALERT_SIM_NO_MAIN") then
+  local failed = false
   for _, line in ipairs(Sim.Run(rawget(_G, "arg"))) do
     print(line)
+    failed = failed or string.find(line, "error: ", 1, true) == 1
+  end
+  -- A non-zero exit lets a Proof run notice a broken sim invocation.
+  if failed then
+    os.exit(1)
   end
 end
 
