@@ -116,6 +116,7 @@ local timerSeq = 0
 local function installDefaults()
   Wow.stub("CreateFrame", newFrame)
   Wow.stub("UIParent", newFrame("Frame", nil))
+  table.remove(Wow.frames) -- UIParent never registers events; keep Wow.frames to the addon's frames
   Wow.stub("C_Timer", {
     After = function(delay, fn)
       timerSeq = timerSeq + 1
