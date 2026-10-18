@@ -1,0 +1,5 @@
+{
+  "runtime.version": "Lua 5.1",
+  "workspace.ignoreDir": ["docs", "dist", ".tools", ".tmp_luals", "tools/Probe", "tools/captures", "tools/tests"],
+  "workspace.checkThirdParty": false
+}

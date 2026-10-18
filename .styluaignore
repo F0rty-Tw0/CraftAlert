@@ -1,0 +1,4 @@
+# Local-only probe files (git-ignored) must not reach the format check.
+tools/Probe/
+tools/captures/
+tools/tests/fixtures/
