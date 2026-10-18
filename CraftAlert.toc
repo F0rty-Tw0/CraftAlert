@@ -25,4 +25,5 @@ Core/ChatPrint.lua
 Core/EventRouter.lua
 Core/PlayerName.lua
 Persistence/Defaults.lua
+Persistence/Schema.lua
 Bootstrap.lua
