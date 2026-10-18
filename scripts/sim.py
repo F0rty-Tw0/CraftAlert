@@ -26,8 +26,10 @@ def main():
 
     lua = LuaRuntime(unpack_returned_tuples=True)
 
-    # Same shim as run_test.py: require("CraftAlert.Core.X") resolves to <root>/Core/X.lua.
+    # Same shim as run_test.py: require("CraftAlert.Core.X") resolves to <root>/Core/X.lua,
+    # and the "C" locale keeps string.lower ASCII-only as in WoW (see run_test.py).
     lua.execute(f"""
+        os.setlocale("C")
         package.path = "{root}/?.lua;{root}/?/init.lua;" .. package.path
 
         local rawRequire = require
