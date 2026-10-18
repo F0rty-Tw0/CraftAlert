@@ -24,4 +24,5 @@ Core/Localization.lua
 Core/ChatPrint.lua
 Core/EventRouter.lua
 Core/PlayerName.lua
+Persistence/Defaults.lua
 Bootstrap.lua
