@@ -45,6 +45,8 @@ return function()
     handle:close()
   end
 
+  -- A failed listing command returns nothing, which would pass vacuously.
+  assert(#listLua("Core") > 0, "listing found no Lua files under Core")
   for _, dir in ipairs(ADDON_DIRS) do
     for _, path in ipairs(listLua(dir)) do
       if not isFolderModuleStub(path) then
