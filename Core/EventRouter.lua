@@ -53,10 +53,12 @@ function EventRouter.On(event, fn)
     copy[i] = list[i]
   end
   copy[#copy + 1] = fn
-  handlers[event] = copy
+  -- Register before storing: clients throw on unknown events, and a stored
+  -- handler would make every later On skip registration for good.
   if #copy == 1 then
     getFrame():RegisterEvent(event)
   end
+  handlers[event] = copy
 end
 
 function EventRouter.Off(event, fn)

@@ -115,8 +115,34 @@ local function testFailingHandlerDoesNotBlockOthers()
   end, "boom")
 end
 
+local function testFailedRegisterKeepsNoHandler()
+  local EventRouter = newRouter()
+  local failing = true
+  local createFrame = rawget(_G, "CreateFrame")
+  Wow.stub("CreateFrame", function(...)
+    local frame = createFrame(...)
+    local register = frame.RegisterEvent
+    function frame:RegisterEvent(event)
+      if failing then
+        error('Attempt to register unknown event "' .. event .. '"')
+      end
+      return register(self, event)
+    end
+    return frame
+  end)
+  local function handler() end
+
+  Assert.raises(function()
+    EventRouter.On("CLUB_STREAM_ADDED", handler)
+  end, "unknown event")
+  failing = false
+  EventRouter.On("CLUB_STREAM_ADDED", handler)
+  Assert.truthy(routerFrame():IsEventRegistered("CLUB_STREAM_ADDED"), "retry registers")
+end
+
 return function()
   testRegistersOnlyWhileHandlersExist()
+  testFailedRegisterKeepsNoHandler()
   testDispatchOrderAndArguments()
   testSameHandlerRegistersOnce()
   testChangesDuringDispatch()
