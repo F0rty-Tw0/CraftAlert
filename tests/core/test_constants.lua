@@ -5,15 +5,6 @@ local FLAVOR_KEYS = { "retail", "forever", "era", "tbc", "wrath", "cata", "mop" 
 local SHIPPED_SOUND_KITS = { 8959, 3081, 5274, 12867, 8960 }
 local CHANNEL_FIELDS = { "trade", "services", "general", "lfg", "guild", "communities" }
 
-local function contains(list, value)
-  for _, item in ipairs(list) do
-    if item == value then
-      return true
-    end
-  end
-  return false
-end
-
 return function()
   Assert.equal(type(Constants.version), "string")
 
@@ -65,9 +56,7 @@ return function()
   end
 
   -- §6.3 default word lists and §6.4 ambiguous slot words.
-  for _, word in ipairs({ "lf", "lfc", "wtb", "need", "needs", "looking", "anyone", "who", "recraft" }) do
-    Assert.truthy(contains(Constants.intentWords, word), "intent word " .. word)
-  end
+  Assert.same(Constants.intentWords, { "lf", "lfc", "wtb", "need", "needs", "looking", "anyone", "who", "recraft" })
   Assert.same(Constants.blockerWords, { "wts", "lfw", "selling" })
   Assert.same(Constants.ambiguousWords, { "legs", "head", "hands", "feet" })
 end
