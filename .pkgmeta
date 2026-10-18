@@ -1,0 +1,25 @@
+package-as: CraftAlert
+enable-toc-creation: yes
+
+ignore:
+  - .github
+  - .claude
+  - tests
+  - scripts
+  - docs
+  - tools
+  - .editorconfig
+  - .gitignore
+  - .gitattributes
+  - .luacheckrc
+  - .luarc.json
+  - .styluaignore
+  - stylua.toml
+  - README.md
+  - CHANGELOG.md
+  - "*/init.lua"
+  - "*/*/init.lua"
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
