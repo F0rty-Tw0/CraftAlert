@@ -26,6 +26,15 @@ return function()
   rawget(_G, "SendChatMessage")("hi", "WHISPER", nil, "Bob-Realm")
   Assert.equal(lines[#lines], "send: SendChatMessage hi | WHISPER | nil | Bob-Realm")
 
+  -- Each chat line reports its normalized sender; --sender applies to the next line only.
+  local senders = Sim.Run({ "--sender", "Zoë-Kel'Thuzad", "LF belt", "LF boots", "--sender", "Bob-Area 52", "LF ring" })
+  Assert.same({ senders[2], senders[3], senders[4] }, {
+    "sender: Zoë-Kel'Thuzad",
+    "sender: Customer-OtherRealm",
+    "sender: Bob-Area52",
+  })
+  Assert.equal(Sim.Run({ "--sender", "Bob", "hi" })[2], "sender: Bob-OwnRealm")
+
   local unknownFlag = Sim.Run({ "--nope" })
   Assert.equal(#unknownFlag, 1)
   assert(string.find(tostring(unknownFlag[1]), "^error: unknown flag"), unknownFlag[1])

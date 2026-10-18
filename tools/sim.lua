@@ -10,6 +10,8 @@ local Wow = require("tests.helpers.wow")
 local Toc = require("tests.helpers.toc")
 
 local DEFAULT_SENDER = "Customer-OtherRealm"
+local OWN_NAME = "Crafter"
+local OWN_REALM = "OwnRealm"
 local DEFAULT_FLAVOR = "retail"
 local CLICK_BUTTONS = { left = true, shift = true, ctrl = true, right = true }
 local ON_OFF = { on = true, off = false }
@@ -157,6 +159,16 @@ local function newContext(plan, out)
   Wow.stub("IsResting", function()
     return ctx.resting
   end)
+  -- The player is the fixture's Crafter-OwnRealm.
+  Wow.stub("UnitName", function()
+    return OWN_NAME
+  end)
+  Wow.stub("GetNormalizedRealmName", function()
+    return OWN_REALM
+  end)
+  Wow.stub("GetRealmName", function()
+    return OWN_REALM
+  end)
   return ctx
 end
 
@@ -165,6 +177,7 @@ end
 local function start(ctx)
   if not ctx.started then
     ctx.started = true
+    ctx.ns.PlayerName.Init()
   end
 end
 
@@ -177,6 +190,7 @@ end
 function STEPS.line(ctx, step)
   start(ctx)
   ctx.lastLine = { text = step.text, sender = ctx.sender }
+  ctx.out[#ctx.out + 1] = "sender: " .. tostring(ctx.ns.PlayerName.Normalize(ctx.sender))
   ctx.sender = DEFAULT_SENDER
 end
 
