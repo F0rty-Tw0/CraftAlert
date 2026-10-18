@@ -1,0 +1,15 @@
+dist/
+*.zip
+docs/
+.env
+.claude
+.release
+.tools/
+.tmp_luals/
+__pycache__/
+/CLAUDE.md
+tools/captures/
+tools/Probe/
+tools/probe_*.py
+tools/tests/test_probe_report.py
+tools/tests/fixtures/probe_db*.lua
