@@ -20,4 +20,5 @@
 
 Core/FlavorCompat.lua
 Core/Constants.lua
+Core/Localization.lua
 Bootstrap.lua
