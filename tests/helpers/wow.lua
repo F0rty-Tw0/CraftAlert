@@ -129,6 +129,7 @@ local function installDefaults()
   Wow.stub("time", function()
     return Wow.clock.time
   end)
+  Wow.stub("date", os.date) -- WoW's global date() is os.date
   Wow.stub("debugprofilestop", function()
     return Wow.clock.profile
   end)

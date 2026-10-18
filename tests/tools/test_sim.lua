@@ -1,6 +1,16 @@
 local Assert = require("tests.helpers.assert")
 local Toc = require("tests.helpers.toc")
 
+-- The lines a run printed after its `db:` line: what the steps themselves produced.
+local function stepLines(lines)
+  for index, line in ipairs(lines) do
+    if string.find(line, "^db: ") then
+      return { unpack(lines, index + 1) }
+    end
+  end
+  error("no db: line in " .. table.concat(lines, " / "))
+end
+
 return function()
   _G.CRAFTALERT_SIM_NO_MAIN = true
   local Sim = dofile("tools/sim.lua")
@@ -27,13 +37,13 @@ return function()
   Assert.equal(lines[#lines], "send: SendChatMessage hi | WHISPER | nil | Bob-Realm")
 
   -- Each chat line reports its normalized sender; --sender applies to the next line only.
-  local senders = Sim.Run({ "--sender", "Zoë-Kel'Thuzad", "LF belt", "LF boots", "--sender", "Bob-Area 52", "LF ring" })
-  Assert.same({ senders[2], senders[3], senders[4] }, {
+  local senders = stepLines(Sim.Run({ "--sender", "Zoë-Kel'Thuzad", "LF belt", "LF boots", "--sender", "Bob-Area 52", "LF ring" }))
+  Assert.same({ senders[1], senders[2], senders[3] }, {
     "sender: Zoë-Kel'Thuzad",
     "sender: Customer-OtherRealm",
     "sender: Bob-Area52",
   })
-  Assert.equal(Sim.Run({ "--sender", "Bob", "hi" })[2], "sender: Bob-OwnRealm")
+  Assert.equal(stepLines(Sim.Run({ "--sender", "Bob", "hi" }))[1], "sender: Bob-OwnRealm")
 
   local unknownFlag = Sim.Run({ "--nope" })
   Assert.equal(#unknownFlag, 1)
@@ -59,5 +69,13 @@ return function()
   Assert.equal(rawget(_G, "IsResting")(), true)
 
   -- Commands without a registered handler report it instead of crashing.
-  assert(string.find(tostring(Sim.Run({ "--cmd", "/ca" })[2]), "^error: no slash handler"))
+  assert(string.find(tostring(stepLines(Sim.Run({ "--cmd", "/ca" }))[1]), "^error: no slash handler"))
+
+  -- The account DB goes through SavedState.Load first: one `db:` line, preceded by one
+  -- `chat:` line per Schema warning.
+  Assert.equal(Sim.Run({})[2], "db: schema=1 characters=2 recipes=6 leads=0")
+  local newer = Sim.Run({ "--db", "tests/fixtures/db_schema2.lua" })
+  Assert.equal(#newer, 3)
+  assert(string.find(newer[2], "^chat: Craft Alert: .*newer"), newer[2])
+  Assert.equal(newer[3], "db: schema=2 characters=1 recipes=2 leads=100")
 end
