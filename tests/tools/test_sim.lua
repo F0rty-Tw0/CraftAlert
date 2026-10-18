@@ -1,4 +1,5 @@
 local Assert = require("tests.helpers.assert")
+local Toc = require("tests.helpers.toc")
 
 return function()
   _G.CRAFTALERT_SIM_NO_MAIN = true
@@ -8,6 +9,22 @@ return function()
   assert(string.match(header, "^sim: flavor=retail modules=%d+$"), "bad header: " .. tostring(header))
 
   Assert.equal(Sim.Run({ "--flavor", "tbc" })[1], (string.gsub(header, "retail", "tbc")))
+
+  -- The header's flavor comes from FlavorCompat, fed only by the build stubs.
+  for _, key in ipairs({ "retail", "forever", "era", "tbc", "wrath", "cata", "mop" }) do
+    Assert.equal(Sim.Run({ "--flavor", key })[1], string.format("sim: flavor=%s modules=%d", key, #Toc.luaFiles()))
+    Assert.equal(Sim.lastNs.FlavorCompat.flavorKey, key)
+  end
+  Sim.Run({ "--flavor", "forever" })
+  Assert.truthy(rawget(_G, "WOW_PROJECT_CAMELOT"))
+  Assert.equal(rawget(_G, "WOW_PROJECT_CAMELOT"), rawget(_G, "WOW_PROJECT_ID"))
+
+  -- Chat prints and sends land in the returned lines (the table stays live after Run).
+  local lines = Sim.Run({})
+  Sim.lastNs.ChatPrint.Line("hello")
+  Assert.equal(lines[#lines], "chat: Craft Alert: hello")
+  rawget(_G, "SendChatMessage")("hi", "WHISPER", nil, "Bob-Realm")
+  Assert.equal(lines[#lines], "send: SendChatMessage hi | WHISPER | nil | Bob-Realm")
 
   local unknownFlag = Sim.Run({ "--nope" })
   Assert.equal(#unknownFlag, 1)

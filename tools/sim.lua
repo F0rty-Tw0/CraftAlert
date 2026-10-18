@@ -16,6 +16,9 @@ local ON_OFF = { on = true, off = false }
 
 local Sim = {}
 
+-- The shared ns of the most recent Run, for tests and ad-hoc inspection.
+Sim.lastNs = nil
+
 -- Flags taking exactly one value; the parser checks the value where it is not free text.
 local ONE_VALUE = { "--flavor", "--db", "--sender", "--cmd", "--click", "--afk", "--resting" }
 
@@ -124,7 +127,7 @@ local function captureOutput(out)
   Wow.stub("ChatFrameUtil", { SendTellWithMessage = sender("SendTellWithMessage"), SendTell = sender("SendTell") })
   Wow.stub("DEFAULT_CHAT_FRAME", {
     AddMessage = function(_, text)
-      out[#out + 1] = "chat: " .. text
+      out[#out + 1] = "chat: " .. string.gsub(string.gsub(text, "|c%x%x%x%x%x%x%x%x", ""), "|r", "")
     end,
   })
 end
@@ -234,7 +237,8 @@ function Sim.Run(argv)
   if not moduleCount then
     return { "error: module load failed: " .. tostring(loadError) }
   end
-  out[1] = string.format("sim: flavor=%s modules=%d", ctx.flavor, moduleCount)
+  Sim.lastNs = ctx.ns
+  out[1] = string.format("sim: flavor=%s modules=%d", ctx.ns.FlavorCompat.flavorKey, moduleCount)
 
   for _, step in ipairs(plan.steps) do
     STEPS[step.kind](ctx, step)
