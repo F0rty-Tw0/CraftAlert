@@ -124,15 +124,23 @@ local function fixRecords(map, keyOk, fixOne)
   return map
 end
 
--- Array of values that pass valueOk, as a new array; nil when `list` is not a table.
+-- Array of values that pass valueOk, as a new array in key order; nil when `list` is not a
+-- table. Walks every numeric key, not ipairs, so a hole (`leads[1] = nil`) keeps the rest.
 local function fixList(list, valueOk)
   if type(list) ~= "table" then
     return nil
   end
+  local keys = {}
+  for key in pairs(list) do
+    if type(key) == "number" then
+      keys[#keys + 1] = key
+    end
+  end
+  table.sort(keys)
   local kept = {}
-  for _, value in ipairs(list) do
-    if valueOk(value) then
-      kept[#kept + 1] = value
+  for _, key in ipairs(keys) do
+    if valueOk(list[key]) then
+      kept[#kept + 1] = list[key]
     end
   end
   return kept
@@ -234,7 +242,7 @@ end
 local function warnNewer(version)
   ChatPrint.Line(
     Localization.Text(
-      "Your saved data comes from a newer Craft Alert (schema %s). It is kept as is; update Craft Alert to use it fully.",
+      "Your saved data comes from a newer Craft Alert (schema %s). Fields this version does not know are kept; update Craft Alert to use them.",
       tostring(version)
     )
   )

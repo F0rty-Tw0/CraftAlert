@@ -212,6 +212,17 @@ local function testLedgerRecentIgnoredLeadsUi()
   Assert.same(db.ui, { toast = { point = "TOP", x = 1 }, launcher = {} })
 end
 
+-- A list with a hole (an entry set to nil) keeps every entry after it, in key order.
+local function testListWithHoles()
+  local Schema = load()
+  local db = Schema.Validate({
+    leads = { [2] = { customer = "A-Realm", time = 10 }, [3] = { customer = "B-Realm", time = 20 } },
+  })
+  Assert.equal(#db.leads, 2)
+  Assert.equal(db.leads[1].customer, "A-Realm")
+  Assert.equal(db.leads[2].customer, "B-Realm")
+end
+
 -- Review Focus 5: a newer schema loads, keeps its data, and warns once.
 local function testNewerSchema()
   local Schema = load()
@@ -232,6 +243,8 @@ local function testNewerSchema()
   Assert.equal(#printedLines(), 1)
   Assert.truthy(string.find(printedLines()[1], "newer", 1, true))
   Assert.truthy(string.find(printedLines()[1], "2", 1, true))
+  -- Known fields were repaired (toastDuration clamped), so the warning must not claim "as is".
+  Assert.falsy(string.find(printedLines()[1], "as is", 1, true))
 end
 
 local function testOlderSchemaIsRaisedAndNoWarning()
@@ -259,6 +272,7 @@ return function()
   testCharactersUnknownKeysAndBadRecords()
   testImportCharacter()
   testLedgerRecentIgnoredLeadsUi()
+  testListWithHoles()
   testNewerSchema()
   testOlderSchemaIsRaisedAndNoWarning()
   testIdempotent()
