@@ -28,4 +28,6 @@ Persistence/Defaults.lua
 Persistence/Schema.lua
 Persistence/SavedState.lua
 Model/Tokenizer.lua
+Model/Slang.lua
+Model/ItemKeywords.lua
 Bootstrap.lua
