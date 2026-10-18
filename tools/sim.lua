@@ -181,6 +181,26 @@ local function start(ctx)
   end
 end
 
+local function count(map)
+  local total = 0
+  for _ in pairs(map) do
+    total = total + 1
+  end
+  return total
+end
+
+-- The account DB goes through SavedState.Load exactly as at ADDON_LOADED; Schema warnings
+-- arrive as `chat:` lines just before the summary.
+local function bindDb(ctx)
+  local db = ctx.ns.SavedState.Load()
+  local recipes = 0
+  for _, character in pairs(db.characters) do
+    recipes = recipes + count(character.recipes)
+  end
+  ctx.out[#ctx.out + 1] =
+    string.format("db: schema=%s characters=%d recipes=%d leads=%d", tostring(db.schema), count(db.characters), recipes, #db.leads)
+end
+
 local STEPS = {}
 
 function STEPS.sender(ctx, step)
@@ -253,6 +273,7 @@ function Sim.Run(argv)
   end
   Sim.lastNs = ctx.ns
   out[1] = string.format("sim: flavor=%s modules=%d", ctx.ns.FlavorCompat.flavorKey, moduleCount)
+  bindDb(ctx)
 
   for _, step in ipairs(plan.steps) do
     STEPS[step.kind](ctx, step)
