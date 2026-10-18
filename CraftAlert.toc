@@ -31,4 +31,5 @@ Model/Tokenizer.lua
 Model/Slang.lua
 Model/ItemKeywords.lua
 Model/ProfessionWords.lua
+Model/Index.lua
 Bootstrap.lua

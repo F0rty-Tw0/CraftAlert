@@ -38,6 +38,7 @@ local intentCount = 0
 local tokens = {}
 local itemIDs = {}
 local linkNames = {}
+Tokenizer.WORD = WORD -- Index normalizes recipe phrases with the same word class
 Tokenizer.tokens = tokens
 Tokenizer.itemIDs = itemIDs
 Tokenizer.linkNames = linkNames
