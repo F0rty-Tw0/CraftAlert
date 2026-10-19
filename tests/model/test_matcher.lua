@@ -145,7 +145,7 @@ local function testTypoPass()
   fixture(ns)
   expect(ns, "lf mongose", "item:enchant weapon - mongoose", "distance 1")
   expect(ns, "lf mnogoose", "item:enchant weapon - mongoose", "a swap counts 1")
-  expect(ns, "lf lionhaert", "item:lionheart helm")
+  expect(ns, "lf lionhaert", "stop:nomatch", "a kind-c alias by typo needs a second word")
   expect(ns, "lf mangose", "stop:nomatch", "distance 2 on a 7-letter token")
   expect(ns, "lf mangoosee", "stop:nomatch", "distance 2 on 8+ letters too")
   expect(ns, "any tilor can help pls", "profession:" .. TAILOR)
@@ -209,7 +209,7 @@ local function testOldIndexReleased()
   end
   for _, line in ipairs({
     "lf green iron hauberk",
-    "lf fierry weapon",
+    "lf mongose",
     "lf tailr",
     "lf chest 8stam",
     "lf mail feet",

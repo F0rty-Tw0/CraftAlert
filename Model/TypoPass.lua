@@ -139,26 +139,34 @@ local function eligible(index, token, length)
     and ProfessionKeyFor(token, false) == nil
 end
 
-local function keep(token)
-  TypoPass.whyCount = TypoPass.whyCount + 1
-  TypoPass.why[TypoPass.whyCount] = token
+-- Keeps the token's hits; a kind-c alias only with a companion (§6.2 item 1). The token is a
+-- why token when it kept something.
+local function keep(token, kindC, companion)
   local records, profs, profTokens = TypoPass.records, TypoPass.profs, TypoPass.profTokens
+  local kept = false
   for k = 1, tokenHitCount do
     local value = tokenHits[k]
-    if type(value) == "table" then
-      TypoPass.recordCount = TypoPass.recordCount + 1
-      records[TypoPass.recordCount] = value
-    else
+    if type(value) ~= "table" then
       TypoPass.profCount = TypoPass.profCount + 1
       profs[TypoPass.profCount] = value
       profTokens[TypoPass.profCount] = token
+      kept = true
+    elseif companion or not kindC[value] then
+      TypoPass.recordCount = TypoPass.recordCount + 1
+      records[TypoPass.recordCount] = value
+      kept = true
     end
+  end
+  if kept then
+    TypoPass.whyCount = TypoPass.whyCount + 1
+    TypoPass.why[TypoPass.whyCount] = token
   end
 end
 
 -- Tries the first MAX_TOKENS eligible tokens of tokens[1..count]; per token only the hits
--- at its smallest distance count. → the number of alias records hit.
-function TypoPass.Run(index, tokens, count)
+-- at its smallest distance count. companion: the line has a wordIndex word or a step 4.2
+-- hit, so kind-c aliases count. → the number of alias records hit.
+function TypoPass.Run(index, tokens, count, companion)
   TypoPass.recordCount, TypoPass.profCount, TypoPass.whyCount = 0, 0, 0
   local typoBuckets = index.typoBuckets
   local tried = 0
@@ -169,7 +177,7 @@ function TypoPass.Run(index, tokens, count)
       tried = tried + 1
       local byLength = typoBuckets[byte(token, 1)]
       if byLength and nearest(token, length, byLength) > 0 then
-        keep(token)
+        keep(token, index.kindC, companion)
       end
     end
   end

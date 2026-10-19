@@ -193,6 +193,17 @@ local function phrasesAt(i)
   end
 end
 
+-- Whether a token of the last Run's line is a wordIndex word.
+function PhraseMatch.HasIndexWord()
+  local wordIndex = index.wordIndex
+  for i = 1, tokenCount do
+    if wordIndex[tokens[i]] then
+      return true
+    end
+  end
+  return false
+end
+
 -- Step 4.2 on the tokenized line (Tokenizer buffers). → "match", "set" (several recipes,
 -- left in Candidates; PhraseMatch.why[1..whyCount] holds their why tokens) or nil.
 function PhraseMatch.Run(newIndex, count, intentToken)
@@ -213,6 +224,11 @@ function PhraseMatch.Run(newIndex, count, intentToken)
     if record then
       addHit(record, record.wordCount, record.phrase, nil)
     end
+  end
+  -- §6.2 item 1 (c): a kind-c alias matched by one token, alone among the hits, needs a
+  -- wordIndex word in the line (a join pair covers 2 tokens, so it is never dropped here).
+  if hitCount == 1 and hitLength == 1 and index.kindC[hits[1]] and not PhraseMatch.HasIndexWord() then
+    hitCount, hitWhyCount = 0, 0
   end
   PhraseMatch.whyCount = hitWhyCount
   if hitCount == 0 then

@@ -66,6 +66,29 @@ local function testAliasKinds()
   Assert.same(groups(byPhrase.mongoose), { "enchant weapon - mongoose" })
   Assert.equal(byPhrase["green iron hauberk"].wordCount, 3)
   Assert.equal(byPhrase.lionheart.wordCount, 1)
+  -- kindC: the kind-c-only aliases ("mongoose" is also kind a).
+  local kindC = {}
+  for record in pairs(index.kindC) do
+    kindC[#kindC + 1] = record.phrase
+  end
+  table.sort(kindC)
+  Assert.same(kindC, { "fiery", "hauberk", "leggings", "lionheart" })
+end
+
+-- A phrase that one name makes as kind c and another (same group) as kind a is not kind c,
+-- in either build order (characters build in sorted key order).
+local function testKindCOnlyWhenEveryNameAgrees()
+  local ns = Fixture.load()
+  local names = { "Lionheart Helm", "Enchant Helm - Lionheart" }
+  for _, first in ipairs({ 1, 2 }) do
+    local db = ns.Defaults.Db()
+    db.characters["A-Realm"] = Fixture.character({ BS }, { [1] = { item = 900, name = names[first], prof = BS } })
+    db.characters["B-Realm"] = Fixture.character({ BS }, { [1] = { item = 900, name = names[3 - first], prof = BS } })
+    local index = ns.Index.Build(db, db.settings, { ownKey = "Me-Realm" })
+    local lionheart = records(index).lionheart
+    Assert.truthy(lionheart)
+    Assert.equal(index.kindC[lionheart], nil, "lionheart, " .. names[first] .. " first")
+  end
 end
 
 -- §6.2 item 2: all-guard aliases are never made (stop, slang, weapon, stat, profession words).
@@ -254,6 +277,7 @@ end
 
 return function()
   testAliasKinds()
+  testKindCOnlyWhenEveryNameAgrees()
   testGuard()
   testPhraseSetAndSharing()
   testJoinIndex()

@@ -81,7 +81,7 @@ local function testRunFindsEveryNearTarget()
         want[word] = true
       end
     end
-    ns.TypoPass.Run(index, { token }, 1)
+    ns.TypoPass.Run(index, { token }, 1, true)
     local got = {}
     for k = 1, ns.TypoPass.recordCount do
       got[ns.TypoPass.records[k].phrase] = true

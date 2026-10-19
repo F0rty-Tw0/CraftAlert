@@ -132,9 +132,10 @@ local function matchWords(hasSet)
   return WordGroups.Match(index, tokens, tokenCount, intentToken, hasSet, PhraseMatch.why, PhraseMatch.whyCount)
 end
 
--- Step 4.5: the typo pass, only after steps 4.1-4.4 found nothing.
-local function matchTypos()
-  if TypoPass.Run(index, tokens, tokenCount) == 0 then
+-- Step 4.5: the typo pass, only after steps 4.1-4.4 found nothing. hasPhrase: step 4.2 kept
+-- a hit, which (like a wordIndex word) lets kind-c aliases count (§6.2 item 1).
+local function matchTypos(hasPhrase)
+  if TypoPass.Run(index, tokens, tokenCount, hasPhrase or PhraseMatch.HasIndexWord()) == 0 then
     return false
   end
   Candidates.FromRecords(TypoPass.records, TypoPass.recordCount)
@@ -170,7 +171,8 @@ local function matchTokens()
   if phrases == "match" then
     return true
   end
-  return matchStatSlot() or matchWords(phrases == "set") or matchTypos() or matchProfessionWord()
+  local hasSet = phrases == "set"
+  return matchStatSlot() or matchWords(hasSet) or matchTypos(hasSet) or matchProfessionWord()
 end
 
 -- Steps 2-4 without the gate (/ca test). → result or nil; lastStop says why.

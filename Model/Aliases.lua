@@ -11,9 +11,9 @@ local StatSlot = ns.StatSlot or require("CraftAlert.Model.StatSlot")
 local PhraseMatch = ns.PhraseMatch or require("CraftAlert.Model.PhraseMatch")
 
 -- Spec §6.2 "Short names, typos and stat + slot": the phrase records behind nameIndex and the
--- structures built from them (phraseSet, joinIndex; PhraseMatch files each record by shape,
--- StatSlot fills statSlotIndex, and TypoPass builds typoBuckets from the same records). Runs inside Index.Build only, never per chat line, so
--- it may allocate freely.
+-- structures built from them (phraseSet, kindC, joinIndex; PhraseMatch files each record by
+-- shape, StatSlot fills statSlotIndex, and TypoPass builds typoBuckets from the same records).
+-- Runs inside Index.Build only, never per chat line, so it may allocate freely.
 local Aliases = {}
 
 local pairs = pairs
@@ -96,9 +96,9 @@ local function guarded(guard, words, first, last)
   return true
 end
 
--- Appends words[first..last] to list as (phrase, first word, word count) when it is a new,
--- unguarded alias.
-local function addAlias(list, seen, guard, words, first, last)
+-- Appends words[first..last] to list as (phrase, first word, word count, kind c) when it is a
+-- new, unguarded alias.
+local function addAlias(list, seen, guard, words, first, last, kindC)
   if guarded(guard, words, first, last) then
     return
   end
@@ -106,28 +106,29 @@ local function addAlias(list, seen, guard, words, first, last)
   if not seen[phrase] then
     seen[phrase] = true
     local n = #list
-    list[n + 1], list[n + 2], list[n + 3] = phrase, words[first], last - first + 1
+    list[n + 1], list[n + 2], list[n + 3], list[n + 4] = phrase, words[first], last - first + 1, kindC
   end
 end
 
--- → alias triples of one recipe name (kinds a, b, c), guarded and without the full name.
+-- → alias quads of one recipe name (kinds a, b, c), guarded and without the full name; a
+-- phrase of two kinds is listed once, as the first.
 local function aliasesOf(name, info, group, owner, guard)
   local list, seen, words = {}, { [info.phrase] = true }, info.words
   local dash = find(name, " - ", 1, true)
   if dash then
     local _, suffix = Aliases.Normalize(sub(name, dash + 3))
     if suffix then
-      addAlias(list, seen, guard, suffix, 1, #suffix) -- kind a
+      addAlias(list, seen, guard, suffix, 1, #suffix, false) -- kind a
     end
   end
   local n = #words
   for k = 2, n - 1 do -- kind b
-    addAlias(list, seen, guard, words, 1, k)
-    addAlias(list, seen, guard, words, n - k + 1, n)
+    addAlias(list, seen, guard, words, 1, k, false)
+    addAlias(list, seen, guard, words, n - k + 1, n, false)
   end
   for k, word in ipairs(words) do -- kind c
     if #word >= MIN_UNIQUE_LETTERS and owner[word] == group then
-      addAlias(list, seen, guard, words, k, k)
+      addAlias(list, seen, guard, words, k, k, true)
     end
   end
   return list
@@ -194,11 +195,23 @@ local function addJoins(index, records)
   end
 end
 
+-- kindC[record] = true: every name that made this alias made it as kind c, so one token
+-- matching it needs a second word in the line (§6.2 item 1, user ruling 2026-10-20). A set,
+-- not a record field: a fifth field would double the hash part of each such record.
+local function markKind(kindC, notKindC, record, isKindC)
+  if not isKindC then
+    kindC[record], notKindC[record] = nil, true
+  elseif not notKindC[record] then
+    kindC[record] = true
+  end
+end
+
 -- names = { { name = lowercase recipe name, entry = entry, pending = true|nil }, ... } in
--- build order. Fills index.nameIndex, phraseSet, phraseIds, phraseKeys, phraseWordRange,
--- joinIndex and statSlotIndex; intentSet and blockerSet must already be set.
+-- build order. Fills index.nameIndex, phraseSet, kindC, phraseIds, phraseKeys,
+-- phraseWordRange, joinIndex and statSlotIndex; intentSet and blockerSet must already be set.
 function Aliases.Build(index, names)
-  index.phraseSet, index.joinIndex = {}, {}
+  index.phraseSet, index.kindC, index.joinIndex = {}, {}, {}
+  local notKindC = {}
   PhraseMatch.Begin(index)
   StatSlot.Begin(index)
   local parsed, fullNames = {}, {}
@@ -223,11 +236,13 @@ function Aliases.Build(index, names)
           info.aliases, info.aliasGroup = aliasesOf(item.name, info, entry.group, owner, guard), entry.group
         end
         local aliases = info.aliases
-        for k = 1, #aliases, 3 do
+        for k = 1, #aliases, 4 do
           -- §6.3 4.2: a full name beats its own alias, so a phrase that is some recipe's full
           -- name holds full-name entries only.
           if not fullNames[aliases[k]] then
-            addEntry(recordFor(index, records, aliases[k], aliases[k + 1], aliases[k + 2], false), entry)
+            local record = recordFor(index, records, aliases[k], aliases[k + 1], aliases[k + 2], false)
+            addEntry(record, entry)
+            markKind(index.kindC, notKindC, record, aliases[k + 3])
           end
         end
         StatSlot.Add(index, item.name, words, entry)
