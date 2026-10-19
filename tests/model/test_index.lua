@@ -366,6 +366,19 @@ local function testAddPending()
   Assert.equal(index.crafterCount, 1)
 end
 
+-- A session learn of a recipe an alt stores joins the alt's group (its item ID), so the two
+-- count as one recipe in step 4.4; a name nobody stores keeps the name as its group.
+local function testPendingSharesStoredGroup()
+  local Index, Defaults = load()
+  local index = build(Index, fixtureDb(Defaults), { ownKey = "Me-Realm", pending = { "thick plate belt", "iron shield" } })
+  local groups = {}
+  for _, entry in ipairs(index.nameIndex.thick[1].entries) do
+    groups[#groups + 1] = entry.character .. ":" .. tostring(entry.group)
+  end
+  Assert.same(groups, { "Alt-Realm:501", "Smith-Realm:501", "Me-Realm:501" })
+  Assert.equal(index.nameIndex.iron[2].entries[1].group, "iron shield")
+end
+
 return function()
   testUnboundFilter()
   testMutedAndDisabledAbsent()
@@ -380,5 +393,6 @@ return function()
   testCombatDeferral()
   testCombatStartsBeforeTimer()
   testAddPending()
+  testPendingSharesStoredGroup()
   Wow.reset()
 end

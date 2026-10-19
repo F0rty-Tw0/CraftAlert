@@ -90,13 +90,20 @@ local function addCharacter(index, ctx, key, character)
   return added
 end
 
--- §5.3: session-only Classic learns match by name, crafted by the current character.
+-- §5.3: session-only Classic learns match by name, crafted by the current character, in the
+-- group an alt stores that name under (its item ID: one recipe in step 4.4), else the name.
 local function addPending(index, ctx, own, pending)
   local ownRecipes = own and own.recipes or {}
-  local added = false
+  local added, storedGroup = false, {}
+  if pending[1] then
+    for _, item in ipairs(ctx.names) do
+      storedGroup[item.name] = storedGroup[item.name] or item.entry.group
+    end
+  end
   for _, name in ipairs(pending) do
     if ownRecipes[name] == nil then
-      addName(ctx, name, { character = index.ownName, recipeKey = name, group = name }, true)
+      local entry = { character = index.ownName, recipeKey = name, group = storedGroup[name] or name }
+      addName(ctx, name, entry, true)
       index.size = index.size + 1
       added = true
     end
