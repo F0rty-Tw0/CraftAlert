@@ -27,16 +27,27 @@ local function candidateCount(byLength, length)
   return total
 end
 
--- A 255-char intent line of near-miss 5-9 letter tokens (each 3 edits from a target with the
--- same first byte and length), densest buckets first, so the typo pass compares deep prefixes
--- against as many targets as possible and never matches.
-function WorstLines.typo(index)
+-- Near misses of a target: its last 3 bytes replaced (5-9 letters), or with keepEnds its
+-- middle (7-12 letters: first 3 and last 2 bytes kept, so both TypoPass byte filters pass).
+local function nearMiss(word, keepEnds)
+  local length = #word
+  if keepEnds and length >= 7 and length <= 12 then
+    return string.sub(word, 1, 3) .. string.rep("q", length - 5) .. string.sub(word, -2)
+  elseif not keepEnds and length >= 5 and length <= 9 then
+    return string.sub(word, 1, length - 3) .. "qqq"
+  end
+end
+
+-- A 255-char intent line of near-miss tokens (each 2+ edits from a target with the same first
+-- byte and length), densest buckets first, so the typo pass compares as many targets as
+-- possible as deep as possible and never matches.
+function WorstLines.typo(index, keepEnds)
   local tokens = {}
   for _, byLength in pairs(index.typoBuckets) do
     for targetLength, bucket in pairs(byLength) do
-      if targetLength >= 5 and targetLength <= 9 then
-        for word in pairs(bucket) do
-          local token = string.sub(word, 1, targetLength - 3) .. "qqq"
+      for word in pairs(bucket) do
+        local token = nearMiss(word, keepEnds)
+        if token then
           tokens[#tokens + 1] = { token = token, cost = candidateCount(byLength, targetLength) }
         end
       end
@@ -94,6 +105,7 @@ function WorstLines.cases(index)
   local fill = WorstLines.fill
   return {
     { "typo", WorstLines.typo(index) },
+    { "typo_ends", WorstLines.typo(index, true) }, -- 4.5: past both byte filters
     { "plate", fill("lf", "plate") }, -- 4.4: one big wordIndex list, repeated
     { "enchant", fill("lf", "enchant") }, -- 4.2: 200 records under one first word
     { "chest1x", fill("lf", "chest 1x") }, -- 4.3: slot words without a stat word

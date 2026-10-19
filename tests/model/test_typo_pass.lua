@@ -57,7 +57,25 @@ local function testDistance()
   end
 end
 
--- The byte prefilter never drops a target within the allowed distance, and only the hits at
+-- Every one-edit variant of word past byte 1 (substitution, deletion, insertion, neighbour
+-- swap) at every position, so edits at both ends of a word are covered.
+local function edits(word)
+  local list = {}
+  for p = 2, #word + 1 do
+    local head, tail = string.sub(word, 1, p - 1), string.sub(word, p)
+    list[#list + 1] = head .. "z" .. tail
+    if p <= #word then
+      list[#list + 1] = head .. "z" .. string.sub(tail, 2)
+      list[#list + 1] = head .. string.sub(tail, 2)
+    end
+    if p < #word then
+      list[#list + 1] = head .. string.sub(tail, 2, 2) .. string.sub(tail, 1, 1) .. string.sub(tail, 3)
+    end
+  end
+  return list
+end
+
+-- The byte prefilters never drop a target within the allowed distance, and only the hits at
 -- a token's smallest distance count.
 local function testRunFindsEveryNearTarget()
   local ns = Fixture.load()
@@ -69,7 +87,15 @@ local function testRunFindsEveryNearTarget()
   end
   ns.TypoPass.Build(index)
   local hitTokens = 0
-  for _, token in ipairs(words(120, 11)) do
+  local tokens = words(120, 11)
+  for k = 1, 8 do
+    for _, token in ipairs(edits(targets[k])) do
+      if #token >= 5 then -- shorter tokens are never tried (§6.2 item 5)
+        tokens[#tokens + 1] = token
+      end
+    end
+  end
+  for _, token in ipairs(tokens) do
     local allowed = 1 -- every length (§6.2 item 5)
     local best = allowed + 1
     for _, word in ipairs(targets) do

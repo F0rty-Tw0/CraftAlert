@@ -94,33 +94,35 @@ local function distance(a, i, la, b, j, lb)
 end
 TypoPass.Distance = distance
 
--- Cheap filter on bytes 2-3 (byte 1 is equal by bucket): false only when the distance from
--- byte 2 on is surely above 1 (equal byte 2, or the one edit at byte 2: substitution,
--- deletion, insertion or swap), so most targets skip distance(). Bytes past the end are nil,
--- and nil == nil keeps the filter a necessary condition at word ends.
-local function mayBeNear(t2, t3, w2, w3)
-  return t2 == w2 or t3 == w3 or t3 == w2 or t2 == w3
-end
-
--- Fills tokenHits with the targets nearest to one token; → their count.
+-- Fills tokenHits with the targets nearest to one token; → their count. Two cheap filters
+-- skip distance() for most targets; each fails only when the distance is surely above 1:
+--   bytes 2-3 (byte 1 is equal by bucket): one of them is equal, or the one edit is at byte 2
+--     (substitution, deletion, insertion or swap); bytes past the end are nil, and nil == nil
+--     keeps the filter a necessary condition at word ends;
+--   the last two bytes: the same, mirrored (OSA distance is the same on reversed strings).
+-- Inline, not a call per target: the call would cost more than the filter.
 local function nearest(token, length, byLength)
   local best = OVER
   local t2, t3 = byte(token, 2, 3)
+  local tLast2, tLast = byte(token, length - 1, length)
   tokenHitCount = 0
   for targetLength = length - 1, length + 1 do
     local bucket = byLength[targetLength]
     if bucket then
       for word, value in next, bucket do
         local w2, w3 = byte(word, 2, 3)
-        if mayBeNear(t2, t3, w2, w3) then
-          -- Same first byte by construction: compare from byte 2.
-          local d = distance(token, 2, length, word, 2, targetLength)
-          if d < best then
-            best, tokenHitCount = d, 0
-          end
-          if d == best and d < OVER then
-            tokenHitCount = tokenHitCount + 1
-            tokenHits[tokenHitCount] = value
+        if t2 == w2 or t3 == w3 or t3 == w2 or t2 == w3 then
+          local wLast2, wLast = byte(word, targetLength - 1, targetLength)
+          if tLast == wLast or tLast2 == wLast2 or tLast == wLast2 or tLast2 == wLast then
+            -- Same first byte by construction: compare from byte 2.
+            local d = distance(token, 2, length, word, 2, targetLength)
+            if d < best then
+              best, tokenHitCount = d, 0
+            end
+            if d == best and d < OVER then
+              tokenHitCount = tokenHitCount + 1
+              tokenHits[tokenHitCount] = value
+            end
           end
         end
       end
