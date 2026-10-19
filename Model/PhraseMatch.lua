@@ -35,12 +35,16 @@ local tokenAt = {} -- tokenAt[i]: position of token i in padded; [tokenCount + 1
 local hits, hitCount, hitLength = {}, 0, 0
 local hitWhy, hitWhyCount = {}, 0
 PhraseMatch.why, PhraseMatch.whyCount = hitWhy, 0
+-- hitStamp[record] == hitRun: the record is in hits (a new run starts with each line and
+-- with each longer hit), so a repeated hit costs one lookup, not a scan of hits.
+local hitStamp, hitRun = {}, 0
 
 local NO_INDEX = {} -- Run always sets the real one first
 
 -- New index: drop the hits (records) and the index the last Run kept.
 function PhraseMatch.Reset()
   index, hits, hitCount, hitLength = NO_INDEX, {}, 0, 0
+  hitStamp = {}
 end
 
 function PhraseMatch.Begin(newIndex)
@@ -88,13 +92,12 @@ local function addHit(record, length, why1, why2)
     return
   end
   if length > hitLength then
-    hitLength, hitCount, hitWhyCount = length, 0, 0
+    hitLength, hitCount, hitWhyCount, hitRun = length, 0, 0, hitRun + 1
   end
-  for k = 1, hitCount do
-    if hits[k] == record then
-      return
-    end
+  if hitStamp[record] == hitRun then
+    return
   end
+  hitStamp[record] = hitRun
   hitCount = hitCount + 1
   hits[hitCount] = record
   hitWhyCount = hitWhyCount + 1
@@ -125,10 +128,11 @@ local function tryRecord(record, at, from, wordCount)
   end
 end
 
--- A joinIndex record (its phrase starts with token) that token .. right spells.
+-- A joinIndex record (its phrase starts with token and is #token + #right long) that
+-- token .. right spells.
 local function tryJoin(record, i, token, right)
-  local phrase, from = record.phrase, #token + 1
-  if #phrase == from - 1 + #right and phraseAt(phrase, tokenAt[i + 1] - from + 1, from) then
+  local from = #token + 1
+  if phraseAt(record.phrase, tokenAt[i + 1] - from + 1, from) then
     addHit(record, 2, token, right)
   end
 end
@@ -168,11 +172,22 @@ local function phrasesAt(i)
   end
   local found, right = index.joinIndex[token], tokens[i + 1]
   if found and right then
+    -- The length check is inline: a short left side ("ca") is shared by many records, and a
+    -- call per record would cost more than the check. A list is sorted shortest phrase first,
+    -- so the walk stops at the first longer phrase.
+    local total = #token + #right
     if found.phrase then
-      tryJoin(found, i, token, right)
+      if #found.phrase == total then
+        tryJoin(found, i, token, right)
+      end
     else
       for k = 1, #found do
-        tryJoin(found[k], i, token, right)
+        local length = #found[k].phrase
+        if length > total then
+          break
+        elseif length == total then
+          tryJoin(found[k], i, token, right)
+        end
       end
     end
   end
@@ -183,7 +198,7 @@ end
 function PhraseMatch.Run(newIndex, count, intentToken)
   index, tokenCount = newIndex, count
   padded = " " .. Tokenizer.normalized .. " "
-  hitCount, hitLength, hitWhyCount = 0, 0, 0
+  hitCount, hitLength, hitWhyCount, hitRun = 0, 0, 0, hitRun + 1
   local at = 2 -- position of token 1 in padded
   for i = 1, tokenCount do
     tokenAt[i] = at

@@ -22,6 +22,7 @@ local find = string.find
 local sub = string.sub
 local gmatch = string.gmatch
 local concat = table.concat
+local sort = table.sort
 
 local MIN_UNIQUE_LETTERS = 5 -- kind c words
 local MIN_JOIN_LETTERS = 6
@@ -157,9 +158,17 @@ local function recordFor(index, records, phrase, firstWord, wordCount, full)
   return record
 end
 
+local function shorterPhrase(a, b)
+  if #a.phrase ~= #b.phrase then
+    return #a.phrase < #b.phrase
+  end
+  return a.phrase < b.phrase
+end
+
 -- §6.2 item 3: every one-word record of 6+ letters, split with 2+ letters on each side.
--- joinIndex[left] = the record, or a list of the records, whose phrase starts with left (the
--- Matcher checks the right side's bytes): no table and no string per right side.
+-- joinIndex[left] = the record, or a list of the records (shortest phrase first), whose phrase
+-- starts with left (the Matcher checks the right side's bytes): no table and no string per
+-- right side.
 local function addJoins(index, records)
   local joinIndex = index.joinIndex
   for phrase, record in pairs(records) do
@@ -176,6 +185,11 @@ local function addJoins(index, records)
           found[#found + 1] = record
         end
       end
+    end
+  end
+  for _, found in pairs(joinIndex) do
+    if not found.phrase then
+      sort(found, shorterPhrase)
     end
   end
 end
