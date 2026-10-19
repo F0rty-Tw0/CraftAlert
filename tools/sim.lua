@@ -14,6 +14,13 @@ local OWN_NAME = "Crafter"
 local OWN_REALM = "OwnRealm"
 local DEFAULT_FLAVOR = "retail"
 local CLICK_BUTTONS = { left = true, shift = true, ctrl = true, right = true }
+local CHANNEL = "trade" -- every sim chat line arrives on Trade
+-- Item data of the fixture items (tools/sim_fixture.lua) for GetItemInfoInstant:
+-- itemID -> { equipLoc, classID, subclassID }.
+local SIM_ITEMS = {
+  [190001] = { "INVTYPE_WAIST", 4, 4 }, -- Sim Plate Belt: plate belt
+  [190003] = { "", 7, 0 }, -- Sim Iron Reagent: trade goods
+}
 local ON_OFF = { on = true, off = false }
 
 local Sim = {}
@@ -169,32 +176,45 @@ local function newContext(plan, out)
   Wow.stub("GetRealmName", function()
     return OWN_REALM
   end)
+  Wow.stub("C_Item", {
+    GetItemInfoInstant = function(itemID)
+      local item = SIM_ITEMS[itemID]
+      if item then
+        return itemID, "type", "subtype", item[1], 0, item[2], item[3]
+      end
+    end,
+  })
   return ctx
 end
 
--- Runs once before the first chat line, event, command or click: the place where the
--- initial index build and scan evaluation go once those modules exist.
+-- Runs once before the first chat line, event, command or click: the initial index build
+-- (as at PLAYER_LOGIN); scan evaluation joins it once that module exists.
 local function start(ctx)
   if not ctx.started then
     ctx.started = true
-    ctx.ns.PlayerName.Init()
-    -- The default intent list until the matcher exists; then Matcher.SetIndex configures it.
-    ctx.ns.Tokenizer.Configure(ctx.ns.Constants.intentWords)
+    local ns = ctx.ns
+    ns.PlayerName.Init()
+    ns.Index.Configure(ctx.db, {})
+    ns.Index.OnRebuilt(ns.Matcher.SetIndex)
+    ns.Index.OnRebuilt(function(index)
+      ctx.out[#ctx.out + 1] = "index: size=" .. index.size
+    end)
+    ns.Index.Rebuild()
   end
 end
 
--- `prefilter: reject`, or the Tokenizer buffers of a line that passed the intent prefilter.
-local function tokenLine(Tokenizer, text)
-  local lower = Tokenizer.Scan(text)
-  if not lower then
-    return "prefilter: reject"
+-- `match: <kind> group=<group> prof=<prof> why=<a+b+c>` or `stop: <Matcher.lastStop>`.
+local function matchLine(Matcher, text, sender)
+  local result = Matcher.Match(CHANNEL, text, sender)
+  if not result then
+    return "stop: " .. Matcher.lastStop
   end
-  Tokenizer.Tokenize(lower)
-  local ids = {}
-  for i = 1, Tokenizer.itemCount do
-    ids[i] = tostring(Tokenizer.itemIDs[i])
+  local why = {}
+  for i = 1, result.whyCount do
+    why[i] = tostring(result.why[i])
   end
-  return "tokens: " .. Tokenizer.normalized .. " items=" .. table.concat(ids, ",")
+  local group, prof = tostring(result.group), tostring(result.prof)
+  return string.format("match: %s group=%s prof=%s why=%s", result.kind, group, prof, table.concat(why, "+"))
 end
 
 local function count(map)
@@ -209,6 +229,7 @@ end
 -- arrive as `chat:` lines just before the summary.
 local function bindDb(ctx)
   local db = ctx.ns.SavedState.Load()
+  ctx.db = db
   local recipes = 0
   for _, character in pairs(db.characters) do
     recipes = recipes + count(character.recipes)
@@ -227,7 +248,7 @@ function STEPS.line(ctx, step)
   start(ctx)
   ctx.lastLine = { text = step.text, sender = ctx.sender }
   ctx.out[#ctx.out + 1] = "sender: " .. tostring(ctx.ns.PlayerName.Normalize(ctx.sender))
-  ctx.out[#ctx.out + 1] = tokenLine(ctx.ns.Tokenizer, step.text)
+  ctx.out[#ctx.out + 1] = matchLine(ctx.ns.Matcher, step.text, ctx.sender)
   ctx.sender = DEFAULT_SENDER
 end
 
