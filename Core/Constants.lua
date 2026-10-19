@@ -79,8 +79,9 @@ Constants.aliasStopWords = {
   "major",
 }
 
--- §6.4: body-part words that count only next to another slot/type word.
-Constants.ambiguousWords = { "legs", "head", "hands", "feet" }
+-- §6.4: slot words that count only next to another slot/type word or a phrase: body parts,
+-- and "ring" ("ring me when ready", "ring of blood"; user ruling 2026-10-20).
+Constants.ambiguousWords = { "legs", "head", "hands", "feet", "ring" }
 
 -- §7.4: greeting templates. Only Retail has crafting orders to point an alt's customer to.
 local function templates(altItemTail)
