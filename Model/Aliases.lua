@@ -196,6 +196,41 @@ local function addJoins(index, records)
   end
 end
 
+-- Records and itemIndex lists that hold the same entries in the same order share one list:
+-- most aliases list exactly their recipe's entries, so this saves a table per alias (§4.4
+-- index memory). A list is compared with the first list seen that starts with the same entry
+-- (no key strings: the build budget is tight). Every list is read-only once the index is built.
+local function sameEntries(a, b)
+  if #a ~= #b then
+    return false
+  end
+  for k = 2, #a do
+    if a[k] ~= b[k] then
+      return false
+    end
+  end
+  return true
+end
+
+local function shareEntryLists(index, records)
+  local byFirst = {}
+  local function canonical(list)
+    local found = byFirst[list[1]]
+    if found == nil then
+      byFirst[list[1]] = list
+      return list
+    end
+    return sameEntries(found, list) and found or list
+  end
+  local itemIndex = index.itemIndex
+  for itemID, list in pairs(itemIndex) do
+    itemIndex[itemID] = canonical(list)
+  end
+  for _, record in pairs(records) do
+    record.entries = canonical(record.entries)
+  end
+end
+
 -- needsSecondWord[record] = true: one token matching the record counts only beside a second
 -- word in the line (§6.2 item 1, user rulings 2026-10-20). Holds one-word full names, and
 -- aliases that every name made as kind c. A set, not a record field: a fifth field would
@@ -257,6 +292,7 @@ function Aliases.Build(index, names)
   end
   StatSlot.Finish(index)
   addJoins(index, records)
+  shareEntryLists(index, records)
 end
 
 ns.Aliases = Aliases
