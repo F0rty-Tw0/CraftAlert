@@ -136,7 +136,41 @@ local function testRealLines()
   end
 end
 
+-- §6.3 step 2: only the first 64 word tokens are kept; links after them still give their
+-- item ID and link name, and the escapes are still walked (no link text leaks as a token).
+local function testTokenCap()
+  local Tokenizer = load()
+  local words = {}
+  for k = 1, 70 do
+    words[k] = "w" .. k
+  end
+  local line = table.concat(words, " ") .. " |hitem:7|h[thick belt]|h tail |henchant:9|h[mongoose]|h"
+  Assert.equal(Tokenizer.Tokenize(line), 64)
+  Assert.equal(Tokenizer.tokens[64], "w64")
+  Assert.equal(Tokenizer.tokens[65], nil)
+  Assert.equal(Tokenizer.normalized, table.concat(words, " ", 1, 64))
+  Assert.equal(Tokenizer.itemCount, 1)
+  Assert.equal(Tokenizer.itemIDs[1], 7)
+  Assert.same({ Tokenizer.linkNames[1], Tokenizer.linkNames[2] }, { "thick belt", "mongoose" })
+  Assert.equal(Tokenizer.linkNameCount, 2)
+  -- A link inside the first 64 tokens keeps the words after it, up to the cap.
+  Assert.equal(Tokenizer.Tokenize("|hitem:7|h[a b c]|h " .. table.concat(words, " ")), 64)
+  Assert.equal(Tokenizer.tokens[1], "w1")
+end
+
+-- Runs of "||" are literal pipes, skipped whole; an odd last "|" starts the next escape, and
+-- escapes back to back leave nothing behind.
+local function testPipeRuns()
+  local Tokenizer = load()
+  Tokenizer.Tokenize("lf ||||word |||cffff0000red|r ok|r|r|rend")
+  Assert.equal(Tokenizer.normalized, "lf word red ok end")
+  Tokenizer.Tokenize("lf " .. string.rep("||", 200) .. "x")
+  Assert.equal(Tokenizer.normalized, "lf x")
+end
+
 return function()
+  testTokenCap()
+  testPipeRuns()
   testScan()
   testTypedBrackets()
   testLinkShapes()

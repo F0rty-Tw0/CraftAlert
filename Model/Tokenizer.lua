@@ -26,6 +26,7 @@ local WORD = "[%w'\128-\255]+"
 local ITEM_LINK = "^|hitem:(%d+)"
 local ENCHANT_LINK = "^|henchant:"
 local ANY_LINK = "^|h%a+:"
+local MAX_TOKENS = 64 -- word tokens kept per line (§6.3 step 2; bounds the §4.4 per-line max)
 
 local BYTE_A, BYTE_C, BYTE_H, BYTE_K = 97, 99, 104, 107
 local BYTE_N, BYTE_R, BYTE_T, BYTE_BAR = 110, 114, 116, 124
@@ -120,9 +121,8 @@ local function link(s, p)
   return dataEnd + 2
 end
 
--- Position after the escape sequence starting with the `|` at p.
-local function escape(s, p)
-  local code = byte(s, p + 1)
+-- Position after the escape sequence starting with the `|` at p; code is the byte after it.
+local function escape(s, p, code)
   if code == BYTE_H then
     return link(s, p)
   end
@@ -165,15 +165,30 @@ function Tokenizer.Tokenize(lower)
   local afterEnd = #lower + 1
   local i = 1
   local bar = find(lower, "|", 1, true) or afterEnd
+  -- The next word match is kept across escapes and searched again only when an escape ran
+  -- past its start and no escape starts right at i: a search per escape would rescan the rest
+  -- of the line each time (O(n^2) on "||||..."), and escapes back to back ("|r|r...") need none.
+  local first, last = find(lower, WORD, 1)
   while true do
-    local first, last = find(lower, WORD, i)
-    if bar < (first or afterEnd) then
-      i = escape(lower, bar)
+    if first and first < i and bar ~= i then
+      first, last = find(lower, WORD, i)
+    end
+    if bar == i or bar < (first or afterEnd) then
+      local code = byte(lower, bar + 1)
+      if code == BYTE_BAR then -- a run of "||" (literal pipes): one search
+        local run = (find(lower, "[^|]", bar) or afterEnd) - bar
+        i = bar + run - run % 2 -- an odd last "|" starts the next escape
+      else
+        i = escape(lower, bar, code)
+      end
       bar = find(lower, "|", i, true) or afterEnd
-    elseif first then
+    elseif first and (count < MAX_TOKENS or linkEnd) then -- link text leaves the buffer at its |h
       count = count + 1
       tokens[count] = sub(lower, first, last)
       i = last + 1
+      first, last = find(lower, WORD, i)
+    elseif first and bar < afterEnd then
+      i = bar -- full: skip the words up to the next escape, whose links still count
     else
       break
     end
