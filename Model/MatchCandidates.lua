@@ -15,7 +15,7 @@ local HUGE = math.huge
 -- The Matcher's result, reused on every call: callers copy what they keep.
 local result = { kind = nil, entries = {}, entryCount = 0, group = nil, prof = nil, why = {}, whyCount = 0 }
 MatchCandidates.result = result
-MatchCandidates.wordWhy = {} -- step 4.4 why tokens, filled by the Matcher
+MatchCandidates.wordWhy = {} -- step 4.4 why tokens, filled by WordGroups (collect)
 MatchCandidates.count = 0
 
 local candidates = {}

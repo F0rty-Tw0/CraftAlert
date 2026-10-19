@@ -4,7 +4,7 @@ local Fixture = require("tests.helpers.matcher_fixture")
 
 -- Spec §13 "Matcher corpus" and §6.2 item 6: every labeled line of the trade corpus against
 -- the §6.2 item 6 fixture index. The corpus is the only file this test needs beyond the
--- fixture helper; it is reviewed by the user before it is committed (Task 1.8 corpus gate).
+-- fixture helper; the user approved its lines and labels 2026-10-19 (Task 1.8 corpus gate).
 local SENDER = "Customer-Other"
 
 local function outcome(ns, text)
