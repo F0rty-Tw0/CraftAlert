@@ -31,5 +31,11 @@ Model/Tokenizer.lua
 Model/Slang.lua
 Model/ItemKeywords.lua
 Model/ProfessionWords.lua
+Model/StatSlot.lua
+Model/MatchCandidates.lua
+Model/PhraseMatch.lua
+Model/Aliases.lua
+Model/TypoPass.lua
+Model/WordGroups.lua
 Model/Index.lua
 Bootstrap.lua

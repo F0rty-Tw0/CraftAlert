@@ -6,13 +6,17 @@ end
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
-local Tokenizer = ns.Tokenizer or require("CraftAlert.Model.Tokenizer")
 local ItemKeywords = ns.ItemKeywords or require("CraftAlert.Model.ItemKeywords")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
+local Aliases = ns.Aliases or require("CraftAlert.Model.Aliases")
+local TypoPass = ns.TypoPass or require("CraftAlert.Model.TypoPass")
+local WordGroups = ns.WordGroups or require("CraftAlert.Model.WordGroups")
 
 -- Spec §6.2: everything the hot path (§6.3 steps 1-4) reads, built in one pass from the
 -- enabled crafters' listening recipes and the settings, so a chat line never reads
--- CraftAlertDB. Build may allocate and call the item API; it never runs per line.
+-- CraftAlertDB. Build may allocate and call the item API; it never runs per line. Phrase
+-- records, aliases and the join and stat + slot structures come from Aliases, typo targets
+-- from TypoPass, the step 4.4 group structures from WordGroups.
 -- Rebuild requests coalesce into one C_Timer.After(0) and wait out combat (§4.3 rule 1,
 -- §4.4 rule 6).
 local Index = {}
@@ -21,24 +25,9 @@ local pairs = pairs
 local ipairs = ipairs
 local type = type
 local lower = string.lower
-local gmatch = string.gmatch
-local concat = table.concat
 local sort = table.sort
 
 local REGEN_EVENT = "PLAYER_REGEN_ENABLED"
-
--- "Enchant Bracer - Minor Health" -> "enchant bracer minor health", "enchant"; the form
--- Tokenizer.normalized uses. nil for a name without word characters.
-local function normalize(name)
-  local words = {}
-  for word in gmatch(lower(name), Tokenizer.WORD) do
-    words[#words + 1] = word
-  end
-  if #words == 0 then
-    return nil
-  end
-  return concat(words, " "), words[1]
-end
 
 local function append(map, key, value)
   local list = map[key]
@@ -49,16 +38,9 @@ local function append(map, key, value)
   end
 end
 
-local function addName(index, phrases, name, entry)
-  local cached = phrases[name]
-  if cached == nil then
-    local phrase, first = normalize(name)
-    cached = { phrase = phrase, first = first }
-    phrases[name] = cached
-  end
-  if cached.phrase then
-    append(index.nameIndex, cached.first, { phrase = cached.phrase, entry = entry })
-  end
+-- Names go to Aliases.Build after every recipe is seen (kind c needs all names).
+local function addName(ctx, name, entry, pending)
+  ctx.names[#ctx.names + 1] = { name = name, entry = entry, pending = pending }
 end
 
 local function addItem(index, ctx, itemID, entry)
@@ -89,7 +71,7 @@ local function addRecipe(index, ctx, character, recipeKey, recipe)
   for _, rank in ipairs(recipe.ranks or {}) do
     append(index.itemIndex, rank, entry)
   end
-  addName(index, ctx.phrases, name, entry)
+  addName(ctx, name, entry, nil)
   index.size = index.size + 1
 end
 
@@ -114,7 +96,7 @@ local function addPending(index, ctx, own, pending)
   local added = false
   for _, name in ipairs(pending) do
     if ownRecipes[name] == nil then
-      addName(index, ctx.phrases, name, { character = index.ownName, recipeKey = name, group = name })
+      addName(ctx, name, { character = index.ownName, recipeKey = name, group = name }, true)
       index.size = index.size + 1
       added = true
     end
@@ -191,7 +173,7 @@ end
 function Index.Build(db, settings, opts)
   opts = opts or {}
   local index = newIndex(db, settings, opts)
-  local ctx = { settings = settings, phrases = {}, words = {}, professions = {} }
+  local ctx = { settings = settings, names = {}, words = {}, professions = {} }
   local characters = db.characters or {}
   local crafters = {}
   -- Sorted, so entry lists come out in the same order on every build.
@@ -209,6 +191,9 @@ function Index.Build(db, settings, opts)
     index.crafterCount = index.crafterCount + 1
   end
   addProfessionWords(index, ctx.professions)
+  Aliases.Build(index, ctx.names)
+  TypoPass.Build(index)
+  WordGroups.Build(index)
   return index
 end
 

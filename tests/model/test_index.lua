@@ -31,7 +31,18 @@ local function load(flavor)
   for _, path in ipairs({ "Core.FlavorCompat", "Core.Constants", "Core.EventRouter", "Core.PlayerName" }) do
     Fresh.require(path)
   end
-  for _, path in ipairs({ "Model.Tokenizer", "Model.Slang", "Model.ItemKeywords", "Model.ProfessionWords" }) do
+  for _, path in ipairs({
+    "Model.Tokenizer",
+    "Model.Slang",
+    "Model.ItemKeywords",
+    "Model.ProfessionWords",
+    "Model.StatSlot",
+    "Model.MatchCandidates",
+    "Model.PhraseMatch",
+    "Model.Aliases",
+    "Model.TypoPass",
+    "Model.WordGroups",
+  }) do
     Fresh.require(path)
   end
   local Defaults = Fresh.require("Persistence.Defaults")
@@ -142,7 +153,8 @@ local function testSharedEntry()
   local fromRank = index.itemIndex[512][1]
   local fromName = index.nameIndex.iron[1]
   Assert.equal(fromName.phrase, "iron bracers")
-  Assert.truthy(rawequal(fromItem, fromName.entry), "itemIndex and nameIndex share the entry")
+  Assert.truthy(rawequal(fromName, index.phraseSet["iron bracers"]), "nameIndex and phraseSet share the record")
+  Assert.truthy(rawequal(fromItem, fromName.entries[1]), "itemIndex and nameIndex share the entry")
   Assert.truthy(rawequal(fromItem, fromRank), "item and rank share the entry")
   Assert.truthy(rawequal(fromItem, index.wordIndex.bracers[1]), "wordIndex shares the entry")
   Assert.same(fromItem, { character = "Smith-Realm", recipeKey = 1002, group = 502, prof = BS })
@@ -160,8 +172,15 @@ local function testIndexes()
   -- Phrases are normalized like Tokenizer.normalized: runs of non-word characters -> one space.
   local enchant = index.nameIndex.enchant[1]
   Assert.equal(enchant.phrase, "enchant bracer minor health")
-  Assert.same(enchant.entry, { character = "Alt-Realm", recipeKey = 2001, group = "enchant bracer - minor health", prof = ENCH })
-  Assert.equal(#index.nameIndex.thick, 2)
+  Assert.equal(enchant.full, true)
+  Assert.same(enchant.entries, { { character = "Alt-Realm", recipeKey = 2001, group = "enchant bracer - minor health", prof = ENCH } })
+  -- §6.2 item 1: one record per phrase, shared by both characters; aliases follow the full name.
+  local thick = index.nameIndex.thick[1]
+  Assert.equal(thick.phrase, "thick plate belt")
+  Assert.same(characters(thick.entries), { "Alt-Realm", "Smith-Realm" })
+  Assert.truthy(index.phraseSet["thick plate belt"])
+  Assert.equal(index.phraseSet["thick plate"], nil, "aliases are not in phraseSet")
+  Assert.equal(index.nameIndex.thick[2].full, false)
   -- Only professions some enabled crafter has.
   Assert.equal(index.professionWords.bs, BS)
   Assert.equal(index.professionWords.enchanter, ENCH)
@@ -209,7 +228,7 @@ local function testClassicProfessionKeys()
   }
   local index = build(Index, db, { ownKey = "Tai-Realm" })
   Assert.equal(index.professionWords.tailor, "tailoring")
-  Assert.equal(index.nameIndex.bolt[1].entry.group, "bolt of linen cloth")
+  Assert.equal(index.nameIndex.bolt[1].entries[1].group, "bolt of linen cloth")
 end
 
 local function testEmptyIndex()
@@ -339,7 +358,8 @@ local function testAddPending()
   Assert.equal(#index.nameIndex.enchant, 1, "added once")
   local pending = index.nameIndex.enchant[1]
   Assert.equal(pending.phrase, "enchant bracer minor health")
-  Assert.same(pending.entry, { character = "Me-Realm", recipeKey = "enchant bracer - minor health", group = "enchant bracer - minor health" })
+  Assert.same(pending.entries, { { character = "Me-Realm", recipeKey = "enchant bracer - minor health", group = "enchant bracer - minor health" } })
+  Assert.same(index.nameIndex, { enchant = { pending } }, "full-name record only, no aliases")
   Assert.same(index.itemIndex, {})
   Assert.same(index.wordIndex, {})
   Assert.equal(index.size, 1)
