@@ -79,7 +79,7 @@ for _, word in ipairs(Constants.ambiguousWords) do
   Slang.ambiguous[word] = true
 end
 
--- Every word above, for the matcher's "recognized slang word with no entries" rule (§6.3 4.3).
+-- Every word above, for the matcher's "recognized slang word with no entries" rule (§6.3 4.4).
 Slang.wordSet = {}
 local function addWords(words)
   for _, word in ipairs(words) do

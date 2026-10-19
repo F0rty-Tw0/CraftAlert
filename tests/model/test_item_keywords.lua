@@ -139,7 +139,7 @@ local function testAmbiguousFlags()
   Assert.falsy(Slang.ambiguous.plate)
 end
 
--- Matcher step 4.3: a recognized slang word with no index entries still counts.
+-- Matcher step 4.4: a recognized slang word with no index entries still counts.
 local function testWordSet()
   load({})
   local Slang = Fresh.require("Model.Slang")
