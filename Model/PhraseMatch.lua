@@ -139,9 +139,8 @@ end
 
 -- Full names and aliases starting at token i (one phraseKeys lookup per word count: the words
 -- must span exactly #phrase bytes, so only whole words match), then the join pair (i, i + 1).
-local function phrasesAt(i)
-  local token = tokens[i]
-  local id = index.phraseIds[token]
+-- id = phraseIds[token], found = joinIndex[token] (Run looks them up: most tokens have neither).
+local function phrasesAt(i, token, id, found)
   if id then
     local phraseKeys = index.phraseKeys
     local at, from = tokenAt[i], #token + 1
@@ -160,17 +159,17 @@ local function phrasesAt(i)
         break -- longer than any filed phrase (and the key would spill into the next id)
       end
       local shape = ((id * KEY_LENGTHS + stop - at + 1) * KEY_WORDS + wordCount) * KEY_LENGTHS
-      local found = phraseKeys[(shape + (wordCount > 1 and second or 0)) * KEY_BYTES + byte(padded, stop)]
-      if found and found.phrase then
-        tryRecord(found, at, from, wordCount)
-      elseif found then
-        for k = 1, #found do
-          tryRecord(found[k], at, from, wordCount)
+      local keyed = phraseKeys[(shape + (wordCount > 1 and second or 0)) * KEY_BYTES + byte(padded, stop)]
+      if keyed and keyed.phrase then
+        tryRecord(keyed, at, from, wordCount)
+      elseif keyed then
+        for k = 1, #keyed do
+          tryRecord(keyed[k], at, from, wordCount)
         end
       end
     end
   end
-  local found, right = index.joinIndex[token], tokens[i + 1]
+  local right = tokens[i + 1]
   if found and right then
     -- The length check is inline: a short left side ("ca") is shared by many records, and a
     -- call per record would cost more than the check. A list is sorted shortest phrase first,
@@ -216,8 +215,13 @@ function PhraseMatch.Run(newIndex, count, intentToken)
     at = at + #tokens[i] + 1
   end
   tokenAt[tokenCount + 1] = at
+  local phraseIds, joinIndex = index.phraseIds, index.joinIndex
   for i = 1, tokenCount do
-    phrasesAt(i)
+    local token = tokens[i]
+    local id, found = phraseIds[token], joinIndex[token]
+    if id or found then
+      phrasesAt(i, token, id, found)
+    end
   end
   local linked = false
   for k = 1, Tokenizer.linkNameCount do
