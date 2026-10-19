@@ -23,6 +23,11 @@ local find = string.find
 local KEY_LENGTHS = 256 -- a chat line has at most 255 bytes
 local KEY_WORDS = 128
 local KEY_BYTES = 256
+-- The same key expanded, so Run pays the first-word and second-word terms once per position:
+-- id * ID_UNIT + #phrase * LENGTH_UNIT + wordCount * WORDS_UNIT + second * KEY_BYTES + last byte.
+local WORDS_UNIT = KEY_LENGTHS * KEY_BYTES
+local LENGTH_UNIT = KEY_WORDS * WORDS_UNIT
+local ID_UNIT = KEY_LENGTHS * LENGTH_UNIT
 
 local tokens, linkNames = Tokenizer.tokens, Tokenizer.linkNames
 ---@type table
@@ -145,22 +150,25 @@ local function phrasesAt(i, token, id, found)
   if id then
     local phraseKeys = index.phraseKeys
     local at = tokenAt[i]
-    -- A span of 2+ words holds the second word, so a second word of 256+ bytes never reaches
-    -- a key (the span-length break below comes first).
-    local second = i < tokenCount and #tokens[i + 1] or 0
     local range = index.phraseWordRange[id]
     local most = range % KEY_WORDS
     local fewest = (range - most) / KEY_WORDS
     if most > tokenCount - i + 1 then
       most = tokenCount - i + 1
     end
+    -- Key terms but the span's: one word has no second-word term. A span of 2+ words holds the
+    -- second word, so a second word of 256+ bytes never reaches a key (the break comes first).
+    local oneWord = id * ID_UNIT + (1 - at) * LENGTH_UNIT
+    local moreWords = i < tokenCount and oneWord + #tokens[i + 1] * KEY_BYTES or oneWord
+    local base = fewest == 1 and oneWord or moreWords
+    local limit = at + KEY_LENGTHS - 1
     for wordCount = fewest, most do
       local stop = tokenAt[i + wordCount] - 2 -- last byte of the span
-      if stop - at + 1 >= KEY_LENGTHS then
+      if stop >= limit then
         break -- longer than any filed phrase (and the key would spill into the next id)
       end
-      local shape = ((id * KEY_LENGTHS + stop - at + 1) * KEY_WORDS + wordCount) * KEY_LENGTHS
-      local keyed = phraseKeys[(shape + (wordCount > 1 and second or 0)) * KEY_BYTES + byte(padded, stop)]
+      local keyed = phraseKeys[base + stop * LENGTH_UNIT + wordCount * WORDS_UNIT + byte(padded, stop)]
+      base = moreWords -- only the first span can be one word
       if keyed and keyed.phrase then
         tryRecord(keyed, at, wordCount)
       elseif keyed then

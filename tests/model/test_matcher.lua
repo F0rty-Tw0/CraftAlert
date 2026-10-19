@@ -234,6 +234,11 @@ local function testLongSpan()
   ns.Matcher.SetIndex(ns.Index.Build(db, db.settings, { ownKey = "Me-Realm" }))
   expect(ns, "lf aa cc" .. string.rep("x", 255) .. "c", "stop:nomatch")
   expect(ns, "lf aa cc", "item:aa cc")
+  -- The longest filed phrase (255 bytes) still matches.
+  local long = "aa " .. string.rep("c", 252)
+  db.characters["A-Realm"].recipes[3] = { name = long, prof = BS }
+  ns.Matcher.SetIndex(ns.Index.Build(db, db.settings, { ownKey = "Me-Realm" }))
+  expect(ns, "lf " .. long, "item:" .. long)
 end
 
 -- A span of a record's shape (first word, length, word count, second word's length, last byte)
