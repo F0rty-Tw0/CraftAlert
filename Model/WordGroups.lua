@@ -13,6 +13,8 @@ local Candidates = ns.MatchCandidates or require("CraftAlert.Model.MatchCandidat
 --   groupWords[group] = { word = true, ... }: the words whose wordIndex list holds the group,
 --     one shared set per distinct word set (a list holds every entry of a group, because a
 --     group's words come from its item, so membership is a per-group question);
+--   wordSets[word] = { set, ... }: the distinct groupWords sets holding word (a few dozen), so
+--     a line whose words no group has together is rejected without walking a list;
 --   wordInfo[word] = { groupCount, prof, entries, enchanting }: step 4.4's decision for that
 --     word alone, and the same decision over its Enchanting entries only (nil when none).
 -- Every wordIndex list keeps one global entry order (build order), so an intersection walked
@@ -59,11 +61,37 @@ local function buildGroupWords(index)
       end
     end
   end
-  local groupWords = {}
+  local groupWords, wordSets, listed = {}, {}, {}
   for group, node in pairs(nodeOf) do
-    groupWords[group] = node.set
+    local set = node.set
+    groupWords[group] = set
+    if not listed[set] then
+      listed[set] = true
+      for word in pairs(set) do
+        local sets = wordSets[word] or {}
+        wordSets[word] = sets
+        sets[#sets + 1] = set
+      end
+    end
   end
-  index.groupWords = groupWords
+  index.groupWords, index.wordSets = groupWords, wordSets
+end
+
+-- Whether some group has every words[1..n]: one of the word sets of words[k] holds them all.
+local function someGroupHasAll(sets, words, n)
+  for s = 1, #sets do
+    local set, all = sets[s], true
+    for w = 1, n do
+      if not set[words[w]] then
+        all = false
+        break
+      end
+    end
+    if all then
+      return true
+    end
+  end
+  return false
 end
 
 -- Step 4.4 on one list: one recipe → its entries; several → the best profession's entries.
@@ -202,16 +230,26 @@ function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, set
     end
     return info ~= nil and Candidates.DecideWord(intentToken, info, why, whyCount)
   end
-  local smallest = 1
-  for k = 2, lineCount do
-    if #lineLists[k] < #lineLists[smallest] then
-      smallest = k
+  -- Walk the smallest list; with an Enchanting word, the smallest Enchanting-only list (each
+  -- word's precomputed one), so the narrowing never walks a big list of other professions.
+  local smallest, smallestList = 0, nil
+  for k = 1, lineCount do
+    local list = lineLists[k]
+    if enchanting then
+      local info = index.wordInfo[lineWords[k]].enchanting
+      if info == nil then
+        return false -- a word with no Enchanting entry empties the narrowed intersection
+      end
+      list = info.entries
+    end
+    if smallestList == nil or #list < #smallestList then
+      smallest, smallestList = k, list
     end
   end
-  Candidates.FromListWhere(lineLists[smallest], index.groupWords, lineWords, lineCount, smallest)
-  if enchanting then
-    Candidates.KeepProf(index.enchantingKey)
+  if not someGroupHasAll(index.wordSets[lineWords[smallest]], lineWords, lineCount) then
+    return false
   end
+  Candidates.FromListWhere(smallestList, index.groupWords, lineWords, lineCount, smallest)
   return Candidates.count > 0 and Candidates.Decide(intentToken, nil, 0, why, whyCount)
 end
 
