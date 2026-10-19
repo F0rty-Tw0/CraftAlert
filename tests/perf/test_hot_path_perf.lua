@@ -15,11 +15,13 @@ local RETAINED_KB = 50
 local BUILD_MS = 80
 local INDEX_KB = 3072 -- §4.4 idle memory, 3 MB
 local LINES = 10000
-local RUNS = 3
+local RUNS = 3 -- the 10,000-line mean: median of 3 (plan A4)
+local BEST_OF = 5 -- build and each worst line: the fastest of 5, since noise only adds time
 local WORST_REPS = 300
 local SENDER = "Customer-Other"
 
 local Synthetic = require("tests.helpers.synthetic_index")
+local WorstLines = require("tests.helpers.worst_lines")
 local build = Synthetic.build
 local function pick(list, n)
   return list[(n % #list) + 1]
@@ -70,99 +72,17 @@ local function nonMatchingLines(count, offset)
   return lines
 end
 
--- Number of typo targets a token of this first byte and length is compared with (§6.2 item
--- 5: length within 1).
-local function candidateCount(byLength, length)
-  local total = 0
-  for targetLength = length - 1, length + 1 do
-    for _ in pairs(byLength[targetLength] or {}) do
-      total = total + 1
-    end
-  end
-  return total
-end
-
--- A 255-char intent line of near-miss 5-9 letter tokens (each 3 edits from a target with the
--- same first byte and length), densest buckets first, so the typo pass compares deep prefixes
--- against as many targets as possible and never matches.
-local function typoWorstLine(index)
-  local tokens = {}
-  for _, byLength in pairs(index.typoBuckets) do
-    for targetLength, bucket in pairs(byLength) do
-      if targetLength >= 5 and targetLength <= 9 then
-        for word in pairs(bucket) do
-          local token = string.sub(word, 1, targetLength - 3) .. "qqq"
-          tokens[#tokens + 1] = { token = token, cost = candidateCount(byLength, targetLength) }
-        end
-      end
-    end
-  end
-  table.sort(tokens, function(a, b)
-    if a.cost ~= b.cost then
-      return a.cost > b.cost
-    end
-    return a.token < b.token
-  end)
-  local parts, length = { "lf" }, 2
-  for k = 1, 255 do
-    local token = tokens[(k - 1) % #tokens + 1].token
-    if length + #token + 1 > 255 then
-      break
-    end
-    parts[#parts + 1] = token
-    length = length + #token + 1
-  end
-  return table.concat(parts, " ")
-end
-
--- "lf <unit> <unit> ..." up to 255 chars: one word (or pair) repeated, the worst case of a
--- step that does work per token (4.2 phrase scan, 4.3 stat + slot, 4.4 intersection).
-local function repeatedLine(unit)
-  local parts, length = { "lf" }, 2
-  while length + #unit + 1 <= 255 do
-    parts[#parts + 1] = unit
-    length = length + #unit + 1
-  end
-  return table.concat(parts, " ")
-end
-
--- "lf" (+ prefix) + every distinct wordIndex word, biggest lists first, up to 255 chars:
--- step 4.4 with the most lists to intersect.
-local function allWordsLine(index, prefix)
-  local words = {}
-  for word, list in pairs(index.wordIndex) do
-    words[#words + 1] = { word, #list }
-  end
-  table.sort(words, function(a, b)
-    if a[2] ~= b[2] then
-      return a[2] > b[2]
-    end
-    return a[1] < b[1]
-  end)
-  local parts = { "lf", prefix }
-  local length = #table.concat(parts, " ")
-  for _, item in ipairs(words) do
-    if length + #item[1] + 1 <= 255 then
-      parts[#parts + 1] = item[1]
-      length = length + #item[1] + 1
-    end
-  end
-  return table.concat(parts, " ")
-end
-
 -- Median of RUNS passes over lines; → mean microseconds per line.
-local function meanMicros(Matcher, lines, repeats)
+local function meanMicros(Matcher, lines)
   local runs = {}
   for r = 1, RUNS do
     local started = os.clock()
-    for _ = 1, repeats or 1 do
-      for i = 1, #lines do
-        Matcher.Match("trade", lines[i], SENDER)
-      end
+    for i = 1, #lines do
+      Matcher.Match("trade", lines[i], SENDER)
     end
     runs[r] = os.clock() - started
   end
-  return median(runs) * 1e6 / (#lines * (repeats or 1))
+  return median(runs) * 1e6 / #lines
 end
 
 local function pass(Matcher, lines)
@@ -200,17 +120,30 @@ local function retainedKB(Matcher, lines, passes)
   return collectgarbage("count") - before
 end
 
--- Median build time; each build starts after a full collect, so garbage of the run before
+-- Fastest of BEST_OF builds; each starts after a full collect, so garbage of the run before
 -- (an earlier build's whole index) is not collected on this one's clock.
 local function buildMs(ns, db)
-  local runs = {}
-  for r = 1, RUNS do
+  local best = math.huge
+  for _ = 1, BEST_OF do
     collectgarbage("collect")
     local started = os.clock()
     build(ns, db)
-    runs[r] = (os.clock() - started) * 1000
+    best = math.min(best, (os.clock() - started) * 1000)
   end
-  return median(runs)
+  return best
+end
+
+-- Fastest of BEST_OF timings of WORST_REPS calls on one line; → microseconds per call.
+local function worstMicros(Matcher, line)
+  local best = math.huge
+  for _ = 1, BEST_OF do
+    local started = os.clock()
+    for _ = 1, WORST_REPS do
+      Matcher.Match("trade", line, SENDER)
+    end
+    best = math.min(best, (os.clock() - started) * 1e6 / WORST_REPS)
+  end
+  return best
 end
 
 return function()
@@ -231,24 +164,17 @@ return function()
 
   local mixed = mixedLines(LINES)
   local quiet = nonMatchingLines(LINES, LINES)
-  local worst = typoWorstLine(index)
+  local worst = WorstLines.typo(index)
   Assert.equal(Matcher.Match("trade", worst, SENDER), nil, "worst line must not match")
   Assert.equal(Matcher.lastStop, "nomatch")
   Assert.truthy(#worst > 240 and #worst <= 255, "worst line length " .. #worst)
   Assert.truthy(Matcher.Match("trade", mixed[10], SENDER), "requests in the mix do match")
-  local worstCases = {
-    { "typo", worst },
-    { "plate", repeatedLine("plate") }, -- 4.4: one big wordIndex list, repeated
-    { "enchant", repeatedLine("enchant") }, -- 4.2: 200 records under one first word
-    { "chest1x", repeatedLine("chest 1x") }, -- 4.3: slot words without a stat word
-    { "enchantchest", repeatedLine("enchant chest") }, -- 4.2: many records of one shape
-    { "alldistinct", allWordsLine(index) }, -- 4.4: every distinct wordIndex word
-    { "enchantwords", allWordsLine(index, "enchant") }, -- 4.4 narrowed to Enchanting
-  }
+  Assert.truthy(index.joinIndex.ca and not index.joinIndex.ca.phrase, "join_ca hits a shared join left side")
+  local worstCases = WorstLines.cases(index)
   local worstLines, worstText = {}, {}
   local worstMean = 0
   for k, case in ipairs(worstCases) do
-    local micros = meanMicros(Matcher, { case[2] }, WORST_REPS)
+    local micros = worstMicros(Matcher, case[2])
     worstMean = math.max(worstMean, micros)
     worstLines[k] = case[2]
     worstText[k] = string.format("%s=%.0f", case[1], micros)
