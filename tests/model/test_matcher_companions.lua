@@ -28,9 +28,17 @@ local function testKindCOnSpecFixture()
   expect(ns, "lf mongose", "item:enchant weapon - mongoose", "kind a by typo")
 end
 
--- The reviewer's probe index (PR 3): one-word names of other things in Trade.
+-- The reviewer's probe index (PR 3): one-word names of other things in Trade. Shadowfang is a
+-- sword (item 910: class 2, subclass 7).
 local function testKindCOnTradeWords()
   local ns = Fixture.load()
+  Wow.stub("C_Item", {
+    GetItemInfoInstant = function(itemID)
+      if itemID == 910 then
+        return itemID, "type", "subtype", "INVTYPE_WEAPON", 0, 2, 7
+      end
+    end,
+  })
   local db = ns.Defaults.Db()
   db.characters["Tailor-Realm"] = character({ TAILOR }, {
     [1] = { name = "Black Mageweave Vest", prof = TAILOR },
@@ -38,7 +46,7 @@ local function testKindCOnTradeWords()
     [3] = { name = "Runecloth Bag", prof = TAILOR },
   })
   db.characters["Smith-Realm"] = character({ BS }, {
-    [4] = { name = "Shadowfang", prof = BS },
+    [4] = { item = 910, name = "Shadowfang", prof = BS },
     [5] = { name = "Heavy Copper Maul", prof = BS },
   })
   ns.Matcher.SetIndex(ns.Index.Build(db, db.settings, { ownKey = "Me-Realm" }))
@@ -54,8 +62,14 @@ local function testKindCOnTradeWords()
   expect(ns, "lf black mageweave", "item:black mageweave vest", "kind b")
   expect(ns, "lf heavy copper maul", "item:heavy copper maul")
   expect(ns, "lf copper maul", "item:heavy copper maul")
-  -- A one-word full name is no alias, so the rule leaves it alone (§6.2 item 1).
-  expect(ns, "lf shadowfang", "item:shadowfang")
+  -- A one-word full name follows the same rule (§6.2 item 1); link names and item links don't.
+  expect(ns, "LF tank for Shadowfang Keep", "stop:nomatch")
+  expect(ns, "lf shadowfang", "stop:nomatch")
+  expect(ns, "lf shadowfnag", "stop:nomatch", "by typo")
+  local result = expect(ns, "lf shadowfang sword", "item:910", "a wordIndex word")
+  Assert.equal(why(result), "lf+shadowfang")
+  expect(ns, "lf |cffffd000|Henchant:1|h[Shadowfang]|h|r", "item:910", "a link name")
+  expect(ns, "LF |cff0070dd|Hitem:910::::::::60:::::|h[Shadowfang]|h|r", "item:910", "an item link")
 end
 
 -- §6.4: "ring" is ambiguous. Ring items (class 4 subclass 0) carry no armor word; item 802

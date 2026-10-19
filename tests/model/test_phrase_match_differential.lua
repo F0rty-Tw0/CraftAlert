@@ -4,7 +4,8 @@ local Fixture = require("tests.helpers.matcher_fixture")
 
 -- Differential check on seeded random indexes and lines: step 4.2 in PhraseMatch (shape
 -- keys, byte compare) against plain find of " phrase " in the padded line, join pairs by
--- concatenation and link names through phraseSet (§6.3 4.2), and the kind-c rule (§6.2 item 1).
+-- concatenation and link names through phraseSet (§6.3 4.2), and the second-word rule (§6.2
+-- item 1).
 
 local SYLLABLES = { "ab", "lion", "heart", "mane", "o'", "9x", "\195\169t", "ir", "on", "green", "a", "zz", "1", "ka" }
 local rand, pick = require("tests.helpers.lcg")(1)
@@ -58,7 +59,8 @@ local function randomLine(records, vocab)
 end
 
 -- Reference step 4.2: the sorted why tokens of the longest hits; none when the only hit is a
--- kind-c alias matched by one token and no token is a wordIndex word (→ "", true).
+-- kind-c alias (Aliases' set, checked in test_aliases) or a one-word full name, matched by one
+-- token and not by a link name, and no token is a wordIndex word (→ "", "alias" | "full").
 local function reference42(index, records, Tokenizer, count)
   local padded, best, hits = " " .. Tokenizer.normalized .. " ", 0, {}
   local function add(record, length, why)
@@ -82,20 +84,23 @@ local function reference42(index, records, Tokenizer, count)
       end
     end
   end
+  local linked = {}
   for k = 1, Tokenizer.linkNameCount do
     local record = index.phraseSet[Tokenizer.linkNames[k]]
     if record then
       add(record, record.wordCount, { record.phrase })
+      linked[record] = true
     end
   end
   local only = next(hits)
-  if best == 1 and next(hits, only) == nil and index.kindC[only] then
+  local kind = only and (only.full and only.wordCount == 1 and "full" or not only.full and index.needsSecondWord[only] and "alias")
+  if best == 1 and next(hits, only) == nil and kind and not linked[only] then
     local wordIndexToken = false
     for i = 1, count do
       wordIndexToken = wordIndexToken or index.wordIndex[Tokenizer.tokens[i]] ~= nil
     end
     if not wordIndexToken then
-      return "", true
+      return "", kind
     end
   end
   local whys = {}
@@ -111,7 +116,7 @@ end
 local function testPhraseMatchDifferential()
   local ns = Fixture.load()
   local Tokenizer, PhraseMatch = ns.Tokenizer, ns.PhraseMatch
-  local hitLines, kindCDrops = 0, 0
+  local hitLines, drops = 0, { alias = 0, full = 0 }
   for _ = 1, 60 do
     local index, vocab = randomPhraseIndex(ns)
     ns.Matcher.SetIndex(index)
@@ -133,11 +138,14 @@ local function testPhraseMatchDifferential()
       table.sort(got)
       Assert.equal(table.concat(got, "|"), want, line)
       hitLines = hitLines + (want ~= "" and 1 or 0)
-      kindCDrops = kindCDrops + (dropped and 1 or 0)
+      if dropped then
+        drops[dropped] = drops[dropped] + 1
+      end
     end
   end
   Assert.truthy(hitLines > 500, "lines with phrase hits: " .. hitLines)
-  Assert.truthy(kindCDrops > 20, "lines with a dropped kind-c hit: " .. kindCDrops)
+  Assert.truthy(drops.alias > 20, "lines with a dropped kind-c hit: " .. drops.alias)
+  Assert.truthy(drops.full > 20, "lines with a dropped one-word full name: " .. drops.full)
 end
 
 return function()

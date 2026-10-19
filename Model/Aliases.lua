@@ -11,8 +11,9 @@ local StatSlot = ns.StatSlot or require("CraftAlert.Model.StatSlot")
 local PhraseMatch = ns.PhraseMatch or require("CraftAlert.Model.PhraseMatch")
 
 -- Spec §6.2 "Short names, typos and stat + slot": the phrase records behind nameIndex and the
--- structures built from them (phraseSet, kindC, joinIndex; PhraseMatch files each record by
--- shape, StatSlot fills statSlotIndex, and TypoPass builds typoBuckets from the same records).
+-- structures built from them (phraseSet, needsSecondWord, joinIndex; PhraseMatch files each
+-- record by shape, StatSlot fills statSlotIndex, and TypoPass builds typoBuckets from the same
+-- records).
 -- Runs inside Index.Build only, never per chat line, so it may allocate freely.
 local Aliases = {}
 
@@ -195,22 +196,23 @@ local function addJoins(index, records)
   end
 end
 
--- kindC[record] = true: every name that made this alias made it as kind c, so one token
--- matching it needs a second word in the line (§6.2 item 1, user ruling 2026-10-20). A set,
--- not a record field: a fifth field would double the hash part of each such record.
-local function markKind(kindC, notKindC, record, isKindC)
+-- needsSecondWord[record] = true: one token matching the record counts only beside a second
+-- word in the line (§6.2 item 1, user rulings 2026-10-20). Holds one-word full names, and
+-- aliases that every name made as kind c. A set, not a record field: a fifth field would
+-- double the hash part of each such record.
+local function markKind(needsSecondWord, notKindC, record, isKindC)
   if not isKindC then
-    kindC[record], notKindC[record] = nil, true
+    needsSecondWord[record], notKindC[record] = nil, true
   elseif not notKindC[record] then
-    kindC[record] = true
+    needsSecondWord[record] = true
   end
 end
 
 -- names = { { name = lowercase recipe name, entry = entry, pending = true|nil }, ... } in
--- build order. Fills index.nameIndex, phraseSet, kindC, phraseIds, phraseKeys,
+-- build order. Fills index.nameIndex, phraseSet, needsSecondWord, phraseIds, phraseKeys,
 -- phraseWordRange, joinIndex and statSlotIndex; intentSet and blockerSet must already be set.
 function Aliases.Build(index, names)
-  index.phraseSet, index.kindC, index.joinIndex = {}, {}, {}
+  index.phraseSet, index.needsSecondWord, index.joinIndex = {}, {}, {}
   local notKindC = {}
   PhraseMatch.Begin(index)
   StatSlot.Begin(index)
@@ -230,7 +232,11 @@ function Aliases.Build(index, names)
     local info = parsed[item.name]
     if info then
       local words, entry = info.words, item.entry
-      addEntry(recordFor(index, records, info.phrase, words[1], #words, true), entry)
+      local full = recordFor(index, records, info.phrase, words[1], #words, true)
+      addEntry(full, entry)
+      if #words == 1 then
+        index.needsSecondWord[full] = true -- a one-word full name ("Shadowfang")
+      end
       if not item.pending then
         if info.aliasGroup ~= entry.group then -- aliases depend on the group (kind c)
           info.aliases, info.aliasGroup = aliasesOf(item.name, info, entry.group, owner, guard), entry.group
@@ -242,7 +248,7 @@ function Aliases.Build(index, names)
           if not fullNames[aliases[k]] then
             local record = recordFor(index, records, aliases[k], aliases[k + 1], aliases[k + 2], false)
             addEntry(record, entry)
-            markKind(index.kindC, notKindC, record, aliases[k + 3])
+            markKind(index.needsSecondWord, notKindC, record, aliases[k + 3])
           end
         end
         StatSlot.Add(index, item.name, words, entry)

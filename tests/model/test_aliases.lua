@@ -66,13 +66,13 @@ local function testAliasKinds()
   Assert.same(groups(byPhrase.mongoose), { "enchant weapon - mongoose" })
   Assert.equal(byPhrase["green iron hauberk"].wordCount, 3)
   Assert.equal(byPhrase.lionheart.wordCount, 1)
-  -- kindC: the kind-c-only aliases ("mongoose" is also kind a).
-  local kindC = {}
-  for record in pairs(index.kindC) do
-    kindC[#kindC + 1] = record.phrase
+  -- needsSecondWord: the kind-c-only aliases ("mongoose" is also kind a); no one-word names.
+  local needsSecondWord = {}
+  for record in pairs(index.needsSecondWord) do
+    needsSecondWord[#needsSecondWord + 1] = record.phrase
   end
-  table.sort(kindC)
-  Assert.same(kindC, { "fiery", "hauberk", "leggings", "lionheart" })
+  table.sort(needsSecondWord)
+  Assert.same(needsSecondWord, { "fiery", "hauberk", "leggings", "lionheart" })
 end
 
 -- A phrase that one name makes as kind c and another (same group) as kind a is not kind c,
@@ -87,7 +87,7 @@ local function testKindCOnlyWhenEveryNameAgrees()
     local index = ns.Index.Build(db, db.settings, { ownKey = "Me-Realm" })
     local lionheart = records(index).lionheart
     Assert.truthy(lionheart)
-    Assert.equal(index.kindC[lionheart], nil, "lionheart, " .. names[first] .. " first")
+    Assert.equal(index.needsSecondWord[lionheart], nil, "lionheart, " .. names[first] .. " first")
   end
 end
 

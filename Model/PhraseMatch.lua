@@ -219,15 +219,19 @@ function PhraseMatch.Run(newIndex, count, intentToken)
   for i = 1, tokenCount do
     phrasesAt(i)
   end
+  local linked = false
   for k = 1, Tokenizer.linkNameCount do
     local record = index.phraseSet[linkNames[k]]
     if record then
       addHit(record, record.wordCount, record.phrase, nil)
+      linked = true
     end
   end
-  -- §6.2 item 1 (c): a kind-c alias matched by one token, alone among the hits, needs a
-  -- wordIndex word in the line (a join pair covers 2 tokens, so it is never dropped here).
-  if hitCount == 1 and hitLength == 1 and index.kindC[hits[1]] and not PhraseMatch.HasIndexWord() then
+  -- §6.2 item 1: a kind-c alias or a one-word full name matched by one token, alone among the
+  -- hits, needs a wordIndex word in the line. A join pair covers 2 tokens, and a line with a
+  -- link-name hit has either that record as its hit, a longer hit, or two hits: never dropped.
+  local lone = hitCount == 1 and hitLength == 1 and not linked
+  if lone and index.needsSecondWord[hits[1]] and not PhraseMatch.HasIndexWord() then
     hitCount, hitWhyCount = 0, 0
   end
   PhraseMatch.whyCount = hitWhyCount
