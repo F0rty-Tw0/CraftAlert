@@ -6,9 +6,10 @@ end
 -- Hot path §6.3 steps 2: the cheap intent prefilter, then tokenizing of surviving lines.
 -- No table or closure is created per line: results go into the module buffers below,
 -- valid until the next Tokenize call, and the string is walked with string.find (never gmatch).
--- Item links (`|Hitem:<id>...|h[Name]|h`) give their ID and normalized name; link data and
--- link text never become tokens, so a linked "[Thunderbrow Ring]" does not read as "ring".
--- Other link types (battle pets, spells, ...) and other escapes leave nothing behind.
+-- Item links (`|Hitem:<id>...|h[Name]|h`) give their ID and normalized name; enchant links
+-- (`|Henchant:<spellID>|h[Name]|h`, Classic/TBC) give only the name. Link data and link text
+-- never become tokens, so a linked "[Thunderbrow Ring]" does not read as "ring". Other link
+-- types (battle pets, spells, ...) and other escapes leave nothing behind.
 local Tokenizer = {}
 
 local find = string.find
@@ -23,6 +24,7 @@ local type = type
 -- Word characters: ASCII letters and digits, the apostrophe, and every byte >= 128 (UTF-8).
 local WORD = "[%w'\128-\255]+"
 local ITEM_LINK = "^|hitem:(%d+)"
+local ENCHANT_LINK = "^|henchant:"
 local ANY_LINK = "^|h%a+:"
 
 local BYTE_A, BYTE_C, BYTE_H, BYTE_K = 97, 99, 104, 107
@@ -49,8 +51,8 @@ Tokenizer.normalized = ""
 -- Per-call state, module-level so the helpers below need no closures.
 local count, items, names = 0, 0, 0
 local lastCount, lastItems, lastNames = 0, 0, 0
-local linkEnd = nil -- position of the open item link's closing `|h`
-local linkFirst = 0 -- first token index of the open item link's text
+local linkEnd = nil -- position of the open named link's closing `|h`
+local linkFirst = 0 -- first token index of the open named link's text
 
 -- Replaces the intent list (lowercased here, once, so Scan never lowercases a word).
 function Tokenizer.Configure(intentWords)
@@ -78,7 +80,7 @@ function Tokenizer.Scan(text)
   return nil
 end
 
--- The item link's text tokens become one normalized link name and leave the token buffer.
+-- The named link's text tokens become one normalized link name and leave the token buffer.
 local function closeLink(p)
   if count >= linkFirst then
     names = names + 1
@@ -92,7 +94,8 @@ local function closeLink(p)
   return p + 2
 end
 
--- At a `|h`: closes the open item link, opens an item link, or skips a whole other link.
+-- At a `|h`: closes the open named link, opens an item or enchant link, or skips a whole
+-- other link.
 local function link(s, p)
   if p == linkEnd then
     return closeLink(p)
@@ -106,11 +109,12 @@ local function link(s, p)
   end
   local textEnd = find(s, "|h", dataEnd + 2, true) or #s + 1
   local _, _, id = find(s, ITEM_LINK, p)
-  if not id then
+  if id then
+    items = items + 1
+    itemIDs[items] = tonumber(id)
+  elseif not find(s, ENCHANT_LINK, p) then
     return textEnd + 2
   end
-  items = items + 1
-  itemIDs[items] = tonumber(id)
   linkEnd = textEnd
   linkFirst = count + 1
   return dataEnd + 2

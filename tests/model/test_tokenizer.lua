@@ -61,6 +61,23 @@ local function testLinkShapes()
   Assert.same({ unpack(Tokenizer.linkNames, 1, Tokenizer.linkNameCount) }, { "thunderfury blessed blade", "red linen shirt" })
 end
 
+-- §6.3 step 2: an enchant link (Classic/TBC) gives its bracketed name as a link name, no item
+-- ID, and its text never becomes tokens; item and enchant link names keep line order.
+local function testEnchantLinks()
+  local Tokenizer = load()
+  local line = "LF |cffffd000|Henchant:33999|h[Enchant Gloves - Major Healing]|h|r and "
+    .. "|cff1eff00|Hitem:2575::::::::60:::::|h[Red Linen Shirt]|h|r pls"
+  local count = Tokenizer.Tokenize(Tokenizer.Scan(line))
+  Assert.same(tokensOf(Tokenizer, count), { "lf", "and", "pls" })
+  Assert.same({ unpack(Tokenizer.itemIDs, 1, Tokenizer.itemCount) }, { 2575 })
+  Assert.same({ unpack(Tokenizer.linkNames, 1, Tokenizer.linkNameCount) }, { "enchant gloves major healing", "red linen shirt" })
+  -- An enchant link cut off before its closing `|h` still closes at the end of the line.
+  count = Tokenizer.Tokenize("lf |henchant:7418|h[enchant bracer - minor health]")
+  Assert.same(tokensOf(Tokenizer, count), { "lf" })
+  Assert.equal(Tokenizer.itemCount, 0)
+  Assert.same({ unpack(Tokenizer.linkNames, 1, Tokenizer.linkNameCount) }, { "enchant bracer minor health" })
+end
+
 -- A link with no color code, and a crafted world drop typed next to a link: the typed name stays text.
 local function testBareLinkAndText()
   local Tokenizer = load()
@@ -123,6 +140,7 @@ return function()
   testScan()
   testTypedBrackets()
   testLinkShapes()
+  testEnchantLinks()
   testBareLinkAndText()
   testNonAscii()
   testOtherEscapes()
