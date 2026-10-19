@@ -236,6 +236,16 @@ local function testLongSpan()
   expect(ns, "lf aa cc", "item:aa cc")
 end
 
+-- A span of a record's shape (first word, length, word count, second word's length, last byte)
+-- matches only when the record's phrase starts right there, not somewhere later in the line.
+local function testShapeTwinElsewhere()
+  local ns = Fixture.load()
+  local db = ns.Defaults.Db()
+  db.characters["A-Realm"] = character({ BS }, { [1] = { name = "aa cc", prof = BS }, [2] = { name = "bb cc", prof = BS } })
+  ns.Matcher.SetIndex(ns.Index.Build(db, db.settings, { ownKey = "Me-Realm" }))
+  expect(ns, "lf aa dc xaa ccx", "stop:nomatch")
+end
+
 local function testResultReuseAndConfigure()
   local ns = Fixture.load()
   local db = Fixture.db(ns)
@@ -265,5 +275,6 @@ return function()
   testResultReuseAndConfigure()
   testOldIndexReleased()
   testLongSpan()
+  testShapeTwinElsewhere()
   Wow.reset()
 end

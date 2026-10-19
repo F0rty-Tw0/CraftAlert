@@ -120,10 +120,11 @@ local function phraseAt(phrase, at, from)
   return true
 end
 
--- A record found by its shape when its other bytes match too.
-local function tryRecord(record, at, from, wordCount)
+-- A record found by its shape when its other bytes match too. One plain find (C) costs less
+-- than a byte loop in Lua; a miss scans at most the rest of the line.
+local function tryRecord(record, at, wordCount)
   local phrase = record.phrase
-  if phraseAt(phrase, at, from) then
+  if find(padded, phrase, at, true) == at then
     addHit(record, wordCount, phrase, nil)
   end
 end
@@ -143,7 +144,7 @@ end
 local function phrasesAt(i, token, id, found)
   if id then
     local phraseKeys = index.phraseKeys
-    local at, from = tokenAt[i], #token + 1
+    local at = tokenAt[i]
     -- A span of 2+ words holds the second word, so a second word of 256+ bytes never reaches
     -- a key (the span-length break below comes first).
     local second = i < tokenCount and #tokens[i + 1] or 0
@@ -161,10 +162,10 @@ local function phrasesAt(i, token, id, found)
       local shape = ((id * KEY_LENGTHS + stop - at + 1) * KEY_WORDS + wordCount) * KEY_LENGTHS
       local keyed = phraseKeys[(shape + (wordCount > 1 and second or 0)) * KEY_BYTES + byte(padded, stop)]
       if keyed and keyed.phrase then
-        tryRecord(keyed, at, from, wordCount)
+        tryRecord(keyed, at, wordCount)
       elseif keyed then
         for k = 1, #keyed do
-          tryRecord(keyed[k], at, from, wordCount)
+          tryRecord(keyed[k], at, wordCount)
         end
       end
     end
