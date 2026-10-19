@@ -123,9 +123,9 @@ local function aliasesOf(name, info, group, owner, guard)
     end
   end
   local n = #words
-  for k = 2, n - 1 do -- kind b
-    addAlias(list, seen, guard, words, 1, k, false)
-    addAlias(list, seen, guard, words, n - k + 1, n, false)
+  if n > 2 then -- kind b: the first two and the last two words (a 2-word name is its full name)
+    addAlias(list, seen, guard, words, 1, 2, false)
+    addAlias(list, seen, guard, words, n - 1, n, false)
   end
   for k, word in ipairs(words) do -- kind c
     if #word >= MIN_UNIQUE_LETTERS and owner[word] == group then

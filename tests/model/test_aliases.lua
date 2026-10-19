@@ -41,9 +41,7 @@ local function testAliasKinds()
     ["green iron leggings"] = true,
     ["green iron boots"] = true,
     -- aliases
-    ["fiery weapon"] = false, -- a (and b)
-    ["enchant weapon fiery"] = false, -- b
-    ["weapon fiery weapon"] = false, -- b
+    ["fiery weapon"] = false, -- a (and b: the last two words)
     ["fiery"] = false, -- c
     ["mongoose"] = false, -- a and c, one record
     ["weapon mongoose"] = false, -- b
