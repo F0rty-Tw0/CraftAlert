@@ -182,6 +182,30 @@ local function testStatSlotIndex()
   -- Same tier: the larger numeric recipeKey wins.
   Assert.equal(index.statSlotIndex["2h"].agility[1].recipeKey, 45)
   Assert.equal(index.statSlotIndex.cape.agility[1].recipeKey, 46)
+
+  -- Mixed key types (numeric keys next to Classic name keys): numbers first, larger first,
+  -- then names. Numbers carry names that sort against them, which a name-only compare
+  -- between a number and a string turned into cycles (an intransitive sort order).
+  db = ns.Defaults.Db()
+  local numbered, named, want = {}, {}, {}
+  for k = 1, 12 do
+    numbered[k] = { name = string.format("Enchant Chest - Stamina %02d", 25 - 2 * k), prof = ENCH }
+    local name = string.format("enchant chest - stamina %02d", 2 * k)
+    named[name] = { name = name, prof = ENCH }
+  end
+  for k = 12, 1, -1 do
+    want[#want + 1] = k
+  end
+  for k = 1, 12 do
+    want[#want + 1] = string.format("enchant chest - stamina %02d", 2 * k)
+  end
+  db.characters["A-Realm"] = Fixture.character({ ENCH }, numbered)
+  db.characters["B-Realm"] = Fixture.character({ ENCH }, named)
+  local got = {}
+  for _, entry in ipairs(ns.Index.Build(db, db.settings, { ownKey = "Me-Realm" }).statSlotIndex.chest.stamina) do
+    got[#got + 1] = entry.recipeKey
+  end
+  Assert.same(got, want)
 end
 
 -- §6.2 item 5: one-word records and profession words of 5+ letters, by first byte and length.

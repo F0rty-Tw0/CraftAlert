@@ -13,7 +13,6 @@ local StatSlot = {}
 local pairs = pairs
 local ipairs = ipairs
 local type = type
-local find = string.find
 local sub = string.sub
 local byte = string.byte
 local sort = table.sort
@@ -116,14 +115,20 @@ function StatSlot.Add(index, name, words, entry)
   end
 end
 
--- Best enchant first: tier, then the larger numeric recipeKey, then name, then character.
+-- Best enchant first: tier, then numeric recipeKeys before name keys (Classic), the larger
+-- number first, then name, then character. Ranking the key type first keeps the order
+-- transitive when both kinds of key meet (sort raises "invalid order function" otherwise).
 local function better(a, b)
   local ra, rb = ranks[a], ranks[b]
   if ra.tier ~= rb.tier then
     return ra.tier > rb.tier
   end
   local ka, kb = a.recipeKey, b.recipeKey
-  if type(ka) == "number" and type(kb) == "number" and ka ~= kb then
+  local na, nb = type(ka) == "number", type(kb) == "number"
+  if na ~= nb then
+    return na
+  end
+  if na and ka ~= kb then
     return ka > kb
   end
   if ra.name ~= rb.name then
@@ -146,8 +151,17 @@ local function statOf(token)
   local key = statWords[token]
   local first = byte(token, 1)
   if key == nil and first >= DIGIT_0 and first <= DIGIT_9 then
-    local _, digitsEnd = find(token, "^%d+")
-    key = statWords[sub(token, digitsEnd + 1)]
+    -- A byte walk, not find(token, "^%d+"): the pattern matcher costs more per token (§4.4).
+    local after = 2
+    local b = byte(token, after)
+    while b and b >= DIGIT_0 and b <= DIGIT_9 do
+      after = after + 1
+      b = byte(token, after)
+    end
+    if b == nil then
+      return nil -- all digits: no stat word left
+    end
+    key = statWords[sub(token, after)]
   end
   return key
 end
