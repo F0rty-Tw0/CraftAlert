@@ -160,10 +160,9 @@ function WordGroups.Reset()
   lineWords, lineLists, lineCount, wordStamp = {}, {}, 0, {}
 end
 
--- The first two distinct wordIndex words of the line, and whether it holds an Enchanting
--- profession word.
+-- The first two distinct wordIndex words of the line (§6.4: what an ambiguous word needs).
 local function firstWords(wordIndex, tokens, count)
-  local first, other, enchanting = nil, nil, false
+  local first, other = nil, nil
   for i = 1, count do
     local token = tokens[i]
     if wordIndex[token] and first == nil then
@@ -171,33 +170,40 @@ local function firstWords(wordIndex, tokens, count)
     elseif wordIndex[token] and other == nil and token ~= first then
       other = token
     end
-    enchanting = enchanting or enchantingWords[token] == true
   end
-  return first, other, enchanting
+  return first, other
 end
 
 -- Fills lineWords/lineLists (the first MAX_WORDS distinct counted words; later new words
 -- are skipped) and Candidates.wordWhy. → why count, or nil when a known slang word nobody can
--- craft empties the intersection; and whether the line holds an Enchanting word.
+-- craft empties the intersection; and whether the line holds an Enchanting word. The first
+-- two wordIndex words are found only when an ambiguous word needs them (most lines have none).
 local function collect(wordIndex, tokens, count, hasSet)
-  local first, other, enchanting = firstWords(wordIndex, tokens, count)
+  local first, other, scanned, enchanting = nil, nil, false, false
   local why, whyCount = Candidates.wordWhy, 0
   lineCount, stamp = 0, stamp + 1
   for i = 1, count do
     local token = tokens[i]
+    enchanting = enchanting or enchantingWords[token] == true
     local list = wordIndex[token]
     local new = wordStamp[token] ~= stamp
-    if (list or slangWords[token]) and (not new or lineCount < MAX_WORDS) and counts(token, first, other, hasSet) then
-      if list == nil then
-        return nil, enchanting
+    if (list or slangWords[token]) and (not new or lineCount < MAX_WORDS) then
+      if ambiguous[token] and not scanned then
+        first, other = firstWords(wordIndex, tokens, count)
+        scanned = true
       end
-      if new then
-        wordStamp[token] = stamp
-        lineCount = lineCount + 1
-        lineWords[lineCount], lineLists[lineCount] = token, list
+      if counts(token, first, other, hasSet) then
+        if list == nil then
+          return nil, enchanting
+        end
+        if new then
+          wordStamp[token] = stamp
+          lineCount = lineCount + 1
+          lineWords[lineCount], lineLists[lineCount] = token, list
+        end
+        whyCount = whyCount + 1
+        why[whyCount] = token
       end
-      whyCount = whyCount + 1
-      why[whyCount] = token
     end
   end
   return whyCount, enchanting
