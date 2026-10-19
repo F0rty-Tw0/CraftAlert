@@ -32,7 +32,7 @@ ProfessionWords.entries = {
     englishName = "jewelcrafting",
   },
   {
-    words = { "enchanting", "enchanter", "enchanters", "ench" },
+    words = { "enchanting", "enchanter", "enchanters", "ench", "enchant", "enchants" },
     skillLineID = 333,
     englishName = "enchanting",
   },

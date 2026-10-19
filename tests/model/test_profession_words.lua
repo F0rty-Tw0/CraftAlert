@@ -61,6 +61,9 @@ local function testSlangResolvesPerFlavor()
     -- plurals appear in real chat ("any enchanters")
     { "enchanters", 333, "enchanting" },
     { "tailors", 197, "tailoring" },
+    -- "WTB enchant" / "WTB enchants" ask an enchanter (spec §6.4, ruling 2026-10-19)
+    { "enchant", 333, "enchanting" },
+    { "enchants", 333, "enchanting" },
   }
   for _, case in ipairs(cases) do
     Assert.equal(ProfessionWords.KeyFor(case[1], false), case[2], case[1] .. " retail")
@@ -70,8 +73,7 @@ end
 
 local function testNotProfessionWords()
   local ProfessionWords = load()
-  -- "enchant" is what a request names ("lf enchant mangoose"), not who is asked for.
-  for _, word in ipairs({ "enchant", "mining", "cooking", "skinning", "herbalism", "fishing", "belt", "", "BS" }) do
+  for _, word in ipairs({ "mining", "cooking", "skinning", "herbalism", "fishing", "belt", "", "BS" }) do
     Assert.equal(ProfessionWords.KeyFor(word, false), nil, word)
     Assert.equal(ProfessionWords.KeyFor(word, true), nil, word)
   end
