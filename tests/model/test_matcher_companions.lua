@@ -26,6 +26,12 @@ local function testKindCOnSpecFixture()
   expect(ns, "lf lionhaert", "stop:nomatch")
   expect(ns, "lf lionhaert boots leather", "item:lionheart helm", "a wordIndex word")
   expect(ns, "lf mongose", "item:enchant weapon - mongoose", "kind a by typo")
+  -- A step 4.2 set still standing at step 4.5 ("enchant" empties 4.4) is the companion.
+  result = expect(ns, "lf hauberk leggings enchant lionhaert", "profession:" .. BS)
+  Assert.equal(why(result), "lf+hauberk+leggings+lionhaert")
+  -- A token whose hits were all set aside is no why token.
+  result = expect(ns, "lf lionhaert mongose", "item:enchant weapon - mongoose")
+  Assert.equal(why(result), "lf+mongose")
 end
 
 -- The reviewer's probe index (PR 3): one-word names of other things in Trade. Shadowfang is a
