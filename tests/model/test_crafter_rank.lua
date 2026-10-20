@@ -105,6 +105,23 @@ return function()
   data.characters["Prim-Realm"].enabled = true
   Assert.equal((CrafterRank.Pick(profession, CUSTOMER, data)), "Prim-Realm")
 
+  -- A character whose recipes of that profession are all muted wants no leads for it; one with
+  -- no recipe of it stored yet (never read) still answers, and so does one unmuted recipe.
+  data = db()
+  data.characters["Me-Realm"].recipes = {
+    [1] = { name = "belt", prof = BS, muted = true },
+    [2] = { name = "helm", prof = BS, muted = true },
+    [3] = { name = "enchant", prof = ENCH },
+  }
+  for _, key in ipairs({ "Prim-Realm", "Alt-Realm", "Zed-Realm", "Imp-Realm" }) do
+    data.characters[key].professions[BS] = nil
+  end
+  Assert.equal(CrafterRank.Pick(profession, CUSTOMER, data), nil, "all muted: no crafter, no lead")
+  data.characters["Alt-Realm"].professions[BS] = { name = "Blacksmithing", primary = false, read = false }
+  Assert.equal((CrafterRank.Pick(profession, CUSTOMER, data)), "Alt-Realm", "the muted current character is passed over")
+  data.characters["Me-Realm"].recipes[2].muted = nil
+  Assert.equal((CrafterRank.Pick(profession, CUSTOMER, data)), "Me-Realm", "one unmuted recipe is enough")
+
   -- Blizzard's ignore list: the customer is dropped unless /ca test skips the check.
   local asked = {}
   Wow.stub("C_FriendList", {

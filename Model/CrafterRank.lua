@@ -39,10 +39,27 @@ local function tierOf(character, key, prof)
   return character and character.source == "import" and IMPORTED or SAME_ACCOUNT
 end
 
+-- Whether a character takes profession-word leads (step 4.6) for `prof`: not when it stores
+-- recipes of that profession and has muted every one; muting says "no leads for these". A
+-- profession not read yet has no recipes and still counts.
+local function listensFor(character, prof)
+  local stored = false
+  for _, recipe in pairs(character.recipes or {}) do
+    if recipe.prof == prof then
+      if not recipe.muted then
+        return true
+      end
+      stored = true
+    end
+  end
+
+  return not stored
+end
+
 -- → characterKey, cannotOrder; nil when the customer is on Blizzard's ignore list (unless
 -- opts.skipIgnore, which /ca test passes) or no character qualifies. `result` is the
 -- Matcher's reused result: only read here. A match without entries (a profession word) is
--- answered by every enabled character with that profession.
+-- answered by every enabled character with that profession that still listens for it.
 function CrafterRank.Pick(result, customerKey, db, opts)
   if not (opts and opts.skipIgnore) and isIgnored(customerKey) then
     return nil
@@ -73,7 +90,8 @@ function CrafterRank.Pick(result, customerKey, db, opts)
     end
   else
     for key, character in pairs(db.characters) do
-      if character.enabled ~= false and character.professions[result.prof] then
+      local candidate = character.enabled ~= false and character.professions[result.prof] ~= nil
+      if candidate and listensFor(character, result.prof) then
         consider(key, result.prof)
       end
     end
