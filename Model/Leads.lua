@@ -16,6 +16,7 @@ local Leads = {}
 
 local concat = table.concat
 local remove = table.remove
+local sort = table.sort
 local max = math.max
 local pcall = pcall
 local tostring = tostring
@@ -108,23 +109,54 @@ armExpiry = function()
   _G["C_Timer"].After(max(1, first.time + timeoutSeconds() - now() + 1), onExpiry)
 end
 
--- Binds db.leads (Bootstrap, at PLAYER_LOGIN): drops expired leads and starts the timer.
+-- Oldest first; leads of the same second keep their id order (ids are unique by now).
+local function isOlder(a, b)
+  if a.time ~= b.time then
+    return a.time < b.time
+  end
+  return a.id < b.id
+end
+
+-- A hand-edited db may repeat or lack ids; find(id) must see each lead once. The first holder
+-- of an id keeps it, the rest get fresh ones above every id in the db.
+local function fixIds()
+  local seen, broken = {}, {}
+  nextId = 1
+  for i = 1, #leads do
+    local id = leads[i].id
+    if type(id) == "number" and not seen[id] then
+      seen[id] = true
+      nextId = max(nextId, id + 1)
+    else
+      broken[#broken + 1] = leads[i]
+    end
+  end
+  for i = 1, #broken do
+    broken[i].id = nextId
+    nextId = nextId + 1
+  end
+end
+
+-- Keeps the newest MAX_LEADS of a list that is sorted oldest first.
+local function trim()
+  local count = #leads
+  local excess = count - MAX_LEADS
+  if excess <= 0 then
+    return
+  end
+  for i = 1, count do
+    leads[i] = leads[i + excess]
+  end
+end
+
+-- Binds db.leads (Bootstrap, at PLAYER_LOGIN): repairs a hand-edited list (ids, order, size),
+-- drops expired leads and starts the timer.
 function Leads.Restore(accountDb)
   db = accountDb
   leads = db.leads
-  nextId = 1
-  for i = 1, #leads do
-    local lead, j = leads[i], i - 1
-    if type(lead.id) == "number" then
-      nextId = max(nextId, lead.id + 1)
-    end
-    -- A hand-edited db may be out of order; everything below relies on oldest first.
-    while j >= 1 and leads[j].time > lead.time do
-      leads[j + 1] = leads[j]
-      j = j - 1
-    end
-    leads[j + 1] = lead
-  end
+  fixIds()
+  sort(leads, isOlder)
+  trim()
   if sweep() then
     fire("change")
   end

@@ -405,6 +405,77 @@ return function()
   Assert.equal(#Wow.timers, 1)
   Assert.equal(newLead(ns, "LF plate belt").id, 13)
 
+  -- Restore keeps at most 100 leads, the newest, however many a hand-edited db holds.
+  ns, db = setup()
+  Leads = ns.Leads
+  local flood = {}
+  for i = 1, 5000 do
+    flood[i] = { id = i, customer = "Cust" .. i .. "-Draenor", time = T0 - 590 + math.floor(i / 10), kind = "item", greeted = false, replied = false }
+  end
+  db.leads = flood
+  Leads.Restore(db)
+  Assert.equal(#db.leads, 100)
+  Assert.equal(db.leads[1].id, 4901)
+  Assert.equal(db.leads[100].id, 5000)
+  Assert.equal(Leads.Latest().id, 5000)
+  Assert.equal(db.leads, flood, "the db keeps its table")
+  Assert.equal(newLead(ns, "LF plate belt").id, 5001)
+
+  -- The oldest are the ones dropped, also when the list is out of order or part of it expired.
+  ns, db = setup()
+  Leads = ns.Leads
+  db.leads = {}
+  for i = 1, 150 do
+    db.leads[i] = { id = i, customer = "Cust" .. i .. "-Draenor", time = T0 - 200 + (i * 37) % 150, kind = "item", greeted = false, replied = false }
+  end
+  Leads.Restore(db)
+  Assert.equal(#db.leads, 100)
+  for i = 2, 100 do
+    Assert.truthy(db.leads[i - 1].time <= db.leads[i].time, "oldest first at " .. i)
+  end
+
+  -- Leads of the same second keep a stable order, by id.
+  ns, db = setup()
+  Leads = ns.Leads
+  db.leads = {}
+  for _, id in ipairs({ 3, 1, 4, 2 }) do
+    db.leads[#db.leads + 1] = { id = id, customer = "Cust" .. id .. "-Draenor", time = T0 - 5, kind = "item", greeted = false, replied = false }
+  end
+  Leads.Restore(db)
+  local order = {}
+  for i, restored in ipairs(db.leads) do
+    order[i] = restored.id
+  end
+  Assert.same(order, { 1, 2, 3, 4 })
+
+  -- A missing or repeated id would make find(nil) or the second twin act on the wrong lead:
+  -- each gets a fresh one, the first twin keeps its own.
+  ns, db = setup()
+  Leads = ns.Leads
+  db.leads = {
+    { id = 5, customer = "A-Draenor", time = T0 - 40, kind = "item", greeted = false, replied = false },
+    { customer = "B-Draenor", time = T0 - 30, kind = "item", greeted = false, replied = false },
+    { id = 5, customer = "C-Draenor", time = T0 - 20, kind = "item", greeted = false, replied = false },
+    { id = "7", customer = "D-Draenor", time = T0 - 10, kind = "item", greeted = false, replied = false },
+  }
+  Leads.Restore(db)
+  local ids = {}
+  for _, restored in ipairs(db.leads) do
+    Assert.equal(type(restored.id), "number")
+    ids[restored.id] = true
+  end
+  local distinct = 0
+  for _ in pairs(ids) do
+    distinct = distinct + 1
+  end
+  Assert.equal(distinct, 4, "every lead has its own id")
+  Assert.equal(db.leads[1].id, 5, "the first twin keeps its id")
+  Assert.equal(Leads.MarkGreeted(nil), false)
+  Assert.equal(db.leads[2].greeted, false)
+  Assert.equal(Leads.MarkGreeted(db.leads[3].id), true)
+  Assert.same({ db.leads[1].greeted, db.leads[2].greeted, db.leads[3].greeted, db.leads[4].greeted }, { false, false, true, false })
+  Assert.equal(newLead(ns, "LF plate belt").id > 7, true, "new ids continue above every restored one")
+
   -- A subscriber that raises does not stop the others or the lead.
   ns, db = setup()
   Leads = ns.Leads
