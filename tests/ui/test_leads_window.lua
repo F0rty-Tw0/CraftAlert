@@ -215,6 +215,34 @@ local function testSavedFrameAndOpacity()
   Assert.same({ point, relativePoint, x, y, window():GetWidth(), window():GetHeight() }, { "LEFT", "LEFT", 30, 40, 500, 400 })
 end
 
+-- Runs fn, raising instead of hanging when it loops (a client freeze).
+local function bounded(fn)
+  debug.sethook(function()
+    debug.sethook()
+    error("runaway loop")
+  end, "", 1e7)
+  local ok, err = pcall(fn)
+  debug.sethook()
+  assert(ok, err)
+end
+
+-- A saved size the Schema keeps (any finite number) opens on screen and refreshes at once.
+local function testHugeSavedSize()
+  local ns = load({ "Ann-Draenor", "Bob-Draenor" }, function(accountDb)
+    accountDb.ui.window = { width = 1e300, height = 1e300 }
+  end)
+  bounded(ns.LeadsWindow.Toggle)
+  local parent = rawget(_G, "UIParent")
+  Assert.equal(window():GetWidth(), parent:GetWidth(), "no wider than the screen")
+  Assert.equal(window():GetHeight(), parent:GetHeight(), "no taller than the screen")
+  Assert.equal(#rows(), 2)
+  -- Even a frame taller than the screen (the client does not guarantee the clamp) rows only
+  -- the leads there are.
+  window():SetSize(500, 1e300)
+  bounded(ns.LeadsWindow.Refresh)
+  Assert.equal(#rows(), 2)
+end
+
 -- Review Focus 5: whatever a hand-edited SavedVariables holds, every lead the load-time Schema
 -- check keeps renders on the toast and in the window and can be greeted.
 local function testCorruptedSavedLeads()
@@ -252,5 +280,6 @@ return function()
   testVisibleLatestAndScroll()
   testSavedFrameAndOpacity()
   testCorruptedSavedLeads()
+  testHugeSavedSize()
   Wow.reset()
 end

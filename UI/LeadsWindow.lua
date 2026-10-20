@@ -61,8 +61,10 @@ function LeadsWindow.Refresh()
   local leads = Leads.List()
   local fit = rowsThatFit(window.frame)
   offset = max(0, min(offset, #leads - fit))
-  for index = 1, max(fit, #window.rows) do
-    local lead = index <= fit and leads[offset + index] or nil
+  -- Bounded by the leads, not the frame height: a huge saved height must not loop for ever.
+  local shown = max(0, min(fit, #leads - offset))
+  for index = 1, max(shown, #window.rows) do
+    local lead = index <= shown and leads[offset + index] or nil
     if lead then
       LeadRow.Show(rowAt(index), lead)
     elseif window.rows[index] then
@@ -90,11 +92,14 @@ local function saveFrame(frame)
   end
 end
 
+-- The saved size, at most the screen's (the Schema keeps any finite number).
 local function applySavedSize(frame)
-  local layout, saved = Theme.LAYOUT, FrameKit.Saved(UI_KEY) or {}
+  local layout, saved, screen = Theme.LAYOUT, FrameKit.Saved(UI_KEY) or {}, _G["UIParent"]
   local width = type(saved.width) == "number" and saved.width or layout.WINDOW_WIDTH
   local height = type(saved.height) == "number" and saved.height or layout.WINDOW_HEIGHT
-  frame:SetSize(max(width, layout.WINDOW_MIN_WIDTH), max(height, layout.WINDOW_MIN_HEIGHT))
+  width = max(min(width, screen:GetWidth()), layout.WINDOW_MIN_WIDTH)
+  height = max(min(height, screen:GetHeight()), layout.WINDOW_MIN_HEIGHT)
+  frame:SetSize(width, height)
   frame:SetResizable(true)
   frame:SetResizeBounds(layout.WINDOW_MIN_WIDTH, layout.WINDOW_MIN_HEIGHT)
 end
