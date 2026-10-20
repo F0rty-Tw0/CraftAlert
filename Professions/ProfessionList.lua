@@ -25,24 +25,29 @@ end
 
 local order = {}
 
--- → { { key, name }... } in GetProfessions slot order, or nil without the API.
+-- → { { key, name }... } in GetProfessions slot order and the number of slots in use; nil
+-- when the API is missing or a slot's skill line has not loaded (unknown data).
 local function currentProfessions()
   local getProfessions = _G["GetProfessions"]
   local getInfo = _G["GetProfessionInfo"]
   if type(getProfessions) ~= "function" or type(getInfo) ~= "function" then
     return nil
   end
-  local list = {}
+  local list, slots = {}, 0
   for position = 1, SLOTS do
     local index = select(position, getProfessions())
     if index then
+      slots = slots + 1
       local name, _, _, _, _, _, skillLine = getInfo(index)
+      if skillLine == nil then
+        return nil
+      end
       if crafting[skillLine] then
         list[#list + 1] = { key = skillLine, name = name }
       end
     end
   end
-  return list
+  return list, slots
 end
 
 local function dropRecipes(recipes, professionKey)
@@ -55,12 +60,18 @@ end
 
 -- Rebuilds the character's professions from the client (`primary` is the player's choice
 -- per profession, so it is kept, never derived from the slot) and removes the recipes of a
--- profession it no longer has. Other characters are never touched; nothing happens when
--- the API is missing, so a failed lookup cannot wipe stored recipes.
+-- profession it no longer has. Other characters are never touched. Unknown data writes
+-- nothing, so a failed lookup cannot wipe stored recipes: a missing API, a slot whose
+-- skill line has not loaded, or no slot at all for a character that has professions stored.
+-- Trade-off: a character that unlearns every profession keeps its stale data until it
+-- learns one. A list of non-crafting professions only (gathering...) is real data and drops.
 function ProfessionList.Refresh(db, charKey)
-  local list = currentProfessions()
+  local list, slots = currentProfessions()
   local character = db.characters[charKey]
   if list == nil or (character == nil and #list == 0) then
+    return
+  end
+  if slots == 0 and character ~= nil and next(character.professions) ~= nil then
     return
   end
   if character == nil then

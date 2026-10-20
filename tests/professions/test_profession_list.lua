@@ -103,4 +103,24 @@ return function()
   Wow.stub("GetProfessions", nil)
   ProfessionList.Refresh(db, CHAR)
   Assert.truthy(db.characters[CHAR].recipes[2])
+
+  -- Unknown data never deletes: no slot at all, or a slot whose skill line has not loaded.
+  state = ProfessionsRetail.install({ slots = { slot("Enchanting", ENCH) } })
+  ProfessionList.Refresh(db, CHAR)
+  state.slots = {}
+  ProfessionList.Refresh(db, CHAR)
+  Assert.truthy(ProfessionList.IsStored(db, CHAR, ENCH))
+  Assert.truthy(db.characters[CHAR].recipes[2])
+  state.slots = { slot("Enchanting", nil) }
+  ProfessionList.Refresh(db, CHAR)
+  Assert.truthy(ProfessionList.IsStored(db, CHAR, ENCH))
+  Assert.truthy(db.characters[CHAR].recipes[2])
+  Assert.same(ProfessionList.Order(), { ENCH })
+
+  -- A list of non-crafting professions only is real data: the crafting professions drop.
+  state.slots = { slot("Mining", MINING) }
+  ProfessionList.Refresh(db, CHAR)
+  Assert.same(db.characters[CHAR].professions, {})
+  Assert.same(db.characters[CHAR].recipes, {})
+  Assert.same(ProfessionList.Order(), {})
 end
