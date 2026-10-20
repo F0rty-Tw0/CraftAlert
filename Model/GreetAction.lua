@@ -13,6 +13,7 @@ local SendGuard = ns.SendGuard or require("CraftAlert.Model.SendGuard")
 -- in the addon that sends an addon message, and it never listens for one.
 local GreetAction = {}
 
+local pcall = pcall
 local type = type
 
 local NOTICE_PREFIX = "robots.txt"
@@ -23,12 +24,12 @@ local function greetingFor(lead)
 end
 
 -- Lets customer-side filters recognise the whisper that follows (§7.5 rule 4). Whatever it
--- returns (throttled, locked down, target offline), the greeting is still sent.
+-- returns or raises (throttled, locked down, target offline), the greeting is still sent.
 local function sendNotice(customer)
   local chatInfo = _G["C_ChatInfo"]
   local send = type(chatInfo) == "table" and chatInfo.SendAddonMessage or _G["SendAddonMessage"]
   if type(send) == "function" then
-    send(NOTICE_PREFIX, NOTICE, "WHISPER", customer)
+    pcall(send, NOTICE_PREFIX, NOTICE, "WHISPER", customer)
   end
 end
 

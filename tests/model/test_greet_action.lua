@@ -98,6 +98,19 @@ return function()
   ns.GreetAction.Greet(ns.Leads.Latest(), 49)
   Assert.equal(calls[2][1], "chat")
 
+  -- A notice call that raises (a lockdown error, a client change) does not stop the greeting either.
+  ns, _, calls = setup(withLeads(1))
+  Wow.stub("C_ChatInfo", {
+    SendAddonMessage = function()
+      error("addon messages are locked down")
+    end,
+    SendChatMessage = _G["C_ChatInfo"].SendChatMessage,
+  })
+  lead = ns.Leads.Latest()
+  ns.GreetAction.Greet(lead, 49)
+  Assert.same(calls, { { "chat", GREETING, "WHISPER", nil, "Customer1-Draenor" } })
+  Assert.equal(lead.greeted, true)
+
   -- A blocked greet (each rule) opens the edit box with the greeting and sends nothing, marks
   -- nothing greeted and does not count against the rate cap.
   local blocks = {
