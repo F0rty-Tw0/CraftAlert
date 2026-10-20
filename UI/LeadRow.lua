@@ -27,6 +27,14 @@ local function onClick(row, button)
   ClickRouter.Handle(button, row.lead, row.shownAt)
 end
 
+-- On screen again (the window reopened, UIParent back after Alt+Z): the lead counts as shown
+-- from now, so the time under the hidden UI is no look (§7.5 rule 3).
+local function onShow(row)
+  if row.lead then
+    row.shownAt = now()
+  end
+end
+
 local function onBlock(button)
   local lead = button.row.lead
   if lead then
@@ -93,6 +101,7 @@ function LeadRow.Create(parent, index)
   row.detail:SetPoint("RIGHT", row.greetedIcon, "LEFT", -layout.PADDING, 0)
   row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   row:SetScript("OnClick", onClick)
+  row:SetScript("OnShow", onShow)
   row:Hide()
   return row
 end

@@ -101,6 +101,21 @@ local function testGreetLatest()
   G("CraftAlert_GreetLatest")()
   Assert.equal(#UiFixture.callsTo(calls, "chat"), 1)
 
+  -- The same for the leads window's top row.
+  ns, _, calls = UiFixture.load({ leads = 2 })
+  ns.LeadsWindow.Toggle()
+  Wow.clock.gettime = 55
+  G("UIParent"):Hide()
+  Wow.clock.gettime = 58
+  G("UIParent"):Show()
+  Wow.clock.gettime = 58.01
+  G("CraftAlert_GreetLatest")()
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 0, "the row was back on screen for 10 ms")
+  Assert.equal(#UiFixture.callsTo(calls, "prefill"), 1)
+  Wow.clock.gettime = 58.6
+  G("CraftAlert_GreetLatest")()
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 1)
+
   -- No lead: nothing happens.
   calls = select(3, UiFixture.load())
   G("CraftAlert_GreetLatest")()
