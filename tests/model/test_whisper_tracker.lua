@@ -13,8 +13,8 @@ local secretNames = {}
 
 -- Real Matcher over the fixture's item index and real Leads; the player is Me-Realm.
 -- Install is left to the test. → ns, db.
-local function setup(restored)
-  local ns = Fixture.load("retail")
+local function setup(restored, flavor)
+  local ns = Fixture.load(flavor or "retail")
   Wow.clock.time = T0
   Wow.stub("UnitName", function()
     return "Me"
@@ -44,9 +44,10 @@ local function setup(restored)
   return ns, db
 end
 
-local function newLead(ns, customer)
-  local result = ns.Matcher.Match("trade", "LF plate belt", "Someone-Else")
-  return ns.Leads.OnMatch(result, customer, "LF plate belt", "trade", nil)
+local function newLead(ns, customer, text)
+  text = text or "LF plate belt"
+  local result = ns.Matcher.Match("trade", text, "Someone-Else")
+  return ns.Leads.OnMatch(result, customer, text, "trade", nil)
 end
 
 -- Whether the addon's frame listens for the whisper events.
@@ -116,6 +117,48 @@ return function()
   secretNames["Cy-Draenor"] = nil
   Wow.fireEvent(WHISPER, "hello", "Nobody-Draenor")
   Assert.equal(#replied, 1)
+
+  -- A newer lead of the same customer does not hide the greeting: the customer's whisper
+  -- marks every greeted, unanswered lead of theirs replied (one whisper, one answer).
+  ns = setup({ "Bob-Realm" })
+  replied = {}
+  ns.Leads.On("replied", function(l)
+    replied[#replied + 1] = l.id
+  end)
+  ns.WhisperTracker.Install()
+  ns.Leads.MarkGreeted(1)
+  local newer = newLead(ns, "Bob-Realm", "LF plate greaves")
+  Assert.equal(ns.Leads.FindActiveByCustomer("Bob-Realm"), newer, "the newest lead is not greeted")
+  Wow.fireEvent(WHISPER, "hello", "Bob-Realm")
+  Assert.same(replied, { 1 }, "the older, greeted lead is answered")
+  Assert.equal(newer.replied, false)
+  Wow.fireEvent(WHISPER, "again", "Bob-Realm")
+  Assert.same(replied, { 1 }, "once per lead")
+
+  -- Two greeted leads of one customer are both answered by one whisper.
+  ns = setup({ "Bob-Realm" })
+  replied = {}
+  ns.Leads.On("replied", function(l)
+    replied[#replied + 1] = l.id
+  end)
+  ns.WhisperTracker.Install()
+  newer = newLead(ns, "Bob-Realm", "LF plate greaves")
+  ns.Leads.MarkGreeted(1)
+  ns.Leads.MarkGreeted(newer.id)
+  Wow.fireEvent(WHISPER, "hello", "Bob-Realm")
+  table.sort(replied)
+  Assert.same(replied, { 1, newer.id })
+
+  -- Forever whispers carry no realm: the sender "Bob Smith" is the lead's customer on the own realm.
+  ns = setup({ "Bob Smith-Realm" }, "forever")
+  replied = {}
+  ns.Leads.On("replied", function(l)
+    replied[#replied + 1] = l.id
+  end)
+  ns.WhisperTracker.Install()
+  Wow.fireEvent(INFORM, "hi", "Bob Smith")
+  Wow.fireEvent(WHISPER, "hello", "Bob Smith")
+  Assert.same(replied, { 1 })
 
   -- The addon never listens for addon messages: no shipped file mentions the event.
   for _, path in ipairs(Toc.luaFiles()) do

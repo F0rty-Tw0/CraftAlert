@@ -18,28 +18,34 @@ local WhisperTracker = {}
 local WHISPER = "CHAT_MSG_WHISPER"
 local WHISPER_INFORM = "CHAT_MSG_WHISPER_INFORM"
 
--- The customer's newest lead for a whisper partner; nil for a secret or unknown name.
-local function leadFor(name)
+-- The normalized key of a whisper partner; nil for a secret or unknown name.
+local function keyOf(name)
   if FlavorCompat.issecretvalue(name) then
     return nil
   end
-  local key = PlayerName.Normalize(name)
-  return key and Leads.FindActiveByCustomer(key)
+  return PlayerName.Normalize(name)
 end
 
--- The player whispered somebody: (text, target).
+-- The player whispered somebody: (text, target). Their newest lead counts as greeted.
 local function onInform(_, target)
-  local lead = leadFor(target)
+  local key = keyOf(target)
+  local lead = key and Leads.FindActiveByCustomer(key)
   if lead then
     Leads.MarkGreeted(lead.id)
   end
 end
 
--- Somebody whispered the player: (text, sender).
+-- Somebody whispered the player: (text, sender). Every greeted lead of theirs still waiting for
+-- an answer gets it, so a newer, ungreeted lead of the same customer cannot hide the greeting.
 local function onWhisper(_, sender)
-  local lead = leadFor(sender)
-  if lead then
-    Leads.MarkReplied(lead.id)
+  local key = keyOf(sender)
+  if key == nil then
+    return
+  end
+  for _, lead in ipairs(Leads.List()) do
+    if lead.customer == key then
+      Leads.MarkReplied(lead.id)
+    end
   end
 end
 
