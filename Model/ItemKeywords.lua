@@ -68,5 +68,21 @@ function ItemKeywords.WordsFor(itemID, extraSlang)
   return words
 end
 
+-- → a new table: Slang.armorTags plus each extra slang word whose target has a tag, with that
+-- tag. A static word keeps its own tag. Build time only.
+function ItemKeywords.ArmorTags(extraSlang)
+  local tags = {}
+  for word, tag in pairs(Slang.armorTags) do
+    tags[word] = tag
+  end
+  for extra, target in pairs(extraSlang or {}) do
+    extra, target = lower(extra), lower(target)
+    if extra ~= "" and Slang.armorTags[target] and not Slang.armorTags[extra] then
+      tags[extra] = Slang.armorTags[target]
+    end
+  end
+  return tags
+end
+
 ns.ItemKeywords = ItemKeywords
 return ItemKeywords

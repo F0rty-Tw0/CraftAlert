@@ -153,6 +153,56 @@ local function testWordSet()
   end
 end
 
+-- Class-armor spec §4 rule 1: armor slot words are tagged "slot", armor types "type"; a player's
+-- extra slang word takes the tag of the word it maps to.
+local function testArmorTags()
+  load({})
+  local Slang = Fresh.require("Model.Slang")
+  local ItemKeywords = Fresh.require("Model.ItemKeywords")
+  local slots = {
+    "belt",
+    "waist",
+    "boots",
+    "boot",
+    "feet",
+    "shoes",
+    "gloves",
+    "glove",
+    "hands",
+    "gauntlets",
+    "bracers",
+    "bracer",
+    "wrist",
+    "helm",
+    "helmet",
+    "head",
+    "shoulders",
+    "shoulder",
+    "pauldrons",
+    "chest",
+    "robe",
+    "legs",
+    "pants",
+  }
+  local expected = { cloth = "type", leather = "type", mail = "type", plate = "type" }
+  for _, word in ipairs(slots) do
+    expected[word] = "slot"
+  end
+  Assert.same(Slang.armorTags, expected)
+  -- Non-armor slots carry no tag.
+  for _, word in ipairs({ "ring", "cloak", "neck", "trinket", "shield", "offhand", "bag", "1h", "sword" }) do
+    Assert.equal(Slang.armorTags[word], nil, word)
+  end
+  local tags = ItemKeywords.ArmorTags({ pl8 = "plate", Britches = "LEGS", junk = "wand", plate = "belt", [""] = "head" })
+  Assert.equal(tags.pl8, "type")
+  Assert.equal(tags.britches, "slot")
+  Assert.equal(tags.junk, nil)
+  Assert.equal(tags.plate, "type", "a static word keeps its tag")
+  Assert.equal(tags[""], nil)
+  Assert.equal(Slang.armorTags.pl8, nil, "the static table is not written")
+  Assert.same(ItemKeywords.ArmorTags(nil), expected)
+end
+
 return function()
   testEverySlotAndType()
   testUnknownItem()
@@ -162,4 +212,5 @@ return function()
   testResultIsFresh()
   testAmbiguousFlags()
   testWordSet()
+  testArmorTags()
 end
