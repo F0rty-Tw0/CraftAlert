@@ -187,6 +187,27 @@ local function testCraftersPage()
   Assert.equal(character.label:GetText(), "Alt-Realm (same account)")
 end
 
+-- Removing the current character stores it again from the client at once (as at login), so its
+-- profession windows keep recording instead of waiting for the next login.
+local function testRemoveOwnCharacter()
+  local ns, db = SettingsFixture.load({ db = crafters })
+  Wow.stub("GetProfessions", function()
+    return 1
+  end)
+  Wow.stub("GetProfessionInfo", function()
+    return "Blacksmithing", nil, 1, 100, nil, nil, BS
+  end)
+  open(ns, "Crafters")
+  Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Remove character"))
+  Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Click again to remove"))
+  local me = db.characters["Me-Realm"]
+  Assert.truthy(me, "stored again")
+  Assert.same(me.recipes, {}, "its recipes are gone")
+  Assert.same(me.professions, { [BS] = { name = "Blacksmithing", primary = false, read = false } })
+  Assert.equal(ns.ProfessionList.IsStored(db, "Me-Realm", BS), true)
+  Assert.truthy(db.characters["Alt-Realm"].recipes[9001], "other characters are untouched")
+end
+
 -- §9 Test: a line → result and "why", through Matcher.MatchUngated (no gate, no lead, no
 -- ignore check); a line that stops says where.
 local function testTestPage()
@@ -224,5 +245,6 @@ return function()
   testKeywordsPage()
   testBlockTypedName()
   testCraftersPage()
+  testRemoveOwnCharacter()
   testTestPage()
 end
