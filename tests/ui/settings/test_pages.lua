@@ -177,6 +177,12 @@ local function testGreetingsPage()
   Assert.truthy(SettingsFixture.texts():find("Item: Yo Customer, Sample Item here.", 1, true))
   Widgets.type(row("Alt profession").input, "{crafter} does {profession}")
   Assert.equal(settings.templates.altProfession, "{crafter} does {profession}")
+  -- An emptied template would whisper nothing: it goes back to the default, as the box shows.
+  Widgets.type(row("Item").input, "   ")
+  Assert.equal(settings.templates.item, "Hi! I can craft {item}.")
+  Assert.equal(row("Item").input:GetText(), "Hi! I can craft {item}.")
+  Widgets.type(row("Alt profession").input, "")
+  Assert.equal(settings.templates.altProfession, ns.Defaults.Settings().templates.altProfession)
 
   -- Professions by name; the note goes to the one shown and joins its preview lines.
   Assert.equal(row("Note for").input.label:GetText(), "Blacksmithing")

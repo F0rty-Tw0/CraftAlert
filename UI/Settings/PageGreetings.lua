@@ -5,6 +5,7 @@ end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
+local Defaults = ns.Defaults or require("CraftAlert.Persistence.Defaults")
 local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
@@ -13,6 +14,8 @@ local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls
 -- that runs Greeting.Build on a sample lead for each template. Greetings are built at click
 -- time, so nothing is rebuilt here; the preview repaints after each change.
 local PageGreetings = { id = "greetings", title = Localization.Text("Greetings") }
+
+local find = string.find
 
 local TEMPLATES = {
   { key = "item", label = "Item", kind = "item", own = true },
@@ -103,7 +106,13 @@ function PageGreetings.Create(parent)
   end
   Controls.Section(column, Localization.Text("Templates ({item} {crafter} {profession} {customer})"))
   for _, template in ipairs(TEMPLATES) do
-    local input = Controls.Input(column, Localization.Text(template.label), function(text)
+    local input
+    -- An emptied template would send an empty whisper: it falls back to the default.
+    input = Controls.Input(column, Localization.Text(template.label), function(text)
+      if not find(text, "%S") then
+        text = Defaults.Settings().templates[template.key]
+        input.Set(text)
+      end
       db().settings.templates[template.key] = text
       repaint()
     end)
