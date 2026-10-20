@@ -19,7 +19,7 @@ local function testRequiredLines()
   Assert.equal(why(result), "lf+lion+heart")
   expect(ns, "lf enchant mangoose pls", "item:enchant weapon - mongoose")
   expect(ns, "Any Enchaters in ORG?", "profession:" .. ENCH)
-  result = expect(ns, "LF Enchanter +8stam to chest", "item:enchant chest - greater stamina")
+  result = assert(expect(ns, "LF Enchanter +8stam to chest", "item:enchant chest - greater stamina"))
   Assert.equal(why(result), "lf+chest+8stam")
   Assert.equal(result.entryCount, 1)
   Assert.equal(result.entries[1].character, "Ench-Realm")
@@ -84,7 +84,7 @@ end
 local function testItemLinks()
   local ns = Fixture.load()
   local index = Fixture.itemIndex(ns)
-  local result = expect(ns, "WTB |Hitem:999|h[Thunderbrow Ring]|h or |cnIQ3:|Hitem:501::::::::30:1488|h[Thick Plate Belt]|h|r", "item:501")
+  local result = assert(expect(ns, "WTB |Hitem:999|h[Thunderbrow Ring]|h or |cnIQ3:|Hitem:501::::::::30:1488|h[Thick Plate Belt]|h|r", "item:501"))
   Assert.equal(result.entryCount, 2, "both crafters")
   Assert.equal(result.prof, BS)
   Assert.equal(why(result), "wtb+501")
@@ -272,6 +272,42 @@ local function testResultReuseAndConfigure()
   Assert.equal(ns.Matcher.Match("trade", "mongoose plz", SENDER).why[3], nil, "stale why cleared")
 end
 
+-- The getter Matcher hands to step 4.4. WordGroups.Match is replaced so only this test calls it.
+local function testClassGetter()
+  local CLASS_ARMOR_ARG = 8 -- WordGroups.Match(index, tokens, count, intent, hasSet, setWhy, setWhyCount, classArmor)
+  local function capture(flavor)
+    local ns = Fixture.load(flavor)
+    Fixture.itemIndex(ns)
+    local seen = {}
+    ns.WordGroups.Match = function(...)
+      seen.getter = select(CLASS_ARMOR_ARG, ...)
+      return false
+    end
+    return ns, seen
+  end
+  local ns, seen = capture()
+  local calls = Fixture.stubClasses({ ["Player-1-W"] = "WARRIOR" })
+  ns.Matcher.Match("trade", "LF belt", SENDER, "Player-1-W")
+  Assert.equal(type(seen.getter), "function")
+  local first = seen.getter
+  Assert.same({ seen.getter() }, { "plate", "plate (warrior)" })
+  ns.Matcher.Match("trade", "LF belt", SENDER, nil)
+  Assert.equal(seen.getter, first, "one function value for every line")
+  Assert.equal(seen.getter(), nil, "a line without a GUID has no class")
+  ns.Matcher.Match("trade", "LF belt", SENDER, "Player-1-W")
+  ns.Matcher.MatchUngated("LF belt")
+  Assert.equal(seen.getter(), nil, "/ca test never reuses the last sender's GUID")
+  Assert.equal(calls.n, 1, "only the first getter call reached the API")
+  ns, seen = capture("era")
+  calls = Fixture.stubClasses({ ["Player-1-W"] = "WARRIOR" })
+  ns.Matcher.Match("trade", "LF belt", SENDER, "Player-1-W")
+  Assert.same({ seen.getter() }, { "plate", "plate (warrior)" }, "a Classic flavor infers too")
+  Assert.equal(calls.n, 1, "Classic: one API call")
+  ns.Matcher.MatchUngated("LF belt")
+  Assert.equal(seen.getter(), nil, "Classic: /ca test never uses a GUID")
+  Assert.equal(calls.n, 1, "Classic: no call for the ungated line")
+end
+
 return function()
   testRequiredLines()
   testGate()
@@ -286,5 +322,6 @@ return function()
   testOldIndexReleased()
   testLongSpan()
   testShapeTwinElsewhere()
+  testClassGetter()
   Wow.reset()
 end

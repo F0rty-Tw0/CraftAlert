@@ -249,7 +249,15 @@ return function()
   -- and the sender's GUID travel along.
   ns, db, resting = setup("retail")
   start(ns, db)
+  local seenGuid
+  local match = ns.Matcher.Match
+  ns.Matcher.Match = function(key, text, sender, guid)
+    seenGuid = guid
+    return match(key, text, sender, guid)
+  end
   fireChannel("LF plate belt", "Bob-Draenor", 2, "Player-1-0A")
+  Assert.equal(seenGuid, "Player-1-0A")
+  ns.Matcher.Match = match
   local lead = ns.Leads.Latest()
   Assert.equal(lead.customer, "Bob-Draenor")
   Assert.equal(lead.channel, "trade")

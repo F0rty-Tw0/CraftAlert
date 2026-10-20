@@ -90,7 +90,7 @@ function ScanGate.HandleChat(event, text, sender, _, _, _, _, zoneChannelID, _, 
   if key == nil then
     return
   end
-  local result = Matcher.Match(key, text, sender)
+  local result = Matcher.Match(key, text, sender, guid)
   if result == nil then
     return
   end

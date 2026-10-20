@@ -5,6 +5,7 @@ end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
+local ClassArmor = ns.ClassArmor or require("CraftAlert.Model.ClassArmor")
 local Tokenizer = ns.Tokenizer or require("CraftAlert.Model.Tokenizer")
 local PhraseMatch = ns.PhraseMatch or require("CraftAlert.Model.PhraseMatch")
 local StatSlot = ns.StatSlot or require("CraftAlert.Model.StatSlot")
@@ -13,9 +14,11 @@ local Candidates = ns.MatchCandidates or require("CraftAlert.Model.MatchCandidat
 local WordGroups = ns.WordGroups or require("CraftAlert.Model.WordGroups")
 
 -- Hot path, spec §6.3 steps 1-4: gate, prefilter + tokenize, intent, match. Reads only the
--- index (never CraftAlertDB or settings), calls no Blizzard API but issecretvalue, and
--- creates no table or closure per line: buffers are module-level and reused. A match fills
--- the one module-level `result`; callers copy what they keep.
+-- index (never CraftAlertDB or settings), calls no Blizzard API but issecretvalue (except one
+-- GetPlayerInfoByGUID per line in step 4.4 when the class-armor rule applies, see
+-- docs/specs/2026-10-20-class-armor-design.md §4 rule 8), and creates no table or closure per
+-- line: buffers are module-level and reused. A match fills the one module-level `result`;
+-- callers copy what they keep.
 local Matcher = {}
 
 local find = string.find
@@ -31,6 +34,7 @@ local result = Candidates.result
 local index = nil
 local tokenCount = 0
 local intentToken = nil
+local lineGuid = nil -- the sender GUID of the line in flight; nil for /ca test
 
 Matcher.lastStop = "nomatch"
 
@@ -127,9 +131,15 @@ local function matchStatSlot()
   return true
 end
 
+-- The sender's armor word and why label, from their class. → armorWord, whyLabel or nil. Handed
+-- to step 4.4 as one function value, so a line without an armor slot never pays the API call.
+local function senderArmor()
+  return ClassArmor.For(FlavorCompat.ClassOf(lineGuid))
+end
+
 -- Step 4.4 (WordGroups). hasSet: step 4.2 left several recipes in Candidates.
 local function matchWords(hasSet)
-  return WordGroups.Match(index, tokens, tokenCount, intentToken, hasSet, PhraseMatch.why, PhraseMatch.whyCount)
+  return WordGroups.Match(index, tokens, tokenCount, intentToken, hasSet, PhraseMatch.why, PhraseMatch.whyCount, senderArmor)
 end
 
 -- Step 4.5: the typo pass, only after steps 4.1-4.4 found nothing. hasPhrase: step 4.2 kept
@@ -177,8 +187,8 @@ local function matchTokens()
   return matchStatSlot() or matchWords(hasSet) or matchTypos(hasSet) or matchProfessionWord()
 end
 
--- Steps 2-4 without the gate (/ca test). → result or nil; lastStop says why.
-function Matcher.MatchUngated(text)
+-- Steps 2-4 on the text. → result or nil; lastStop says why.
+local function matchText(text)
   if index == nil then
     return stop("noIndex") -- never built: login stopped early or the build raised
   end
@@ -202,8 +212,14 @@ function Matcher.MatchUngated(text)
   return result
 end
 
+-- Steps 2-4 without the gate (/ca test); never uses a GUID.
+function Matcher.MatchUngated(text)
+  lineGuid = nil
+  return matchText(text)
+end
+
 -- Steps 1-4. channelKey: a ScanGate.ChannelKey value ("trade", "services", ...).
-function Matcher.Match(channelKey, text, sender)
+function Matcher.Match(channelKey, text, sender, guid)
   if index == nil or not index.channelEnabled[channelKey] then
     return stop("channel")
   end
@@ -217,7 +233,8 @@ function Matcher.Match(channelKey, text, sender)
   if key ~= nil and index.blockSet[key] then
     return stop("blocked")
   end
-  return Matcher.MatchUngated(text)
+  lineGuid = guid
+  return matchText(text)
 end
 
 ns.Matcher = Matcher
