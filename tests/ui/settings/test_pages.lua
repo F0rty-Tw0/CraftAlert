@@ -29,7 +29,7 @@ local function testLazyWindow()
       titles[#titles + 1] = frame.label:GetText()
     end
   end
-  Assert.same(titles, { "General", "Alerts" })
+  Assert.same(titles, { "General", "Alerts", "Greetings" })
 end
 
 local function testAddPage()
@@ -149,10 +149,55 @@ local function testAlertsPage()
   Assert.same(take(refreshes), { "leadsWindow" })
 end
 
+local function character(professions)
+  return { source = "local", enabled = true, realms = { "Realm" }, professions = professions, recipes = {} }
+end
+
+-- §7.4: templates and per-profession notes are written as typed; the preview is
+-- Greeting.Build on a sample lead per template and follows every change. No refresh is
+-- triggered: greetings are built when a lead is clicked.
+local function testGreetingsPage()
+  local ns, db, refreshes = SettingsFixture.load({
+    db = function(accountDb)
+      accountDb.characters["Me-Realm"] = character({ [333] = { name = "Enchanting", primary = false, read = true } })
+      accountDb.characters["Alt-Realm"] = character({ [164] = { name = "Blacksmithing", primary = false, read = true } })
+    end,
+  })
+  local settings = db.settings
+  open(ns, "Greetings")
+  take(refreshes)
+  local texts = SettingsFixture.texts()
+  Assert.truthy(texts:find("Item: Hi! I can craft Sample Item.", 1, true), texts)
+  Assert.truthy(texts:find("Alt item: Hi! My alt Alt can craft Sample Item, send the order there.", 1, true), texts)
+  Assert.truthy(texts:find("Profession: Hi! I have Blacksmithing, what do you need?", 1, true), texts)
+  Assert.equal(row("Item").input:GetText(), "Hi! I can craft {item}.")
+
+  Widgets.type(row("Item").input, "Yo {customer}, {item} here.")
+  Assert.equal(settings.templates.item, "Yo {customer}, {item} here.")
+  Assert.truthy(SettingsFixture.texts():find("Item: Yo Customer, Sample Item here.", 1, true))
+  Widgets.type(row("Alt profession").input, "{crafter} does {profession}")
+  Assert.equal(settings.templates.altProfession, "{crafter} does {profession}")
+
+  -- Professions by name; the note goes to the one shown and joins its preview lines.
+  Assert.equal(row("Note for").input.label:GetText(), "Blacksmithing")
+  Widgets.type(row("Note").input, "Bring mats.")
+  Assert.same(settings.notes, { [164] = "Bring mats." })
+  Assert.truthy(SettingsFixture.texts():find("what do you need? Bring mats.", 1, true))
+  Widgets.click(row("Note for").input)
+  Assert.equal(row("Note for").input.label:GetText(), "Enchanting")
+  Assert.equal(row("Note").input:GetText(), "", "the shown note follows the profession")
+  Assert.truthy(SettingsFixture.texts():find("Profession: Hi! I have Enchanting, what do you need?", 1, true))
+  Widgets.click(row("Note for").input)
+  Widgets.type(row("Note").input, "")
+  Assert.same(settings.notes, {}, "an emptied note is removed")
+  Assert.same(take(refreshes), {})
+end
+
 return function()
   testLazyWindow()
   testAddPage()
   testGeneralPage()
   testChannelsPerFlavor()
   testAlertsPage()
+  testGreetingsPage()
 end

@@ -8,6 +8,7 @@ local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local PageGeneral = ns.PageGeneral or require("CraftAlert.UI.Settings.PageGeneral")
 local PageAlerts = ns.PageAlerts or require("CraftAlert.UI.Settings.PageAlerts")
+local PageGreetings = ns.PageGreetings or require("CraftAlert.UI.Settings.PageGreetings")
 
 -- Spec §9: Craft Alert's own settings window in the WhisperMessenger look, frame
 -- CraftAlertSettingsWindow, created on the first Toggle (§4.4 rule 5). Left navigation, one
@@ -129,6 +130,7 @@ end
 
 SettingsWindow.AddPage(PageGeneral)
 SettingsWindow.AddPage(PageAlerts)
+SettingsWindow.AddPage(PageGreetings)
 
 ns.SettingsWindow = SettingsWindow
 return SettingsWindow

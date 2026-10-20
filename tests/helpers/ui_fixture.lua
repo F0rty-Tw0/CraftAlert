@@ -36,6 +36,7 @@ local UI = {
   "UI.Settings.Controls",
   "UI.Settings.PageGeneral",
   "UI.Settings.PageAlerts",
+  "UI.Settings.PageGreetings",
   "UI.Settings.SettingsWindow",
   "Core.Bindings",
 }
