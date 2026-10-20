@@ -55,6 +55,16 @@ local function testGreetLatest()
   G("CraftAlert_GreetLatest")()
   Assert.equal(#UiFixture.callsTo(calls, "chat"), 1)
 
+  -- Shown in both, the lead counts as on screen since the earlier of the two: the window's top
+  -- row from 50, the toast only from 50.3.
+  ns, _, calls = UiFixture.load({ leads = 2 })
+  ns.LeadsWindow.Toggle()
+  Wow.clock.gettime = 50.3
+  ns.AlertToast.Show(ns.Leads.Latest())
+  Wow.clock.gettime = 50.6
+  G("CraftAlert_GreetLatest")()
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 1)
+
   -- The toast showing an older lead does not count for the latest one.
   ns, _, calls = UiFixture.load({ leads = 2 })
   ns.AlertToast.Show(ns.Leads.List()[2])
