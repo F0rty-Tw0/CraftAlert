@@ -3,6 +3,7 @@
 --   Wow.stub(name, value)   set _G[name] (restored by the next reset)
 --   Wow.fireEvent(e, ...)   fire e on every stub frame that registered it
 --   Wow.runTimers()         run queued C_Timer.After callbacks (lowest delay first)
+--   Wow.pendingTimers(d)    how many queued C_Timer.After callbacks have delay d
 --   Wow.secret(v)           wrap v so issecretvalue(wrapper) is true
 local Wow = {}
 
@@ -111,6 +112,16 @@ function Wow.runTimers()
     timer.fn()
   end
   error("Wow.runTimers: timers keep re-arming", 2)
+end
+
+function Wow.pendingTimers(delay)
+  local count = 0
+  for _, timer in ipairs(Wow.timers) do
+    if timer.delay == delay then
+      count = count + 1
+    end
+  end
+  return count
 end
 
 local timerSeq = 0

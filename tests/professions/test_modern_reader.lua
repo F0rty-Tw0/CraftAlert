@@ -70,7 +70,7 @@ local function readFlow(flavor)
   Assert.equal(db.characters[CHAR].professions[ENCH].read, false)
   Assert.same(state.requests, { 100, 200 }, "bind requested for items with an unknown bind")
   Assert.same(ModernReader.lastRead, { prof = BS, stored = 3, pendingBind = 2 })
-  Assert.equal(#Wow.timers, 1, "one coalesced rebuild")
+  Assert.equal(Wow.pendingTimers(0), 1, "one coalesced rebuild")
   Wow.runTimers()
   Assert.same(run.reasons, { "read" })
   Assert.equal(run.builds, 1)
@@ -89,7 +89,7 @@ return function()
     Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
     Assert.same(recipesOf(db), {}, guard)
     Assert.equal(db.characters[CHAR].professions[BS].read, false, guard)
-    Assert.equal(#Wow.timers, 0, guard)
+    Assert.equal(Wow.pendingTimers(0), 0, guard)
     Assert.equal(run.builds, 0, guard)
   end
 
@@ -101,7 +101,7 @@ return function()
   state.base = nil
   Wow.fireEvent("TRADE_SKILL_SHOW")
   Assert.same(recipesOf(db), {})
-  Assert.equal(#Wow.timers, 0)
+  Assert.equal(Wow.pendingTimers(0), 0)
 
   -- Reads only add: a partial read, then a full read, then a partial one again.
   state, _, db = setup()
@@ -159,7 +159,7 @@ return function()
   Wow.fireEvent("TRADE_SKILL_SHOW")
   Wow.runTimers()
   Wow.fireEvent("TRADE_SKILL_SHOW")
-  Assert.equal(#Wow.timers, 0)
+  Assert.equal(Wow.pendingTimers(0), 0)
 
   -- ReadOne: the recipe is stored on the current character even though `learned` is still false.
   local ModernReader, run
@@ -176,5 +176,5 @@ return function()
   Assert.equal(run.builds, 1)
   Assert.same(run.reasons, { "learn" })
   Assert.equal(ModernReader.ReadOne(1, BS), true)
-  Assert.equal(#Wow.timers, 0, "storing the same recipe again changes nothing")
+  Assert.equal(Wow.pendingTimers(0), 0, "storing the same recipe again changes nothing")
 end

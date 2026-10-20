@@ -8,7 +8,8 @@ local EVENT = "GET_ITEM_INFO_RECEIVED"
 local BS = 164
 local BATCH = 50
 
--- Two characters with recipes whose bind is unknown; 101 is shared, 102 already has a bind.
+-- Two characters with recipes whose bind is unknown; 101 is shared, 102 already has a bind,
+-- and A holds a second recipe for 101 whose bind is known (a read never overwrites it).
 local function setup(extraItems)
   local ns = Fixture.load()
   local state = ProfessionsRetail.install({})
@@ -17,6 +18,7 @@ local function setup(extraItems)
   db.characters["A-Realm"] = Fixture.character({ BS }, {
     [1] = { name = "a", item = 101, prof = BS },
     [2] = { name = "b", item = 102, prof = BS, bind = 1 },
+    [3] = { name = "c", item = 101, prof = BS, bind = 1 },
   })
   db.characters["B-Realm"] = Fixture.character({ BS }, { [1] = { name = "a", item = 101, prof = BS } })
   for i = 1, extraItems or 0 do
@@ -36,6 +38,18 @@ local function registered()
   return Wow.frames[1] ~= nil and Wow.frames[1]:IsEventRegistered(EVENT)
 end
 
+-- Runs the one pending 1 s bind timer (not the index rebuild timer).
+local function tick()
+  for i, timer in ipairs(Wow.timers) do
+    if timer.delay == 1 then
+      table.remove(Wow.timers, i)
+      timer.fn()
+      return
+    end
+  end
+  error("no bind timer pending")
+end
+
 -- The client loads the item, then tells the addon.
 local function arrive(state, itemID, success)
   state.cached[itemID] = success ~= false or nil
@@ -51,17 +65,18 @@ return function()
   BindLookup.Queue(101)
   Assert.same(state.requests, { 101 }, "an item is requested once")
   Assert.truthy(registered())
-  Assert.equal(#Wow.timers, 0, "no timer until data arrives")
+  Assert.equal(#Wow.timers, 1, "a request arms the timer")
   Wow.fireEvent(EVENT, 999, true)
-  Assert.equal(#Wow.timers, 0, "an item nobody queued is ignored")
+  Assert.equal(#Wow.timers, 1, "an item nobody queued is ignored")
   arrive(state, 101)
-  Assert.equal(#Wow.timers, 1)
+  Assert.equal(#Wow.timers, 1, "still one pending timer")
   Assert.equal(Wow.timers[1].delay, 1, "1 s debounce")
   Assert.equal(db.characters["A-Realm"].recipes[1].bind, nil, "stored when the timer fires")
   Wow.runTimers()
   Assert.equal(db.characters["A-Realm"].recipes[1].bind, 2)
   Assert.equal(db.characters["B-Realm"].recipes[1].bind, 2)
-  Assert.equal(db.characters["A-Realm"].recipes[2].bind, 1, "a known bind stays")
+  Assert.equal(db.characters["A-Realm"].recipes[2].bind, 1, "an item nobody asked about is untouched")
+  Assert.equal(db.characters["A-Realm"].recipes[3].bind, 1, "a known bind stays")
   Assert.equal(BindLookup.lastStored, 2)
   Assert.equal(run.builds, 1)
   Assert.same(run.reasons, { "bind" })
@@ -89,7 +104,8 @@ return function()
   Assert.equal(run.builds, 0)
   Assert.falsy(registered())
 
-  -- Batches of 50 (§4.4 rule 7): the next batch goes out after the debounce timer.
+  -- Batches of 50 (§4.4 rule 7): the next batch goes out on the timer after the last one
+  -- arrived, and the index is rebuilt once when everything has drained.
   state, BindLookup, db, run = setup(120)
   for i = 1, 120 do
     state.bind[1000 + i] = 1
@@ -101,21 +117,49 @@ return function()
     arrive(state, 1000 + i)
   end
   Assert.falsy(registered(), "nothing in flight between batches")
-  Wow.runTimers()
+  tick()
   Assert.equal(#state.requests, 2 * BATCH)
   Assert.truthy(registered())
   Assert.equal(db.characters["A-Realm"].recipes[1001].bind, 1)
   Assert.equal(db.characters["A-Realm"].recipes[1051].bind, nil)
+  Assert.equal(#Wow.timers, 1, "no rebuild between batches")
   for i = BATCH + 1, 2 * BATCH do
     arrive(state, 1000 + i)
   end
-  Wow.runTimers()
+  tick()
   Assert.equal(#state.requests, 120, "the last batch holds the rest")
+  Assert.equal(#Wow.timers, 1, "still no rebuild")
   for i = 2 * BATCH + 1, 120 do
     arrive(state, 1000 + i)
   end
+  tick()
+  Assert.equal(#Wow.timers, 1, "the drain requests the rebuild")
   Wow.runTimers()
   Assert.equal(db.characters["A-Realm"].recipes[1120].bind, 1)
-  Assert.equal(run.builds, 3, "one rebuild per batch")
+  Assert.equal(run.builds, 1, "one rebuild per drain, not per batch")
+  Assert.same(run.reasons, { "bind" })
+  Assert.equal(BindLookup.lastStored, 120, "stored over the whole drain")
   Assert.falsy(registered())
+
+  -- An item that never answers is given up after 10 ticks, so it cannot block the window or
+  -- keep the event registered; it is not retried this session.
+  state, BindLookup, db, run = setup(60)
+  for i = 1, BATCH + 1 do
+    BindLookup.Queue(1000 + i)
+  end
+  Assert.equal(#state.requests, BATCH)
+  for _ = 1, 9 do
+    tick()
+  end
+  Assert.equal(#state.requests, BATCH, "still waiting at tick 9")
+  tick()
+  Assert.equal(#state.requests, BATCH + 1, "tick 10 gives up and sends the next item")
+  Assert.truthy(registered())
+  Wow.runTimers()
+  Assert.falsy(registered(), "everything given up: unregistered")
+  Assert.equal(run.builds, 0)
+  Assert.equal(db.characters["A-Realm"].recipes[1001].bind, nil)
+  BindLookup.Queue(1001)
+  Assert.equal(#state.requests, BATCH + 1, "not retried this session")
+  Assert.equal(#Wow.timers, 0)
 end

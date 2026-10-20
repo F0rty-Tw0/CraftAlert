@@ -51,7 +51,7 @@ return function()
     Wow.fireEvent(EVENT, 1)
     Assert.equal(LearnWatcher.lastStored, true)
     Assert.same(db.characters[CHAR].recipes[1], { item = 1001, name = "recipe 1", prof = BS })
-    Assert.equal(#Wow.timers, 1)
+    Assert.equal(Wow.pendingTimers(0), 1)
     Wow.runTimers()
     Assert.same(run.reasons, { "learn" })
     Assert.truthy(ns.Index.Current().itemIndex[1001], "the new recipe is in the index")
@@ -79,7 +79,7 @@ return function()
   Wow.fireEvent(EVENT, Wow.secret(1))
   Assert.equal(LearnWatcher.lastStored, false)
   Assert.same(db.characters[CHAR].recipes, {})
-  Assert.equal(#Wow.timers, 0)
+  Assert.equal(Wow.pendingTimers(0), 0)
   Assert.equal(run.builds, 0)
 
   -- Bulk learning (Review Focus 4): 30 learns before the timers run → one rebuild.
@@ -90,7 +90,7 @@ return function()
   for id = 1, 30 do
     Wow.fireEvent(EVENT, id)
   end
-  Assert.equal(#Wow.timers, 1, "one pending C_Timer.After")
+  Assert.equal(Wow.pendingTimers(0), 1, "one pending C_Timer.After")
   Wow.runTimers()
   Assert.equal(run.builds, 1)
   for id = 1, 30 do
