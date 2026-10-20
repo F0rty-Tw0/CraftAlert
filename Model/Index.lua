@@ -23,6 +23,7 @@ local Index = {}
 
 local pairs = pairs
 local ipairs = ipairs
+local pcall = pcall
 local type = type
 local lower = string.lower
 local sort = table.sort
@@ -224,8 +225,17 @@ function Index.Current()
   return current
 end
 
+-- Called with the new index after every build, in subscription order; one that raises is
+-- reported and the rest still run.
 function Index.OnRebuilt(fn)
   rebuilt[#rebuilt + 1] = fn
+end
+
+local function reportError(err)
+  local getHandler = _G["geterrorhandler"]
+  if type(getHandler) == "function" then
+    getHandler()(err)
+  end
 end
 
 -- Synchronous build from the configured context; nil before Configure.
@@ -244,7 +254,10 @@ function Index.Rebuild()
   Index.lastBuildMs = clock() - started
   current = index
   for i = 1, #rebuilt do
-    rebuilt[i](index)
+    local ok, err = pcall(rebuilt[i], index)
+    if not ok then
+      reportError(err)
+    end
   end
   return index
 end

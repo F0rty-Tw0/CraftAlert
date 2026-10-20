@@ -272,6 +272,29 @@ local function testRebuild()
   Assert.truthy(rawequal(calls[1][2], index) and rawequal(calls[2][2], index))
 end
 
+-- A callback that raises is reported through geterrorhandler; the ones after it still run.
+local function testFailingCallback()
+  local Index, Defaults = load()
+  configure(Index, Defaults)
+  local reported, after = {}, 0
+  Wow.stub("geterrorhandler", function()
+    return function(err)
+      reported[#reported + 1] = err
+    end
+  end)
+  Index.OnRebuilt(function()
+    error("callback broke")
+  end)
+  Index.OnRebuilt(function()
+    after = after + 1
+  end)
+  local index = Index.Rebuild()
+  Assert.truthy(rawequal(Index.Current(), index))
+  Assert.equal(after, 1)
+  Assert.equal(#reported, 1)
+  assert(string.find(tostring(reported[1]), "callback broke", 1, true), tostring(reported[1]))
+end
+
 local function countBuilds(Index)
   local builds = { n = 0 }
   Index.OnRebuilt(function()
@@ -389,6 +412,7 @@ return function()
   testClassicProfessionKeys()
   testEmptyIndex()
   testRebuild()
+  testFailingCallback()
   testCoalescing()
   testCombatDeferral()
   testCombatStartsBeforeTimer()
