@@ -447,6 +447,19 @@ return function()
   Assert.equal(#Wow.timers, 1)
   Assert.equal(newLead(ns, "LF plate belt").id, 13)
 
+  -- A lead dated in the future (hand-edited, or the clock went back) counts as arrived now, so it
+  -- still expires after the timeout instead of never.
+  ns, db = setup()
+  Leads = ns.Leads
+  local future = { id = 1, customer = "Future-Draenor", time = T0 + 1e9, kind = "item", greeted = false, replied = false }
+  db.leads = { future }
+  Leads.Restore(db)
+  Assert.equal(future.time, T0)
+  Assert.equal(Wow.timers[1].delay, TIMEOUT + 1)
+  Wow.clock.time = T0 + TIMEOUT + 1
+  fireTimer()
+  Assert.same(db.leads, {}, "expired on the timeout")
+
   -- Restore keeps at most 100 leads, the newest, however many a hand-edited db holds.
   ns, db = setup()
   Leads = ns.Leads

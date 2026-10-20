@@ -187,12 +187,24 @@ local function trim()
   end
 end
 
--- Binds db.leads (Bootstrap, at PLAYER_LOGIN): repairs a hand-edited list (ids, order, size),
--- drops expired leads and starts the timer.
+-- A lead dated after now (hand-edited, or the clock was set back) would never pass the timeout:
+-- it counts as arrived now.
+local function clampTimes()
+  local current = now()
+  for i = 1, #leads do
+    if leads[i].time > current then
+      leads[i].time = current
+    end
+  end
+end
+
+-- Binds db.leads (Bootstrap, at PLAYER_LOGIN): repairs a hand-edited list (ids, times, order,
+-- size), drops expired leads and starts the timer.
 function Leads.Restore(accountDb)
   db = accountDb
   leads = db.leads
   fixIds()
+  clampTimes()
   sort(leads, isOlder)
   trim()
   if sweep() then
