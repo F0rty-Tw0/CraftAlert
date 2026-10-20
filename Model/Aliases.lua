@@ -212,22 +212,23 @@ local function sameEntries(a, b)
   return true
 end
 
-local function shareEntryLists(index, records)
-  local byFirst = {}
-  local function canonical(list)
-    local found = byFirst[list[1]]
-    if found == nil then
-      byFirst[list[1]] = list
-      return list
-    end
-    return sameEntries(found, list) and found or list
+-- byFirst is a parameter: a LuaJIT trace keeps a called closure, so its upvalues, alive.
+local function canonical(byFirst, list)
+  local found = byFirst[list[1]]
+  if found == nil then
+    byFirst[list[1]] = list
+    return list
   end
-  local itemIndex = index.itemIndex
+  return sameEntries(found, list) and found or list
+end
+
+local function shareEntryLists(index, records)
+  local byFirst, itemIndex = {}, index.itemIndex
   for itemID, list in pairs(itemIndex) do
-    itemIndex[itemID] = canonical(list)
+    itemIndex[itemID] = canonical(byFirst, list)
   end
   for _, record in pairs(records) do
-    record.entries = canonical(record.entries)
+    record.entries = canonical(byFirst, record.entries)
   end
 end
 
