@@ -247,8 +247,9 @@ function PhraseMatch.Run(newIndex, count, intentToken)
     end
   end
   -- §6.2 item 1: a kind-c alias or a one-word full name matched by one token, alone among the
-  -- hits, needs a wordIndex word in the line. A join pair covers 2 tokens, and a line with a
-  -- link-name hit has either that record as its hit, a longer hit, or two hits: never dropped.
+  -- hits, needs a wordIndex or enchant slot word in the line; otherwise it is set aside (the
+  -- typo pass may still pair with it). A join pair covers 2 tokens, and a line with a link-name
+  -- hit has either that record as its hit, a longer hit, or two hits: never set aside.
   local lone = hitCount == 1 and hitLength == 1 and not linked
   if lone and index.needsSecondWord[hits[1]] and not PhraseMatch.HasCompanionWord() then
     PhraseMatch.setAside, hitCount, hitWhyCount = hits[1], 0, 0

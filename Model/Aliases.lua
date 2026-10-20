@@ -246,7 +246,8 @@ end
 
 -- names = { { name = lowercase recipe name, entry = entry, pending = true|nil }, ... } in
 -- build order. Fills index.nameIndex, phraseSet, needsSecondWord, phraseIds, phraseKeys,
--- phraseWordRange, joinIndex and statSlotIndex; intentSet and blockerSet must already be set.
+-- phraseWordRange, joinIndex, statSlotIndex and enchantSlotWords; intentSet and blockerSet
+-- must already be set.
 function Aliases.Build(index, names)
   index.phraseSet, index.needsSecondWord, index.joinIndex = {}, {}, {}
   local notKindC = {}
