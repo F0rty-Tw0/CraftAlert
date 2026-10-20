@@ -151,6 +151,8 @@ local function testRows6To10()
   local ns = fullIndex()
   check(ns, "row 6", "LF head crafter", W, "item:504", nil, "lf+head+plate (warrior)")
   check(ns, "row 6 repeated", "LF head crafter head", W, "item:504", 1, "lf+head+head+plate (warrior)")
+  -- The admitted word belongs to its own line: the next line does not intersect with it.
+  check(ns, "admit is per line", "LF belt crafter", W, "item:501", 1, "lf+belt+plate (warrior)")
   check(ns, "row 7", "LF bs for legs", P, "item:502", nil, "lf+legs+plate (paladin)")
   check(ns, "row 9", "LF healer, head to Deadmines", P, "stop:nomatch", 0)
   check(ns, "row 10", "need legs", W, "stop:nomatch", 0)
