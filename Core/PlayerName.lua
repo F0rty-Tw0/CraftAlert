@@ -72,8 +72,14 @@ local function realmId(realm)
   return lower(PlayerName.StripApostrophes(normalizeRealm(realm) or ""))
 end
 
+-- A realm with nothing left once stripped (only apostrophes) is the same as no realm.
 local function sameRealm(realm, known)
-  return type(known) == "string" and realmId(known) == realmId(realm)
+  local id = realmId(realm)
+  if id == "" then
+    return false
+  end
+
+  return type(known) == "string" and realmId(known) == id
 end
 
 -- The spelling of `realm` among the own realm and `realms` (normalized), ignoring case, spaces

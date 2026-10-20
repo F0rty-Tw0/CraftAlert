@@ -141,6 +141,9 @@ local function testFromTyped()
   Assert.equal(PlayerName.FromTyped(""), nil)
   Assert.equal(PlayerName.FromTyped(nil), nil)
   Assert.equal(PlayerName.Normalize("bob"), "bob-OwnRealm", "Normalize is unchanged")
+  -- A realm of apostrophes only matches no stored realm, a blank one included.
+  Assert.equal(PlayerName.FromTyped("bob-'''", { "" }), "Bob-'''")
+  Assert.equal(PlayerName.FromTyped("bob-'", { "", "Area52" }), "Bob-'")
   -- Forever: each part of "First Last" starts upper case.
   local forever = load("forever", "First", "Last")
   Assert.equal(forever.FromTyped("mary JANE"), "Mary Jane-OwnRealm")
