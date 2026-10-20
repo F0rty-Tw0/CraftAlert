@@ -171,13 +171,14 @@ function LeadsWindow.Toggle()
   LeadsWindow.Refresh()
 end
 
--- The lead in the top row and GetTime() when it appeared there, or nil (closed, scrolled, empty).
+-- The lead in the top row and GetTime() when it appeared there, or nil (closed, hidden by Alt+Z,
+-- scrolled, empty). IsVisible, not IsShown: a window under a hidden UIParent stays shown.
 function LeadsWindow.VisibleLatest()
-  if window == nil or not window.frame:IsShown() or offset ~= 0 then
+  if window == nil or not window.frame:IsVisible() or offset ~= 0 then
     return nil
   end
   local row = window.rows[1]
-  local lead = row and row:IsShown() and row.lead
+  local lead = row and row:IsVisible() and row.lead
   if not lead or not Leads.IsActive(lead.id) then
     return nil
   end

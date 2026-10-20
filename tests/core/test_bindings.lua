@@ -63,6 +63,18 @@ local function testGreetLatest()
   Assert.equal(#UiFixture.callsTo(calls, "chat"), 0)
   Assert.equal(UiFixture.callsTo(calls, "prefill")[1][2], "Customer2-Draenor")
 
+  -- With the UI hidden (Alt+Z) the toast and window stay "shown" but nothing is on screen: the
+  -- keybind only prefills.
+  ns, _, calls = UiFixture.load({ leads = 2 })
+  ns.AlertToast.Show(ns.Leads.Latest())
+  ns.LeadsWindow.Toggle()
+  Wow.clock.gettime = 60
+  G("UIParent"):Hide()
+  G("CraftAlert_GreetLatest")()
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 0)
+  Assert.equal(UiFixture.callsTo(calls, "prefill")[1][2], "Customer2-Draenor")
+  Assert.equal(ns.Leads.Latest().greeted, false)
+
   -- No lead: nothing happens.
   calls = select(3, UiFixture.load())
   G("CraftAlert_GreetLatest")()

@@ -75,6 +75,11 @@ local function newFrame(frameType, name, parent, template)
     return self.shown
   end
 
+  -- As the client: shown, and so is every parent (UIParent:Hide() is Alt+Z).
+  function frame:IsVisible()
+    return self.shown and (self.parent == nil or self.parent:IsVisible())
+  end
+
   -- Fire(event, ...) runs the OnEvent script as the client would; a no-op unless registered.
   function frame:Fire(event, ...)
     local onEvent = self.scripts.OnEvent

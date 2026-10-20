@@ -197,10 +197,11 @@ function AlertToast.ShowTest(lead, greeting)
   startHideTimer()
 end
 
--- The lead on the toast and GetTime() when it appeared, or nil (hidden, test toast, lead gone).
+-- The lead on the toast and GetTime() when it appeared, or nil (hidden, also by Alt+Z, test
+-- toast, lead gone). IsVisible, not IsShown: a toast under a hidden UIParent stays shown.
 function AlertToast.VisibleLead()
   local lead = current.lead
-  if toast == nil or not toast.frame:IsShown() or current.isTest or lead == nil or not Leads.IsActive(lead.id) then
+  if toast == nil or not toast.frame:IsVisible() or current.isTest or lead == nil or not Leads.IsActive(lead.id) then
     return nil
   end
   return lead, current.shownAt
