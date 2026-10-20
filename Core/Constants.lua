@@ -83,6 +83,10 @@ Constants.aliasStopWords = {
 -- and "ring" ("ring me when ready", "ring of blood"; user ruling 2026-10-20).
 Constants.ambiguousWords = { "legs", "head", "hands", "feet", "ring" }
 
+-- Class-armor spec §5: words that mark a line as asking for crafting, so a body-part slot word
+-- may take the sender's armor type. Every profession word counts too. Fixed, not user-editable.
+Constants.craftCueWords = { "crafter", "craft", "crafted", "maker" }
+
 -- §7.4: greeting templates. Only Retail has crafting orders to point an alt's customer to.
 local function templates(altItemTail)
   return {

@@ -79,6 +79,31 @@ for _, word in ipairs(Constants.ambiguousWords) do
   Slang.ambiguous[word] = true
 end
 
+-- Class-armor spec §4 rule 1: armor slot words -> "slot", armor type words -> "type". Step 4.4
+-- reads them (through index.armorTags) to see a slot named without an armor type.
+local ARMOR_SLOTS = {
+  "INVTYPE_WAIST",
+  "INVTYPE_FEET",
+  "INVTYPE_HAND",
+  "INVTYPE_WRIST",
+  "INVTYPE_HEAD",
+  "INVTYPE_SHOULDER",
+  "INVTYPE_CHEST",
+  "INVTYPE_ROBE",
+  "INVTYPE_LEGS",
+}
+Slang.armorTags = {}
+for _, equipLoc in ipairs(ARMOR_SLOTS) do
+  for _, word in ipairs(Slang.slots[equipLoc]) do
+    Slang.armorTags[word] = "slot"
+  end
+end
+for _, words in pairs(Slang.armor) do
+  for _, word in ipairs(words) do
+    Slang.armorTags[word] = "type"
+  end
+end
+
 -- Every word above, for the matcher's "recognized slang word with no entries" rule (§6.3 4.4).
 Slang.wordSet = {}
 local function addWords(words)
