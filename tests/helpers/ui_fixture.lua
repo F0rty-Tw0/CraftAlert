@@ -43,6 +43,7 @@ local UI = {
   "UI.Settings.SettingsWindow",
   "UI.Settings.BlizzardCategory",
   "Core.Bindings",
+  "Core.Perf",
 }
 -- Globals Core/Bindings.lua defines at load: stubbed first, so Wow.reset removes them again.
 UiFixture.BINDING_GLOBALS = {

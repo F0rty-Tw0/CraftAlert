@@ -70,4 +70,5 @@ UI/Settings/PageTest.lua
 UI/Settings/SettingsWindow.lua
 UI/Settings/BlizzardCategory.lua
 Core/Bindings.lua
+Core/Perf.lua
 Bootstrap.lua
