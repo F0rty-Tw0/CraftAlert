@@ -257,9 +257,20 @@ return function()
   Assert.equal(rawget(_G, "UnitIsAFK")("player"), false)
   Assert.equal(rawget(_G, "IsResting")(), true)
 
-  -- Commands without a registered handler report it instead of crashing.
-  -- (stepLines[1..3] are the start-up build: `index:`, `scan:`, `chat:`.)
-  assert(string.find(tostring(stepLines(Sim.Run({ "--cmd", "/ca" }))[4]), "^error: no slash handler"))
+  -- --cmd routes through SlashCmdList.CRAFTALERT (registered by the sim as Bootstrap will);
+  -- what the command prints arrives as `chat:` lines, after the start-up build's three.
+  local test = stepLines(Sim.Run({ "--cmd", "/ca test LF plate belt" }))
+  Assert.equal(test[4], "chat: Craft Alert: Item: Sim Plate Belt")
+  Assert.equal(test[5], "chat: Craft Alert: Why: lf + plate + belt")
+  Assert.equal(test[6], "chat: Craft Alert: Crafter: Crafter-OwnRealm")
+  Assert.equal(test[7], "chat: Craft Alert: Greeting: Hi! I can craft Sim Plate Belt.")
+  Assert.equal(#test, 7, "no lead, no toast line, no send")
+  Assert.equal(rawget(_G, "SLASH_CRAFTALERT2"), "/ca")
+  Assert.equal(stepLines(Sim.Run({ "--cmd", "/ca test hello there" }))[4], "chat: Craft Alert: No match (stopped at: prefilter)")
+  Assert.equal(
+    stepLines(Sim.Run({ "--cmd", "/ca nonsense" }))[4],
+    "chat: Craft Alert: Commands: /ca (leads window), /ca config, /ca test <line>, /ca perf"
+  )
 
   -- The account DB goes through SavedState.Load first: one `db:` line, preceded by one
   -- `chat:` line per Schema warning.

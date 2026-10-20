@@ -209,6 +209,10 @@ local function newContext(plan, out)
   Wow.stub("IsResting", function()
     return ctx.resting
   end)
+  -- What the client defines and the addon writes into (SlashCommands.Register).
+  Wow.stub("SlashCmdList", {})
+  Wow.stub("SLASH_CRAFTALERT1", nil)
+  Wow.stub("SLASH_CRAFTALERT2", nil)
   -- The player is the fixture's Crafter-OwnRealm.
   Wow.stub("UnitName", function()
     return OWN_NAME
@@ -335,6 +339,7 @@ local function start(ctx)
     end)
     ns.ScanGate.Install(ctx.db)
     ns.Index.OnRebuilt(ns.ScanGate.Evaluate)
+    ns.SlashCommands.Register()
     reportMatches(ctx)
     reportToasts(ctx)
     watchHandler(ctx)
