@@ -219,12 +219,19 @@ local function testTestPage()
       for key, character in pairs(Fixture.db({ Defaults = require("CraftAlert.Persistence.Defaults") }).characters) do
         accountDb.characters[key] = character
       end
+      -- Blocked in the index's block set and on Blizzard's ignore list: both checks are
+      -- skipped, as for /ca test.
+      accountDb.ignored["Test-Realm"] = true
     end,
     before = function(chain)
       chain.Matcher.SetIndex(Fixture.index(chain, fixtureDb))
     end,
   })
-  db.ignored["Test-Realm"] = true -- the ignore check is skipped, as for /ca test
+  Wow.stub("C_FriendList", {
+    IsIgnored = function()
+      return true
+    end,
+  })
   open(ns, "Test")
   Widgets.type(row("Test a line").input, "lf lion heart")
   local shown = texts()
