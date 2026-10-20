@@ -123,8 +123,9 @@ local function buildIndex()
 end
 
 -- In dependency order. Each step runs on its own: one that raises is reported and the rest
--- still run. Chat events stay fail-closed: only ScanGate.Evaluate registers them, and it needs
--- the db, a built index and the resting gate.
+-- still run. ScanGate and Leads bind the db last, so a raising install leaves its module
+-- unbound and fail-closed: only ScanGate.Evaluate registers the chat events, and only once the
+-- resting events are registered and the index is built; Leads makes no lead without its db.
 local LOGIN_STEPS = {
   installProfessions,
   storeRealms,

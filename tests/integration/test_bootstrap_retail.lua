@@ -343,6 +343,47 @@ local function testRaisingLoginStep(db)
   Assert.same(chatSince(0), { STATUS_ACTIVE }, "the login lines print")
 end
 
+-- The resting events failing to register leave the gate without its db: no rebuild registers
+-- the chat events, so scanning never runs outside a city.
+local function testRaisingRestingRegistration(db)
+  local session = startClient(db)
+  local errors = recordErrors()
+  local ns = login(session, function(ns)
+    local on = ns.EventRouter.On
+    ns.EventRouter.On = function(event, fn)
+      if event == "PLAYER_UPDATE_RESTING" then
+        error("resting event failed", 0)
+      end
+      on(event, fn)
+    end
+  end)
+  ns.Index.Rebuild()
+  Assert.same(errors, { "resting event failed" }, "the error reaches the error handler")
+  Assert.equal(ns.ScanGate.IsActive(), false)
+  Assert.equal(isRegistered("CHAT_MSG_CHANNEL"), false, "no chat event without the resting gate")
+end
+
+-- The restored lead's expiry timer failing to start makes Leads.Restore raise: Leads stays
+-- unbound, so a trade line makes no lead that no toast, launcher or window would show.
+local function testRaisingLeadsRestore(db)
+  local session = startClient(db)
+  local errors = recordErrors()
+  local freshExpiryDelay = EXPIRY_DELAY + LEAD_AGE -- no minute has passed since the lead
+  login(session, function()
+    local after = _G["C_Timer"].After
+    _G["C_Timer"].After = function(delay, fn)
+      if delay == freshExpiryDelay then
+        error("timer failed", 0)
+      end
+      after(delay, fn)
+    end
+  end)
+  Assert.same(errors, { "timer failed" }, "the error reaches the error handler")
+  trade("LF " .. BELT_LINK .. " crafter", "Buyer-OtherRealm")
+  Assert.equal(#rawget(_G, "CraftAlertDB").leads, 1, "a trade line makes no lead")
+  Assert.equal(session.toasts, 0)
+end
+
 -- §4.4: the login time counts the saved-variable load and check at ADDON_LOADED and the
 -- PLAYER_LOGIN work, not the time between the two events.
 local function testLoginTime(db)
@@ -379,6 +420,8 @@ return function()
   testPartialProfessionsAtLogin(deepCopy(saved))
   testMixedKeysAtLogin(deepCopy(saved))
   testRaisingLoginStep(deepCopy(saved))
+  testRaisingRestingRegistration(deepCopy(saved))
+  testRaisingLeadsRestore(deepCopy(saved))
   testLoginTime(deepCopy(saved))
   Wow.reset()
 end
