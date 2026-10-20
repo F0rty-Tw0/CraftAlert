@@ -57,11 +57,17 @@ local function cap(text)
     local colored = open > 10 and find(sub(kept, open - 10, open - 1), "^|c%x%x%x%x%x%x%x%x$")
     kept = sub(kept, 1, colored and open - 11 or open - 1)
   end
-  if #match(kept, "|*$") % 2 == 1 then
-    kept = sub(kept, 1, -2)
-  end
-  kept = gsub(kept, "|c%x?%x?%x?%x?%x?%x?%x?$", "")
-  kept = gsub(kept, "|cn[%w_]*:?$", "")
+  -- A lone trailing pipe and a partial colour start can each expose the other ("||c" cut to
+  -- "||" + "c" → "|"), so trim both until neither is left.
+  local before
+  repeat
+    before = kept
+    if #match(kept, "|*$") % 2 == 1 then
+      kept = sub(kept, 1, -2)
+    end
+    kept = gsub(kept, "|c%x?%x?%x?%x?%x?%x?%x?$", "")
+    kept = gsub(kept, "|cn[%w_]*:?$", "")
+  until kept == before
   return kept
 end
 

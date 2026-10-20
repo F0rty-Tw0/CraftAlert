@@ -144,4 +144,15 @@ return function()
   end
   settings.templates.item = string.rep("x", 254) .. "||"
   Assert.equal(Greeting.Build(lead, settings), string.rep("x", 254), "an escaped pipe is not cut in half")
+  -- Dropping a colour start can expose a lone pipe, and the pipe trim can expose a colour start:
+  -- either order alone leaves one of these broken, so no cut may end in an odd run of pipes.
+  for _, tail in ipairs({ "||cafe", "||cnot", "||c", "|cnIQ4:|Hitem:1|h[a]|h|r" }) do
+    for pad = 240, 254 do
+      settings.templates.item = string.rep("x", pad) .. tail
+      local greeting = Greeting.Build(lead, settings)
+      Assert.equal(#string.match(greeting, "|*$") % 2, 0, "pad " .. pad .. " " .. tail .. " ends in a lone pipe")
+      local pipes = string.match(greeting, "(|+)c[%xn]?[%w_]*:?$")
+      Assert.falsy(pipes and #pipes % 2 == 1, "pad " .. pad .. " " .. tail .. " ends in a colour start")
+    end
+  end
 end
