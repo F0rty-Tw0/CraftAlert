@@ -399,6 +399,21 @@ local function testRaisingLoad(db)
   Assert.equal(isRegistered("CHAT_MSG_CHANNEL"), false, "no chat event without a db")
 end
 
+-- The player's name failing to resolve at login (`name`: "Init" or "Own") is reported once;
+-- /ca is still there, and nothing listens to chat without the player's key.
+local function testRaisingPlayerName(db, name)
+  local session = startClient(db)
+  local errors = recordErrors()
+  login(session, function(ns)
+    ns.PlayerName[name] = function()
+      error("name failed", 0)
+    end
+  end)
+  Assert.same(errors, { "name failed" }, "only the " .. name .. " error is reported")
+  Assert.equal(type(rawget(_G, "SlashCmdList").CRAFTALERT), "function", "/ca works")
+  Assert.equal(isRegistered("CHAT_MSG_CHANNEL"), false, "no chat event without the player's key")
+end
+
 -- §4.4: the login time counts the saved-variable load and check at ADDON_LOADED and the
 -- PLAYER_LOGIN work, not the time between the two events.
 local function testLoginTime(db)
@@ -438,6 +453,8 @@ return function()
   testRaisingRestingRegistration(deepCopy(saved))
   testRaisingLeadsRestore(deepCopy(saved))
   testRaisingLoad(deepCopy(saved))
+  testRaisingPlayerName(deepCopy(saved), "Init")
+  testRaisingPlayerName(deepCopy(saved), "Own")
   testLoginTime(deepCopy(saved))
   Wow.reset()
 end

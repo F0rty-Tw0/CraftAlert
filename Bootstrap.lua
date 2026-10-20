@@ -139,25 +139,33 @@ local LOGIN_STEPS = {
   printLoginLines,
 }
 
+-- → whether the step ran without raising.
 local function runStep(step)
   local ok, err = pcall(step)
   if not ok then
     EventRouter.ReportError(err)
   end
+  return ok
 end
 
--- `/ca` is registered first, so it works whatever a later step does. Without a db (the load
--- raised at ADDON_LOADED and was reported there) no step can work, so none runs.
+local function readOwnKey()
+  ownKey = PlayerName.Own()
+end
+
+-- `/ca` is registered first, so it works whatever a later step does; it reads the player's
+-- name only when used. Without a db (the load raised at ADDON_LOADED and was reported there)
+-- or the player's name, no step can work, so none runs.
 local function onLogin()
   EventRouter.Off(PLAYER_LOGIN, onLogin)
-  PlayerName.Init()
   runStep(SlashCommands.Register)
-  if db == nil then
+  if db == nil or not runStep(PlayerName.Init) then
     return
   end
   local clock = _G["debugprofilestop"]
   local started = clock()
-  ownKey = PlayerName.Own()
+  if not runStep(readOwnKey) then
+    return
+  end
   for _, step in ipairs(LOGIN_STEPS) do
     runStep(step)
   end
