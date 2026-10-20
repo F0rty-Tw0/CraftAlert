@@ -159,5 +159,27 @@ function FrameKit.Draggable(frame, key)
   end)
 end
 
+-- The window chrome: a title bar with the title on the left and an "X" that hides the frame.
+function FrameKit.TitleBar(frame, title)
+  local layout = Theme.LAYOUT
+  local bar = frame:CreateTexture(nil, "ARTWORK")
+  bar:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+  bar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+  bar:SetHeight(layout.TITLE_BAR_HEIGHT)
+  FrameKit.Fill(bar, Theme.COLORS.chrome)
+  local text = FrameKit.Text(frame, Theme.FONTS.title, Theme.COLORS.textPrimary)
+  text:SetPoint("LEFT", bar, "LEFT", layout.PADDING, 0)
+  text:SetText(title)
+  local close = _G["CreateFrame"]("Button", nil, frame)
+  close:SetSize(layout.TITLE_BUTTON_SIZE, layout.TITLE_BUTTON_SIZE)
+  close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
+  local glyph = FrameKit.Text(close, Theme.FONTS.name, Theme.COLORS.textSecondary)
+  glyph:SetPoint("CENTER", close, "CENTER", 0, 0)
+  glyph:SetText("X")
+  close:SetScript("OnClick", function()
+    frame:Hide()
+  end)
+end
+
 ns.FrameKit = FrameKit
 return FrameKit
