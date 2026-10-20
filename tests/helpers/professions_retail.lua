@@ -5,6 +5,7 @@
 --   state.guards.IsTradeSkillLinked = true   -- the open window is somebody else's list
 -- state.slots: GetProfessions positions, each { name = "Blacksmithing", skillLine = 164 } or false.
 -- state.base: professionID C_TradeSkillUI.GetBaseProfessionInfo reports for the open window.
+-- state.changing: C_TradeSkillUI.IsDataSourceChanging() (the list is still rebuilding).
 -- A recipe: { id, name, item, ranks, learned, profession = {professionID, parentProfessionID},
 -- isRecraft, isDummyRecipe, isSalvageRecipe, isGatheringRecipe }.
 local Wow = require("tests.helpers.wow")
@@ -74,6 +75,9 @@ local function installTradeSkill(state)
     GetProfessionInfoByRecipeID = function(id)
       local recipe = findRecipe(state, id)
       return recipe and recipe.profession or nil
+    end,
+    IsDataSourceChanging = function()
+      return state.changing == true
     end,
   }
   for _, name in ipairs(GUARDS) do

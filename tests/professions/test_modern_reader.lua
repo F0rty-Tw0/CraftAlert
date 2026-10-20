@@ -177,4 +177,30 @@ return function()
   Assert.same(run.reasons, { "learn" })
   Assert.equal(ModernReader.ReadOne(1, BS), true)
   Assert.equal(Wow.pendingTimers(0), 0, "storing the same recipe again changes nothing")
+
+  -- A list that also holds another profession's recipe (mid-switch on Retail): each recipe
+  -- keeps its own profession, whichever window reads it.
+  state, _, db = setup()
+  local ownBs = { professionID = 2872, parentProfessionID = BS }
+  local ownEnch = { professionID = 2909, parentProfessionID = ENCH }
+  state.recipes = { belt(1, 100, { profession = ownBs }), belt(2, 200, { profession = ownEnch }) }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(recipesOf(db)[1].prof, BS)
+  Assert.equal(recipesOf(db)[2], nil, "an Enchanting recipe in the Blacksmithing window is not stored as Blacksmithing")
+  state.base = ENCH
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(recipesOf(db)[1].prof, BS, "the Enchanting window does not re-tag a Blacksmithing recipe")
+  Assert.equal(recipesOf(db)[2].prof, ENCH)
+
+  -- A list update while the data source is still rebuilding is skipped; the next one reads.
+  state, _, db = setup()
+  state.recipes = { belt(1, 100) }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  state.recipes[2] = belt(2, 200)
+  state.changing = true
+  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  Assert.equal(recipesOf(db)[2], nil, "no read while the data source changes")
+  state.changing = false
+  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  Assert.truthy(recipesOf(db)[2])
 end

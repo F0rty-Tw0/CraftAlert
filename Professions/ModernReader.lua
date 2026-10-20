@@ -135,10 +135,25 @@ local function windowProfession(api)
   return nil
 end
 
+-- The base profession of a recipe: the parent skill line when there is one, else nil.
+function ModernReader.ProfessionOf(recipeID)
+  local api = tradeSkillApi()
+  local getInfo = api and api.GetProfessionInfoByRecipeID
+  local info = type(getInfo) == "function" and getInfo(recipeID) or nil
+  return type(info) == "table" and (info.parentProfessionID or info.professionID) or nil
+end
+
+-- Mid-switch the list may still hold the other profession's recipes: one of those is never
+-- stored under this window's key. A recipe with no profession info belongs to the window.
+local function belongsToWindow(recipeID, key)
+  local own = ModernReader.ProfessionOf(recipeID)
+  return own == nil or own == key
+end
+
 local function readWindow(api, character, key, recipeIDs)
   local stored, pendingBind, anyChanged = 0, 0, false
   for _, recipeID in ipairs(recipeIDs) do
-    local fields = readRecipe(api, recipeID, true)
+    local fields = belongsToWindow(recipeID, key) and readRecipe(api, recipeID, true) or nil
     if fields then
       local changed, unknownBind = store(character.recipes, recipeID, fields, key)
       stored = stored + 1
@@ -155,11 +170,21 @@ local function readWindow(api, character, key, recipeIDs)
   end
 end
 
+-- Blizzard's ProfessionsFrame yields a list update while the data source is rebuilding; a
+-- later update follows with the finished list.
+local function isDataSourceChanging(api)
+  local changing = api.IsDataSourceChanging
+  return type(changing) == "function" and changing() == true
+end
+
 -- force: the window was just opened. An update re-reads only when the profession or the
 -- recipe count differs from the last read.
 local function onWindowEvent(force)
   local api = tradeSkillApi()
   if api == nil or db == nil or isBlocked(api) then
+    return
+  end
+  if not force and isDataSourceChanging(api) then
     return
   end
   local key = windowProfession(api)
