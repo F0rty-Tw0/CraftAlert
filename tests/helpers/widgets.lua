@@ -255,7 +255,8 @@ local function addSlider(slider)
   end
 end
 
--- What the box keeps of `text`: the first maxLetters letters (bytes here), all when 0.
+-- What the box keeps of `text`: the first maxLetters bytes, all when 0. The client counts
+-- characters, so this matches it for ASCII text only.
 local function capped(editBox, text)
   if editBox.maxLetters > 0 and type(text) == "string" then
     return string.sub(text, 1, editBox.maxLetters)

@@ -183,7 +183,8 @@ local function testGreetingsPage()
   Assert.equal(row("Item").input:GetText(), "Hi! I can craft {item}.")
   Widgets.type(row("Alt profession").input, "")
   Assert.equal(settings.templates.altProfession, ns.Defaults.Settings().templates.altProfession)
-  -- A whisper is at most 255 bytes: template and note boxes stop there.
+  -- Template and note boxes stop at 255 letters (SetMaxLetters counts characters, not bytes;
+  -- Greeting.Build cuts the whisper to 255 bytes).
   Assert.equal(row("Item").input.maxLetters, 255)
   Assert.equal(row("Note").input.maxLetters, 255)
 
