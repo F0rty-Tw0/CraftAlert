@@ -41,6 +41,7 @@ Model/Index.lua
 Model/Matcher.lua
 Model/RealmTag.lua
 Model/CrafterRank.lua
+Model/Leads.lua
 Professions/ProfessionList.lua
 Professions/BindLookup.lua
 Professions/ModernReader.lua
