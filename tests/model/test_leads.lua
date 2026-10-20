@@ -600,7 +600,8 @@ return function()
   Assert.same({ db.leads[1].greeted, db.leads[2].greeted, db.leads[3].greeted, db.leads[4].greeted }, { false, false, true, false })
   Assert.equal(newLead(ns, "LF plate belt").id > 7, true, "new ids continue above every restored one")
 
-  -- NaN and infinite ids are not ids: a NaN table key raises, and inf + 1 repeats inf.
+  -- NaN and infinite ids are not ids: a NaN table key raises, inf + 1 repeats inf, and -inf
+  -- would hand out ids below every real one.
   ns, db = setup()
   Leads = ns.Leads
   db.leads = {
@@ -608,15 +609,44 @@ return function()
     { id = 2, customer = "B-Draenor", time = T0 - 20, kind = "item", greeted = false, replied = false },
     { id = 1 / 0, customer = "C-Draenor", time = T0 - 10, kind = "item", greeted = false, replied = false },
     { id = 1 / 0, customer = "D-Draenor", time = T0 - 5, kind = "item", greeted = false, replied = false },
+    { id = -1 / 0, customer = "E-Draenor", time = T0 - 4, kind = "item", greeted = false, replied = false },
   }
   Leads.Restore(db)
   local finite = {}
   for _, restored in ipairs(db.leads) do
-    Assert.truthy(restored.id == restored.id and restored.id < math.huge, "finite id")
+    Assert.truthy(restored.id == restored.id and restored.id > -math.huge and restored.id < math.huge, "finite id")
     Assert.falsy(finite[restored.id], "distinct id")
     finite[restored.id] = true
   end
-  Assert.equal(#db.leads, 4)
+  Assert.equal(#db.leads, 5)
+  Assert.equal(db.leads[5].id > 2, true, "the -inf lead gets a fresh id above the real ones")
+
+  -- A C_Timer.After that raises leaves no timer behind: the next lead arms one instead of
+  -- trusting a timer that never started.
+  ns = setup()
+  local after = _G["C_Timer"].After
+  local function failingAfter()
+    error("timer failed", 0)
+  end
+  _G["C_Timer"].After = failingAfter
+  Assert.raises(function()
+    newLead(ns, "LF plate belt")
+  end, "timer failed")
+  _G["C_Timer"].After = after
+  newLead(ns, "LF plate greaves")
+  Assert.equal(#Wow.timers, 1, "the next lead arms the expiry timer")
+
+  -- A Rearm whose timer raises keeps the pending timer live: it still sweeps when it fires.
+  ns, db = setup()
+  newLead(ns, "LF plate belt")
+  Wow.clock.time = T0 + 30
+  db.settings.leadTimeoutMin = 1
+  _G["C_Timer"].After = failingAfter
+  Assert.raises(ns.Leads.Rearm, "timer failed")
+  _G["C_Timer"].After = after
+  Wow.clock.time = T0 + TIMEOUT + 1
+  fireTimer()
+  Assert.same(db.leads, {}, "the pending timer swept the lead")
 
   -- A subscriber that raises does not stop the others or the lead.
   ns, db = setup()
