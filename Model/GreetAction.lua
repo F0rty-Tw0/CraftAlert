@@ -32,11 +32,13 @@ local function sendNotice(customer)
   end
 end
 
--- Sends the greeting when the anti-bot rules allow it, else opens the edit box with it.
+-- Sends the greeting when the anti-bot rules allow it, else opens the edit box with it. A
+-- lead that is no longer listed (dismissed, expired, evicted) can never be marked greeted, so
+-- it would be sent to again on every click: it only prefills.
 -- shownAt: GetTime() when the toast or row showing the lead appeared, nil when none is visible.
 function GreetAction.Greet(lead, shownAt)
   local greeting = greetingFor(lead)
-  if not SendGuard.Check(lead, shownAt) then
+  if not Leads.IsActive(lead.id) or not SendGuard.Check(lead, shownAt) then
     FlavorCompat.SendTellWithMessage(lead.customer, greeting)
     return
   end

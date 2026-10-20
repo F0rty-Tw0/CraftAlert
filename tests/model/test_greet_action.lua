@@ -120,6 +120,32 @@ return function()
     Assert.equal(db.recentGreeted["Customer1-Draenor"], nil, name)
   end
 
+  -- A lead that was dismissed or expired is gone from the list, so greeting it again could
+  -- never mark it greeted: every click prefills and nothing is sent or counted.
+  local gone = {
+    dismissed = function(lead)
+      ns.Leads.Dismiss(lead.id)
+    end,
+    expired = function()
+      Wow.clock.time = T0 + 11 * 60
+      table.remove(Wow.timers, 1).fn()
+    end,
+  }
+  for name, remove in pairs(gone) do
+    ns, db, calls = setup(withLeads(1))
+    lead = ns.Leads.Latest()
+    remove(lead)
+    Assert.equal(ns.Leads.IsActive(lead.id), false, name)
+    ns.GreetAction.Greet(lead, 49)
+    ns.GreetAction.Greet(lead, 49)
+    Assert.same(calls, {
+      { "prefill", "Customer1-Draenor", GREETING },
+      { "prefill", "Customer1-Draenor", GREETING },
+    }, name)
+    Assert.equal(lead.greeted, false, name)
+    Assert.equal(db.recentGreeted["Customer1-Draenor"], nil, name)
+  end
+
   -- The 7th greeting in 60 s prefills; a send made by Prefill or Empty never counted.
   ns, _, calls = setup(withLeads(8))
   for _ = 1, 3 do
