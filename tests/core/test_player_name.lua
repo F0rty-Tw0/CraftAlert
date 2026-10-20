@@ -74,6 +74,13 @@ local function testOwnAndRealmOf()
   Assert.equal(retailWithRealm.Own(), "Hero-OwnRealm")
 end
 
+-- /ca test and the Test page send as "Test" on the player's own realm (spec §7.3).
+local function testTestCustomer()
+  Assert.equal(load().TestCustomer(), "Test-OwnRealm")
+  local unset = Fresh.require("Core.PlayerName")
+  Assert.equal(unset.TestCustomer(), "Test-", "before Init there is no realm")
+end
+
 local function testNoApiCallsAfterInit()
   local PlayerName = load()
   local function boom()
@@ -145,6 +152,7 @@ return function()
   testNonAsciiAndApostrophes()
   testForeverNames()
   testOwnAndRealmOf()
+  testTestCustomer()
   testNoApiCallsAfterInit()
   testRealmFallbacks()
   Wow.reset()
