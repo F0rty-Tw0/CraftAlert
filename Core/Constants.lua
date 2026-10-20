@@ -79,12 +79,14 @@ Constants.aliasStopWords = {
   "major",
 }
 
--- §6.4: slot words that count only next to another slot/type word or a phrase: body parts,
--- and "ring" ("ring me when ready", "ring of blood"; user ruling 2026-10-20).
-Constants.ambiguousWords = { "legs", "head", "hands", "feet", "ring" }
+-- §6.4: slot words that count only next to another slot/type word, a phrase or a crafting cue
+-- word: body parts, "ring" ("ring me when ready", "ring of blood"; user ruling 2026-10-20)
+-- and "back" ("be back in 5", "pay you back"; user ruling 2026-10-21).
+Constants.ambiguousWords = { "legs", "head", "hands", "feet", "ring", "back" }
 
--- Class-armor spec §5: words that mark a line as asking for crafting, so a body-part slot word
--- may take the sender's armor type. Every profession word counts too. Fixed, not user-editable.
+-- Class-armor spec §5: words that mark a line as asking for crafting, so an ambiguous slot word
+-- counts (§6.4) and may take the sender's armor type. Every profession word counts too. Fixed,
+-- not user-editable.
 Constants.craftCueWords = { "crafter", "craft", "crafted", "maker" }
 
 -- §7.4: greeting templates. Only Retail has crafting orders to point an alt's customer to.

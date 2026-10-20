@@ -128,7 +128,7 @@ function WorstLines.cases(index)
     { "8x", fill("lf", "8x") }, -- 4.3: digits then letters, no stat word
     { "search", SEARCH_LINE },
     { "bareslot", fill("lf", "belt") }, -- 4.4: a bare slot word, so the armor word is inferred
-    { "admit", fill("lf crafter", "head") }, -- 4.4: unpartnered cued ambiguous word, admitted
+    { "admit", fill("lf crafter", "head") }, -- 4.4: an ambiguous word counted through its cue word
     { "inferred_empty", WorstLines.inferredEmpty(index) }, -- 4.4: lookup, append, empty, typo
   }
 end

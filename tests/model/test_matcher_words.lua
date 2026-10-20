@@ -79,15 +79,23 @@ local function testEnchantingNarrowing()
   expect(ns, "LF Enchanter +8stam to chest", "item:enchant chest - greater stamina", "step 4.3 first")
 end
 
--- §6.4: "back" names the cloak slot, a plain word (user ruling 2026-10-20); a line without an
--- intent word still stops at the prefilter.
+-- §6.4: "back" names the cloak slot (user ruling 2026-10-20) but is ambiguous (user ruling
+-- 2026-10-21): it counts beside another slot/type word or a crafting cue word (a profession
+-- word too), never alone or in everyday speech; a line without an intent word still stops at
+-- the prefilter.
 local function testBackIsCloak()
   local ns = Fixture.load()
   Fixture.itemIndex(ns, function(db)
     db.characters["Tai-Realm"] = character({ TAILOR }, { [9] = { item = 606, name = "Silk Cloak", prof = TAILOR } })
   end)
-  expect(ns, "LF back crafter", "item:606")
-  expect(ns, "LF back", "item:606")
+  expect(ns, "LF back crafter", "item:606", "a cue word partners an ambiguous word")
+  expect(ns, "LF cloth back", "item:606")
+  expect(ns, "LF tailor back", "item:606", "a profession word is a cue word")
+  expect(ns, "LF back", "stop:nomatch", "an ambiguous word alone")
+  expect(ns, "LF tank for M+ will be back in 5", "stop:nomatch")
+  expect(ns, "LF guild looking to get back into raiding", "stop:nomatch")
+  expect(ns, "WTB carry, pay you back", "stop:nomatch")
+  expect(ns, "LF someone to get my back", "stop:nomatch")
   expect(ns, "brb, back in 5", "stop:prefilter", "no intent word")
 end
 

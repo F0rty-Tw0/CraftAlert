@@ -81,7 +81,7 @@ end
 -- whether the 6-word cap left a word out.
 local function reference44(ns, index, tokens, set)
   local wordIndex, Slang = index.wordIndex, ns.Slang
-  local first, other, enchanting
+  local first, other, enchanting, cued
   for _, t in ipairs(tokens) do
     if wordIndex[t] and first == nil then
       first = t
@@ -89,10 +89,14 @@ local function reference44(ns, index, tokens, set)
       other = t
     end
     enchanting = enchanting or ns.ProfessionWords.KeyFor(t, false) == ENCH
+    cued = cued or ns.ProfessionWords.KeyFor(t, false) ~= nil
+    for _, cue in ipairs(ns.Constants.craftCueWords) do
+      cued = cued or t == cue
+    end
   end
   local lists, taken, takenCount, capped = {}, {}, 0, false
   for _, t in ipairs(tokens) do
-    local counted = not Slang.ambiguous[t] or set ~= nil or (first ~= nil and first ~= t) or other ~= nil
+    local counted = not Slang.ambiguous[t] or set ~= nil or cued or (first ~= nil and first ~= t) or other ~= nil
     if (wordIndex[t] or Slang.wordSet[t]) and counted then
       if not taken[t] and takenCount == 6 then
         capped = true
@@ -186,7 +190,7 @@ end
 
 local function testWordGroupsDifferential()
   local ns = Fixture.load()
-  local checked, cappedHits, enchantHits, ambiguousSetHits = 0, 0, 0, 0
+  local checked, cappedHits, enchantHits, ambiguousSetHits, ambiguousCueHits = 0, 0, 0, 0, 0
   for _ = 1, 60 do
     local db = randomItemDb(ns)
     local index = ns.Index.Build(db, db.settings, {
@@ -233,20 +237,23 @@ local function testWordGroupsDifferential()
       Assert.equal(got, want, table.concat(tokens, " "))
       checked = checked + (got ~= "nil" and 1 or 0)
       cappedHits = cappedHits + ((capped and got ~= "nil") and 1 or 0)
-      local enchant, ambiguousSet = false, false
+      local enchant, ambiguousSet, ambiguousWord = false, false, false
       for _, t in ipairs(tokens) do
         enchant = enchant or ns.ProfessionWords.KeyFor(t, false) == ENCH
         ambiguousSet = ambiguousSet or (set ~= nil and ns.Slang.ambiguous[t] == true)
+        ambiguousWord = ambiguousWord or (set == nil and ns.Slang.ambiguous[t] == true)
       end
       enchantHits = enchantHits + ((enchant and got ~= "nil") and 1 or 0)
       ambiguousSetHits = ambiguousSetHits + ((ambiguousSet and got ~= "nil") and 1 or 0)
+      ambiguousCueHits = ambiguousCueHits + ((ambiguousWord and enchant and got ~= "nil") and 1 or 0)
     end
   end
-  -- Each rule decides enough matching lines (296 / 20 / 38 / 14 with this seed).
+  -- Each rule decides enough matching lines (298 / 20 / 41 / 16 / 12 with this seed).
   Assert.truthy(checked > 150, "lines that match: " .. checked)
   Assert.truthy(cappedHits > 10, "matching lines the 6-word cap decided: " .. cappedHits)
   Assert.truthy(enchantHits > 20, "matching lines with an Enchanting word: " .. enchantHits)
   Assert.truthy(ambiguousSetHits > 8, "matching lines with a 4.2 set and an ambiguous word: " .. ambiguousSetHits)
+  Assert.truthy(ambiguousCueHits > 6, "matching lines with an ambiguous word and a cue word: " .. ambiguousCueHits)
 end
 
 return function()

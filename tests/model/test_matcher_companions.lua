@@ -111,6 +111,7 @@ local function testRing()
   expect(ns, "LF tank, ring me when ready", "stop:nomatch")
   expect(ns, "anyone want to go to the ring of blood", "stop:nomatch")
   expect(ns, "LF ring", "stop:nomatch", "an ambiguous word alone")
+  expect(ns, "LF ring crafter", "item:801", "a crafting cue word partners it (user ruling 2026-10-21)")
   -- A phrase: "silver ring" is a kind-b alias (step 4.2).
   expect(ns, "lf silver ring", "item:801")
   -- Another word: "ring" is the wordIndex word the kind-c alias "heavy" needs, and "finger"

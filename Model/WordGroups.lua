@@ -156,13 +156,13 @@ function WordGroups.Build(index)
   end
 end
 
--- §6.4: an ambiguous word counts only when another wordIndex word or a step 4.2 phrase
--- match (hasSet) is in the line.
-local function counts(token, first, other, hasSet)
+-- §6.4: an ambiguous word counts only when another wordIndex word, a step 4.2 phrase match
+-- (hasSet) or a crafting cue word (cued; user ruling 2026-10-21) is in the line.
+local function counts(token, first, other, hasSet, cued)
   if not ambiguous[token] then
     return true
   end
-  return hasSet or (first ~= nil and first ~= token) or other ~= nil
+  return hasSet or cued or (first ~= nil and first ~= token) or other ~= nil
 end
 
 -- Per-line buffers: the distinct counted words (a repeated word intersects once), found
@@ -171,27 +171,28 @@ local lineWords, lineLists, lineCount = {}, {}, 0
 local wordStamp = {}
 local stamp = 0
 -- Per-line state collect leaves for inferArmor: whether the sender's armor word may be
--- inferred (class-armor §4 rule 2), and an ambiguous slot word left uncounted (no partner)
--- with how many times it was seen (§4 rule 5); admit is nil without a crafting cue.
-local inferable, admit, admitCount = false, nil, 0
+-- inferred (class-armor §4 rule 2).
+local inferable = false
 
 -- New index: drop the lists the last line kept, the stamps and the set marks.
 function WordGroups.Reset()
   lineWords, lineLists, lineCount, wordStamp, setMark = {}, {}, 0, {}, {}
 end
 
--- The first two distinct wordIndex words of the line (§6.4: what an ambiguous word needs).
+-- The first two distinct wordIndex words of the line, and whether it holds a crafting cue
+-- word (§6.4: what an ambiguous word needs).
 local function firstWords(wordIndex, tokens, count)
-  local first, other = nil, nil
+  local first, other, cued = nil, nil, false
   for i = 1, count do
     local token = tokens[i]
+    cued = cued or cueWords[token] == true
     if wordIndex[token] and first == nil then
       first = token
     elseif wordIndex[token] and other == nil and token ~= first then
       other = token
     end
   end
-  return first, other
+  return first, other, cued
 end
 
 -- Fills lineWords/lineLists (the first MAX_WORDS distinct counted words; later new words
@@ -200,22 +201,19 @@ end
 -- Enchanting word. inferable (§4 rule 2) is decided on every scanned word, counted or not:
 -- a slot without an armor type (an ambiguous slot needs a cue) and no Enchanting word (user
 -- ruling 2026-10-20: an enchant ignores the asker's armor). tags: index.armorTags. A repeat
--- of a word already decided (wordStamp: stamp counted, -stamp unpartnered) takes the same
--- decision at once, since nothing it depends on changed. The first two wordIndex words are
--- found only when an ambiguous word needs them (most lines have none).
+-- of a word already counted (wordStamp) takes the same decision at once, since nothing it
+-- depends on changed. The first two wordIndex words and the cue are found only when an
+-- ambiguous word needs them (most lines have none).
 local function collect(wordIndex, tokens, count, hasSet, tags)
-  local first, other, scanned, enchanting, cue = nil, nil, false, false, false
+  local first, other, cued, scanned, enchanting, cue = nil, nil, false, false, false, false
   local sawType, sawPlainSlot, sawAmbiguousSlot = false, false, false
   local why, whyCount = Candidates.wordWhy, 0
-  lineCount, stamp, admit, admitCount = 0, stamp + 1, nil, 0
+  lineCount, stamp = 0, stamp + 1
   for i = 1, count do
     local token = tokens[i]
-    local seen = wordStamp[token]
-    if seen == stamp then
+    if wordStamp[token] == stamp then
       whyCount = whyCount + 1
       why[whyCount] = token
-    elseif seen == -stamp then
-      admitCount = admitCount + 1
     else
       enchanting = enchanting or enchantingWords[token] == true
       cue = cue or cueWords[token] == true
@@ -224,19 +222,16 @@ local function collect(wordIndex, tokens, count, hasSet, tags)
         local tag, ambiguousSlot = tags[token], false
         if ambiguous[token] then
           if not scanned then
-            first, other = firstWords(wordIndex, tokens, count)
+            first, other, cued = firstWords(wordIndex, tokens, count)
             scanned = true
           end
           ambiguousSlot = tag == "slot"
         end
-        local counted = counts(token, first, other, hasSet)
+        local counted = counts(token, first, other, hasSet, cued)
         sawType = sawType or tag == "type"
         sawPlainSlot = sawPlainSlot or (tag == "slot" and not ambiguousSlot)
         sawAmbiguousSlot = sawAmbiguousSlot or ambiguousSlot
-        if ambiguousSlot and not counted then
-          wordStamp[token] = -stamp
-          admit, admitCount = token, admitCount + 1
-        elseif counted then
+        if counted then
           if list == nil then
             return nil, enchanting
           end
@@ -250,39 +245,26 @@ local function collect(wordIndex, tokens, count, hasSet, tags)
     end
   end
   local slotWithoutType = not sawType and (sawPlainSlot or (sawAmbiguousSlot and cue))
-  inferable, admit = slotWithoutType and not enchanting, cue and admit or nil
+  inferable = slotWithoutType and not enchanting
   return whyCount, enchanting
 end
 
--- Class-armor §4 rules 5 and 7: the sender's armor word joins the counted words (after the
--- line's own, outside the MAX_WORDS cap) with its "<armor> (<class>)" why label. admit: an
--- unpartnered ambiguous slot word (collect), seen admitCount times, that counts too with the
--- armor word as its partner. Being unpartnered, it is the line's only wordIndex word, so the
--- line counted nothing else: admitting it makes it the one word, admitCount times in the why.
+-- Class-armor §4 rule 7: the sender's armor word joins the counted words (after the line's
+-- own, outside the MAX_WORDS cap) with its "<armor> (<class>)" why label. A cued ambiguous
+-- slot word (§4 rule 5) already counts through its cue word (collect).
 -- → why count, or nil when the intersection is empty. No class → the line as collected.
 local function inferArmor(index, hasSet, classArmor, whyCount)
   local armor, label = classArmor()
   if armor == nil then
     return whyCount
   end
-  local wordIndex, why = index.wordIndex, Candidates.wordWhy
-  if admit ~= nil then
-    local list = wordIndex[admit]
-    if list == nil then -- a recognized slang word with no entries empties the intersection
-      return nil
-    end
-    lineCount, lineWords[1], lineLists[1], whyCount = 1, admit, list, admitCount
-    for k = 1, admitCount do
-      why[k] = admit
-    end
-  end
-  local list = wordIndex[armor]
+  local list = index.wordIndex[armor]
   if list == nil then -- a recognized slang word with no entries empties the intersection,
     return hasSet and whyCount or nil -- but a step 4.2 set ignores it (see keepSetWords)
   end
   lineCount = lineCount + 1
   lineWords[lineCount], lineLists[lineCount] = armor, list
-  why[whyCount + 1] = label
+  Candidates.wordWhy[whyCount + 1] = label
   return whyCount + 1, true
 end
 

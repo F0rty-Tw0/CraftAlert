@@ -124,7 +124,8 @@ end
 local function testBaselines()
   local ns = fullIndex()
   Assert.equal(outcome(ns, "LF belt"), "profession:" .. BS, "baseline: three belts, profession order")
-  Assert.equal(outcome(ns, "LF head crafter"), "stop:nomatch", "baseline: head has no partner")
+  -- §6.4, user ruling 2026-10-21: a crafting cue word partners an ambiguous word.
+  Assert.equal(outcome(ns, "LF head crafter"), "profession:" .. BS, "baseline: head counts through the cue word")
   Assert.equal(outcome(ns, "LF bs for legs"), "profession:" .. BS, "baseline: legs has no partner")
   Assert.equal(outcome(ns, "LF belt and head"), "stop:nomatch", "baseline: head counts through belt")
 end
@@ -151,8 +152,8 @@ local function testRows6To10()
   local ns = fullIndex()
   check(ns, "row 6", "LF head crafter", W, "item:504", nil, "lf+head+plate (warrior)")
   check(ns, "row 6 repeated", "LF head crafter head", W, "item:504", 1, "lf+head+head+plate (warrior)")
-  -- The admitted word belongs to its own line: the next line does not intersect with it.
-  check(ns, "admit is per line", "LF belt crafter", W, "item:501", 1, "lf+belt+plate (warrior)")
+  -- The cued word belongs to its own line: the next line does not intersect with it.
+  check(ns, "cued word is per line", "LF belt crafter", W, "item:501", 1, "lf+belt+plate (warrior)")
   check(ns, "row 7", "LF bs for legs", P, "item:502", nil, "lf+legs+plate (paladin)")
   check(ns, "row 9", "LF healer, head to Deadmines", P, "stop:nomatch", 0)
   check(ns, "row 10", "need legs", W, "stop:nomatch", 0)
@@ -162,7 +163,7 @@ end
 
 local function testRows11To12()
   local ns = fullIndex()
-  check(ns, "row 11", "LF head crafter", U, "stop:nomatch", 1)
+  check(ns, "row 11", "LF head crafter", U, "profession:" .. BS, 1, "lf+head")
   check(ns, "row 12", "LF belt and boots", W, "stop:nomatch", 1)
 end
 
