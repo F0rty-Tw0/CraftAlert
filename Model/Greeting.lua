@@ -33,6 +33,28 @@ local function crafterName(key)
   return key
 end
 
+local PIPE = 124 -- "|"
+
+-- Whether the pipe at `at` starts an escape sequence: in a run of pipes each "||" is a literal
+-- pipe, so only the last pipe of an odd run does.
+local function startsCode(text, at)
+  local first = at
+  while first > 1 and byte(text, first - 1) == PIPE do
+    first = first - 1
+  end
+  return (at - first) % 2 == 0
+end
+
+-- Drops a colour start (`pattern`, from its pipe) the cut left at the end of `kept`, unless
+-- that pipe is escaped and the rest is plain text.
+local function dropColorStart(kept, pattern)
+  local at = match(kept, "()" .. pattern .. "$")
+  if at and startsCode(kept, at) then
+    return sub(kept, 1, at - 1)
+  end
+  return kept
+end
+
 -- The 255-byte chat limit must not leave half a UTF-8 character, half a hyperlink, a
 -- partial colour code or a lone escape pipe behind.
 local function cap(text)
@@ -54,7 +76,7 @@ local function cap(text)
   if open and not find(kept, "|h.-|h", open) then
     -- Drop the half link and the colour code in front of it. A named colour (|cnIQ4:) is left
     -- at the end by that cut, so the partial-code cleanup below takes it.
-    local colored = open > 10 and find(sub(kept, open - 10, open - 1), "^|c%x%x%x%x%x%x%x%x$")
+    local colored = open > 10 and find(sub(kept, open - 10, open - 1), "^|c%x%x%x%x%x%x%x%x$") and startsCode(kept, open - 10)
     kept = sub(kept, 1, colored and open - 11 or open - 1)
   end
   -- A lone trailing pipe and a partial colour start can each expose the other ("||c" cut to
@@ -65,8 +87,8 @@ local function cap(text)
     if #match(kept, "|*$") % 2 == 1 then
       kept = sub(kept, 1, -2)
     end
-    kept = gsub(kept, "|c%x?%x?%x?%x?%x?%x?%x?$", "")
-    kept = gsub(kept, "|cn[%w_]*:?$", "")
+    kept = dropColorStart(kept, "|c%x?%x?%x?%x?%x?%x?%x?")
+    kept = dropColorStart(kept, "|cn[%w_]*:?")
   until kept == before
   return kept
 end

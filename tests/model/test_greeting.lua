@@ -155,4 +155,15 @@ return function()
       Assert.falsy(pipes and #pipes % 2 == 1, "pad " .. pad .. " " .. tail .. " ends in a colour start")
     end
   end
+  -- An escaped pipe ("||") is a literal "|", so the "c..." after it is text, not a colour code:
+  -- a cut right after it keeps it.
+  for _, tail in ipairs({ "||cafe", "||cnot", "||c", "||cnIQ4:" }) do
+    local pad = 255 - #tail
+    settings.templates.item = string.rep("x", pad) .. tail .. "zz"
+    Assert.equal(Greeting.Build(lead, settings), string.rep("x", pad) .. tail, tail .. " is kept")
+  end
+  settings.templates.item = string.rep("x", 200) .. "||cffffffff|Hitem:1|h[" .. string.rep("a", 60) .. "]|h"
+  Assert.equal(Greeting.Build(lead, settings), string.rep("x", 200) .. "||cffffffff", "the escaped text before a cut link stays")
+  settings.templates.item = string.rep("x", 248) .. "|||cafe" .. "zz"
+  Assert.equal(Greeting.Build(lead, settings), string.rep("x", 248) .. "||", "an escaped pipe, then a real colour start")
 end
