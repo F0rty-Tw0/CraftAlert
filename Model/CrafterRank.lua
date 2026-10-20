@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
+local Index = ns.Index or require("CraftAlert.Model.Index")
 local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
 
 -- Spec §6.3 step 5: which of the characters that know the matched recipe answers the
@@ -41,19 +42,13 @@ end
 
 -- Whether a character takes profession-word leads (step 4.6) for `prof`: not when it stores
 -- recipes of that profession and has muted every one; muting says "no leads for these". A
--- profession not read yet has no recipes and still counts.
-local function listensFor(character, prof)
-  local stored = false
-  for _, recipe in pairs(character.recipes or {}) do
-    if recipe.prof == prof then
-      if not recipe.muted then
-        return true
-      end
-      stored = true
-    end
-  end
+-- profession not read yet has no recipes and still counts. Index.Build notes the muted
+-- professions, so this is a lookup, not a walk over the recipes.
+local function listensFor(key, prof)
+  local index = Index.Current()
+  local muted = index and index.mutedProfessions[key]
 
-  return not stored
+  return not (muted and muted[prof])
 end
 
 -- → characterKey, cannotOrder; nil when the customer is on Blizzard's ignore list (unless
@@ -91,7 +86,7 @@ function CrafterRank.Pick(result, customerKey, db, opts)
   else
     for key, character in pairs(db.characters) do
       local candidate = character.enabled ~= false and character.professions[result.prof] ~= nil
-      if candidate and listensFor(character, result.prof) then
+      if candidate and listensFor(key, result.prof) then
         consider(key, result.prof)
       end
     end
