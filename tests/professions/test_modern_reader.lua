@@ -62,9 +62,9 @@ local function readFlow(flavor)
   }
   Wow.fireEvent("TRADE_SKILL_SHOW")
   Assert.same(recipesOf(db), {
-    [1] = { item = 100, name = "belt 1", prof = BS },
-    [2] = { item = 200, ranks = { 201, 202, 203 }, name = "belt 2", prof = BS },
-    [3] = { name = "enchant bracer - health", prof = BS },
+    [1] = { item = 100, name = "Belt 1", prof = BS },
+    [2] = { item = 200, ranks = { 201, 202, 203 }, name = "Belt 2", prof = BS },
+    [3] = { name = "Enchant Bracer - Health", prof = BS },
   }, flavor)
   Assert.equal(db.characters[CHAR].professions[BS].read, true)
   Assert.equal(db.characters[CHAR].professions[ENCH].read, false)
@@ -123,7 +123,7 @@ return function()
   recipesOf(db)[1].bind = 2
   state.recipes = { belt(1, 100, { name = "Renamed Belt", ranks = { 101, 102 } }) }
   Wow.fireEvent("TRADE_SKILL_SHOW")
-  Assert.same(recipesOf(db)[1], { item = 100, ranks = { 101, 102 }, name = "renamed belt", prof = BS, bind = 2, muted = true })
+  Assert.same(recipesOf(db)[1], { item = 100, ranks = { 101, 102 }, name = "Renamed Belt", prof = BS, bind = 2, muted = true })
   state.recipes = { belt(1, 150, { name = "Renamed Belt", ranks = { 101, 102 } }) }
   Wow.fireEvent("TRADE_SKILL_SHOW")
   Assert.equal(recipesOf(db)[1].bind, nil, "a new output item has an unknown bind")
@@ -135,14 +135,14 @@ return function()
   Wow.fireEvent("TRADE_SKILL_SHOW")
   state.recipes[1].name = "Changed"
   Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
-  Assert.equal(recipesOf(db)[1].name, "belt 1", "same count: no re-read")
+  Assert.equal(recipesOf(db)[1].name, "Belt 1", "same count: no re-read")
   state.recipes[2] = belt(2, 200)
   Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
-  Assert.equal(recipesOf(db)[1].name, "changed")
+  Assert.equal(recipesOf(db)[1].name, "Changed")
   Assert.truthy(recipesOf(db)[2])
   state.recipes[1].name = "Again"
   Wow.fireEvent("TRADE_SKILL_SHOW")
-  Assert.equal(recipesOf(db)[1].name, "again")
+  Assert.equal(recipesOf(db)[1].name, "Again")
 
   -- The list may still be empty at TRADE_SKILL_SHOW: nothing stored, not marked read.
   state, _, db = setup()
@@ -166,7 +166,7 @@ return function()
   state, ModernReader, db, run = setup()
   state.recipes = { belt(1, 100, { learned = false }), belt(2, 200, { isRecraft = true }), belt(3, 300) }
   Assert.equal(ModernReader.ReadOne(1, BS), true)
-  Assert.same(recipesOf(db)[1], { item = 100, name = "belt 1", prof = BS })
+  Assert.same(recipesOf(db)[1], { item = 100, name = "Belt 1", prof = BS })
   Assert.equal(ModernReader.ReadOne(2, BS), false, "a recraft recipe is dropped")
   Assert.equal(ModernReader.ReadOne(99, BS), false, "an unknown recipe")
   Assert.equal(ModernReader.ReadOne(3, COOKING), false, "a profession the character does not have")
