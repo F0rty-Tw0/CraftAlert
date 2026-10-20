@@ -1,6 +1,7 @@
 -- Spec §4.3 runtime rules and §13 "Runtime rules": loads the whole addon from the TOC under
--- trapping stubs (tests/helpers/runtime_traps.lua) and drives every Install/Restore plus a
--- greeting, so a violation raises where it happens. From Task 1.19 this drives Bootstrap.
+-- trapping stubs (tests/helpers/runtime_traps.lua) and drives Bootstrap (ADDON_LOADED,
+-- PLAYER_LOGIN), a matched line and a click, then the UI, the settings and the slash
+-- commands, so a violation raises where it happens.
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Toc = require("tests.helpers.toc")
@@ -8,7 +9,6 @@ local RuntimeTraps = require("tests.helpers.runtime_traps")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 
-local OWN_KEY = "Crafter-OwnRealm"
 local CHANNEL, PLAYER_RESTING = "CHAT_MSG_CHANNEL", "PLAYER_UPDATE_RESTING"
 -- Timer delays the plan allows (§4.3 rule 1): index coalescing 0, bind tick 1, toast auto-hide
 -- (20 s by default), lead expiry (timeout + 1 s, 601 with the default 10 min).
@@ -312,30 +312,21 @@ end
 local function testAddonObeysTheRules()
   withTraps(function(state, sent)
     local ns = loadAddon()
-    -- The account DB goes through SavedState.Load exactly as at ADDON_LOADED.
-    local db = ns.SavedState.Load()
-    Assert.equal(rawget(_G, "CraftAlertDB"), db)
-    db.characters = dofile("tools/sim_fixture.lua").characters
-    ns.PlayerName.Init()
-    ns.Leads.Restore(db)
-    ns.ProfessionList.Refresh(db, OWN_KEY)
-    ns.ModernReader.Install(db)
-    ns.LearnWatcher.Install()
-    ns.Index.Configure(db, { professionOrder = ns.ProfessionList.Order })
-    ns.Index.OnRebuilt(ns.Matcher.SetIndex)
-    ns.WhisperTracker.Install()
-    ns.ScanGate.Install(db)
     -- The trap asks the gate itself, so a registration made before the gate flips raises.
     state.isActive = ns.ScanGate.IsActive
-    ns.Index.OnRebuilt(ns.ScanGate.Evaluate)
-    ns.Bootstrap.Install()
-    ns.SlashCommands.Register()
+    -- Bootstrap does every install, from the two events the client fires: ADDON_LOADED binds
+    -- the account DB (the fixture characters go in before login), PLAYER_LOGIN the rest.
+    Wow.fireEvent("ADDON_LOADED", "CraftAlert")
+    local db = rawget(_G, "CraftAlertDB")
+    Assert.truthy(db, "ADDON_LOADED bound the account DB")
+    db.characters = dofile("tools/sim_fixture.lua").characters
+    Assert.same(publicChatEvents(), {}, "nothing listens before login")
+    Wow.fireEvent("PLAYER_LOGIN")
+    Assert.equal(ns.Leads.HasActive(), false)
     Assert.same({ rawget(_G, "SLASH_CRAFTALERT1"), rawget(_G, "SLASH_CRAFTALERT2") }, { "/craftalert", "/ca" })
 
-    -- Nothing listens to public chat before the first evaluation; whisper events wait for a lead.
-    Assert.same(publicChatEvents(), {})
-    -- Activating registers the channel event (the trap saw the gate already active).
-    ns.Index.Rebuild()
+    -- The login rebuild activated the scan: the channel event only (the trap saw the gate
+    -- already active); whisper events wait for a lead.
     Assert.equal(ns.ScanGate.IsActive(), true)
     Assert.same(publicChatEvents(), { CHANNEL })
 
@@ -347,12 +338,16 @@ local function testAddonObeysTheRules()
     Wow.fireEvent(PLAYER_RESTING)
     Assert.same(publicChatEvents(), { CHANNEL })
 
-    -- A request becomes a lead (whisper events on), a greeting goes out: notice, then whisper.
+    -- A request becomes a lead and its toast (whisper events on); a left-click on the toast
+    -- greets: notice, then whisper.
     fireRequest("LF plate belt", "Customer-OtherRealm")
     local lead = ns.Leads.Latest()
     Assert.truthy(lead, "the request made a lead")
     Assert.same(publicChatEvents(), { CHANNEL, "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM" })
-    ns.GreetAction.Greet(lead, rawget(_G, "GetTime")() - 1)
+    local toast = G("CraftAlertToast")
+    Assert.equal(toast:IsShown(), true, "Bootstrap shows the toast for a new lead")
+    Wow.clock.gettime = Wow.clock.gettime + 1
+    toast:GetScript("OnClick")(toast, "LeftButton")
     Assert.equal(sent[1][1], "addon")
     Assert.equal(sent[2][1], "chat")
     Assert.equal(lead.greeted, true)
@@ -362,10 +357,10 @@ local function testAddonObeysTheRules()
     Assert.equal(sent[4][1], "empty")
 
     -- The last lead gone: whisper events go too. Only the allowed timers are pending.
-    -- The UI under the traps: the toast, the launcher and its tooltip, the leads window (its
-    -- UISpecialFrames insert) and the keybind functions.
+    -- The UI under the traps: the toast, the launcher Bootstrap made and its tooltip, the leads
+    -- window (its UISpecialFrames insert) and the keybind functions.
     ns.AlertToast.Show(lead)
-    local launcher = ns.Launcher.Create()
+    local launcher = G("CraftAlertLauncher")
     launcher:GetScript("OnEnter")(launcher)
     launcher:GetScript("OnLeave")(launcher)
     ns.Launcher.Refresh()
