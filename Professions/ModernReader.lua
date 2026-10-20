@@ -15,6 +15,7 @@ local BindLookup = ns.BindLookup or require("CraftAlert.Professions.BindLookup")
 -- nothing, and reads only add. ReadOne serves the learn path (§5.3) with the window closed.
 local ModernReader = {}
 
+local pairs = pairs
 local ipairs = ipairs
 local type = type
 
@@ -77,9 +78,9 @@ local function sameList(a, b)
   return true
 end
 
--- → { item, ranks, name } for a recipe worth storing, else nil. `learned` is checked by the
--- window read only: it is still false inside NEW_RECIPE_LEARNED (§5.3).
-local function readRecipe(api, recipeID, requireLearned)
+-- → the recipe info of a recipe worth storing, else nil. `learned` is checked by the window
+-- read only: it is still false inside NEW_RECIPE_LEARNED (§5.3).
+local function usableInfo(api, recipeID, requireLearned)
   local info = api.GetRecipeInfo(recipeID)
   if type(info) ~= "table" or type(info.name) ~= "string" then
     return nil
@@ -90,6 +91,11 @@ local function readRecipe(api, recipeID, requireLearned)
   if requireLearned and not info.learned then
     return nil
   end
+  return info
+end
+
+-- → { item, ranks, name } of a usable recipe (usableInfo).
+local function readFields(api, recipeID, info)
   local schematic = api.GetRecipeSchematic(recipeID, false)
   -- Blizzard's spelling: the greeting names the recipe with it; Index lowercases for matching.
   return { item = schematic and schematic.outputItemID, ranks = copyList(info.qualityItemIDs), name = info.name }
@@ -143,31 +149,39 @@ function ModernReader.ProfessionOf(recipeID)
   return type(info) == "table" and (info.parentProfessionID or info.professionID) or nil
 end
 
--- Mid-switch the list may still hold the other profession's recipes: one of those is never
--- stored under this window's key. A recipe with no profession info belongs to the window.
-local function belongsToWindow(recipeID, key)
+-- Mid-switch the list may still hold another profession's recipes: each is stored under its
+-- own profession when the character stores that one, and skipped (nil) otherwise. A recipe
+-- with no profession info (nil, or 0 before the data loads) belongs to the window.
+local function storeKey(charKey, recipeID, key)
   local own = ModernReader.ProfessionOf(recipeID)
-  return own == nil or own == key
+  if own == nil or own == 0 or own == key then
+    return key
+  end
+  return ProfessionList.IsStored(db, charKey, own) and own or nil
 end
 
-local function readWindow(api, character, key, recipeIDs)
-  local stored, pendingBind, anyChanged = 0, 0, false
+-- Marks read only the professions that got a recipe. → whether the window's profession did.
+local function readWindow(api, character, charKey, key, recipeIDs)
+  local stored, pendingBind, anyChanged, readKeys = 0, 0, false, {}
   for _, recipeID in ipairs(recipeIDs) do
-    local fields = belongsToWindow(recipeID, key) and readRecipe(api, recipeID, true) or nil
-    if fields then
-      local changed, unknownBind = store(character.recipes, recipeID, fields, key)
+    local info = usableInfo(api, recipeID, true)
+    local professionKey = info and storeKey(charKey, recipeID, key)
+    if professionKey then
+      local changed, unknownBind = store(character.recipes, recipeID, readFields(api, recipeID, info), professionKey)
       stored = stored + 1
       anyChanged = anyChanged or changed
       pendingBind = pendingBind + (unknownBind and 1 or 0)
+      readKeys[professionKey] = true
     end
   end
-  if #recipeIDs > 0 then
-    character.professions[key].read = true
+  for professionKey in pairs(readKeys) do
+    character.professions[professionKey].read = true
   end
   ModernReader.lastRead = { prof = key, stored = stored, pendingBind = pendingBind }
   if anyChanged then
     Index.RequestRebuild("read")
   end
+  return readKeys[key] == true
 end
 
 -- Blizzard's ProfessionsFrame yields a list update while the data source is rebuilding; a
@@ -178,7 +192,7 @@ local function isDataSourceChanging(api)
 end
 
 -- force: the window was just opened. An update re-reads only when the profession or the
--- recipe count differs from the last read.
+-- recipe count differs from the last read that stored a recipe for the window.
 local function onWindowEvent(force)
   local api = tradeSkillApi()
   if api == nil or db == nil or isBlocked(api) then
@@ -195,8 +209,10 @@ local function onWindowEvent(force)
   if not force and key == readKey and #recipeIDs == readCount then
     return
   end
-  readKey, readCount = key, #recipeIDs
-  readWindow(api, db.characters[PlayerName.Own()], key, recipeIDs)
+  local charKey = PlayerName.Own()
+  if readWindow(api, db.characters[charKey], charKey, key, recipeIDs) then
+    readKey, readCount = key, #recipeIDs
+  end
 end
 
 function ModernReader.OnShow()
@@ -213,11 +229,11 @@ function ModernReader.ReadOne(recipeID, professionKey)
   if api == nil or db == nil or not ProfessionList.IsStored(db, PlayerName.Own(), professionKey) then
     return false
   end
-  local fields = readRecipe(api, recipeID, false)
-  if fields == nil then
+  local info = usableInfo(api, recipeID, false)
+  if info == nil then
     return false
   end
-  local changed = store(db.characters[PlayerName.Own()].recipes, recipeID, fields, professionKey)
+  local changed = store(db.characters[PlayerName.Own()].recipes, recipeID, readFields(api, recipeID, info), professionKey)
   if changed then
     Index.RequestRebuild("learn")
   end

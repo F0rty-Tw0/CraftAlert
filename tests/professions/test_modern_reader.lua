@@ -178,19 +178,69 @@ return function()
   Assert.equal(ModernReader.ReadOne(1, BS), true)
   Assert.equal(Wow.pendingTimers(0), 0, "storing the same recipe again changes nothing")
 
-  -- A list that also holds another profession's recipe (mid-switch on Retail): each recipe
-  -- keeps its own profession, whichever window reads it.
-  state, _, db = setup()
+  -- A list that also holds other professions' recipes (mid-switch on Retail): each recipe is
+  -- stored under its own profession when the character has it, under the window's when its
+  -- profession is unknown (0: not loaded yet), and not at all otherwise.
+  state, ModernReader, db = setup()
   local ownBs = { professionID = 2872, parentProfessionID = BS }
   local ownEnch = { professionID = 2909, parentProfessionID = ENCH }
-  state.recipes = { belt(1, 100, { profession = ownBs }), belt(2, 200, { profession = ownEnch }) }
+  local ownCooking = { professionID = 2873, parentProfessionID = COOKING }
+  state.recipes = {
+    belt(1, 100, { profession = ownBs }),
+    belt(2, 200, { profession = ownEnch }),
+    belt(3, 300, { profession = ownCooking }),
+    belt(4, 400, { profession = { professionID = 0 } }),
+  }
   Wow.fireEvent("TRADE_SKILL_SHOW")
   Assert.equal(recipesOf(db)[1].prof, BS)
-  Assert.equal(recipesOf(db)[2], nil, "an Enchanting recipe in the Blacksmithing window is not stored as Blacksmithing")
+  Assert.equal(recipesOf(db)[2].prof, ENCH, "an Enchanting recipe in the Blacksmithing window is stored as Enchanting")
+  Assert.equal(recipesOf(db)[3], nil, "a recipe of a profession the character does not have")
+  Assert.equal(recipesOf(db)[4].prof, BS, "profession 0 (not loaded yet) falls back to the window")
+  Assert.equal(db.characters[CHAR].professions[ENCH].read, true, "Enchanting got a recipe from this read")
+  Assert.same(ModernReader.lastRead, { prof = BS, stored = 3, pendingBind = 3 })
   state.base = ENCH
   Wow.fireEvent("TRADE_SKILL_SHOW")
   Assert.equal(recipesOf(db)[1].prof, BS, "the Enchanting window does not re-tag a Blacksmithing recipe")
   Assert.equal(recipesOf(db)[2].prof, ENCH)
+
+  -- A skipped recipe costs no schematic, and an unlearned one no profession lookup either.
+  state = setup()
+  local api, schematics, lookups = _G["C_TradeSkillUI"], {}, {}
+  local getSchematic = api.GetRecipeSchematic
+  ---@type fun(id: number): table|nil
+  local getProfession = api.GetProfessionInfoByRecipeID
+  rawset(api, "GetRecipeSchematic", function(id, isRecraft)
+    schematics[#schematics + 1] = id
+    return getSchematic(id, isRecraft)
+  end)
+  rawset(api, "GetProfessionInfoByRecipeID", function(id)
+    lookups[#lookups + 1] = id
+    return getProfession(id)
+  end)
+  state.recipes = { belt(1, 100), belt(2, 200, { profession = ownCooking }), belt(3, 300, { learned = false }) }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.same(schematics, { 1 })
+  Assert.same(lookups, { 1, 2 })
+
+  -- A list holding no recipe for the window leaves it unread, and the next update of the same
+  -- count with the window's own recipes is read.
+  state, _, db = setup()
+  state.recipes = { belt(1, 100, { profession = ownEnch }), belt(2, 200, { profession = ownCooking }) }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(db.characters[CHAR].professions[BS].read, false)
+  Assert.equal(db.characters[CHAR].professions[ENCH].read, true)
+  state.recipes = { belt(3, 300, { profession = ownBs }), belt(4, 400) }
+  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  Assert.equal(recipesOf(db)[3].prof, BS)
+  Assert.equal(recipesOf(db)[4].prof, BS)
+  Assert.equal(db.characters[CHAR].professions[BS].read, true)
+
+  -- Opening the window reads even while the data source is still rebuilding.
+  state, _, db = setup()
+  state.recipes = { belt(1, 100) }
+  state.changing = true
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.truthy(recipesOf(db)[1], "TRADE_SKILL_SHOW does not yield")
 
   -- A list update while the data source is still rebuilding is skipped; the next one reads.
   state, _, db = setup()
