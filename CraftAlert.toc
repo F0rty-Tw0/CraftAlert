@@ -39,6 +39,7 @@ Model/TypoPass.lua
 Model/WordGroups.lua
 Model/Index.lua
 Model/Matcher.lua
+Model/RealmTag.lua
 Professions/ProfessionList.lua
 Professions/BindLookup.lua
 Professions/ModernReader.lua
