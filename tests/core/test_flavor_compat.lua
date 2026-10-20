@@ -199,6 +199,13 @@ local function testClassOf()
   Assert.equal(FlavorCompat.ClassOf("Player-1-0A"), "WARRIOR", "stubbed after load: read per call")
   Assert.equal(calls, 1)
   Assert.equal(FlavorCompat.ClassOf(Wow.secret("Player-1-0B")), nil, "secret GUID")
+  -- In game a secret GUID is still a string, so only the secret test can stop it.
+  local realSecret = FlavorCompat.issecretvalue
+  FlavorCompat.issecretvalue = function(value)
+    return value == "Player-1-0S" or realSecret(value)
+  end
+  Assert.equal(FlavorCompat.ClassOf("Player-1-0S"), nil, "secret GUID that is a string")
+  FlavorCompat.issecretvalue = realSecret
   Assert.equal(FlavorCompat.ClassOf(nil), nil, "no GUID")
   Assert.equal(FlavorCompat.ClassOf(42), nil, "not a string")
   Assert.equal(calls, 1, "none of the three reached the API")
