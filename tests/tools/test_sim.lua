@@ -101,6 +101,18 @@ return function()
   )
   Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "TRADE_SKILL_SHOW" })), { "index: size=4" })
 
+  -- A learned recipe is stored at once; the coalesced rebuild makes it matchable.
+  Assert.same(stepLines(Sim.Run({ "--event", "NEW_RECIPE_LEARNED", "9004", "LF Sim Plate Helm" })), {
+    "index: size=4",
+    "learn: stored=true",
+    "index: size=5",
+    "sender: Customer-OtherRealm",
+    "match: item group=190004 prof=164 why=lf+sim plate helm",
+  })
+  Assert.same(stepLines(Sim.Run({ "--event", "NEW_RECIPE_LEARNED", "123" })), { "index: size=4", "learn: stored=false" })
+
+  Assert.equal(Sim.Run({ "--event" })[1], "error: --event needs an event name")
+
   local unknownFlag = Sim.Run({ "--nope" })
   Assert.equal(#unknownFlag, 1)
   assert(string.find(tostring(unknownFlag[1]), "^error: unknown flag"), unknownFlag[1])

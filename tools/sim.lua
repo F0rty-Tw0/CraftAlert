@@ -36,6 +36,9 @@ local SIM_RECIPES = {
   { id = 9005, name = "Sim Iron Bar", item = 190005, learned = true },
 }
 local ON_OFF = { on = true, off = false }
+-- Events with a known payload take exactly that many arguments, so a chat line may follow
+-- them; any other event takes every following non-`--` token.
+local EVENT_ARITY = { TRADE_SKILL_SHOW = 0, TRADE_SKILL_LIST_UPDATE = 0, NEW_RECIPE_LEARNED = 1, GET_ITEM_INFO_RECEIVED = 2 }
 
 local Sim = {}
 
@@ -88,15 +91,18 @@ local function parse(argv)
   while i <= #argv do
     local token = argv[i]
     if token == "--event" then
+      local name = argv[i + 1]
+      if name == nil or string.sub(name, 1, 2) == "--" then
+        return nil, "error: --event needs an event name"
+      end
+      i = i + 1
+      local arity = EVENT_ARITY[name]
       local args = {}
-      while argv[i + 1] and string.sub(argv[i + 1], 1, 2) ~= "--" do
+      while argv[i + 1] and string.sub(argv[i + 1], 1, 2) ~= "--" and (arity == nil or #args < arity) do
         args[#args + 1] = argv[i + 1]
         i = i + 1
       end
-      if #args == 0 then
-        return nil, "error: --event needs an event name"
-      end
-      plan.steps[#plan.steps + 1] = { kind = "event", name = table.remove(args, 1), args = args }
+      plan.steps[#plan.steps + 1] = { kind = "event", name = name, args = args }
     elseif isOneValueFlag(token) then
       local value = argv[i + 1]
       if value == nil then
@@ -222,6 +228,7 @@ local function start(ctx)
     if not ns.FlavorCompat.isClassic then
       ns.ProfessionList.Refresh(ctx.db, ns.PlayerName.Own())
       ns.ModernReader.Install(ctx.db)
+      ns.LearnWatcher.Install()
     end
     ns.Index.Configure(ctx.db, { professionOrder = ns.ProfessionList.Order })
     ns.Index.OnRebuilt(ns.Matcher.SetIndex)
@@ -300,6 +307,15 @@ local function reportRead(ctx)
   end
 end
 
+-- `learn: stored=<bool>` after a NEW_RECIPE_LEARNED.
+local function reportLearn(ctx)
+  local stored = ctx.ns.LearnWatcher.lastStored
+  if stored ~= nil then
+    ctx.ns.LearnWatcher.lastStored = nil
+    ctx.out[#ctx.out + 1] = "learn: stored=" .. tostring(stored)
+  end
+end
+
 -- Fires the event, then runs the timers it armed (rebuild coalescing, the bind debounce).
 function STEPS.event(ctx, step)
   start(ctx)
@@ -308,9 +324,11 @@ function STEPS.event(ctx, step)
     args[i] = eventArg(text)
   end
   ctx.ns.ModernReader.lastRead = nil
+  ctx.ns.LearnWatcher.lastStored = nil
   ctx.ns.BindLookup.lastStored = nil
   Wow.fireEvent(step.name, unpack(args, 1, #step.args))
   reportRead(ctx)
+  reportLearn(ctx)
   Wow.runTimers()
   flushBind(ctx)
 end
