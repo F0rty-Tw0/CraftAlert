@@ -63,19 +63,25 @@ local function fireRequest(text, sender)
   Wow.fireEvent(CHANNEL, text, sender, "", "2. Trade - City", sender, "", 2, 2, "Trade - City", 0, 1, nil)
 end
 
+-- The public chat events any frame the addon made listens for, sorted, once each.
 local function publicChatEvents()
-  local events = {}
-  for event in pairs(Wow.frames[1] and Wow.frames[1].events or {}) do
-    if string.find(event, "^CHAT_MSG_") then
-      events[#events + 1] = event
+  local seen, events = {}, {}
+  for _, frame in ipairs(Wow.frames) do
+    for event in pairs(frame.events) do
+      if string.find(event, "^CHAT_MSG_") and not seen[event] then
+        seen[event] = true
+        events[#events + 1] = event
+      end
     end
   end
   table.sort(events)
   return events
 end
 
--- Runs fn with the traps installed; always removes them and resets the stubs.
-local function withTraps(fn)
+-- Runs fn(state, sent, verify) with the traps installed, then verifies what the metatables could
+-- not see; always removes the traps and resets the stubs. `learnSignal`: the flavor chose the
+-- Classic learn signal (CHAT_MSG_SYSTEM allowed).
+local function withTraps(fn, learnSignal)
   Wow.reset()
   Wow.flavor("retail")
   local state = { resting = true, scanActive = false }
@@ -96,6 +102,7 @@ local function withTraps(fn)
     Wow.stub("UnitIsAFK", function()
       return false
     end)
+    Wow.stub("ChatFrame_OpenChat", function() end)
     local sent = {}
     installBlizzard(sent)
     ProfessionsRetail.install({
@@ -105,12 +112,15 @@ local function withTraps(fn)
       bind = { [190001] = 2 },
       autoCache = true,
     })
-    restore = RuntimeTraps.install({
+    local verify
+    restore, verify = RuntimeTraps.install({
       isScanActive = function()
         return state.isActive()
       end,
+      learnSignal = learnSignal,
     })
-    fn(state, sent)
+    fn(state, sent, verify)
+    verify()
   end)
   if restore then
     restore()
@@ -134,7 +144,7 @@ local function codeOf(path)
 end
 
 local function testTrapsCatchViolations()
-  withTraps(function(state)
+  withTraps(function(state, _, verify)
     -- Blizzard tables: reads and method calls work, any write raises (new field or overwrite).
     local before = rawget(_G, "GameTooltip").Show
     Assert.raises(function()
@@ -161,7 +171,7 @@ local function testTrapsCatchViolations()
     G("SlashCmdList").CRAFTALERT = function() end
     Assert.equal(type(G("SlashCmdList").CRAFTALERT), "function")
 
-    -- Globals: only our own names.
+    -- Globals: only our own names. A new name raises at the write.
     Assert.raises(function()
       _G.Foo = 1
     end, "write to global Foo")
@@ -172,6 +182,42 @@ local function testTrapsCatchViolations()
     Assert.raises(function()
       _G.BINDING_NAME_OTHER = "x"
     end, "BINDING_NAME_OTHER")
+    verify()
+
+    -- An existing global has no __newindex to hit, so verify() reports the overwrite by name
+    -- (rule 3: never replace what Blizzard defined). Each case is undone before the next.
+    local isResting, openChat, chatUtil = rawget(_G, "IsResting"), rawget(_G, "ChatFrame_OpenChat"), rawget(_G, "ChatFrameUtil")
+    _G.IsResting = function() end
+    Assert.raises(verify, "existing global IsResting was overwritten")
+    rawset(_G, "IsResting", isResting)
+    _G["ChatFrame_OpenChat"] = function() end
+    Assert.raises(verify, "existing global ChatFrame_OpenChat was overwritten")
+    rawset(_G, "ChatFrame_OpenChat", openChat)
+    _G.ChatFrameUtil = {}
+    Assert.raises(verify, "existing global ChatFrameUtil was overwritten")
+    rawset(_G, "ChatFrameUtil", chatUtil)
+    _G.IsResting = nil
+    Assert.raises(verify, "existing global IsResting was overwritten or removed")
+    rawset(_G, "IsResting", isResting)
+    rawset(_G, "Foo", 1) -- a new global that skips __newindex
+    Assert.raises(verify, "new global Foo")
+    rawset(_G, "Foo", nil)
+    verify()
+
+    -- Raw writes skip a proxy's __newindex; verify() finds what landed in it. Our own frame name
+    -- in UISpecialFrames is the one sanctioned insert (rule 3).
+    rawset(G("C_Timer"), "After", function() end)
+    Assert.raises(verify, "raw write into Blizzard table C_Timer%[After%]")
+    rawset(G("C_Timer"), "After", nil)
+    rawset(G("ProfessionsFrame").CraftingPage, "Extra", 1)
+    Assert.raises(verify, "ProfessionsFrame.CraftingPage%[Extra%]")
+    rawset(G("ProfessionsFrame").CraftingPage, "Extra", nil)
+    table.insert(G("UISpecialFrames"), "SomeoneElsesFrame")
+    Assert.raises(verify, "UISpecialFrames%[1%]")
+    rawset(G("UISpecialFrames"), 1, nil)
+    table.insert(G("UISpecialFrames"), "CraftAlertWindow")
+    verify()
+    rawset(G("UISpecialFrames"), 1, nil)
 
     -- Frames: own names only, no OnUpdate, no public chat event while the scan is inactive.
     Assert.raises(function()
@@ -193,12 +239,41 @@ local function testTrapsCatchViolations()
     end, "scan is inactive")
     frame:RegisterEvent("CHAT_MSG_WHISPER")
     frame:RegisterEvent("CHAT_MSG_WHISPER_INFORM")
-    frame:RegisterEvent("CHAT_MSG_SYSTEM")
     frame:RegisterEvent("PLAYER_LOGIN")
+
+    -- Addon messages are never listened for, scanning or not (rule 5); CHAT_MSG_SYSTEM needs the
+    -- Classic learn signal (rule 4), which this run does not have.
+    local function forbidden(event)
+      Assert.raises(function()
+        frame:RegisterEvent(event)
+      end, "rule [45]")
+    end
+    forbidden("CHAT_MSG_ADDON")
+    forbidden("CHAT_MSG_ADDON_LOGGED")
+    forbidden("CHAT_MSG_SYSTEM")
     state.scanActive = true
     frame:RegisterEvent("CHAT_MSG_CHANNEL")
+    forbidden("CHAT_MSG_ADDON")
+    forbidden("CHAT_MSG_ADDON_LOGGED")
+    forbidden("CHAT_MSG_SYSTEM")
+    -- publicChatEvents looks at every frame, not only the first.
+    G("CreateFrame")("Frame", "CraftAlertSecond"):RegisterEvent("CHAT_MSG_GUILD")
+    Assert.same(publicChatEvents(), { "CHAT_MSG_CHANNEL", "CHAT_MSG_GUILD", "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM" })
   end)
   Assert.equal(getmetatable(_G), nil, "the _G trap is removed")
+end
+
+-- A flavor that chose the Classic learn signal (§5.3) may listen to system messages, and only
+-- that flavor; addon messages stay forbidden for it too.
+local function testLearnSignalAllowsSystemEvents()
+  withTraps(function()
+    local frame = G("CreateFrame")("Frame", "CraftAlertLearn")
+    frame:RegisterEvent("CHAT_MSG_SYSTEM")
+    Assert.raises(function()
+      frame:RegisterEvent("CHAT_MSG_ADDON")
+    end, "rule 5")
+    Assert.same(publicChatEvents(), { "CHAT_MSG_SYSTEM" })
+  end, true)
 end
 
 local function testAddonObeysTheRules()
@@ -280,6 +355,7 @@ end
 
 return function()
   testTrapsCatchViolations()
+  testLearnSignalAllowsSystemEvents()
   testAddonObeysTheRules()
   testSourceRules()
 end
