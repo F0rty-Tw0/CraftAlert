@@ -17,7 +17,6 @@ local select = select
 local sort = table.sort
 
 local SLOTS = 6 -- GetProfessions returns prof1, prof2, then the secondary slots
-local PRIMARY_SLOTS = 2
 
 local crafting = {}
 for _, entry in ipairs(ProfessionWords.entries) do
@@ -26,7 +25,7 @@ end
 
 local order = {}
 
--- → { { key, name, primary }... } in GetProfessions slot order, or nil without the API.
+-- → { { key, name }... } in GetProfessions slot order, or nil without the API.
 local function currentProfessions()
   local getProfessions = _G["GetProfessions"]
   local getInfo = _G["GetProfessionInfo"]
@@ -39,7 +38,7 @@ local function currentProfessions()
     if index then
       local name, _, _, _, _, _, skillLine = getInfo(index)
       if crafting[skillLine] then
-        list[#list + 1] = { key = skillLine, name = name, primary = position <= PRIMARY_SLOTS }
+        list[#list + 1] = { key = skillLine, name = name }
       end
     end
   end
@@ -54,7 +53,8 @@ local function dropRecipes(recipes, professionKey)
   end
 end
 
--- Rebuilds the character's professions from the client and removes the recipes of a
+-- Rebuilds the character's professions from the client (`primary` is the player's choice
+-- per profession, so it is kept, never derived from the slot) and removes the recipes of a
 -- profession it no longer has. Other characters are never touched; nothing happens when
 -- the API is missing, so a failed lookup cannot wipe stored recipes.
 function ProfessionList.Refresh(db, charKey)
@@ -71,7 +71,7 @@ function ProfessionList.Refresh(db, charKey)
   local professions, keys = {}, {}
   for _, profession in ipairs(list) do
     local old = previous[profession.key]
-    professions[profession.key] = { name = profession.name, primary = profession.primary, read = old ~= nil and old.read == true }
+    professions[profession.key] = { name = profession.name, primary = old ~= nil and old.primary == true, read = old ~= nil and old.read == true }
     keys[#keys + 1] = profession.key
   end
   for key in pairs(previous) do

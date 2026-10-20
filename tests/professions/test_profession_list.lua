@@ -25,14 +25,14 @@ return function()
     local ProfessionList, Defaults = load(flavor)
     local db = Defaults.Db()
 
-    -- Blacksmithing + Mining are the primary slots; Cooking is secondary, First Aid (Forever) too.
+    -- Blacksmithing + Mining fill the profession slots; Cooking and First Aid (Forever) are secondary.
     ProfessionsRetail.install({
       slots = { slot("Blacksmithing", BS), slot("Mining", MINING), slot("First Aid", FIRST_AID), false, slot("Cooking", COOKING) },
     })
     ProfessionList.Refresh(db, CHAR)
 
     local character = db.characters[CHAR]
-    Assert.same(character.professions, { [BS] = { name = "Blacksmithing", primary = true, read = false } }, flavor)
+    Assert.same(character.professions, { [BS] = { name = "Blacksmithing", primary = false, read = false } }, flavor)
     Assert.equal(character.source, "local")
     Assert.equal(character.enabled, true)
     Assert.same(ProfessionList.Order(), { BS })
@@ -47,19 +47,23 @@ return function()
   local db = Defaults.Db()
   local state = ProfessionsRetail.install({ slots = { slot("Enchanting", ENCH), slot("Blacksmithing", BS) } })
 
-  -- Slot order is the tie-break order; both slots are primary.
+  -- Slot order is the tie-break order. `primary` is the player's choice, never the slot.
   ProfessionList.Refresh(db, CHAR)
   Assert.same(ProfessionList.Order(), { ENCH, BS })
-  Assert.equal(db.characters[CHAR].professions[BS].primary, true)
+  Assert.equal(db.characters[CHAR].professions[BS].primary, false)
+  Assert.equal(db.characters[CHAR].professions[ENCH].primary, false)
   Assert.same(ProfessionList.UnreadNames(db, CHAR), { "Blacksmithing", "Enchanting" })
 
   -- A refresh keeps the read flag, the recipes and what the player muted.
   local professions = db.characters[CHAR].professions
   professions[BS].read = true
+  professions[BS].primary = true
   db.characters[CHAR].recipes[1] = { name = "belt", prof = BS, muted = true }
   db.characters[CHAR].recipes[2] = { name = "enchant bracer", prof = ENCH }
   ProfessionList.Refresh(db, CHAR)
   Assert.equal(db.characters[CHAR].professions[BS].read, true)
+  Assert.equal(db.characters[CHAR].professions[BS].primary, true, "a chosen primary survives a refresh")
+  Assert.equal(db.characters[CHAR].professions[ENCH].primary, false)
   Assert.equal(db.characters[CHAR].recipes[1].muted, true)
   Assert.same(ProfessionList.UnreadNames(db, CHAR), { "Enchanting" })
 
@@ -79,6 +83,12 @@ return function()
   Assert.truthy(db.characters["Alt-OwnRealm"].recipes[1])
   Assert.truthy(ProfessionList.IsStored(db, "Alt-OwnRealm", BS))
   Assert.same(ProfessionList.Order(), { ENCH })
+
+  -- An alt's own refresh keeps its choice: primary = false stays false.
+  db.characters["Alt-OwnRealm"].professions[BS].primary = false
+  state.slots = { slot("Blacksmithing", BS) }
+  ProfessionList.Refresh(db, "Alt-OwnRealm")
+  Assert.equal(db.characters["Alt-OwnRealm"].professions[BS].primary, false)
 
   -- No profession API (or no crafting profession on a new character): nothing is written.
   local empty = Defaults.Db()
