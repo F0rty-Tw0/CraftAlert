@@ -25,6 +25,7 @@ local MODULES = {
   "Model.Slang",
   "Model.ItemKeywords",
   "Model.ProfessionWords",
+  "Model.ClassArmor",
   "Model.StatSlot",
   "Model.MatchCandidates",
   "Model.PhraseMatch",
@@ -127,9 +128,18 @@ Fixture.items = {
   [501] = { "INVTYPE_WAIST", 4, 4 }, -- plate belt
   [502] = { "INVTYPE_LEGS", 4, 4 }, -- plate legs
   [503] = { "INVTYPE_FEET", 4, 4 }, -- plate boots
+  [504] = { "INVTYPE_HEAD", 4, 4 }, -- plate helm
+  [505] = { "INVTYPE_WAIST", 4, 4 }, -- plate belt
+  [506] = { "INVTYPE_CHEST", 4, 3 }, -- mail chest
   [601] = { "INVTYPE_WAIST", 4, 1 }, -- cloth belt
   [602] = { "INVTYPE_WAIST", 4, 1 },
+  [603] = { "INVTYPE_HEAD", 4, 1 }, -- cloth helm
+  [604] = { "INVTYPE_LEGS", 4, 1 }, -- cloth legs
+  [605] = { "INVTYPE_WAIST", 4, 1 }, -- cloth belt
+  [606] = { "INVTYPE_CLOAK", 4, 1 }, -- cloth cloak
   [701] = { "INVTYPE_WAIST", 4, 2 }, -- leather belt
+  [702] = { "INVTYPE_HEAD", 4, 2 }, -- leather helm
+  [703] = { "INVTYPE_LEGS", 4, 2 }, -- leather legs
 }
 
 function Fixture.stubItems()
@@ -170,16 +180,39 @@ function Fixture.why(result)
   return table.concat({ unpack(result.why, 1, result.whyCount) }, "+")
 end
 
--- Asserts the match outcome: "item:<group>", "profession:<key>" or "stop:<lastStop>".
-function Fixture.expect(ns, text, outcome, message)
-  local result = ns.Matcher.Match("trade", text, Fixture.SENDER)
-  local got
+-- Stubs GetPlayerInfoByGUID. classes[guid] is a class token (returned as "Localized", token)
+-- or a function whose returns are returned. → counter; counter.n counts calls.
+function Fixture.stubClasses(classes)
+  local counter = { n = 0 }
+  Wow.stub("GetPlayerInfoByGUID", function(guid)
+    counter.n = counter.n + 1
+    local class = classes[guid]
+    if type(class) == "function" then
+      return class(guid)
+    end
+    if class then
+      return "Localized", class
+    end
+  end)
+  return counter
+end
+
+-- The match outcome: "item:<group>", "profession:<key>" or "stop:<lastStop>", and the result.
+---@return string outcome
+---@return table|nil result nil on a stop
+function Fixture.outcome(ns, text, guid)
+  local result = ns.Matcher.Match("trade", text, Fixture.SENDER, guid)
   if result then
-    got = result.kind .. ":" .. tostring(result.kind == "item" and result.group or result.prof)
     Assert.equal(ns.Matcher.lastStop, "match", text)
-  else
-    got = "stop:" .. ns.Matcher.lastStop
+    return result.kind .. ":" .. tostring(result.kind == "item" and result.group or result.prof), result
   end
+  return "stop:" .. ns.Matcher.lastStop, nil
+end
+
+-- Asserts the match outcome: "item:<group>", "profession:<key>" or "stop:<lastStop>".
+---@return table|nil result nil on a stop
+function Fixture.expect(ns, text, outcome, message, guid)
+  local got, result = Fixture.outcome(ns, text, guid)
   Assert.equal(got, outcome, message or text)
   return result
 end

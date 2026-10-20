@@ -15,7 +15,7 @@ local HUGE = math.huge
 -- The Matcher's result, reused on every call: callers copy what they keep.
 local result = { kind = nil, entries = {}, entryCount = 0, group = nil, prof = nil, why = {}, whyCount = 0 }
 MatchCandidates.result = result
-MatchCandidates.wordWhy = {} -- step 4.4 why tokens, filled by WordGroups (collect)
+MatchCandidates.wordWhy = {} -- step 4.4 why tokens, filled by WordGroups (collect, inferArmor)
 MatchCandidates.count = 0
 
 local candidates = {}
@@ -96,8 +96,9 @@ function MatchCandidates.FromBest(list)
 end
 
 -- Keeps the candidates whose group has word (groupWords: WordGroups); the same as
--- intersecting with wordIndex[word], since a wordIndex list holds whole groups.
-function MatchCandidates.KeepWord(groupWords, word)
+-- intersecting with wordIndex[word], since a wordIndex list holds whole groups. soft: when no
+-- group has word, keep every candidate (nothing was moved) → false.
+function MatchCandidates.KeepWord(groupWords, word, soft)
   local kept = 0
   for k = 1, count do
     local entry = candidates[k]
@@ -107,8 +108,12 @@ function MatchCandidates.KeepWord(groupWords, word)
       candidates[kept] = entry
     end
   end
+  if kept == 0 and soft then
+    return false
+  end
   count = kept
   MatchCandidates.count = count
+  return true
 end
 
 -- Keeps the candidates of profession prof (§6.3 step 4.4: a line with an Enchanting word).
@@ -125,19 +130,12 @@ function MatchCandidates.KeepProf(prof)
   MatchCandidates.count = count
 end
 
--- The entries of list whose group has every words[k] but words[skip] (list's own word).
-function MatchCandidates.FromListWhere(list, groupWords, words, n, skip)
+-- The entries of list whose group's word set is marked (marks[set] == mark, WordGroups).
+function MatchCandidates.FromListMarked(list, groupWords, marks, mark)
   count = 0
   for k = 1, #list do
     local entry = list[k]
-    local set = groupWords[entry.group]
-    local keep = set ~= nil
-    for w = 1, n do
-      if keep and w ~= skip and not set[words[w]] then
-        keep = false
-      end
-    end
-    if keep then
+    if marks[groupWords[entry.group]] == mark then
       count = count + 1
       candidates[count] = entry
     end
