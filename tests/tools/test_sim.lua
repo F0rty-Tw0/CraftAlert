@@ -120,6 +120,43 @@ return function()
     "lead: new customer=Zoë-Kel'Thuzad crafter=Crafter-OwnRealm cannotOrder=true",
   })
 
+  -- Clicks act on the newest lead as if its toast had been up for a second (Task 1.13): left
+  -- sends the disclosure then the whisper, a second left prefills (once per lead), a reply
+  -- from the customer is tracked, shift prefills, ctrl opens an empty whisper, right dismisses.
+  local customer = "Customer-OtherRealm"
+  local greeting = "Hi! I can craft Sim Plate Belt."
+  local clicked = stepLines(Sim.Run({ "LF plate belt", "--click", "left", "--click", "left" }))
+  Assert.same({ unpack(clicked, 6) }, {
+    "send: SendAddonMessage robots.txt | Q:CraftAlert | WHISPER | " .. customer,
+    "send: SendChatMessage " .. greeting .. " | WHISPER | nil | " .. customer,
+    "lead: greeted customer=" .. customer,
+    "send: SendTellWithMessage " .. customer .. " | " .. greeting,
+  })
+  Assert.same({ unpack(stepLines(Sim.Run({ "LF plate belt", "--click", "shift", "--click", "ctrl" })), 6) }, {
+    "send: SendTellWithMessage " .. customer .. " | " .. greeting,
+    "send: SendTell " .. customer,
+  })
+  Assert.same({ unpack(stepLines(Sim.Run({ "LF plate belt", "--click", "right", "--click", "left" })), 6) }, {
+    "lead: dismissed customer=" .. customer,
+    "error: --click left has no lead to act on",
+  })
+  Assert.same(stepLines(Sim.Run({ "--click", "left" })), { "index: size=4", "error: --click left has no lead to act on" })
+
+  -- A whisper from the customer after the greeting marks the lead replied; before it, nothing.
+  local replied = stepLines(
+    Sim.Run({ "LF plate belt", "--event", "CHAT_MSG_WHISPER", "hi", customer, "--click", "left", "--event", "CHAT_MSG_WHISPER", "hi", customer })
+  )
+  Assert.same({ unpack(replied, 6) }, {
+    "send: SendAddonMessage robots.txt | Q:CraftAlert | WHISPER | " .. customer,
+    "send: SendChatMessage " .. greeting .. " | WHISPER | nil | " .. customer,
+    "lead: greeted customer=" .. customer,
+    "lead: replied customer=" .. customer,
+  })
+  -- Whispering the customer by hand (a prefill sent) marks the lead greeted.
+  Assert.same({ unpack(stepLines(Sim.Run({ "LF plate belt", "--event", "CHAT_MSG_WHISPER_INFORM", "hello", customer })), 6) }, {
+    "lead: greeted customer=" .. customer,
+  })
+
   -- Opening the profession window reads it (a new Iron Bar, bind unknown) and rebuilds once;
   -- the item data arriving 1 s later stores bind 0, so the rebuild drops the bar again.
   local window = { "index: size=4", "read: prof=164 stored=3 pendingBind=1", "index: size=5" }

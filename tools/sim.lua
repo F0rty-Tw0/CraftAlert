@@ -39,7 +39,16 @@ local BIND_DEBOUNCE_SECONDS = 1
 local ON_OFF = { on = true, off = false }
 -- Events with a known payload take exactly that many arguments, so a chat line may follow
 -- them; any other event takes every following non-`--` token.
-local EVENT_ARITY = { TRADE_SKILL_SHOW = 0, TRADE_SKILL_LIST_UPDATE = 0, NEW_RECIPE_LEARNED = 1, GET_ITEM_INFO_RECEIVED = 2 }
+local EVENT_ARITY = {
+  TRADE_SKILL_SHOW = 0,
+  TRADE_SKILL_LIST_UPDATE = 0,
+  NEW_RECIPE_LEARNED = 1,
+  GET_ITEM_INFO_RECEIVED = 2,
+  CHAT_MSG_WHISPER = 2, -- text, sender
+  CHAT_MSG_WHISPER_INFORM = 2, -- text, target
+}
+-- How long the toast counts as shown (seconds) when --click acts on the newest lead (§7.5 rule 3).
+local SHOWN_FOR_SECONDS = 1
 
 local Sim = {}
 
@@ -227,6 +236,13 @@ local function start(ctx)
     local ns = ctx.ns
     ns.PlayerName.Init()
     ns.Leads.Restore(ctx.db)
+    ns.WhisperTracker.Install()
+    ns.Leads.On("greeted", function(lead)
+      ctx.out[#ctx.out + 1] = "lead: greeted customer=" .. lead.customer
+    end)
+    ns.Leads.On("replied", function(lead)
+      ctx.out[#ctx.out + 1] = "lead: replied customer=" .. lead.customer
+    end)
     if not ns.FlavorCompat.isClassic then
       ns.ProfessionList.Refresh(ctx.db, ns.PlayerName.Own())
       ns.ModernReader.Install(ctx.db)
@@ -407,9 +423,33 @@ function STEPS.cmd(ctx, step)
   handler(args)
 end
 
+-- What each click does to the newest lead (the §7.1 table; ClickRouter replaces it in Task 1.15).
+local CLICKS = {
+  left = function(ctx, lead, shownAt)
+    ctx.ns.GreetAction.Greet(lead, shownAt)
+  end,
+  shift = function(ctx, lead)
+    ctx.ns.GreetAction.Prefill(lead)
+  end,
+  ctrl = function(ctx, lead)
+    ctx.ns.GreetAction.Empty(lead)
+  end,
+  right = function(ctx, lead)
+    ctx.ns.Leads.Dismiss(lead.id)
+    ctx.out[#ctx.out + 1] = "lead: dismissed customer=" .. lead.customer
+  end,
+}
+
+-- The newest lead, as if its toast had been shown for a second; the `send:` lines come from
+-- the stubbed send APIs.
 function STEPS.click(ctx, step)
   start(ctx)
-  ctx.out[#ctx.out + 1] = "error: --click " .. step.button .. " has no lead to act on yet"
+  local lead = ctx.ns.Leads.Latest()
+  if not lead then
+    ctx.out[#ctx.out + 1] = "error: --click " .. step.button .. " has no lead to act on"
+    return
+  end
+  CLICKS[step.button](ctx, lead, rawget(_G, "GetTime")() - SHOWN_FOR_SECONDS)
 end
 
 function Sim.Run(argv)
