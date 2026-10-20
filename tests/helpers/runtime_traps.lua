@@ -34,10 +34,10 @@ local OWN_PREFIX = "^CraftAlert"
 
 -- Fields the addon may write on a Blizzard table, by global name (rule 3).
 local ALLOWED_FIELDS = { SlashCmdList = { CRAFTALERT = true } }
--- The frames ESC may close (UI/LeadsWindow.lua; the settings window joins in Task 1.17). A
+-- The frames ESC may close (UI/LeadsWindow.lua, UI/Settings/SettingsWindow.lua). A
 -- table.insert into the proxy cannot be trapped where it happens (it writes raw), so verify()
 -- reports any other entry, our own prefix included.
-local SPECIAL_FRAMES = { CraftAlertLeadsWindow = true }
+local SPECIAL_FRAMES = { CraftAlertLeadsWindow = true, CraftAlertSettingsWindow = true }
 
 RuntimeTraps.BLIZZARD_GLOBALS = {
   "UIParent",
