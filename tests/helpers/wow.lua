@@ -15,6 +15,7 @@ Wow.frames = {}
 Wow.timers = {}
 Wow.chat = {}
 Wow.clock = { gettime = 0, time = 0, profile = 0 }
+Wow.combat = false -- what InCombatLockdown() returns
 
 function Wow.stub(name, value)
   if saved[name] == nil then
@@ -136,6 +137,9 @@ local function installDefaults()
   Wow.stub("issecretvalue", function(value)
     return secrets[value] == true
   end)
+  Wow.stub("InCombatLockdown", function()
+    return Wow.combat
+  end)
   Wow.stub("DEFAULT_CHAT_FRAME", {
     AddMessage = function(_, text)
       table.insert(Wow.chat, text)
@@ -186,6 +190,7 @@ function Wow.reset()
   Wow.timers = {}
   Wow.chat = {}
   Wow.clock = { gettime = 0, time = 0, profile = 0 }
+  Wow.combat = false
   installDefaults()
 end
 

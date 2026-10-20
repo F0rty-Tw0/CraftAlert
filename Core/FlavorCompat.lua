@@ -115,7 +115,7 @@ function FlavorCompat.SendTell(name)
 end
 
 -- Bound once at load: the hot path calls it on every chat line.
-local function neverSecret()
+local function neverSecret(_)
   return false
 end
 

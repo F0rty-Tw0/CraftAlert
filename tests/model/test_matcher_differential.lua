@@ -1,0 +1,255 @@
+local Assert = require("tests.helpers.assert")
+local Wow = require("tests.helpers.wow")
+local Fixture = require("tests.helpers.matcher_fixture")
+
+-- Differential check on seeded random indexes and lines: step 4.4 in WordGroups
+-- (group-level, precomputed) against an entry-level reference that follows the spec text
+-- (§6.3 4.4: intersection, the 6-word cap, Enchanting narrowing, grouping, the profession
+-- tie-break; §6.4 ambiguous words).
+
+local ENCH = 333
+local PROFS = { 164, 165, 197, ENCH }
+local ORDER = { 333, 164, 197, 165 }
+local LOCS =
+  { "INVTYPE_WAIST", "INVTYPE_FEET", "INVTYPE_HAND", "INVTYPE_HEAD", "INVTYPE_CHEST", "INVTYPE_LEGS", "INVTYPE_2HWEAPON", "INVTYPE_FINGER" }
+local WORDS = {
+  "belt",
+  "boots",
+  "feet",
+  "gloves",
+  "head",
+  "helm",
+  "chest",
+  "robe",
+  "legs",
+  "2h",
+  "sword",
+  "plate",
+  "mail",
+  "leather",
+  "cloth",
+  "ring",
+  "chesty",
+  "lf",
+  "x",
+  "shield",
+  "enchant",
+  "ench",
+  "boot",
+  "shoes",
+  "waist",
+}
+local rand, pick = require("tests.helpers.lcg")(1)
+
+local function entryText(entries, n)
+  local parts = {}
+  for k = 1, n do
+    parts[k] = entries[k].character .. "/" .. tostring(entries[k].recipeKey)
+  end
+  return table.concat(parts, ",")
+end
+
+local function randomItemDb(ns)
+  local items = {}
+  local itemCount = rand(3, 12)
+  for id = 1, itemCount do
+    items[1000 + id] = { pick(LOCS), 4, rand(1, 4) }
+  end
+  Wow.stub("C_Item", {
+    GetItemInfoInstant = function(itemID)
+      local item = items[itemID]
+      if item then
+        return itemID, "A", "B", item[1], 0, item[2], item[3]
+      end
+    end,
+  })
+  local db = ns.Defaults.Db()
+  db.settings.extraSlang = { chesty = "chest", footies = "boots", stompers = "boots", kicks = "boots", girdle = "belt", sash = "belt" }
+  for c = 1, rand(1, 4) do
+    local recipes = {}
+    for k = 1, rand(2, 8) do
+      local id = 1000 + rand(1, itemCount)
+      local hasItem = rand(1, 5) ~= 1
+      recipes[100 + rand(1, 20)] = { name = "Recipe " .. (hasItem and id or ("n" .. k)), prof = pick(PROFS), item = hasItem and id or nil, bind = 1 }
+    end
+    db.characters["C" .. c .. "-Realm"] = { source = "local", enabled = true, realms = {}, professions = {}, recipes = recipes }
+  end
+  return db
+end
+
+-- Reference step 4.4 over tokens (and a 4.2 set of entries, or nil). → outcome text, and
+-- whether the 6-word cap left a word out.
+local function reference44(ns, index, tokens, set)
+  local wordIndex, Slang = index.wordIndex, ns.Slang
+  local first, other, enchanting
+  for _, t in ipairs(tokens) do
+    if wordIndex[t] and first == nil then
+      first = t
+    elseif wordIndex[t] and other == nil and t ~= first then
+      other = t
+    end
+    enchanting = enchanting or ns.ProfessionWords.KeyFor(t, false) == ENCH
+  end
+  local lists, taken, takenCount, capped = {}, {}, 0, false
+  for _, t in ipairs(tokens) do
+    local counted = not Slang.ambiguous[t] or set ~= nil or (first ~= nil and first ~= t) or other ~= nil
+    if (wordIndex[t] or Slang.wordSet[t]) and counted then
+      if not taken[t] and takenCount == 6 then
+        capped = true
+      else
+        if wordIndex[t] == nil then
+          return "nil", capped
+        end
+        if not taken[t] then
+          taken[t], takenCount = true, takenCount + 1
+        end
+        lists[#lists + 1] = wordIndex[t]
+      end
+    end
+  end
+  local base = set or lists[1]
+  if base == nil then
+    return "nil", capped
+  end
+  local kept = {}
+  for _, e in ipairs(base) do
+    local inAll = true
+    for _, list in ipairs(lists) do
+      local found = false
+      for _, x in ipairs(list) do
+        found = found or x == e
+      end
+      inAll = inAll and found
+    end
+    if inAll and (not enchanting or e.prof == ENCH) then
+      kept[#kept + 1] = e
+    end
+  end
+  local seen, firstOf = {}, {}
+  for _, e in ipairs(kept) do
+    if not seen[e.group] then
+      seen[e.group] = true
+      firstOf[#firstOf + 1] = e
+    end
+  end
+  if #firstOf == 0 then
+    return "nil", capped
+  elseif #firstOf == 1 then
+    return "item " .. tostring(firstOf[1].group) .. " " .. entryText(kept, #kept), capped
+  end
+  local counts, rank = {}, {}
+  for i, key in ipairs(ORDER) do
+    rank[key] = i
+  end
+  for _, e in ipairs(firstOf) do
+    counts[e.prof] = (counts[e.prof] or 0) + 1
+  end
+  local best, bestCount, bestRank = nil, 0, math.huge
+  for _, e in ipairs(firstOf) do
+    local n, r = counts[e.prof], rank[e.prof] or math.huge
+    if n > bestCount or (n == bestCount and r < bestRank) then
+      best, bestCount, bestRank = e.prof, n, r
+    end
+  end
+  local entries = {}
+  for _, e in ipairs(kept) do
+    if e.prof == best then
+      entries[#entries + 1] = e
+    end
+  end
+  return "profession " .. tostring(best) .. " " .. entryText(entries, #entries), capped
+end
+
+-- A random line: 1-4 words, or a group's own words in random order with 1-3 random words
+-- put in anywhere (so the 6-word cap decides lines that still match).
+local function randomTokens(index, all)
+  local tokens = {}
+  if #all == 0 or rand(1, 3) ~= 1 then
+    for k = 1, rand(1, 4) do
+      tokens[k] = pick(WORDS)
+    end
+    return tokens
+  end
+  for word in pairs(index.groupWords[pick(all).group] or {}) do
+    tokens[#tokens + 1] = word
+  end
+  table.sort(tokens)
+  for k = #tokens, 2, -1 do
+    local j = rand(1, k)
+    tokens[k], tokens[j] = tokens[j], tokens[k]
+  end
+  for _ = 1, rand(1, 3) do
+    table.insert(tokens, rand(1, #tokens + 1), pick(WORDS))
+  end
+  return tokens
+end
+
+local function testWordGroupsDifferential()
+  local ns = Fixture.load()
+  local checked, cappedHits, enchantHits, ambiguousSetHits = 0, 0, 0, 0
+  for _ = 1, 60 do
+    local db = randomItemDb(ns)
+    local index = ns.Index.Build(db, db.settings, {
+      ownKey = "C1-Realm",
+      professionOrder = function()
+        return ORDER
+      end,
+    })
+    ns.Matcher.SetIndex(index)
+    local all, ids = {}, {}
+    for id in pairs(index.itemIndex) do
+      ids[#ids + 1] = id
+    end
+    table.sort(ids) -- pairs() order differs between runtimes; the line sequence must not
+    for _, id in ipairs(ids) do
+      for _, e in ipairs(index.itemIndex[id]) do
+        all[#all + 1] = e
+      end
+    end
+    for _ = 1, 40 do
+      local tokens = randomTokens(index, all)
+      local set = nil
+      if #all > 0 and rand(1, 3) == 1 then
+        set = {}
+        for _ = 1, rand(1, 4) do
+          local e = pick(all)
+          local dup = false
+          for _, x in ipairs(set) do
+            dup = dup or x == e
+          end
+          if not dup then
+            set[#set + 1] = e
+          end
+        end
+        ns.MatchCandidates.FromList(set)
+      end
+      local got = "nil"
+      if ns.WordGroups.Match(index, tokens, #tokens, "lf", set ~= nil, {}, 0) then
+        ns.MatchCandidates.Finish()
+        local r = ns.MatchCandidates.result
+        got = r.kind .. " " .. tostring(r.kind == "item" and r.group or r.prof) .. " " .. entryText(r.entries, r.entryCount)
+      end
+      local want, capped = reference44(ns, index, tokens, set)
+      Assert.equal(got, want, table.concat(tokens, " "))
+      checked = checked + (got ~= "nil" and 1 or 0)
+      cappedHits = cappedHits + ((capped and got ~= "nil") and 1 or 0)
+      local enchant, ambiguousSet = false, false
+      for _, t in ipairs(tokens) do
+        enchant = enchant or ns.ProfessionWords.KeyFor(t, false) == ENCH
+        ambiguousSet = ambiguousSet or (set ~= nil and ns.Slang.ambiguous[t] == true)
+      end
+      enchantHits = enchantHits + ((enchant and got ~= "nil") and 1 or 0)
+      ambiguousSetHits = ambiguousSetHits + ((ambiguousSet and got ~= "nil") and 1 or 0)
+    end
+  end
+  -- Each rule decides enough matching lines (296 / 20 / 38 / 14 with this seed).
+  Assert.truthy(checked > 150, "lines that match: " .. checked)
+  Assert.truthy(cappedHits > 10, "matching lines the 6-word cap decided: " .. cappedHits)
+  Assert.truthy(enchantHits > 20, "matching lines with an Enchanting word: " .. enchantHits)
+  Assert.truthy(ambiguousSetHits > 8, "matching lines with a 4.2 set and an ambiguous word: " .. ambiguousSetHits)
+end
+
+return function()
+  testWordGroupsDifferential()
+  Wow.reset()
+end

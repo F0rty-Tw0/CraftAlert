@@ -33,7 +33,11 @@ def main():
 
     # Mirror tests/run.lua: strip the "CraftAlert." prefix so
     # require("CraftAlert.Core.X") resolves to <root>/Core/X.lua.
+    # Python sets LC_CTYPE to the user's locale; under e.g. Windows-1252 the C library's
+    # tolower/isalnum treat bytes >= 128 as letters, so string.lower would rewrite UTF-8.
+    # WoW, lua5.1 in CI and LuaJIT are ASCII-only: force the "C" locale.
     lua.execute(f"""
+        os.setlocale("C")
         package.path = "{project_root}/?.lua;{project_root}/?/init.lua;" .. package.path
 
         local rawRequire = require

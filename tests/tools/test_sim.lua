@@ -1,6 +1,17 @@
 local Assert = require("tests.helpers.assert")
 local Toc = require("tests.helpers.toc")
 
+-- Only the `sender:` lines of a run.
+local function senderLines(lines)
+  local senders = {}
+  for _, line in ipairs(lines) do
+    if string.find(line, "^sender: ") then
+      senders[#senders + 1] = line
+    end
+  end
+  return senders
+end
+
 -- The lines a run printed after its `db:` line: what the steps themselves produced.
 local function stepLines(lines)
   for index, line in ipairs(lines) do
@@ -37,13 +48,47 @@ return function()
   Assert.equal(lines[#lines], "send: SendChatMessage hi | WHISPER | nil | Bob-Realm")
 
   -- Each chat line reports its normalized sender; --sender applies to the next line only.
-  local senders = stepLines(Sim.Run({ "--sender", "Zoë-Kel'Thuzad", "LF belt", "LF boots", "--sender", "Bob-Area 52", "LF ring" }))
-  Assert.same({ senders[1], senders[2], senders[3] }, {
+  local senders = senderLines(Sim.Run({ "--sender", "Zoë-Kel'Thuzad", "LF belt", "LF boots", "--sender", "Bob-Area 52", "LF ring" }))
+  Assert.same(senders, {
     "sender: Zoë-Kel'Thuzad",
     "sender: Customer-OtherRealm",
     "sender: Bob-Area52",
   })
-  Assert.equal(stepLines(Sim.Run({ "--sender", "Bob", "hi" }))[1], "sender: Bob-OwnRealm")
+  Assert.equal(senderLines(Sim.Run({ "--sender", "Bob", "hi" }))[1], "sender: Bob-OwnRealm")
+
+  -- The first step builds the index from the fixture (bind 0 reagent left out: 2 chars x 2);
+  -- each line then reports its Matcher result or the step that stopped it.
+  local link = "|cff1eff00|Hitem:2575::::::::60:::::|h[Red Linen Shirt]|h|r"
+  Assert.same(
+    stepLines(Sim.Run({
+      "LF plate belt crafter",
+      "WTS plate belt",
+      "LF leather belt",
+      "LF [Enchant Bracer - Sim Health]",
+      "lf +8hp to wrist",
+      "wtb " .. link .. " or |Hitem:190001|h[Sim Plate Belt]|h",
+      "--sender",
+      "Crafter-OwnRealm",
+      "LF plate belt",
+    })),
+    {
+      "index: size=4",
+      "sender: Customer-OtherRealm",
+      "match: item group=190001 prof=164 why=lf+plate+belt",
+      "sender: Customer-OtherRealm",
+      "stop: prefilter",
+      "sender: Customer-OtherRealm",
+      "stop: nomatch",
+      "sender: Customer-OtherRealm",
+      "match: item group=enchant bracer - sim health prof=333 why=lf+enchant bracer sim health",
+      "sender: Customer-OtherRealm",
+      "match: item group=enchant bracer - sim health prof=333 why=lf+wrist+8hp",
+      "sender: Customer-OtherRealm",
+      "match: item group=190001 prof=164 why=wtb+190001",
+      "sender: Crafter-OwnRealm",
+      "stop: self",
+    }
+  )
 
   local unknownFlag = Sim.Run({ "--nope" })
   Assert.equal(#unknownFlag, 1)
@@ -69,7 +114,8 @@ return function()
   Assert.equal(rawget(_G, "IsResting")(), true)
 
   -- Commands without a registered handler report it instead of crashing.
-  assert(string.find(tostring(stepLines(Sim.Run({ "--cmd", "/ca" }))[1]), "^error: no slash handler"))
+  -- (stepLines[1] is the `index:` line of the start-up build.)
+  assert(string.find(tostring(stepLines(Sim.Run({ "--cmd", "/ca" }))[2]), "^error: no slash handler"))
 
   -- The account DB goes through SavedState.Load first: one `db:` line, preceded by one
   -- `chat:` line per Schema warning.

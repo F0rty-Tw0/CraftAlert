@@ -57,11 +57,31 @@ Constants.flavors = {
 }
 
 -- §6.3: defaults for the editable intent and blocker lists.
-Constants.intentWords = { "lf", "lfc", "wtb", "need", "needs", "looking", "anyone", "who", "recraft" }
+Constants.intentWords = { "lf", "lfc", "wtb", "need", "needs", "looking", "any", "any1", "anyone", "who", "recraft" }
 Constants.blockerWords = { "wts", "lfw", "selling" }
 
--- §6.4: body-part words that count only next to another slot/type word.
-Constants.ambiguousWords = { "legs", "head", "hands", "feet" }
+-- §6.2 item 2: filler and tier words. An alias made only of these (or of slang, stat,
+-- profession, intent and blocker words) is never created, so "enchant weapon" is no alias.
+Constants.aliasStopWords = {
+  "enchant",
+  "of",
+  "the",
+  "and",
+  "recipe",
+  "pattern",
+  "plans",
+  "formula",
+  "schematic",
+  "minor",
+  "lesser",
+  "greater",
+  "superior",
+  "major",
+}
+
+-- §6.4: slot words that count only next to another slot/type word or a phrase: body parts,
+-- and "ring" ("ring me when ready", "ring of blood"; user ruling 2026-10-20).
+Constants.ambiguousWords = { "legs", "head", "hands", "feet", "ring" }
 
 -- §7.4: greeting templates. Only Retail has crafting orders to point an alt's customer to.
 local function templates(altItemTail)
