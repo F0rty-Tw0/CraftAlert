@@ -89,6 +89,10 @@ Constants.ambiguousWords = { "legs", "head", "hands", "feet", "ring", "back" }
 -- not user-editable.
 Constants.craftCueWords = { "crafter", "craft", "crafted", "maker" }
 
+-- §6.4: words skipped between a cue word and the ambiguous word it partners, which must
+-- otherwise be next to each other ("LF crafter for my legs"; user ruling 2026-10-21).
+Constants.cueFillerWords = { "for", "a", "my", "the", "some", "me" }
+
 -- §7.4: greeting templates. Only Retail has crafting orders to point an alt's customer to.
 local function templates(altItemTail)
   return {

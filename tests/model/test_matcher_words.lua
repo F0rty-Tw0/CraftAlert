@@ -99,9 +99,69 @@ local function testBackIsCloak()
   expect(ns, "brb, back in 5", "stop:prefilter", "no intent word")
 end
 
+-- Cloth, leather and ring pieces beside the smiths' plate belt and plate legs: every
+-- ambiguous slot word below has a recipe of its own, so a word that counts alerts an item.
+local function slotIndex(ns)
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Tai-Realm"] = character({ TAILOR }, {
+      [9] = { item = 606, name = "Silk Cloak", prof = TAILOR },
+      [10] = { item = 603, name = "Silk Hood", prof = TAILOR },
+      [11] = { item = 604, name = "Silk Pants", prof = TAILOR },
+    })
+    db.characters["Lw-Realm"] = character({ LW }, {
+      [12] = { item = 702, name = "Hide Cap", prof = LW },
+      [13] = { item = 802, name = "Hide Gloves", prof = LW },
+      [14] = { item = 703, name = "Hide Pants", prof = LW },
+    })
+    db.characters["Jc-Realm"] = character({ JC }, { [15] = { item = 801, name = "Gem Band", prof = JC } })
+  end)
+end
+
+-- §6.3 4.4: any profession word narrows the candidates to that profession, as an Enchanting
+-- word does (user ruling 2026-10-21); nothing left falls through to step 4.6.
+local function testNamedProfessionNarrowing()
+  local ns = Fixture.load()
+  slotIndex(ns)
+  expect(ns, "LF legs crafter", "profession:" .. TAILOR, "three legs without a profession word")
+  expect(ns, "LF bs legs", "item:502", "one word, narrowed")
+  expect(ns, "LF bs pants", "item:502")
+  expect(ns, "LF lw head", "item:702")
+  expect(ns, "LF cloth legs", "item:604")
+  expect(ns, "LF lw cloth legs", "profession:" .. LW, "several words, nothing left: step 4.6")
+  expect(ns, "LF blacksmith, back in 10 min", "profession:" .. BS, "never a Tailoring cloak")
+  expect(ns, "LF lw bs legs", "item:703", "two professions: the first named")
+  expect(ns, "LF bs enchanter belt", "profession:" .. BS, "Enchanting first, so no plate belt; step 4.6")
+end
+
+-- §6.4, user ruling 2026-10-21: a crafting cue word partners an ambiguous word only as the
+-- token right before or after it (filler words between are skipped, punctuation is not).
+local function testCueAdjacency()
+  local ns = Fixture.load()
+  slotIndex(ns)
+  expect(ns, "LF back crafter", "item:606")
+  expect(ns, "LF tailor back", "item:606")
+  expect(ns, "LF bs for legs", "item:502")
+  expect(ns, "LF ring crafter", "item:801")
+  expect(ns, "LF crafter hands", "item:802")
+  expect(ns, "LF legs crafter", "profession:" .. TAILOR)
+  expect(ns, "LF crafter for my legs", "profession:" .. TAILOR, "filler words between")
+  expect(ns, "LF crafter to make my legs", "stop:nomatch", "a non-filler word between")
+  expect(ns, "LF crafter, be back in 5", "stop:nomatch")
+  expect(ns, "LF engineer, got your back", "stop:nomatch")
+  expect(ns, "LF alchemist for flasks, back soon", "stop:nomatch")
+  expect(ns, "LF scribe, ring me when ready", "stop:nomatch")
+  expect(ns, "LF crafter, hands down best tip", "stop:nomatch", "punctuation ends the neighbourhood")
+  local result = expect(ns, "LF tailor, will pay you back", "profession:" .. TAILOR)
+  Assert.equal(why(result), "lf+tailor", "the profession word alone")
+  result = expect(ns, "LF bs crafter, back from afk", "profession:" .. BS)
+  Assert.equal(why(result), "lf+bs", "the profession word alone")
+end
+
 return function()
   testWordIndex()
   testBackIsCloak()
+  testNamedProfessionNarrowing()
+  testCueAdjacency()
   testProfessionTieBreak()
   testSixWordCap()
   testEnchantingNarrowing()

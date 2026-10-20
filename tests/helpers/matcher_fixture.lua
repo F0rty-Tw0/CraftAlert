@@ -140,6 +140,8 @@ Fixture.items = {
   [701] = { "INVTYPE_WAIST", 4, 2 }, -- leather belt
   [702] = { "INVTYPE_HEAD", 4, 2 }, -- leather helm
   [703] = { "INVTYPE_LEGS", 4, 2 }, -- leather legs
+  [801] = { "INVTYPE_FINGER", 4, 0 }, -- ring
+  [802] = { "INVTYPE_HAND", 4, 2 }, -- leather gloves
 }
 
 function Fixture.stubItems()

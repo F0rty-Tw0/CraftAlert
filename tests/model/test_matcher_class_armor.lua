@@ -126,7 +126,7 @@ local function testBaselines()
   Assert.equal(outcome(ns, "LF belt"), "profession:" .. BS, "baseline: three belts, profession order")
   -- §6.4, user ruling 2026-10-21: a crafting cue word partners an ambiguous word.
   Assert.equal(outcome(ns, "LF head crafter"), "profession:" .. BS, "baseline: head counts through the cue word")
-  Assert.equal(outcome(ns, "LF bs for legs"), "profession:" .. BS, "baseline: legs has no partner")
+  Assert.equal(outcome(ns, "LF bs for legs"), "item:502", "baseline: legs counts through bs, narrowed to Blacksmithing")
   Assert.equal(outcome(ns, "LF belt and head"), "stop:nomatch", "baseline: head counts through belt")
 end
 
@@ -157,8 +157,9 @@ local function testRows6To10()
   check(ns, "row 7", "LF bs for legs", P, "item:502", nil, "lf+legs+plate (paladin)")
   check(ns, "row 9", "LF healer, head to Deadmines", P, "stop:nomatch", 0)
   check(ns, "row 10", "need legs", W, "stop:nomatch", 0)
+  -- User ruling 2026-10-21: a named profession wins; no enabled crafter of it → no alert.
   ns = fullIndex({ disable = { "Tai-Realm" } })
-  check(ns, "row 8", "LF tailor for head", W, "item:504")
+  check(ns, "row 8", "LF tailor for head", W, "stop:nomatch")
 end
 
 local function testRows11To12()

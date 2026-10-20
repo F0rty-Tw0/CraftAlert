@@ -168,7 +168,27 @@ local function testPipeRuns()
   Assert.equal(Tokenizer.normalized, "lf x")
 end
 
+-- §6.4 cue adjacency: BreakBefore(k) says a byte other than a space (punctuation, an escape, a
+-- link) sits between tokens k - 1 and k of the last line; never for the first token.
+local function breaksOf(Tokenizer, count)
+  local breaks = {}
+  for k = 1, count + 1 do
+    breaks[k] = Tokenizer.BreakBefore(k)
+  end
+  return breaks
+end
+
+local function testBreakBefore()
+  local Tokenizer = load()
+  local count = Tokenizer.Tokenize("lf crafter, hands  down|r best... tip")
+  Assert.same(breaksOf(Tokenizer, count), { false, false, true, false, true, true, false })
+  count = Tokenizer.Tokenize(", lf crafter |hitem:1|h[a b]|h back")
+  Assert.same(tokensOf(Tokenizer, count), { "lf", "crafter", "back" })
+  Assert.same(breaksOf(Tokenizer, count), { false, false, true, false }, "past the last token: false")
+end
+
 return function()
+  testBreakBefore()
   testTokenCap()
   testPipeRuns()
   testScan()
