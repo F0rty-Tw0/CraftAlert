@@ -255,13 +255,25 @@ local function addSlider(slider)
   end
 end
 
+-- What the box keeps of `text`: the first maxLetters letters (bytes here), all when 0.
+local function capped(editBox, text)
+  if editBox.maxLetters > 0 and type(text) == "string" then
+    return string.sub(text, 1, editBox.maxLetters)
+  end
+  return text
+end
+
 -- As the client: SetText fires OnTextChanged(self, false); ClearFocus fires OnEditFocusLost
--- only when the box had the focus.
+-- only when the box had the focus; SetMaxLetters cuts what is set or typed (0: no limit).
 local function addEditBox(editBox)
-  editBox.text, editBox.focused = "", false
+  editBox.text, editBox.focused, editBox.maxLetters = "", false, 0
+
+  function editBox:SetMaxLetters(count)
+    self.maxLetters = count
+  end
 
   function editBox:SetText(text)
-    self.text = text
+    self.text = capped(self, text)
     local onTextChanged = self.scripts.OnTextChanged
     if onTextChanged then
       onTextChanged(self, false)
@@ -289,7 +301,7 @@ local function addEditBox(editBox)
     end
   end
 
-  for _, name in ipairs({ "SetAutoFocus", "SetFontObject", "SetMaxLetters", "SetTextInsets", "SetJustifyH", "HighlightText" }) do
+  for _, name in ipairs({ "SetAutoFocus", "SetFontObject", "SetTextInsets", "SetJustifyH", "HighlightText" }) do
     editBox[name] = function(self, ...)
       self[name .. "Args"] = { ... }
     end
@@ -340,7 +352,7 @@ end
 -- The player clicks into the box, replaces its text and presses Enter.
 function Widgets.type(editBox, text)
   editBox:SetFocus()
-  editBox.text = text
+  editBox.text = capped(editBox, text)
   local onTextChanged = editBox.scripts.OnTextChanged
   if onTextChanged then
     onTextChanged(editBox, true)

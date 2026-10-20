@@ -17,6 +17,8 @@ local PageGreetings = { id = "greetings", title = Localization.Text("Greetings")
 
 local find = string.find
 
+local WHISPER_LETTERS = 255 -- the chat limit for one whisper
+
 local TEMPLATES = {
   { key = "item", label = "Item", kind = "item", own = true },
   { key = "altItem", label = "Alt item", kind = "item", own = false },
@@ -87,7 +89,7 @@ local function createNotes(column, state, repaint)
       db().settings.notes[prof] = text ~= "" and text or nil
     end
     repaint()
-  end)
+  end, WHISPER_LETTERS)
 end
 
 function PageGreetings.Create(parent)
@@ -115,7 +117,7 @@ function PageGreetings.Create(parent)
       end
       db().settings.templates[template.key] = text
       repaint()
-    end)
+    end, WHISPER_LETTERS)
     add(function()
       input.Set(db().settings.templates[template.key])
     end)

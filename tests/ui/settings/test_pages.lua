@@ -183,6 +183,9 @@ local function testGreetingsPage()
   Assert.equal(row("Item").input:GetText(), "Hi! I can craft {item}.")
   Widgets.type(row("Alt profession").input, "")
   Assert.equal(settings.templates.altProfession, ns.Defaults.Settings().templates.altProfession)
+  -- A whisper is at most 255 bytes: template and note boxes stop there.
+  Assert.equal(row("Item").input.maxLetters, 255)
+  Assert.equal(row("Note").input.maxLetters, 255)
 
   -- Professions by name; the note goes to the one shown and joins its preview lines.
   Assert.equal(row("Note for").input.label:GetText(), "Blacksmithing")

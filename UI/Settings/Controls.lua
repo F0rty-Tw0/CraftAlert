@@ -204,8 +204,9 @@ function Controls.Slider(column, spec)
 end
 
 -- Label on the left, box on the right. Enter or leaving the box commits a changed text
--- (onCommit(text)); Escape restores the last committed text.
-function Controls.Input(column, label, onCommit)
+-- (onCommit(text)); Escape restores the last committed text. maxLetters (optional) caps the
+-- box; without it a long word list is kept whole (a cut text would be committed on focus loss).
+function Controls.Input(column, label, onCommit, maxLetters)
   local layout = Theme.LAYOUT
   local row = newRow(column, label)
   local box = create("EditBox", row)
@@ -214,7 +215,9 @@ function Controls.Input(column, label, onCommit)
   box:SetAutoFocus(false)
   box:SetFontObject(Theme.FONTS.body)
   box:SetTextInsets(6, 6, 0, 0)
-  box:SetMaxLetters(255)
+  if maxLetters then
+    box:SetMaxLetters(maxLetters)
+  end
   FrameKit.Panel(box, Theme.COLORS.input)
   local committed = ""
   local function commit()

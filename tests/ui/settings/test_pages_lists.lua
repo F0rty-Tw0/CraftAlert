@@ -45,6 +45,30 @@ local function testKeywordsPage()
   Assert.same(db.ignored, { ["Other-Realm"] = true }, "the first row (by name) unblocked")
   Assert.same(take(refreshes), { "rebuild:block" })
   Assert.falsy(texts():find("Customer1-Draenor", 1, true))
+
+  -- A word list longer than a chat line is kept whole, also through a reopen and a focus loss
+  -- (a capped box would commit its cut text).
+  local long, slang = {}, {}
+  for i = 1, 60 do
+    long[i] = "word" .. i
+    slang[i] = "w" .. i .. "=belt"
+  end
+  Widgets.type(row("Intent words").input, table.concat(long, " "))
+  Widgets.type(row("Extra slang (word=slot)").input, table.concat(slang, " "))
+  ns.SettingsWindow.Toggle()
+  open(ns, "Keywords")
+  for _, label in ipairs({ "Intent words", "Extra slang (word=slot)" }) do
+    local box = row(label).input
+    box:SetFocus()
+    box:ClearFocus()
+  end
+  Assert.truthy(#table.concat(long, " ") > 255)
+  Assert.same(settings.intentWords, long)
+  local slangCount = 0
+  for _ in pairs(settings.extraSlang) do
+    slangCount = slangCount + 1
+  end
+  Assert.equal(slangCount, 60)
 end
 
 -- A typed name is cased as chat senders are, so the block matches them (§6.3 step 1).
