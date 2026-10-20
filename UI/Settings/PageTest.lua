@@ -21,10 +21,6 @@ local function db()
   return _G["CraftAlertDB"]
 end
 
-local function testCustomer()
-  return "Test-" .. (PlayerName.RealmOf(PlayerName.Own() or "") or "")
-end
-
 -- What matched: the crafter's recipe name for an item, the profession name otherwise.
 local function describe(result, crafter)
   local character = crafter and db().characters[crafter]
@@ -56,7 +52,7 @@ local function run(text)
   if result == nil then
     return { Localization.Text("No match (stopped at: %s)", tostring(Matcher.lastStop)) }
   end
-  local crafter = CrafterRank.Pick(result, testCustomer(), db(), { skipIgnore = true })
+  local crafter = CrafterRank.Pick(result, PlayerName.TestCustomer(), db(), { skipIgnore = true })
   return {
     describe(result, crafter),
     Localization.Text("Why: %s", whyOf(result)),

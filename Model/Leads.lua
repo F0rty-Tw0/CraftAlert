@@ -27,8 +27,7 @@ local EVENTS = { new = true, change = true, greeted = true, replied = true }
 
 ---@type table
 local db = nil
----@type table
-local leads = nil -- db.leads, edited in place
+local leads = {} -- db.leads once Restore binds it, edited in place; empty while unbound
 local nextId = 1
 local timerArmed = false
 local timerGeneration = 0 -- only the timer started last acts when it fires
@@ -39,8 +38,8 @@ local function now()
   return _G["time"]()
 end
 
-local function timeoutSeconds()
-  return db.settings.leadTimeoutMin * 60
+local function timeoutSeconds(accountDb)
+  return accountDb.settings.leadTimeoutMin * 60
 end
 
 local function reportError(err)
@@ -76,13 +75,12 @@ function Leads.On(name, fn)
   list[#list + 1] = fn
 end
 
-local function sweep()
-  local limit = timeoutSeconds()
+local function sweep(list, limit)
   local current = now()
   local removed = false
-  for i = #leads, 1, -1 do
-    if current - leads[i].time > limit then
-      remove(leads, i)
+  for i = #list, 1, -1 do
+    if current - list[i].time > limit then
+      remove(list, i)
       removed = true
     end
   end
@@ -96,10 +94,11 @@ local function onExpiry(generation)
     return
   end
   timerArmed = false
-  if sweep() then
+  local limit = timeoutSeconds(db)
+  if sweep(leads, limit) then
     fire("change")
   end
-  armExpiry()
+  armExpiry(leads, limit)
 end
 
 local function startTimer(delay)
@@ -112,18 +111,18 @@ local function startTimer(delay)
   end)
 end
 
-local function delayForOldest()
-  return max(1, leads[1].time + timeoutSeconds() - now() + 1)
+local function delayForOldest(list, limit)
+  return max(1, list[1].time + limit - now() + 1)
 end
 
 -- Waits for the oldest lead to pass the timeout (strictly, as the sweep counts it). A timer
 -- that is already pending is kept: if its lead was dismissed or refreshed, it fires early,
 -- sweeps nothing and re-arms.
-armExpiry = function()
-  if timerArmed or leads[1] == nil then
+armExpiry = function(list, limit)
+  if timerArmed or list[1] == nil then
     return
   end
-  startTimer(delayForOldest())
+  startTimer(delayForOldest(list, limit))
 end
 
 -- After a leadTimeoutMin change (settings page): sweeps what the new timeout already expired,
@@ -134,13 +133,14 @@ function Leads.Rearm()
   if db == nil then
     return
   end
-  if sweep() then
+  local limit = timeoutSeconds(db)
+  if sweep(leads, limit) then
     fire("change")
   end
   if leads[1] == nil then
     return
   end
-  local delay = delayForOldest()
+  local delay = delayForOldest(leads, limit)
   if not timerArmed or now() + delay < timerDeadline then
     startTimer(delay)
   end
@@ -156,17 +156,17 @@ end
 
 -- A hand-edited db may repeat or lack ids; find(id) must see each lead once. The first holder
 -- of an id keeps it, the rest get fresh ones above every id in the db.
-local function fixIds()
+local function fixIds(list)
   local seen, broken = {}, {}
   nextId = 1
-  for i = 1, #leads do
-    local id = leads[i].id
+  for i = 1, #list do
+    local id = list[i].id
     -- NaN can't be a table key and inf + 1 == inf, so only finite numbers count as ids.
     if type(id) == "number" and id == id and id > -math.huge and id < math.huge and not seen[id] then
       seen[id] = true
       nextId = max(nextId, id + 1)
     else
-      broken[#broken + 1] = leads[i]
+      broken[#broken + 1] = list[i]
     end
   end
   for i = 1, #broken do
@@ -176,41 +176,44 @@ local function fixIds()
 end
 
 -- Keeps the newest MAX_LEADS of a list that is sorted oldest first.
-local function trim()
-  local count = #leads
+local function trim(list)
+  local count = #list
   local excess = count - MAX_LEADS
   if excess <= 0 then
     return
   end
   for i = 1, count do
-    leads[i] = leads[i + excess]
+    list[i] = list[i + excess]
   end
 end
 
 -- A lead dated after now (hand-edited, or the clock was set back) would never pass the timeout:
 -- it counts as arrived now.
-local function clampTimes()
+local function clampTimes(list)
   local current = now()
-  for i = 1, #leads do
-    if leads[i].time > current then
-      leads[i].time = current
+  for i = 1, #list do
+    if list[i].time > current then
+      list[i].time = current
     end
   end
 end
 
 -- Binds db.leads (Bootstrap, at PLAYER_LOGIN): repairs a hand-edited list (ids, times, order,
--- size), drops expired leads and starts the timer.
+-- size), drops expired leads and starts the timer. The db is bound last: while a repair raises,
+-- Leads stays unbound and makes no lead.
 function Leads.Restore(accountDb)
-  db = accountDb
-  leads = db.leads
-  fixIds()
-  clampTimes()
-  sort(leads, isOlder)
-  trim()
-  if sweep() then
+  local list = accountDb.leads
+  local limit = timeoutSeconds(accountDb)
+  fixIds(list)
+  clampTimes(list)
+  sort(list, isOlder)
+  trim(list)
+  local removed = sweep(list, limit)
+  armExpiry(list, limit)
+  db, leads = accountDb, list
+  if removed then
     fire("change")
   end
-  armExpiry()
 end
 
 local function find(id)
@@ -234,7 +237,7 @@ end
 
 -- The same sender asking for the same thing again inside the timeout. → lead, position.
 local function findDuplicate(customerKey, result)
-  local limit, current = timeoutSeconds(), now()
+  local limit, current = timeoutSeconds(db), now()
   for i = #leads, 1, -1 do
     local lead = leads[i]
     if lead.customer == customerKey and current - lead.time <= limit and sameMatch(lead, result) then
@@ -276,6 +279,27 @@ local function describeCrafter(lead, result, crafter)
   end
 end
 
+-- The lead for a matched line from `crafter`, copied out of the Matcher's reused result;
+-- numbered and stored by the caller.
+local function buildLead(result, customerKey, text, channelKey, crafter, cannotOrder)
+  local lead = {
+    customer = customerKey,
+    message = text,
+    channel = channelKey,
+    kind = result.kind,
+    prof = result.prof,
+    group = result.group,
+    why = joinWhy(result),
+    crafter = crafter,
+    cannotOrder = cannotOrder,
+    time = now(),
+    greeted = false,
+    replied = false,
+  }
+  describeCrafter(lead, result, crafter)
+  return lead
+end
+
 -- nil when the player is not AFK-flagged or the flag is secret (§7.6).
 local function afkNow()
   local isAfk = _G["UnitIsAFK"]
@@ -309,33 +333,34 @@ function Leads.OnMatch(result, customerKey, text, channelKey, guid)
   if crafter == nil then
     return nil
   end
-  lead = {
-    id = nextId,
-    customer = customerKey,
-    guid = type(guid) == "string" and not FlavorCompat.issecretvalue(guid) and guid or nil,
-    message = text,
-    channel = channelKey,
-    kind = result.kind,
-    prof = result.prof,
-    group = result.group,
-    why = joinWhy(result),
-    crafter = crafter,
-    cannotOrder = cannotOrder,
-    time = now(),
-    greeted = false,
-    replied = false,
-    arrivedWhileAfk = afkNow(),
-  }
-  describeCrafter(lead, result, crafter)
+  lead = buildLead(result, customerKey, text, channelKey, crafter, cannotOrder)
+  lead.id = nextId
+  lead.guid = type(guid) == "string" and not FlavorCompat.issecretvalue(guid) and guid or nil
+  lead.arrivedWhileAfk = afkNow()
   nextId = nextId + 1
   leads[#leads + 1] = lead
   if #leads > MAX_LEADS then
     remove(leads, 1)
   end
-  armExpiry()
+  armExpiry(leads, timeoutSeconds(db))
   fire("new", lead)
   fire("change")
   return lead, true
+end
+
+-- `/ca test` (§7.3): the lead `text` would make if "Test" on the player's realm had sent it in
+-- Trade, with the ignore list skipped. Not numbered, stored, counted or announced.
+-- → lead or nil when no enabled crafter qualifies.
+function Leads.Preview(result, text)
+  if db == nil then
+    return nil
+  end
+  local customerKey = PlayerName.TestCustomer()
+  local crafter, cannotOrder = CrafterRank.Pick(result, customerKey, db, { skipIgnore = true })
+  if crafter == nil then
+    return nil
+  end
+  return buildLead(result, customerKey, text, "trade", crafter, cannotOrder)
 end
 
 -- The first time a lead is greeted, however it was sent (§7.1). → whether this was the first.

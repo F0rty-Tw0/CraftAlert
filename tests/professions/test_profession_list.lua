@@ -117,10 +117,58 @@ return function()
   Assert.truthy(db.characters[CHAR].recipes[2])
   Assert.same(ProfessionList.Order(), { ENCH })
 
+  -- At login the secondary slots may load before the profession slots: with both profession
+  -- slots empty, a character with professions stored keeps them (a partial read).
+  state.slots = { false, false, slot("Cooking", COOKING) }
+  Assert.equal(ProfessionList.Refresh(db, CHAR), false)
+  Assert.truthy(ProfessionList.IsStored(db, CHAR, ENCH))
+  Assert.truthy(db.characters[CHAR].recipes[2])
+  Assert.same(ProfessionList.Order(), { ENCH })
+
   -- A list of non-crafting professions only is real data: the crafting professions drop.
   state.slots = { slot("Mining", MINING) }
   ProfessionList.Refresh(db, CHAR)
   Assert.same(db.characters[CHAR].professions, {})
   Assert.same(db.characters[CHAR].recipes, {})
   Assert.same(ProfessionList.Order(), {})
+
+  -- Unknown data at login (the first Refresh of a session) seeds the order from the stored
+  -- professions, sorted; once the data is known (SKILL_LINES_CHANGED), Refresh says whether the
+  -- order it set differs, so the index can be rebuilt.
+  ProfessionList, Defaults = load()
+  db = Defaults.Db()
+  db.characters[CHAR] = {
+    source = "local",
+    enabled = true,
+    realms = {},
+    professions = {
+      [ENCH] = { name = "Enchanting", primary = false, read = true },
+      [BS] = { name = "Blacksmithing", primary = false, read = true },
+    },
+    recipes = { [1] = { name = "belt", prof = BS }, [2] = { name = "enchant bracer", prof = ENCH } },
+  }
+  state = ProfessionsRetail.install({ slots = { false, false, slot("Cooking", COOKING) } })
+  Assert.equal(ProfessionList.Refresh(db, CHAR), false)
+  Assert.same(ProfessionList.Order(), { BS, ENCH })
+  Assert.same(db.characters[CHAR].recipes[1], { name = "belt", prof = BS })
+  state.slots = { slot("Enchanting", ENCH), slot("Blacksmithing", BS), slot("Cooking", COOKING) }
+  Assert.equal(ProfessionList.Refresh(db, CHAR), true)
+  Assert.same(ProfessionList.Order(), { ENCH, BS })
+  Assert.equal(ProfessionList.Refresh(db, CHAR), false, "the same list again changes nothing")
+  -- A later partial read keeps the order the full read set.
+  state.slots = { false, false, slot("Cooking", COOKING) }
+  Assert.equal(ProfessionList.Refresh(db, CHAR), false)
+  Assert.same(ProfessionList.Order(), { ENCH, BS })
+  ProfessionList = load() -- Wow.reset drops the profession API stubs
+  ProfessionList.Refresh(db, CHAR)
+  Assert.same(ProfessionList.Order(), { BS, ENCH }, "a missing API seeds the order too")
+
+  -- A hand-edited db can mix key types (the Schema keeps number and string keys): the seed takes
+  -- the skill-line IDs this flavor writes and leaves the rest out, without raising.
+  ProfessionList = load()
+  db.characters[CHAR].professions[tostring(ENCH)] = { name = "Enchanting", primary = false, read = true }
+  db.characters[CHAR].professions.Tailoring = { name = "Tailoring", primary = false, read = true }
+  ProfessionsRetail.install({ slots = { false, false, slot("Cooking", COOKING) } })
+  Assert.equal(ProfessionList.Refresh(db, CHAR), false)
+  Assert.same(ProfessionList.Order(), { BS, ENCH }, "string keys are left out of the seed")
 end

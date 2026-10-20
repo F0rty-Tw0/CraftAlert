@@ -145,6 +145,21 @@ local function testMutedAndDisabledAbsent()
   Assert.equal(index.crafterCount, 2)
 end
 
+-- A profession whose stored recipes are all muted is noted per character, for CrafterRank;
+-- an unmuted unbound recipe (not indexed) still counts as listening.
+local function testMutedProfessions()
+  local Index, Defaults = load()
+  local db = fixtureDb(Defaults)
+  Assert.same(build(Index, db).mutedProfessions, {}, "every crafter has an unmuted recipe")
+  local recipes = db.characters["Smith-Realm"].recipes
+  recipes[1001].muted, recipes[1002].muted = true, true
+  Assert.same(build(Index, db).mutedProfessions, {}, "the unbound recipe still listens")
+  recipes[1003].muted = true
+  Assert.same(build(Index, db).mutedProfessions, { ["Smith-Realm"] = { [BS] = true } })
+  db.characters["Off-Realm"].recipes[3001].muted = true
+  Assert.same(build(Index, db).mutedProfessions, { ["Smith-Realm"] = { [BS] = true } }, "disabled crafters are left out")
+end
+
 -- §6.2: one entry per recipe and character, referenced by every index.
 local function testSharedEntry()
   local Index, Defaults = load()
@@ -272,6 +287,29 @@ local function testRebuild()
   Assert.truthy(rawequal(calls[1][2], index) and rawequal(calls[2][2], index))
 end
 
+-- A callback that raises is reported through geterrorhandler; the ones after it still run.
+local function testFailingCallback()
+  local Index, Defaults = load()
+  configure(Index, Defaults)
+  local reported, after = {}, 0
+  Wow.stub("geterrorhandler", function()
+    return function(err)
+      reported[#reported + 1] = err
+    end
+  end)
+  Index.OnRebuilt(function()
+    error("callback broke")
+  end)
+  Index.OnRebuilt(function()
+    after = after + 1
+  end)
+  local index = Index.Rebuild()
+  Assert.truthy(rawequal(Index.Current(), index))
+  Assert.equal(after, 1)
+  Assert.equal(#reported, 1)
+  assert(string.find(tostring(reported[1]), "callback broke", 1, true), tostring(reported[1]))
+end
+
 local function countBuilds(Index)
   local builds = { n = 0 }
   Index.OnRebuilt(function()
@@ -382,6 +420,7 @@ end
 return function()
   testUnboundFilter()
   testMutedAndDisabledAbsent()
+  testMutedProfessions()
   testSharedEntry()
   testIndexes()
   testSettingsCopies()
@@ -389,6 +428,7 @@ return function()
   testClassicProfessionKeys()
   testEmptyIndex()
   testRebuild()
+  testFailingCallback()
   testCoalescing()
   testCombatDeferral()
   testCombatStartsBeforeTimer()

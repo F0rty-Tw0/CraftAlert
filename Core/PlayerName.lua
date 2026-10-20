@@ -72,8 +72,14 @@ local function realmId(realm)
   return lower(PlayerName.StripApostrophes(normalizeRealm(realm) or ""))
 end
 
+-- A realm with nothing left once stripped (only apostrophes) is the same as no realm.
 local function sameRealm(realm, known)
-  return type(known) == "string" and realmId(known) == realmId(realm)
+  local id = realmId(realm)
+  if id == "" then
+    return false
+  end
+
+  return type(known) == "string" and realmId(known) == id
 end
 
 -- The spelling of `realm` among the own realm and `realms` (normalized), ignoring case, spaces
@@ -131,6 +137,11 @@ function PlayerName.RealmOf(key)
     return nil
   end
   return match(key, "^[^-]*%-(.+)$") or ownRealm
+end
+
+-- The customer /ca test and the Test page pretend to be: "Test" on the player's own realm.
+function PlayerName.TestCustomer()
+  return "Test-" .. (PlayerName.RealmOf(ownKey or "") or "")
 end
 
 -- For comparisons across sources that drop the apostrophe (CraftScan, spec §10.2).

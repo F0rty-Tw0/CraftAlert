@@ -33,6 +33,23 @@ function Wow.secret(value)
   return wrapper
 end
 
+-- As the client: OnShow (then its hooks) runs on a frame that becomes visible, and on each of
+-- its shown descendants, so showing UIParent again after Alt+Z reaches the addon's frames.
+local function fireOnShow(frame)
+  local onShow = frame.scripts.OnShow
+  if onShow then
+    onShow(frame)
+  end
+  for _, hook in ipairs(frame.hooks.OnShow or {}) do
+    hook(frame)
+  end
+  for _, child in ipairs(Wow.frames) do
+    if child.parent == frame and child.shown then
+      fireOnShow(child)
+    end
+  end
+end
+
 -- Frames start shown, as in the client; Widgets adds the region and child-creation methods.
 local function newFrame(frameType, name, parent, template)
   local frame = { frameType = frameType, name = name, parent = parent, template = template, events = {}, scripts = {}, hooks = {}, shown = true }
@@ -64,7 +81,11 @@ local function newFrame(frameType, name, parent, template)
   end
 
   function frame:Show()
+    local wasVisible = self:IsVisible()
     self.shown = true
+    if not wasVisible and self:IsVisible() then
+      fireOnShow(self)
+    end
   end
 
   function frame:Hide()

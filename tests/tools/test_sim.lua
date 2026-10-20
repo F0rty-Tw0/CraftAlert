@@ -138,8 +138,9 @@ return function()
     "lead: new customer=Zoë-Kel'Thuzad crafter=Crafter-OwnRealm cannotOrder=true",
   })
 
-  -- The toast (Task 1.15): every AlertToast.Show prints the lead and its "+N more" badge; the
-  -- sim shows it for each new lead. An updated lead raises no second toast.
+  -- The toast (Task 1.15): every AlertToast.Show prints the lead and its "+N more" badge;
+  -- Bootstrap's Leads.On("new") shows it once per new lead (the sim adds no second
+  -- subscription). An updated lead raises no second toast.
   local toastLines = {}
   for _, line in ipairs(Sim.Run({ "LF plate belt", "LF plate belt pls", "--sender", "Bob", "LF plate belt" })) do
     if string.find(line, "^toast: ") then
@@ -147,6 +148,9 @@ return function()
     end
   end
   Assert.same(toastLines, { "toast: shown lead=1 more=0", "toast: shown lead=2 more=1" })
+  -- The first step fired PLAYER_LOGIN: Bootstrap made the launcher and timed the login.
+  Assert.truthy(rawget(_G, "CraftAlertLauncher"))
+  Assert.equal(type(Sim.lastNs.Perf.loginMs), "number")
 
   -- Clicks act on the newest lead as if its toast had been up for a second (Task 1.13): left
   -- sends the disclosure then the whisper, a second left prefills (once per lead), a reply
@@ -186,10 +190,12 @@ return function()
   })
 
   -- Scan activation (Task 1.14): lines arrive as Trade channel events, so they only count while
-  -- the scan is active: paused (no resting), no lead; resting again, active, a lead.
+  -- the scan is active: paused (no resting), no lead; resting again, active, a lead. Paused at
+  -- login, Bootstrap prints the status line itself (§7.6), and the first activation again.
   Assert.same(stepLines(Sim.Run({ "--resting", "off", "LF plate belt", "--resting", "on", "--event", "PLAYER_UPDATE_RESTING", "LF plate belt" })), {
     "index: size=4",
     "scan: paused (notResting)",
+    "chat: Craft Alert: Paused — not in a city or inn",
     "sender: Customer-OtherRealm",
     "stop: paused",
     "scan: active",
@@ -257,9 +263,20 @@ return function()
   Assert.equal(rawget(_G, "UnitIsAFK")("player"), false)
   Assert.equal(rawget(_G, "IsResting")(), true)
 
-  -- Commands without a registered handler report it instead of crashing.
-  -- (stepLines[1..3] are the start-up build: `index:`, `scan:`, `chat:`.)
-  assert(string.find(tostring(stepLines(Sim.Run({ "--cmd", "/ca" }))[4]), "^error: no slash handler"))
+  -- --cmd routes through SlashCmdList.CRAFTALERT (registered by Bootstrap at PLAYER_LOGIN);
+  -- what the command prints arrives as `chat:` lines, after the start-up build's three.
+  local test = stepLines(Sim.Run({ "--cmd", "/ca test LF plate belt" }))
+  Assert.equal(test[4], "chat: Craft Alert: Item: Sim Plate Belt")
+  Assert.equal(test[5], "chat: Craft Alert: Why: lf + plate + belt")
+  Assert.equal(test[6], "chat: Craft Alert: Crafter: Crafter-OwnRealm")
+  Assert.equal(test[7], "chat: Craft Alert: Greeting: Hi! I can craft Sim Plate Belt.")
+  Assert.equal(#test, 7, "no lead, no toast line, no send")
+  Assert.equal(rawget(_G, "SLASH_CRAFTALERT2"), "/ca")
+  Assert.equal(stepLines(Sim.Run({ "--cmd", "/ca test hello there" }))[4], "chat: Craft Alert: No match (stopped at: prefilter)")
+  Assert.equal(
+    stepLines(Sim.Run({ "--cmd", "/ca nonsense" }))[4],
+    "chat: Craft Alert: Commands: /ca (leads window), /ca config, /ca test <line>, /ca perf"
+  )
 
   -- The account DB goes through SavedState.Load first: one `db:` line, preceded by one
   -- `chat:` line per Schema warning.

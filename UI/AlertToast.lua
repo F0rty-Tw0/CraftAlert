@@ -125,6 +125,14 @@ local function onClick(_, button)
   end
 end
 
+-- On screen again (UIParent back after Alt+Z): the lead counts as shown from now, so the time
+-- under the hidden UI is no look (§7.5 rule 3).
+local function onShow()
+  if current.lead then
+    current.shownAt = now()
+  end
+end
+
 -- Hides the toast once its lead is dismissed, blocked or expired.
 local function onLeadsChange()
   local lead = current.lead
@@ -150,6 +158,7 @@ local function create()
   FrameKit.Place(frame, UI_KEY, FALLBACK_POSITION)
   frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   frame:SetScript("OnClick", onClick)
+  frame:SetScript("OnShow", onShow)
   local name = FrameKit.Text(frame, fonts.name)
   name:SetPoint("TOPLEFT", frame, "TOPLEFT", layout.PADDING, -layout.PADDING)
   local badge = FrameKit.Text(frame, fonts.badge, colors.accent)

@@ -229,11 +229,12 @@ function ScanGate.OnChange(fn)
 end
 
 -- Bootstrap, after the settings are loaded: re-evaluate when the player enters or leaves a
--- city or inn, or changes zone.
+-- city or inn, or changes zone. The db is bound last: while a registration raises, Evaluate
+-- keeps returning early and no chat event is registered without the resting gate.
 function ScanGate.Install(accountDb)
-  db = accountDb
   EventRouter.On("PLAYER_UPDATE_RESTING", ScanGate.Evaluate)
   EventRouter.On("ZONE_CHANGED_NEW_AREA", ScanGate.Evaluate)
+  db = accountDb
 end
 
 ns.ScanGate = ScanGate

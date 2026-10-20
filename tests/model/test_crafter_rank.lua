@@ -41,6 +41,12 @@ local function db()
   }
 end
 
+-- The default settings, so the index can be built from `data`.
+local function withSettings(data)
+  data.settings = require("CraftAlert.Persistence.Defaults").Db().settings
+  return data
+end
+
 -- A Matcher result naming the given characters as crafters of one recipe.
 local function result(keys, prof)
   local entries = {}
@@ -104,6 +110,53 @@ return function()
   Assert.equal(CrafterRank.Pick(profession, CUSTOMER, data), nil)
   data.characters["Prim-Realm"].enabled = true
   Assert.equal((CrafterRank.Pick(profession, CUSTOMER, data)), "Prim-Realm")
+
+  -- A character whose recipes of that profession are all muted wants no leads for it; one with
+  -- no recipe of it stored yet (never read) still answers, and so does one unmuted recipe, even
+  -- an unbound one the index leaves out. Pick reads this from the index, so each change rebuilds.
+  local Index = require("CraftAlert.Model.Index")
+  data = withSettings(db())
+  data.characters["Me-Realm"].recipes = {
+    [1] = { name = "belt", prof = BS, muted = true },
+    [2] = { name = "helm", prof = BS, muted = true, bind = 0 },
+    [3] = { name = "enchant", prof = ENCH },
+  }
+  for _, key in ipairs({ "Prim-Realm", "Alt-Realm", "Zed-Realm", "Imp-Realm" }) do
+    data.characters[key].professions[BS] = nil
+  end
+  Index.Configure(data, { ownKey = "Me-Realm" })
+  Index.Rebuild()
+  Assert.equal(CrafterRank.Pick(profession, CUSTOMER, data), nil, "all muted: no crafter, no lead")
+  data.characters["Alt-Realm"].professions[BS] = { name = "Blacksmithing", primary = false, read = false }
+  Index.Rebuild()
+  Assert.equal((CrafterRank.Pick(profession, CUSTOMER, data)), "Alt-Realm", "the muted current character is passed over")
+  data.characters["Me-Realm"].recipes[2].muted = nil
+  Index.Rebuild()
+  Assert.equal((CrafterRank.Pick(profession, CUSTOMER, data)), "Me-Realm", "one unmuted unbound recipe is enough")
+
+  -- Pick looks the muted state up in the index (§4.4): a character with thousands of recipes is
+  -- not walked on every profession-word match.
+  local reads = 0
+  local function counted(fields)
+    return setmetatable({}, {
+      __index = function(_, field)
+        reads = reads + 1
+        return fields[field]
+      end,
+    })
+  end
+  data = withSettings(db())
+  for _, key in ipairs({ "Prim-Realm", "Alt-Realm", "Zed-Realm", "Imp-Realm" }) do
+    data.characters[key] = nil
+  end
+  for i = 1, 3000 do
+    data.characters["Me-Realm"].recipes[i] = counted({ name = "recipe " .. i, prof = BS, muted = true })
+  end
+  Index.Configure(data, { ownKey = "Me-Realm" })
+  Index.Rebuild()
+  reads = 0
+  Assert.equal(CrafterRank.Pick(profession, CUSTOMER, data), nil)
+  Assert.equal(reads, 0, "no stored recipe is read")
 
   -- Blizzard's ignore list: the customer is dropped unless /ca test skips the check.
   local asked = {}

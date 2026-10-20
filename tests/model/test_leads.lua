@@ -83,7 +83,58 @@ local function fireTimer()
   table.remove(Wow.timers, 1).fn()
 end
 
+-- /ca test (§7.3): the lead a line would make for "Test" on the own realm, built the same way
+-- as a real one and kept nowhere: not in db.leads, no event, no id taken, ignore list skipped.
+local function testPreview()
+  local ns, db = setup()
+  local Leads = ns.Leads
+  local seen = listen(Leads)
+  Wow.stub("C_FriendList", {
+    IsIgnored = function()
+      return true
+    end,
+  })
+  local text = "LF plate belt"
+  local preview = Leads.Preview(match(ns, text), text)
+  Assert.same({
+    customer = preview.customer,
+    message = preview.message,
+    channel = preview.channel,
+    kind = preview.kind,
+    itemLink = preview.itemLink,
+    recipeName = preview.recipeName,
+    profName = preview.profName,
+    why = preview.why,
+    crafter = preview.crafter,
+    id = preview.id,
+  }, {
+    customer = "Test-Realm",
+    message = text,
+    channel = "trade",
+    kind = "item",
+    itemLink = "|cff1eff00|Hitem:501::::::::60:::::|h[Item 501]|h|r",
+    recipeName = "Thick Plate Belt",
+    profName = tostring(BS),
+    why = "lf + plate + belt",
+    crafter = "Alt-Realm",
+    id = nil,
+  }, "the lead a real one would be, with the ignore list skipped")
+  Assert.same({ #db.leads, seen.change, #seen.new, #Leads.List() }, { 0, 0, 0, 0 })
+  Wow.stub("C_FriendList", nil)
+  local first = newLead(ns, text)
+  Assert.equal(first.id, 1, "the preview took no lead id")
+
+  -- A profession word is answered by enabled characters only.
+  local profession = "LF blacksmith"
+  Assert.truthy(Leads.Preview(match(ns, profession), profession))
+  for _, character in pairs(db.characters) do
+    character.enabled = false
+  end
+  Assert.equal(Leads.Preview(match(ns, profession), profession), nil, "no enabled crafter, no lead")
+end
+
 return function()
+  testPreview()
   -- A new lead copies what it keeps out of the Matcher's result (§6.3 step 7).
   local ns, db = setup()
   local Leads = ns.Leads

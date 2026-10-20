@@ -96,6 +96,12 @@ function FlavorCompat.GetAutoCompleteRealms()
   return callPreferred("C_AutoComplete", "GetAutoCompleteRealms")
 end
 
+-- The addon's memory in KB (/ca perf); the client caches it until it is refreshed.
+function FlavorCompat.GetAddOnMemoryUsage(name)
+  callPreferred("C_AddOns", "UpdateAddOnMemoryUsage")
+  return callPreferred("C_AddOns", "GetAddOnMemoryUsage", name)
+end
+
 -- ChatFrameUtil is present on every flavor; returns false when it is missing.
 local function callChatFrameUtil(name, ...)
   local util = _G["ChatFrameUtil"]

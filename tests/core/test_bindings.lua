@@ -85,6 +85,37 @@ local function testGreetLatest()
   Assert.equal(UiFixture.callsTo(calls, "prefill")[1][2], "Customer2-Draenor")
   Assert.equal(ns.Leads.Latest().greeted, false)
 
+  -- Shown again after Alt+Z, the toast's lead counts as on screen from then: the time under the
+  -- hidden UI is no look (§7.5 rule 3). Within 0.5 s the keybind prefills, after it greets.
+  ns, _, calls = UiFixture.load({ leads = 2 })
+  ns.AlertToast.Show(ns.Leads.Latest())
+  Wow.clock.gettime = 55
+  G("UIParent"):Hide()
+  Wow.clock.gettime = 58
+  G("UIParent"):Show()
+  Wow.clock.gettime = 58.01
+  G("CraftAlert_GreetLatest")()
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 0, "the toast was back on screen for 10 ms")
+  Assert.equal(#UiFixture.callsTo(calls, "prefill"), 1)
+  Wow.clock.gettime = 58.6
+  G("CraftAlert_GreetLatest")()
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 1)
+
+  -- The same for the leads window's top row.
+  ns, _, calls = UiFixture.load({ leads = 2 })
+  ns.LeadsWindow.Toggle()
+  Wow.clock.gettime = 55
+  G("UIParent"):Hide()
+  Wow.clock.gettime = 58
+  G("UIParent"):Show()
+  Wow.clock.gettime = 58.01
+  G("CraftAlert_GreetLatest")()
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 0, "the row was back on screen for 10 ms")
+  Assert.equal(#UiFixture.callsTo(calls, "prefill"), 1)
+  Wow.clock.gettime = 58.6
+  G("CraftAlert_GreetLatest")()
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 1)
+
   -- No lead: nothing happens.
   calls = select(3, UiFixture.load())
   G("CraftAlert_GreetLatest")()
