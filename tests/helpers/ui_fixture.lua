@@ -38,6 +38,7 @@ local UI = {
   "UI.Settings.PageAlerts",
   "UI.Settings.PageGreetings",
   "UI.Settings.PageKeywords",
+  "UI.Settings.PageCrafters",
   "UI.Settings.SettingsWindow",
   "Core.Bindings",
 }
