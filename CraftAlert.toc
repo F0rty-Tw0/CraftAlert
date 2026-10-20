@@ -71,4 +71,5 @@ UI/Settings/SettingsWindow.lua
 UI/Settings/BlizzardCategory.lua
 Core/Bindings.lua
 Core/Perf.lua
+Core/SlashCommands.lua
 Bootstrap.lua

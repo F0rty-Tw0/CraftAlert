@@ -17,6 +17,7 @@ local ALLOWED_DELAYS = { [0] = true, [1] = true, [20] = true, [601] = true }
 local OWN_GLOBALS_SET = {
   "CraftAlertDB",
   "SLASH_CRAFTALERT1",
+  "SLASH_CRAFTALERT2",
   "CraftAlert_GreetLatest",
   "CraftAlert_DismissLatest",
   "CraftAlert_ToggleLeads",
@@ -328,6 +329,8 @@ local function testAddonObeysTheRules()
     state.isActive = ns.ScanGate.IsActive
     ns.Index.OnRebuilt(ns.ScanGate.Evaluate)
     ns.Bootstrap.Install()
+    ns.SlashCommands.Register()
+    Assert.same({ rawget(_G, "SLASH_CRAFTALERT1"), rawget(_G, "SLASH_CRAFTALERT2") }, { "/craftalert", "/ca" })
 
     -- Nothing listens to public chat before the first evaluation; whisper events wait for a lead.
     Assert.same(publicChatEvents(), {})
@@ -414,6 +417,21 @@ local function testAddonObeysTheRules()
       { "CraftAlertLeadsWindow", "CraftAlertSettingsWindow", nil }
     )
     Assert.same(publicChatEvents(), { CHANNEL }, "and drops it at once")
+
+    -- Slash commands under the traps: the windows, a test line (a toast, no lead) and /ca perf
+    -- around one chat line (swapping the handler registers no event and arms no timer).
+    local slash = G("SlashCmdList").CRAFTALERT
+    local leadsBefore = #ns.Leads.List()
+    slash("")
+    slash("config")
+    slash("test LF plate belt")
+    Assert.equal(#ns.Leads.List(), leadsBefore, "/ca test makes no lead")
+    slash("perf")
+    fireRequest("LF plate belt", "Dee-OtherRealm")
+    slash("perf")
+    slash("help")
+    Assert.equal(#ns.Leads.List(), leadsBefore + 1, "the timed handler still makes the lead")
+    Assert.same(publicChatEvents(), { CHANNEL, "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM" }, "only that lead's whisper events")
     for _, timer in ipairs(Wow.timers) do
       Assert.truthy(ALLOWED_DELAYS[timer.delay], "timer with delay " .. tostring(timer.delay))
     end
