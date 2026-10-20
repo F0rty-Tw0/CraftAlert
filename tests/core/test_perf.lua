@@ -63,7 +63,7 @@ return function()
   -- The first line after 60 s carries the report: an unmatched line and a channel the gate
   -- drops count as hot path lines (a stale "match" must not make it a matched one).
   fireCustomChannel()
-  Assert.equal(lastChat(), "Perf: 2 lines, mean 20.0 us, max 30.0 us. 1 matched, mean 500.0 us, max 500.0 us. Login 42.0 ms, index build 12.5 ms.")
+  Assert.equal(lastChat(), "Perf: Lines 2, mean 20.0 us, max 30.0 us. Matched 1, mean 500.0 us, max 500.0 us. Login 42.0 ms, index build 12.5 ms.")
   Assert.equal(#Wow.chat, 2)
   fireCustomChannel()
   Assert.equal(#Wow.chat, 2, "the next report waits another 60 s")
@@ -73,7 +73,7 @@ return function()
   Assert.equal(Perf.IsRunning(), false)
   Assert.equal(
     lastChat(),
-    "Perf off: 3 lines, mean 16.7 us, max 30.0 us. 1 matched, mean 500.0 us, max 500.0 us. Login 42.0 ms, index build 12.5 ms. Memory 100.0 KB to 130.5 KB."
+    "Perf off: Lines 3, mean 16.7 us, max 30.0 us. Matched 1, mean 500.0 us, max 500.0 us. Login 42.0 ms, index build 12.5 ms. Memory 100.0 KB to 130.5 KB."
   )
   local reads = calls()
   SlashFixture.fireTrade("LF mongoose", "Di-Draenor")
@@ -93,6 +93,6 @@ return function()
   Perf.Stop()
   Assert.same(SlashFixture.chat(), {
     "Perf on: timing each chat line, a report every 60 s. /ca perf again stops it.",
-    "Perf off: 0 lines. 0 matched. Login n/a, index build n/a.",
+    "Perf off: Lines 0. Matched 0. Login n/a, index build n/a.",
   })
 end

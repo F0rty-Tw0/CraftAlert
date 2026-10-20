@@ -36,7 +36,7 @@ local startMemory = nil
 local lines, linesTotal, linesMax = 0, 0, 0
 local matched, matchedTotal, matchedMax = 0, 0, 0
 
--- "2 lines, mean 20.0 us, max 30.0 us"; the counts alone for no lines. Times arrive in ms.
+-- "Lines 2, mean 20.0 us, max 30.0 us"; the counts alone for no lines. Times arrive in ms.
 local function timing(countOnly, withTimes, count, total, longest)
   if count == 0 then
     return Localization.Text(countOnly, 0)
@@ -54,8 +54,8 @@ local function setupText()
 end
 
 local function linesText()
-  local hotPath = timing("%d lines", "%d lines, mean %.1f us, max %.1f us", lines, linesTotal, linesMax)
-  local matches = timing("%d matched", "%d matched, mean %.1f us, max %.1f us", matched, matchedTotal, matchedMax)
+  local hotPath = timing("Lines %d", "Lines %d, mean %.1f us, max %.1f us", lines, linesTotal, linesMax)
+  local matches = timing("Matched %d", "Matched %d, mean %.1f us, max %.1f us", matched, matchedTotal, matchedMax)
   return Localization.Text("%s. %s.", hotPath, matches)
 end
 
