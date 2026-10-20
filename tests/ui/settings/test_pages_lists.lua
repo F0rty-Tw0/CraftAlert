@@ -1,5 +1,6 @@
 local Assert = require("tests.helpers.assert")
 local Widgets = require("tests.helpers.widgets")
+local Fixture = require("tests.helpers.matcher_fixture")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 
 local open, row, take, texts = SettingsFixture.open, SettingsFixture.row, SettingsFixture.take, SettingsFixture.texts
@@ -122,7 +123,41 @@ local function testCraftersPage()
   Assert.equal(character.label:GetText(), "Alt-Realm (same account)")
 end
 
+-- §9 Test: a line → result and "why", through Matcher.MatchUngated (no gate, no lead, no
+-- ignore check); a line that stops says where.
+local function testTestPage()
+  local fixtureDb
+  local ns, db = SettingsFixture.load({
+    db = function(accountDb)
+      fixtureDb = accountDb
+      -- The fixture's three crafters (Fixture.db only needs Defaults, loaded by now).
+      for key, character in pairs(Fixture.db({ Defaults = require("CraftAlert.Persistence.Defaults") }).characters) do
+        accountDb.characters[key] = character
+      end
+    end,
+    before = function(chain)
+      chain.Matcher.SetIndex(Fixture.index(chain, fixtureDb))
+    end,
+  })
+  db.ignored["Test-Realm"] = true -- the ignore check is skipped, as for /ca test
+  open(ns, "Test")
+  Widgets.type(row("Test a line").input, "lf lion heart")
+  local shown = texts()
+  Assert.truthy(shown:find("Item: Lionheart Helm", 1, true), shown)
+  Assert.truthy(shown:find("Why: lf + lion + heart", 1, true), shown)
+  Assert.truthy(shown:find("Crafter: Smith-Realm", 1, true), shown)
+  Widgets.type(row("Test a line").input, "Any Enchaters in ORG?")
+  shown = texts()
+  Assert.truthy(shown:find("Profession: 333", 1, true), shown)
+  Assert.truthy(shown:find("Crafter: Ench-Realm", 1, true), shown)
+  Assert.falsy(shown:find("Lionheart", 1, true), "the last result is replaced")
+  Widgets.type(row("Test a line").input, "hello there")
+  Assert.truthy(texts():find("No match (stopped at: prefilter)", 1, true), texts())
+  Assert.same(db.leads, {}, "no lead")
+end
+
 return function()
   testKeywordsPage()
   testCraftersPage()
+  testTestPage()
 end

@@ -39,6 +39,7 @@ local UI = {
   "UI.Settings.PageGreetings",
   "UI.Settings.PageKeywords",
   "UI.Settings.PageCrafters",
+  "UI.Settings.PageTest",
   "UI.Settings.SettingsWindow",
   "Core.Bindings",
 }

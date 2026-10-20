@@ -29,7 +29,7 @@ local function testLazyWindow()
       titles[#titles + 1] = frame.label:GetText()
     end
   end
-  Assert.same(titles, { "General", "Alerts", "Greetings", "Keywords", "Crafters" })
+  Assert.same(titles, { "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" })
 end
 
 local function testAddPage()
