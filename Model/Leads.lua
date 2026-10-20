@@ -124,7 +124,8 @@ local function fixIds()
   nextId = 1
   for i = 1, #leads do
     local id = leads[i].id
-    if type(id) == "number" and not seen[id] then
+    -- NaN can't be a table key and inf + 1 == inf, so only finite numbers count as ids.
+    if type(id) == "number" and id == id and id > -math.huge and id < math.huge and not seen[id] then
       seen[id] = true
       nextId = max(nextId, id + 1)
     else

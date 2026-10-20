@@ -476,6 +476,24 @@ return function()
   Assert.same({ db.leads[1].greeted, db.leads[2].greeted, db.leads[3].greeted, db.leads[4].greeted }, { false, false, true, false })
   Assert.equal(newLead(ns, "LF plate belt").id > 7, true, "new ids continue above every restored one")
 
+  -- NaN and infinite ids are not ids: a NaN table key raises, and inf + 1 repeats inf.
+  ns, db = setup()
+  Leads = ns.Leads
+  db.leads = {
+    { id = 0 / 0, customer = "A-Draenor", time = T0 - 30, kind = "item", greeted = false, replied = false },
+    { id = 2, customer = "B-Draenor", time = T0 - 20, kind = "item", greeted = false, replied = false },
+    { id = 1 / 0, customer = "C-Draenor", time = T0 - 10, kind = "item", greeted = false, replied = false },
+    { id = 1 / 0, customer = "D-Draenor", time = T0 - 5, kind = "item", greeted = false, replied = false },
+  }
+  Leads.Restore(db)
+  local finite = {}
+  for _, restored in ipairs(db.leads) do
+    Assert.truthy(restored.id == restored.id and restored.id < math.huge, "finite id")
+    Assert.falsy(finite[restored.id], "distinct id")
+    finite[restored.id] = true
+  end
+  Assert.equal(#db.leads, 4)
+
   -- A subscriber that raises does not stop the others or the lead.
   ns, db = setup()
   Leads = ns.Leads
