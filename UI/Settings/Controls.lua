@@ -10,7 +10,8 @@ local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 -- UI/Shared/SettingsControls.lua and UI/Helpers/Controls.lua: section label, toggle switch,
 -- slider, option button, input; no presets, no native-HUD variants). A Column stacks rows top
 -- to bottom. Each control returns { row, input, Set(value) }: Set shows a value without
--- reporting it; only the player's action calls onChange. `row.settingsLabel` names the row.
+-- reporting it; only the player's action calls onChange. `row.settingsLabel` names the row and
+-- `row.input` is its control frame.
 local Controls = {}
 
 local floor = math.floor
@@ -72,17 +73,30 @@ function Controls.Button(parent, label, width, onClick)
   return button
 end
 
--- A labelled row; `height` defaults to CONTROL_HEIGHT.
-local function newRow(column, label, height)
+local function newRow(column, label)
   local layout = Theme.LAYOUT
   local row = create("Frame", column.parent)
-  row:SetSize(layout.CONTROL_WIDTH, height or layout.CONTROL_HEIGHT)
+  row:SetSize(layout.CONTROL_WIDTH, layout.CONTROL_HEIGHT)
   row.settingsLabel = label
   local text = FrameKit.Text(row, Theme.FONTS.body, Theme.COLORS.textPrimary)
   text:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -4)
   text:SetText(label)
   Controls.Place(column, row)
   return row, text
+end
+
+-- A page's refresh list: add(fn) collects, refresh() runs them all. → add, refresh
+function Controls.Refresher()
+  local list = {}
+  local function add(fn)
+    list[#list + 1] = fn
+  end
+  local function refresh()
+    for _, fn in ipairs(list) do
+      fn()
+    end
+  end
+  return add, refresh
 end
 
 local function paintSwitch(switch, on)
@@ -119,7 +133,19 @@ function Controls.Toggle(column, label, onChange)
     value = newValue == true
     paintSwitch(switch, value)
   end
+  row.input = switch
   return { row = row, input = switch, Set = set }
+end
+
+-- A toggle that writes owner()[key] and then runs after(). → the fn that shows the db value
+function Controls.BoundToggle(column, label, owner, key, after)
+  local toggle = Controls.Toggle(column, label, function(value)
+    owner()[key] = value
+    after()
+  end)
+  return function()
+    toggle.Set(owner()[key])
+  end
 end
 
 local function createTrack(slider)
@@ -173,17 +199,18 @@ function Controls.Slider(column, spec)
     slider:SetValue(value)
     valueText:SetText(format(value))
   end
+  row.input = slider
   return { row = row, input = slider, Set = set }
 end
 
--- Label above a full-width box. Enter or leaving the box commits a changed text
+-- Label on the left, box on the right. Enter or leaving the box commits a changed text
 -- (onCommit(text)); Escape restores the last committed text.
 function Controls.Input(column, label, onCommit)
   local layout = Theme.LAYOUT
-  local row = newRow(column, label, layout.CONTROL_HEIGHT + layout.INPUT_HEIGHT)
+  local row = newRow(column, label)
   local box = create("EditBox", row)
-  box:SetSize(layout.CONTROL_WIDTH, layout.INPUT_HEIGHT)
-  box:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
+  box:SetSize(layout.CONTROL_WIDTH - layout.LABEL_WIDTH, layout.INPUT_HEIGHT)
+  box:SetPoint("RIGHT", row, "RIGHT", 0, 0)
   box:SetAutoFocus(false)
   box:SetFontObject(Theme.FONTS.body)
   box:SetTextInsets(6, 6, 0, 0)
@@ -210,6 +237,7 @@ function Controls.Input(column, label, onCommit)
     committed = text or ""
     box:SetText(committed)
   end
+  row.input = box
   return { row = row, input = box, Set = set }
 end
 
@@ -243,6 +271,7 @@ function Controls.Choice(column, label, options, onChange)
     onChange(options[current].value)
   end)
   button:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+  row.input = button
   local control = { row = row, input = button }
   function control.Set(value)
     current = indexOf(options, value) or 1

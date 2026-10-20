@@ -61,5 +61,8 @@ UI/LeadRow.lua
 UI/LeadsWindow.lua
 UI/Launcher.lua
 UI/Settings/Controls.lua
+UI/Settings/PageGeneral.lua
+UI/Settings/PageAlerts.lua
+UI/Settings/SettingsWindow.lua
 Core/Bindings.lua
 Bootstrap.lua

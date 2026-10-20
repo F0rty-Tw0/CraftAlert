@@ -33,6 +33,10 @@ local UI = {
   "UI.LeadRow",
   "UI.LeadsWindow",
   "UI.Launcher",
+  "UI.Settings.Controls",
+  "UI.Settings.PageGeneral",
+  "UI.Settings.PageAlerts",
+  "UI.Settings.SettingsWindow",
   "Core.Bindings",
 }
 -- Globals Core/Bindings.lua defines at load: stubbed first, so Wow.reset removes them again.
