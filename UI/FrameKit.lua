@@ -12,7 +12,6 @@ local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 -- plus width/height for the window).
 local FrameKit = {}
 
-local pcall = pcall
 local type = type
 
 local ANCHORS = {
@@ -69,20 +68,15 @@ function FrameKit.Text(parent, font, color)
 end
 
 -- RAID_CLASS_COLORS entry of the player with this chat GUID, or nil. A secret GUID or class is
--- never passed on or compared (the secret test comes first: a secret value cannot be inspected).
+-- never passed on or compared: FlavorCompat.ClassOf owns that guard. The colour table is checked
+-- first, so a client without it makes no API call.
 local function classColor(guid)
-  if FlavorCompat.issecretvalue(guid) or type(guid) ~= "string" then
+  local colors = _G["RAID_CLASS_COLORS"]
+  if type(colors) ~= "table" then
     return nil
   end
-  local getInfo, colors = _G["GetPlayerInfoByGUID"], _G["RAID_CLASS_COLORS"]
-  if type(getInfo) ~= "function" or type(colors) ~= "table" then
-    return nil
-  end
-  local ok, _, classFile = pcall(getInfo, guid)
-  if not ok or FlavorCompat.issecretvalue(classFile) or classFile == nil then
-    return nil
-  end
-  return colors[classFile]
+  local classFile = FlavorCompat.ClassOf(guid)
+  return classFile ~= nil and colors[classFile] or nil
 end
 
 -- Colours a customer's name by class, or in the plain text colour when the class is unknown.
