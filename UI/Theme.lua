@@ -27,6 +27,14 @@ Theme.COLORS = {
   danger = { 0.45, 0.12, 0.12, 0.80 },
   dangerHover = { 0.55, 0.16, 0.16, 0.90 },
   dangerText = { 1.0, 0.35, 0.35, 1.0 },
+  -- Settings controls (WowDefault toggle_on / toggle_off / option_bg / button_fill_hover / input_bg).
+  toggleOn = { 0.12, 0.72, 0.96, 1.0 },
+  toggleOff = { 0.32, 0.33, 0.40, 0.95 },
+  knob = { 0.98, 0.99, 1.00, 1.0 },
+  option = { 0.12, 0.13, 0.18, 0.90 },
+  optionHover = { 0.20, 0.45, 0.65, 1.0 },
+  optionSelected = { 0.12, 0.72, 0.96, 0.16 },
+  input = { 0.17, 0.19, 0.26, 1.0 },
 }
 
 -- Blizzard font object names (WhisperMessenger's FONT_MAP bases).
@@ -58,6 +66,24 @@ Theme.LAYOUT = {
   BLOCK_BUTTON_HEIGHT = 18,
   ICON_SIZE = 42,
   ICON_BADGE_SIZE = 20,
+  SETTINGS_WIDTH = 600,
+  SETTINGS_HEIGHT = 470,
+  NAV_WIDTH = 130,
+  NAV_BUTTON_HEIGHT = 24,
+  CONTROL_WIDTH = 380,
+  CONTROL_HEIGHT = 24,
+  CONTROL_GAP = 8,
+  SECTION_GAP = 14,
+  LABEL_WIDTH = 170,
+  SWITCH_WIDTH = 28,
+  SWITCH_HEIGHT = 16,
+  KNOB_SIZE = 12,
+  KNOB_INSET = 2,
+  SLIDER_HEIGHT = 16,
+  SLIDER_THUMB_WIDTH = 10,
+  INPUT_HEIGHT = 22,
+  BUTTON_HEIGHT = 20,
+  LIST_ROW_HEIGHT = 20,
 }
 
 Theme.ICON = "Interface\\Icons\\INV_Misc_Bell_01"

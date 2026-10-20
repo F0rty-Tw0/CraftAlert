@@ -3,6 +3,8 @@
 -- (fonts, textures, layout) is only recorded.
 --   Widgets.extend(frame)           adds region, frame and child-creation methods
 --   Widgets.click(frame, button)    runs the OnClick script as a mouse click would
+--   Widgets.slide(slider, value)    drags a Slider to value and lets go
+--   Widgets.type(editBox, text)     types text into an EditBox and presses Enter
 --   Widgets.texts(frame, frames)    the shown texts under frame (itself and its descendants
 --                                   among `frames`, usually Wow.frames), in creation order
 local Widgets = {}
@@ -210,10 +212,99 @@ local function addFrameState(frame)
   end
 end
 
+-- As the client: SetValue clamps and fires OnValueChanged(self, value, false) when it changes.
+local function addSlider(slider)
+  slider.value, slider.minValue, slider.maxValue = 0, 0, 0
+
+  function slider:SetOrientation(orientation)
+    self.orientation = orientation
+  end
+
+  function slider:SetMinMaxValues(minValue, maxValue)
+    self.minValue, self.maxValue = minValue, maxValue
+  end
+
+  function slider:GetMinMaxValues()
+    return self.minValue, self.maxValue
+  end
+
+  function slider:SetValueStep(step)
+    self.valueStep = step
+  end
+
+  function slider:SetObeyStepOnDrag(obey)
+    self.obeyStep = obey
+  end
+
+  function slider:SetThumbTexture(texture)
+    self.thumb = texture
+  end
+
+  function slider:SetValue(value)
+    value = math.max(self.minValue, math.min(self.maxValue, value))
+    local changed = value ~= self.value
+    self.value = value
+    local onValueChanged = self.scripts.OnValueChanged
+    if changed and onValueChanged then
+      onValueChanged(self, value, false)
+    end
+  end
+
+  function slider:GetValue()
+    return self.value
+  end
+end
+
+-- As the client: SetText fires OnTextChanged(self, false); ClearFocus fires OnEditFocusLost
+-- only when the box had the focus.
+local function addEditBox(editBox)
+  editBox.text, editBox.focused = "", false
+
+  function editBox:SetText(text)
+    self.text = text
+    local onTextChanged = self.scripts.OnTextChanged
+    if onTextChanged then
+      onTextChanged(self, false)
+    end
+  end
+
+  function editBox:GetText()
+    return self.text
+  end
+
+  function editBox:SetFocus()
+    self.focused = true
+  end
+
+  function editBox:HasFocus()
+    return self.focused
+  end
+
+  function editBox:ClearFocus()
+    local hadFocus = self.focused
+    self.focused = false
+    local onFocusLost = self.scripts.OnEditFocusLost
+    if hadFocus and onFocusLost then
+      onFocusLost(self)
+    end
+  end
+
+  for _, name in ipairs({ "SetAutoFocus", "SetFontObject", "SetMaxLetters", "SetTextInsets", "SetJustifyH", "HighlightText" }) do
+    editBox[name] = function(self, ...)
+      self[name .. "Args"] = { ... }
+    end
+  end
+end
+
 function Widgets.extend(frame)
   addRegion(frame)
   addFrameState(frame)
   frame.regions = {}
+  if frame.frameType == "Slider" then
+    addSlider(frame)
+  elseif frame.frameType == "EditBox" then
+    addEditBox(frame)
+  end
 
   function frame:CreateTexture(_, layer)
     local texture = newTexture(self, layer)
@@ -234,6 +325,30 @@ function Widgets.click(frame, button)
   local onClick = frame.scripts.OnClick
   assert(onClick, "frame has no OnClick script")
   onClick(frame, button or "LeftButton")
+end
+
+-- A drag that ends at `value`: the client moves the thumb (OnValueChanged), then the button
+-- comes up (OnMouseUp).
+function Widgets.slide(slider, value)
+  slider:SetValue(value)
+  local onMouseUp = slider.scripts.OnMouseUp
+  if onMouseUp then
+    onMouseUp(slider, "LeftButton")
+  end
+end
+
+-- The player clicks into the box, replaces its text and presses Enter.
+function Widgets.type(editBox, text)
+  editBox:SetFocus()
+  editBox.text = text
+  local onTextChanged = editBox.scripts.OnTextChanged
+  if onTextChanged then
+    onTextChanged(editBox, true)
+  end
+  local onEnter = editBox.scripts.OnEnterPressed
+  if onEnter then
+    onEnter(editBox)
+  end
 end
 
 -- Font strings of frame and of every stub frame whose parent chain reaches it.
