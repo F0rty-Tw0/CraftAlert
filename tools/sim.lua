@@ -285,8 +285,8 @@ local function reportMatches(ctx)
   end
 end
 
--- `toast: shown lead=<id> more=<n>` whenever AlertToast.Show runs; the sim shows the toast
--- for every new lead (Bootstrap takes over this wiring in Task 1.19).
+-- `toast: shown lead=<id> more=<n>` whenever AlertToast.Show runs. Wrapped before login, so
+-- the Leads.On("new", AlertToast.Show) Bootstrap makes subscribes the wrapper.
 local function reportToasts(ctx)
   local AlertToast = ctx.ns.AlertToast
   local show = AlertToast.Show
@@ -294,9 +294,6 @@ local function reportToasts(ctx)
     show(lead)
     ctx.out[#ctx.out + 1] = string.format("toast: shown lead=%s more=%d", tostring(lead.id), AlertToast.more)
   end
-  ctx.ns.Leads.On("new", function(lead)
-    AlertToast.Show(lead)
-  end)
 end
 
 -- Notes that the chat handler ran, so a line the scan never delivered can say so.
@@ -308,43 +305,35 @@ local function watchHandler(ctx)
   end)
 end
 
--- Runs once before the first chat line, event, command or click: the profession list, the
--- readers, the scan gate and the initial index build (as at PLAYER_LOGIN).
+-- The sim's own listeners, made right after the modules load and before Bootstrap runs, so
+-- each index build prints `index:` before the scan line its evaluation causes.
+local function watch(ctx)
+  local ns = ctx.ns
+  ns.Leads.On("greeted", function(lead)
+    ctx.out[#ctx.out + 1] = "lead: greeted customer=" .. lead.customer
+  end)
+  ns.Leads.On("replied", function(lead)
+    ctx.out[#ctx.out + 1] = "lead: replied customer=" .. lead.customer
+  end)
+  ns.Index.OnRebuilt(function(index)
+    flushBind(ctx)
+    ctx.out[#ctx.out + 1] = "index: size=" .. index.size
+  end)
+  ns.ScanGate.OnChange(function(active, state)
+    ctx.out[#ctx.out + 1] = "scan: " .. (active and "active" or string.format("paused (%s)", state.reason))
+  end)
+  reportMatches(ctx)
+  reportToasts(ctx)
+  watchHandler(ctx)
+end
+
+-- PLAYER_LOGIN, once, before the first chat line, event, command or click: Bootstrap installs
+-- everything and builds the index.
 local function start(ctx)
   if not ctx.started then
     ctx.started = true
-    local ns = ctx.ns
-    ns.PlayerName.Init()
-    ns.Leads.Restore(ctx.db)
-    ns.WhisperTracker.Install()
-    ns.Leads.On("greeted", function(lead)
-      ctx.out[#ctx.out + 1] = "lead: greeted customer=" .. lead.customer
-    end)
-    ns.Leads.On("replied", function(lead)
-      ctx.out[#ctx.out + 1] = "lead: replied customer=" .. lead.customer
-    end)
-    if not ns.FlavorCompat.isClassic then
-      ns.ProfessionList.Refresh(ctx.db, ns.PlayerName.Own())
-      ns.ModernReader.Install(ctx.db)
-      ns.LearnWatcher.Install()
-    end
-    ns.Index.Configure(ctx.db, { professionOrder = ns.ProfessionList.Order })
-    ns.Index.OnRebuilt(ns.Matcher.SetIndex)
-    ns.Index.OnRebuilt(function(index)
-      flushBind(ctx)
-      ctx.out[#ctx.out + 1] = "index: size=" .. index.size
-    end)
-    ns.ScanGate.OnChange(function(active, state)
-      ctx.out[#ctx.out + 1] = "scan: " .. (active and "active" or string.format("paused (%s)", state.reason))
-    end)
-    ns.ScanGate.Install(ctx.db)
-    ns.Index.OnRebuilt(ns.ScanGate.Evaluate)
-    ns.SlashCommands.Register()
-    reportMatches(ctx)
-    reportToasts(ctx)
-    watchHandler(ctx)
-    ns.BindLookup.lastStored = nil
-    ns.Index.Rebuild()
+    ctx.ns.BindLookup.lastStored = nil
+    Wow.fireEvent("PLAYER_LOGIN")
   end
 end
 
@@ -356,10 +345,11 @@ local function count(map)
   return total
 end
 
--- The account DB goes through SavedState.Load exactly as at ADDON_LOADED; Schema warnings
+-- ADDON_LOADED: Bootstrap loads the account DB through SavedState.Load; Schema warnings
 -- arrive as `chat:` lines just before the summary.
 local function bindDb(ctx)
-  local db = ctx.ns.SavedState.Load()
+  Wow.fireEvent("ADDON_LOADED", "CraftAlert")
+  local db = rawget(_G, "CraftAlertDB")
   ctx.db = db
   local recipes = 0
   for _, character in pairs(db.characters) do
@@ -529,6 +519,7 @@ function Sim.Run(argv)
   end
   Sim.lastNs = ctx.ns
   out[1] = string.format("sim: flavor=%s modules=%d", ctx.ns.FlavorCompat.flavorKey, moduleCount)
+  watch(ctx)
   bindDb(ctx)
 
   for _, step in ipairs(plan.steps) do
