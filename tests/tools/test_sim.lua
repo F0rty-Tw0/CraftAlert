@@ -92,6 +92,23 @@ return function()
   })
   Assert.equal(senderLines(Sim.Run({ "--sender", "Bob", "hi" }))[1], "sender: Bob-OwnRealm")
 
+  -- --class gives the next line's sender a class through the chat GUID; one line only.
+  local function outcomeLines(output)
+    local kept = {}
+    for _, line in ipairs(output) do
+      if string.find(line, "^match: ") or string.find(line, "^stop: ") then
+        kept[#kept + 1] = line
+      end
+    end
+    return kept
+  end
+  Assert.same(outcomeLines(Sim.Run({ "--class", "WARRIOR", "LF belt", "--class", "MAGE", "LF belt", "LF belt" })), {
+    "match: item group=190001 prof=164 why=lf+belt+plate (warrior)",
+    "stop: nomatch", -- the sim fixture has no cloth belt
+    "match: item group=190001 prof=164 why=lf+belt", -- --class applies to one line only
+  })
+  Assert.equal(Sim.Run({ "--class" })[1], "error: --class needs a value")
+
   -- The first step builds the index from the fixture (bind 0 reagent left out: 2 chars x 2);
   -- each line then reports its Matcher result or the step that stopped it, and a match its lead:
   -- the same sender asking for the same thing again updates the lead.

@@ -1,6 +1,6 @@
 -- CLI sim: feeds chat lines, events, slash commands and clicks through the real addon
 -- modules with stubbed WoW APIs and returns what happened as text lines.
---   python scripts/sim.py [--flavor retail|forever|era|tbc|wrath|cata|mop] [--db FILE] ...
+--   python scripts/sim.py [--flavor retail|forever|era|tbc|wrath|cata|mop] [--db FILE] [--class TOKEN] ...
 --   lua5.1 tools/sim.lua ...   (from the repo root)
 -- Output lines are `<area>: <fact>`; the first is always `sim: flavor=<key> modules=<n>`.
 local ROOT = rawget(_G, "CRAFTALERT_ROOT") or "."
@@ -11,6 +11,7 @@ local Toc = require("tests.helpers.toc")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
 
 local DEFAULT_SENDER = "Customer-OtherRealm"
+local SIM_CLASS_GUID = "Player-0-SIMCLASS"
 local OWN_NAME = "Crafter"
 local OWN_REALM = "OwnRealm"
 local DEFAULT_FLAVOR = "retail"
@@ -62,7 +63,7 @@ local Sim = {}
 Sim.lastNs = nil
 
 -- Flags taking exactly one value; the parser checks the value where it is not free text.
-local ONE_VALUE = { "--flavor", "--db", "--sender", "--cmd", "--click", "--afk", "--resting" }
+local ONE_VALUE = { "--flavor", "--db", "--sender", "--class", "--cmd", "--click", "--afk", "--resting" }
 
 local function isOneValueFlag(flag)
   for _, name in ipairs(ONE_VALUE) do
@@ -94,6 +95,8 @@ local function acceptOption(plan, flag, value)
     plan.steps[#plan.steps + 1] = { kind = string.sub(flag, 3), on = ON_OFF[value] }
   elseif flag == "--sender" then
     plan.steps[#plan.steps + 1] = { kind = "sender", name = value }
+  elseif flag == "--class" then
+    plan.steps[#plan.steps + 1] = { kind = "class", token = value }
   elseif flag == "--cmd" then
     plan.steps[#plan.steps + 1] = { kind = "cmd", text = value }
   end
@@ -208,6 +211,12 @@ local function newContext(plan, out)
   end)
   Wow.stub("IsResting", function()
     return ctx.resting
+  end)
+  -- The --class sender (STEPS.class) of the line in flight; any other GUID has no class.
+  Wow.stub("GetPlayerInfoByGUID", function(guid)
+    if ctx.class and guid == SIM_CLASS_GUID then
+      return "Class", ctx.class
+    end
   end)
   -- What the client defines and the addon writes into (SlashCommands.Register).
   Wow.stub("SlashCmdList", {})
@@ -365,6 +374,11 @@ function STEPS.sender(ctx, step)
   ctx.sender = step.name
 end
 
+-- --class TOKEN: the next chat line's sender has that class (GUID SIM_CLASS_GUID).
+function STEPS.class(ctx, step)
+  ctx.class = step.token
+end
+
 -- The line as a CHAT_MSG_CHANNEL event from the current sender on Trade. A line the paused
 -- scan never receives prints `stop: paused`; one the Matcher stopped prints `stop: <step>`.
 function STEPS.line(ctx, step)
@@ -372,7 +386,8 @@ function STEPS.line(ctx, step)
   local sender = ctx.sender
   ctx.out[#ctx.out + 1] = "sender: " .. tostring(ctx.ns.PlayerName.Normalize(sender))
   ctx.handled = false
-  Wow.fireEvent("CHAT_MSG_CHANNEL", step.text, sender, "", TRADE_CHANNEL_NAME, sender, "", TRADE_ZONE_CHANNEL_ID, 2, TRADE_BASE_NAME, 0, 1, nil)
+  local guid = ctx.class and SIM_CLASS_GUID or nil
+  Wow.fireEvent("CHAT_MSG_CHANNEL", step.text, sender, "", TRADE_CHANNEL_NAME, sender, "", TRADE_ZONE_CHANNEL_ID, 2, TRADE_BASE_NAME, 0, 1, guid)
   local lastStop = ctx.ns.Matcher.lastStop
   if not ctx.handled then
     ctx.out[#ctx.out + 1] = "stop: paused"
@@ -380,6 +395,7 @@ function STEPS.line(ctx, step)
     ctx.out[#ctx.out + 1] = "stop: " .. lastStop
   end
   ctx.sender = DEFAULT_SENDER
+  ctx.class = nil
 end
 
 -- Event arguments arrive as text: true/false and numbers become the values the client sends.
