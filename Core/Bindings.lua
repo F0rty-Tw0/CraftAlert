@@ -8,6 +8,7 @@ local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
 local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
+local SavedState = ns.SavedState or require("CraftAlert.Persistence.SavedState")
 
 -- Spec §7.1 keybinds, called from Bindings.xml: greet or dismiss the latest lead, toggle the
 -- leads window. Defines, at load, the binding labels and the CraftAlert_* functions (§4.3 rule
@@ -50,10 +51,10 @@ function Bindings.DismissLatest()
   end
 end
 
--- The window reads its settings from CraftAlertDB, missing when the saved data failed to load
--- (already reported at ADDON_LOADED).
+-- The window reads its settings from CraftAlertDB, missing or unchecked when the saved data
+-- failed to load (already reported at ADDON_LOADED).
 function Bindings.ToggleLeads()
-  if _G["CraftAlertDB"] ~= nil then
+  if SavedState.Ready() then
     LeadsWindow.Toggle()
   end
 end
