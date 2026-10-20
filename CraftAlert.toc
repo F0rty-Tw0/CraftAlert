@@ -40,4 +40,5 @@ Model/WordGroups.lua
 Model/Index.lua
 Model/Matcher.lua
 Professions/ProfessionList.lua
+Professions/BindLookup.lua
 Bootstrap.lua
