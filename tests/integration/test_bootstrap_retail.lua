@@ -407,6 +407,27 @@ local function testRaisingLoad(db)
   Assert.equal(isRegistered("CHAT_MSG_CHANNEL"), false, "no chat event without a db")
 end
 
+-- Saved data whose load raises partway stays the unchecked stored table: /ca and the toggle
+-- key keep the windows closed instead of opening them on it.
+local function testRaisingLoadKeepsWindowsClosed(db)
+  local session = startClient(db)
+  local errors = recordErrors()
+  login(session, function(ns)
+    ns.Schema.Validate = function()
+      error("validate failed", 0)
+    end
+  end)
+  Assert.same(errors, { "validate failed" }, "only the load error is reported")
+  Assert.equal(rawget(_G, "CraftAlertDB"), db, "the stored table is left in place")
+  local slash = rawget(_G, "SlashCmdList").CRAFTALERT
+  slash("")
+  slash("config")
+  rawget(_G, "CraftAlert_ToggleLeads")()
+  Assert.same(chatSince(0), { NO_DB, NO_DB })
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil, "no leads window on unchecked data")
+  Assert.equal(rawget(_G, "CraftAlertSettingsWindow"), nil, "no settings window on unchecked data")
+end
+
 -- A fresh install whose saved variables fail to load has no CraftAlertDB at all: the windows
 -- stay closed and say why instead of raising, and /ca test names the stage it stopped at.
 local function testRaisingLoadOnFreshInstall()
@@ -482,6 +503,7 @@ return function()
   testRaisingRestingRegistration(deepCopy(saved))
   testRaisingLeadsRestore(deepCopy(saved))
   testRaisingLoad(deepCopy(saved))
+  testRaisingLoadKeepsWindowsClosed(deepCopy(saved))
   testRaisingLoadOnFreshInstall()
   testRaisingPlayerName(deepCopy(saved), "Init")
   testRaisingPlayerName(deepCopy(saved), "Own")

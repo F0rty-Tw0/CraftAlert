@@ -6,6 +6,7 @@ end
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
 local Perf = ns.Perf or require("CraftAlert.Core.Perf")
+local SavedState = ns.SavedState or require("CraftAlert.Persistence.SavedState")
 local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
@@ -65,10 +66,10 @@ local function togglePerf()
   end
 end
 
--- The windows read their settings from CraftAlertDB, which a fresh install whose saved data
--- failed to load (reported at ADDON_LOADED) does not have. → whether it exists.
+-- The windows read their settings from CraftAlertDB, which is missing or unchecked when the
+-- saved data failed to load (reported at ADDON_LOADED). → whether they may open.
 local function hasDb()
-  if _G["CraftAlertDB"] ~= nil then
+  if SavedState.Ready() then
     return true
   end
   ChatPrint.Line(Localization.Text("Craft Alert's saved data did not load; /reload to try again"))
