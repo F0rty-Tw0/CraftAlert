@@ -79,8 +79,21 @@ local function testEnchantingNarrowing()
   expect(ns, "LF Enchanter +8stam to chest", "item:enchant chest - greater stamina", "step 4.3 first")
 end
 
+-- §6.4: "back" names the cloak slot, a plain word (user ruling 2026-10-20); a line without an
+-- intent word still stops at the prefilter.
+local function testBackIsCloak()
+  local ns = Fixture.load()
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Tai-Realm"] = character({ TAILOR }, { [9] = { item = 606, name = "Silk Cloak", prof = TAILOR } })
+  end)
+  expect(ns, "LF back crafter", "item:606")
+  expect(ns, "LF back", "item:606")
+  expect(ns, "brb, back in 5", "stop:prefilter", "no intent word")
+end
+
 return function()
   testWordIndex()
+  testBackIsCloak()
   testProfessionTieBreak()
   testSixWordCap()
   testEnchantingNarrowing()

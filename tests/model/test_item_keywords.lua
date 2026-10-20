@@ -35,7 +35,7 @@ local CASES = {
   { "INVTYPE_WRIST", CLASS_ARMOR, 1, { "bracers", "bracer", "wrist", "cloth" } },
   { "INVTYPE_HEAD", CLASS_ARMOR, 4, { "helm", "helmet", "head", "plate" } },
   { "INVTYPE_SHOULDER", CLASS_ARMOR, 2, { "shoulders", "shoulder", "pauldrons", "leather" } },
-  { "INVTYPE_CLOAK", CLASS_ARMOR, 1, { "cloak", "cape", "cloth" } },
+  { "INVTYPE_CLOAK", CLASS_ARMOR, 1, { "cloak", "cape", "back", "cloth" } },
   { "INVTYPE_CHEST", CLASS_ARMOR, 3, { "chest", "robe", "mail" } },
   { "INVTYPE_ROBE", CLASS_ARMOR, 1, { "chest", "robe", "cloth" } },
   { "INVTYPE_LEGS", CLASS_ARMOR, 4, { "legs", "pants", "plate" } },
