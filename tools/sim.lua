@@ -35,6 +35,7 @@ local SIM_RECIPES = {
   { id = 9004, name = "Sim Plate Helm", item = 190004, profession = { professionID = 2872, parentProfessionID = 164 } },
   { id = 9005, name = "Sim Iron Bar", item = 190005, learned = true },
 }
+local BIND_DEBOUNCE_SECONDS = 1
 local ON_OFF = { on = true, off = false }
 -- Events with a known payload take exactly that many arguments, so a chat line may follow
 -- them; any other event takes every following non-`--` token.
@@ -225,6 +226,7 @@ local function start(ctx)
     ctx.started = true
     local ns = ctx.ns
     ns.PlayerName.Init()
+    ns.Leads.Restore(ctx.db)
     if not ns.FlavorCompat.isClassic then
       ns.ProfessionList.Refresh(ctx.db, ns.PlayerName.Own())
       ns.ModernReader.Install(ctx.db)
@@ -241,7 +243,8 @@ local function start(ctx)
   end
 end
 
--- `match: <kind> group=<group> prof=<prof> why=<a+b+c>` or `stop: <Matcher.lastStop>`.
+-- `match: <kind> group=<group> prof=<prof> why=<a+b+c>` or `stop: <Matcher.lastStop>`, and
+-- the Matcher's result for a match.
 local function matchLine(Matcher, text, sender)
   local result = Matcher.Match(CHANNEL, text, sender)
   if not result then
@@ -252,7 +255,24 @@ local function matchLine(Matcher, text, sender)
     why[i] = tostring(result.why[i])
   end
   local group, prof = tostring(result.group), tostring(result.prof)
-  return string.format("match: %s group=%s prof=%s why=%s", result.kind, group, prof, table.concat(why, "+"))
+  return string.format("match: %s group=%s prof=%s why=%s", result.kind, group, prof, table.concat(why, "+")), result
+end
+
+-- `lead: new|updated customer=<key> crafter=<key> cannotOrder=<bool>` (§6.3 steps 5-7), or
+-- `lead: none` when no crafter qualifies.
+local function leadLine(ctx, result, text)
+  local customer = ctx.ns.PlayerName.Normalize(ctx.sender)
+  local lead, isNew = ctx.ns.Leads.OnMatch(result, customer, text, CHANNEL, nil)
+  if not lead then
+    return "lead: none"
+  end
+  return string.format(
+    "lead: %s customer=%s crafter=%s cannotOrder=%s",
+    isNew and "new" or "updated",
+    lead.customer,
+    lead.crafter,
+    tostring(lead.cannotOrder == true)
+  )
 end
 
 local function count(map)
@@ -286,7 +306,11 @@ function STEPS.line(ctx, step)
   start(ctx)
   ctx.lastLine = { text = step.text, sender = ctx.sender }
   ctx.out[#ctx.out + 1] = "sender: " .. tostring(ctx.ns.PlayerName.Normalize(ctx.sender))
-  ctx.out[#ctx.out + 1] = matchLine(ctx.ns.Matcher, step.text, ctx.sender)
+  local line, result = matchLine(ctx.ns.Matcher, step.text, ctx.sender)
+  ctx.out[#ctx.out + 1] = line
+  if result then
+    ctx.out[#ctx.out + 1] = leadLine(ctx, result, step.text)
+  end
   ctx.sender = DEFAULT_SENDER
 end
 
@@ -316,14 +340,15 @@ local function reportLearn(ctx)
   end
 end
 
--- Runs the timers armed for the same frame (index rebuild coalescing); longer timers stay
--- pending, as in the game where no second passes between two sim steps.
-local function runFrameTimers()
+-- Runs the timers armed for `maxDelay` seconds or less (0: the same frame, index rebuild
+-- coalescing); longer ones, such as the lead expiry, stay pending, as in the game where no
+-- second passes between two sim steps.
+local function runFrameTimers(maxDelay)
   local found = true
   while found do
     found = false
     for i, timer in ipairs(Wow.timers) do
-      if timer.delay == 0 then
+      if timer.delay <= maxDelay then
         table.remove(Wow.timers, i)
         timer.fn()
         found = true
@@ -347,11 +372,7 @@ function STEPS.event(ctx, step)
   Wow.fireEvent(step.name, unpack(args, 1, #step.args))
   reportRead(ctx)
   reportLearn(ctx)
-  if step.name == "GET_ITEM_INFO_RECEIVED" then
-    Wow.runTimers()
-  else
-    runFrameTimers()
-  end
+  runFrameTimers(step.name == "GET_ITEM_INFO_RECEIVED" and BIND_DEBOUNCE_SECONDS or 0)
   flushBind(ctx)
 end
 

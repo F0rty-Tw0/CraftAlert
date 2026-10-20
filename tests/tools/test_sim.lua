@@ -57,7 +57,8 @@ return function()
   Assert.equal(senderLines(Sim.Run({ "--sender", "Bob", "hi" }))[1], "sender: Bob-OwnRealm")
 
   -- The first step builds the index from the fixture (bind 0 reagent left out: 2 chars x 2);
-  -- each line then reports its Matcher result or the step that stopped it.
+  -- each line then reports its Matcher result or the step that stopped it, and a match its lead:
+  -- the same sender asking for the same thing again updates the lead.
   local link = "|cff1eff00|Hitem:2575::::::::60:::::|h[Red Linen Shirt]|h|r"
   Assert.same(
     stepLines(Sim.Run({
@@ -75,20 +76,44 @@ return function()
       "index: size=4",
       "sender: Customer-OtherRealm",
       "match: item group=190001 prof=164 why=lf+plate+belt",
+      "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
       "sender: Customer-OtherRealm",
       "stop: prefilter",
       "sender: Customer-OtherRealm",
       "stop: nomatch",
       "sender: Customer-OtherRealm",
       "match: item group=enchant bracer - sim health prof=333 why=lf+enchant bracer sim health",
+      "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
       "sender: Customer-OtherRealm",
       "match: item group=enchant bracer - sim health prof=333 why=lf+wrist+8hp",
+      "lead: updated customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
       "sender: Customer-OtherRealm",
       "match: item group=190001 prof=164 why=wtb+190001",
+      "lead: updated customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
       "sender: Crafter-OwnRealm",
       "stop: self",
     }
   )
+
+  -- Leads (Task 1.11): one new, then one updated; another customer is a new lead, and on
+  -- Forever, which has no crafting orders, nobody "cannot order".
+  Assert.same(stepLines(Sim.Run({ "--flavor", "forever", "--sender", "Bob", "LF plate belt" })), {
+    "index: size=4",
+    "sender: Bob-OwnRealm",
+    "match: item group=190001 prof=164 why=lf+plate+belt",
+    "lead: new customer=Bob-OwnRealm crafter=Crafter-OwnRealm cannotOrder=false",
+  })
+  local leadLines = {}
+  for _, line in ipairs(Sim.Run({ "LF plate belt", "LF plate belt pls", "--sender", "Zoë-Kel'Thuzad", "LF plate belt" })) do
+    if string.find(line, "^lead: ") then
+      leadLines[#leadLines + 1] = line
+    end
+  end
+  Assert.same(leadLines, {
+    "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+    "lead: updated customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+    "lead: new customer=Zoë-Kel'Thuzad crafter=Crafter-OwnRealm cannotOrder=true",
+  })
 
   -- Opening the profession window reads it (a new Iron Bar, bind unknown) and rebuilds once;
   -- the item data arriving 1 s later stores bind 0, so the rebuild drops the bar again.
@@ -101,6 +126,11 @@ return function()
   )
   Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "TRADE_SKILL_SHOW" })), { "index: size=4" })
 
+  -- The pending lead expiry timer (601 s) does not run when item data arrives.
+  for _, line in ipairs(Sim.Run({ "LF plate belt", "--event", "TRADE_SKILL_SHOW", "--event", "GET_ITEM_INFO_RECEIVED", "190005", "true" })) do
+    assert(not string.find(line, "^error: "), line)
+  end
+
   -- A learned recipe is stored at once; the coalesced rebuild makes it matchable.
   Assert.same(stepLines(Sim.Run({ "--event", "NEW_RECIPE_LEARNED", "9004", "LF Sim Plate Helm" })), {
     "index: size=4",
@@ -108,6 +138,7 @@ return function()
     "index: size=5",
     "sender: Customer-OtherRealm",
     "match: item group=190004 prof=164 why=lf+sim plate helm",
+    "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
   })
   Assert.same(stepLines(Sim.Run({ "--event", "NEW_RECIPE_LEARNED", "123" })), { "index: size=4", "learn: stored=false" })
 
