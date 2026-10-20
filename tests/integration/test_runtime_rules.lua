@@ -196,6 +196,10 @@ local function testTrapsCatchViolations()
     _G.ChatFrameUtil = {}
     Assert.raises(verify, "existing global ChatFrameUtil was overwritten")
     rawset(_G, "ChatFrameUtil", chatUtil)
+    local slash = rawget(_G, "SlashCmdList")
+    _G.SlashCmdList = {} -- only SlashCmdList.CRAFTALERT is ours, never the table itself
+    Assert.raises(verify, "existing global SlashCmdList was overwritten")
+    rawset(_G, "SlashCmdList", slash)
     _G.IsResting = nil
     Assert.raises(verify, "existing global IsResting was overwritten or removed")
     rawset(_G, "IsResting", isResting)

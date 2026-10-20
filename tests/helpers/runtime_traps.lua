@@ -23,7 +23,6 @@ local RuntimeTraps = {}
 -- Spec §4.3 rule 3: the only global names the addon may create. Frame names and the
 -- CraftAlert_* functions share the CraftAlert prefix.
 local OWN_GLOBALS = {
-  SlashCmdList = true,
   SLASH_CRAFTALERT1 = true,
   SLASH_CRAFTALERT2 = true,
   BINDING_HEADER_CRAFTALERT = true,
