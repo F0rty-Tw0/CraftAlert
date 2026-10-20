@@ -15,7 +15,11 @@ local OWN_NAME = "Crafter"
 local OWN_REALM = "OwnRealm"
 local DEFAULT_FLAVOR = "retail"
 local CLICK_BUTTONS = { left = true, shift = true, ctrl = true, right = true }
-local CHANNEL = "trade" -- every sim chat line arrives on Trade
+-- Every sim chat line arrives on Trade: zone channel ID 2 (flavor-choices.md), as the
+-- CHAT_MSG_CHANNEL payload carries it.
+local TRADE_ZONE_CHANNEL_ID = 2
+local TRADE_CHANNEL_NAME = "2. Trade - City"
+local TRADE_BASE_NAME = "Trade - City"
 -- Item data of the fixture items (tools/sim_fixture.lua) for GetItemInfoInstant:
 -- itemID -> { equipLoc, classID, subclassID }.
 local SIM_ITEMS = {
@@ -46,6 +50,8 @@ local EVENT_ARITY = {
   GET_ITEM_INFO_RECEIVED = 2,
   CHAT_MSG_WHISPER = 2, -- text, sender
   CHAT_MSG_WHISPER_INFORM = 2, -- text, target
+  PLAYER_UPDATE_RESTING = 0,
+  ZONE_CHANGED_NEW_AREA = 0,
 }
 -- How long the toast counts as shown (seconds) when --click acts on the newest lead (§7.5 rule 3).
 local SHOWN_FOR_SECONDS = 1
@@ -227,9 +233,58 @@ local function flushBind(ctx)
   end
 end
 
+-- `match: <kind> group=<group> prof=<prof> why=<a+b+c>` for the Matcher's result.
+local function matchLine(result)
+  local why = {}
+  for i = 1, result.whyCount do
+    why[i] = tostring(result.why[i])
+  end
+  local group, prof = tostring(result.group), tostring(result.prof)
+  return string.format("match: %s group=%s prof=%s why=%s", result.kind, group, prof, table.concat(why, "+"))
+end
+
+-- `lead: new|updated customer=<key> crafter=<key> cannotOrder=<bool>` (§6.3 steps 5-7), or
+-- `lead: none` when no crafter qualifies.
+local function leadLine(lead, isNew)
+  if not lead then
+    return "lead: none"
+  end
+  return string.format(
+    "lead: %s customer=%s crafter=%s cannotOrder=%s",
+    isNew and "new" or "updated",
+    lead.customer,
+    lead.crafter,
+    tostring(lead.cannotOrder == true)
+  )
+end
+
+-- Prints the match, lead and greeting lines of every line that reaches Leads.OnMatch: the
+-- chat handler (ScanGate.HandleChat) calls it, so the sim wraps it to look.
+local function reportMatches(ctx)
+  local Leads = ctx.ns.Leads
+  local onMatch = Leads.OnMatch
+  Leads.OnMatch = function(result, customerKey, text, channelKey, guid)
+    ctx.out[#ctx.out + 1] = matchLine(result)
+    local lead, isNew = onMatch(result, customerKey, text, channelKey, guid)
+    ctx.out[#ctx.out + 1] = leadLine(lead, isNew)
+    if lead then
+      ctx.out[#ctx.out + 1] = "greeting: " .. ctx.ns.Greeting.Build(lead, ctx.db.settings)
+    end
+    return lead, isNew
+  end
+end
+
+-- Notes that the chat handler ran, so a line the scan never delivered can say so.
+local function watchHandler(ctx)
+  local ScanGate = ctx.ns.ScanGate
+  ScanGate.SetHandler(function(...)
+    ctx.handled = true
+    return ScanGate.HandleChat(...)
+  end)
+end
+
 -- Runs once before the first chat line, event, command or click: the profession list, the
--- readers and the initial index build (as at PLAYER_LOGIN); scan evaluation joins it once
--- that module exists.
+-- readers, the scan gate and the initial index build (as at PLAYER_LOGIN).
 local function start(ctx)
   if not ctx.started then
     ctx.started = true
@@ -254,42 +309,16 @@ local function start(ctx)
       flushBind(ctx)
       ctx.out[#ctx.out + 1] = "index: size=" .. index.size
     end)
+    ns.ScanGate.OnChange(function(active, state)
+      ctx.out[#ctx.out + 1] = "scan: " .. (active and "active" or string.format("paused (%s)", state.reason))
+    end)
+    ns.ScanGate.Install(ctx.db)
+    ns.Index.OnRebuilt(ns.ScanGate.Evaluate)
+    reportMatches(ctx)
+    watchHandler(ctx)
     ns.BindLookup.lastStored = nil
     ns.Index.Rebuild()
   end
-end
-
--- `match: <kind> group=<group> prof=<prof> why=<a+b+c>` or `stop: <Matcher.lastStop>`, and
--- the Matcher's result for a match.
-local function matchLine(Matcher, text, sender)
-  local result = Matcher.Match(CHANNEL, text, sender)
-  if not result then
-    return "stop: " .. Matcher.lastStop
-  end
-  local why = {}
-  for i = 1, result.whyCount do
-    why[i] = tostring(result.why[i])
-  end
-  local group, prof = tostring(result.group), tostring(result.prof)
-  return string.format("match: %s group=%s prof=%s why=%s", result.kind, group, prof, table.concat(why, "+")), result
-end
-
--- `lead: new|updated customer=<key> crafter=<key> cannotOrder=<bool>` (§6.3 steps 5-7), or
--- `lead: none` when no crafter qualifies. Also returns the lead.
-local function leadLine(ctx, result, text)
-  local customer = ctx.ns.PlayerName.Normalize(ctx.sender)
-  local lead, isNew = ctx.ns.Leads.OnMatch(result, customer, text, CHANNEL, nil)
-  if not lead then
-    return "lead: none"
-  end
-  local text = string.format(
-    "lead: %s customer=%s crafter=%s cannotOrder=%s",
-    isNew and "new" or "updated",
-    lead.customer,
-    lead.crafter,
-    tostring(lead.cannotOrder == true)
-  )
-  return text, lead
 end
 
 local function count(map)
@@ -319,18 +348,19 @@ function STEPS.sender(ctx, step)
   ctx.sender = step.name
 end
 
+-- The line as a CHAT_MSG_CHANNEL event from the current sender on Trade. A line the paused
+-- scan never receives prints `stop: paused`; one the Matcher stopped prints `stop: <step>`.
 function STEPS.line(ctx, step)
   start(ctx)
-  ctx.lastLine = { text = step.text, sender = ctx.sender }
-  ctx.out[#ctx.out + 1] = "sender: " .. tostring(ctx.ns.PlayerName.Normalize(ctx.sender))
-  local line, result = matchLine(ctx.ns.Matcher, step.text, ctx.sender)
-  ctx.out[#ctx.out + 1] = line
-  if result then
-    local leadText, lead = leadLine(ctx, result, step.text)
-    ctx.out[#ctx.out + 1] = leadText
-    if lead then
-      ctx.out[#ctx.out + 1] = "greeting: " .. ctx.ns.Greeting.Build(lead, ctx.db.settings)
-    end
+  local sender = ctx.sender
+  ctx.out[#ctx.out + 1] = "sender: " .. tostring(ctx.ns.PlayerName.Normalize(sender))
+  ctx.handled = false
+  Wow.fireEvent("CHAT_MSG_CHANNEL", step.text, sender, "", TRADE_CHANNEL_NAME, sender, "", TRADE_ZONE_CHANNEL_ID, 2, TRADE_BASE_NAME, 0, 1, nil)
+  local lastStop = ctx.ns.Matcher.lastStop
+  if not ctx.handled then
+    ctx.out[#ctx.out + 1] = "stop: paused"
+  elseif lastStop ~= "match" then
+    ctx.out[#ctx.out + 1] = "stop: " .. lastStop
   end
   ctx.sender = DEFAULT_SENDER
 end
