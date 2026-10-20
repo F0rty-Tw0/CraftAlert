@@ -145,6 +145,21 @@ local function testMutedAndDisabledAbsent()
   Assert.equal(index.crafterCount, 2)
 end
 
+-- A profession whose stored recipes are all muted is noted per character, for CrafterRank;
+-- an unmuted unbound recipe (not indexed) still counts as listening.
+local function testMutedProfessions()
+  local Index, Defaults = load()
+  local db = fixtureDb(Defaults)
+  Assert.same(build(Index, db).mutedProfessions, {}, "every crafter has an unmuted recipe")
+  local recipes = db.characters["Smith-Realm"].recipes
+  recipes[1001].muted, recipes[1002].muted = true, true
+  Assert.same(build(Index, db).mutedProfessions, {}, "the unbound recipe still listens")
+  recipes[1003].muted = true
+  Assert.same(build(Index, db).mutedProfessions, { ["Smith-Realm"] = { [BS] = true } })
+  db.characters["Off-Realm"].recipes[3001].muted = true
+  Assert.same(build(Index, db).mutedProfessions, { ["Smith-Realm"] = { [BS] = true } }, "disabled crafters are left out")
+end
+
 -- §6.2: one entry per recipe and character, referenced by every index.
 local function testSharedEntry()
   local Index, Defaults = load()
@@ -405,6 +420,7 @@ end
 return function()
   testUnboundFilter()
   testMutedAndDisabledAbsent()
+  testMutedProfessions()
   testSharedEntry()
   testIndexes()
   testSettingsCopies()

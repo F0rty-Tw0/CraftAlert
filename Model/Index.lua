@@ -76,18 +76,36 @@ local function addRecipe(index, ctx, character, recipeKey, recipe)
   index.size = index.size + 1
 end
 
+-- The professions of which the character stores recipes and has muted every one (unbound
+-- recipes count as listening), so CrafterRank skips it without walking its recipes.
+local function noteMuted(index, key, stored, listening)
+  for prof in pairs(stored) do
+    if not listening[prof] then
+      local muted = index.mutedProfessions[key] or {}
+      muted[prof] = true
+      index.mutedProfessions[key] = muted
+    end
+  end
+end
+
 -- → whether the character added at least one entry.
 local function addCharacter(index, ctx, key, character)
   for profKey in pairs(character.professions or {}) do
     ctx.professions[profKey] = true
   end
-  local added = false
+  local added, stored, listening = false, {}, {}
   for recipeKey, recipe in pairs(character.recipes or {}) do
+    local prof = recipe.prof
+    if prof ~= nil then
+      stored[prof] = true
+      listening[prof] = listening[prof] or not recipe.muted
+    end
     if indexed(recipe, ctx.settings.includeUnbound) then
       addRecipe(index, ctx, key, recipeKey, recipe)
       added = true
     end
   end
+  noteMuted(index, key, stored, listening)
   return added
 end
 
@@ -154,6 +172,7 @@ local function newIndex(db, settings, opts)
     nameIndex = {},
     wordIndex = {},
     professionWords = {},
+    mutedProfessions = {}, -- characterKey -> { professionKey -> true }: every stored recipe muted
     blockSet = copySet(db.ignored),
     channelEnabled = copySet(settings.channels),
     intentList = intentList,
