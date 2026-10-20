@@ -18,8 +18,24 @@ local function randomWord()
   return word
 end
 
+-- §6.2 item 4: an enchant's slot words are the Slang.slots lists holding its slot word, or the
+-- word alone.
+local function addSlotWords(slots, Slang, slot)
+  slots[slot] = true
+  for _, list in pairs(Slang.slots) do
+    for _, word in ipairs(list) do
+      if word == slot then
+        for _, other in ipairs(list) do
+          slots[other] = true
+        end
+      end
+    end
+  end
+end
+
+-- → index, vocab, the enchant slot words of its names (word -> true).
 local function randomPhraseIndex(ns)
-  local db, vocab, recipes = ns.Defaults.Db(), {}, {}
+  local db, vocab, recipes, slots = ns.Defaults.Db(), {}, {}, {}
   for k = 1, rand(3, 15) do
     local words = {}
     for j = 1, rand(1, 4) do
@@ -29,11 +45,12 @@ local function randomPhraseIndex(ns)
     local name = table.concat(words, " ")
     if rand(1, 5) == 1 then
       name = "Enchant " .. words[1] .. " - " .. table.concat(words, " ", 2)
+      addSlotWords(slots, ns.Slang, words[1])
     end
     recipes[k] = { name = name, prof = 164 }
   end
   db.characters["A-Realm"] = { source = "local", enabled = true, realms = {}, professions = {}, recipes = recipes }
-  return ns.Index.Build(db, db.settings, { ownKey = "Me-Realm" }), vocab
+  return ns.Index.Build(db, db.settings, { ownKey = "Me-Realm" }), vocab, slots
 end
 
 local function randomLine(records, vocab)
@@ -60,8 +77,9 @@ end
 
 -- Reference step 4.2: the sorted why tokens of the longest hits; none when the only hit is a
 -- kind-c alias (Aliases' set, checked in test_aliases) or a one-word full name, matched by one
--- token and not by a link name, and no token is a wordIndex word (→ "", "alias" | "full").
-local function reference42(index, records, Tokenizer, count)
+-- token and not by a link name, and no token is a wordIndex word or an enchant slot word
+-- (→ "", "alias" | "full"); else the why tokens and whether only a slot word kept the hit.
+local function reference42(index, records, slots, Tokenizer, count)
   local padded, best, hits = " " .. Tokenizer.normalized .. " ", 0, {}
   local function add(record, length, why)
     if length > best then
@@ -92,16 +110,19 @@ local function reference42(index, records, Tokenizer, count)
       linked[record] = true
     end
   end
-  local only = next(hits)
+  local only, keptBySlot = next(hits), false
   local kind = only and (only.full and only.wordCount == 1 and "full" or not only.full and index.needsSecondWord[only] and "alias")
   if best == 1 and next(hits, only) == nil and kind and not linked[only] then
-    local wordIndexToken = false
+    local wordIndexToken, slotToken = false, false
     for i = 1, count do
-      wordIndexToken = wordIndexToken or index.wordIndex[Tokenizer.tokens[i]] ~= nil
+      local token = Tokenizer.tokens[i]
+      wordIndexToken = wordIndexToken or index.wordIndex[token] ~= nil
+      slotToken = slotToken or slots[token] == true
     end
-    if not wordIndexToken then
+    if not wordIndexToken and not slotToken then
       return "", kind
     end
+    keptBySlot = not wordIndexToken
   end
   local whys = {}
   for _, why in pairs(hits) do
@@ -110,15 +131,15 @@ local function reference42(index, records, Tokenizer, count)
     end
   end
   table.sort(whys)
-  return table.concat(whys, "|")
+  return table.concat(whys, "|"), nil, keptBySlot
 end
 
 local function testPhraseMatchDifferential()
   local ns = Fixture.load()
   local Tokenizer, PhraseMatch = ns.Tokenizer, ns.PhraseMatch
-  local hitLines, drops = 0, { alias = 0, full = 0 }
+  local hitLines, slotLines, drops = 0, 0, { alias = 0, full = 0 }
   for _ = 1, 60 do
-    local index, vocab = randomPhraseIndex(ns)
+    local index, vocab, slots = randomPhraseIndex(ns)
     ns.Matcher.SetIndex(index)
     local records = {}
     for _, list in pairs(index.nameIndex) do
@@ -129,7 +150,8 @@ local function testPhraseMatchDifferential()
     for _ = 1, 30 do
       local line = randomLine(records, vocab)
       local count = Tokenizer.Tokenize(string.lower(line))
-      local want, dropped = reference42(index, records, Tokenizer, count)
+      local want, dropped, keptBySlot = reference42(index, records, slots, Tokenizer, count)
+      slotLines = slotLines + (keptBySlot and 1 or 0)
       PhraseMatch.Run(index, count, "lf")
       local got = {}
       for k = 1, PhraseMatch.whyCount do
@@ -146,6 +168,7 @@ local function testPhraseMatchDifferential()
   Assert.truthy(hitLines > 500, "lines with phrase hits: " .. hitLines)
   Assert.truthy(drops.alias > 20, "lines with a dropped kind-c hit: " .. drops.alias)
   Assert.truthy(drops.full > 20, "lines with a dropped one-word full name: " .. drops.full)
+  Assert.truthy(slotLines > 10, "lines kept by an enchant slot word only: " .. slotLines)
 end
 
 return function()

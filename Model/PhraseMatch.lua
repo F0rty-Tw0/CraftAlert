@@ -201,11 +201,13 @@ local function phrasesAt(i, token, id, found)
   end
 end
 
--- Whether a token of the last Run's line is a wordIndex word.
-function PhraseMatch.HasIndexWord()
-  local wordIndex = index.wordIndex
+-- Whether a token of the last Run's line is a wordIndex word or an enchant slot word, the
+-- companions of §6.2 item 1.
+function PhraseMatch.HasCompanionWord()
+  local wordIndex, enchantSlotWords = index.wordIndex, index.enchantSlotWords
   for i = 1, tokenCount do
-    if wordIndex[tokens[i]] then
+    local token = tokens[i]
+    if wordIndex[token] or enchantSlotWords[token] then
       return true
     end
   end
@@ -244,7 +246,7 @@ function PhraseMatch.Run(newIndex, count, intentToken)
   -- hits, needs a wordIndex word in the line. A join pair covers 2 tokens, and a line with a
   -- link-name hit has either that record as its hit, a longer hit, or two hits: never dropped.
   local lone = hitCount == 1 and hitLength == 1 and not linked
-  if lone and index.needsSecondWord[hits[1]] and not PhraseMatch.HasIndexWord() then
+  if lone and index.needsSecondWord[hits[1]] and not PhraseMatch.HasCompanionWord() then
     hitCount, hitWhyCount = 0, 0
   end
   PhraseMatch.whyCount = hitWhyCount

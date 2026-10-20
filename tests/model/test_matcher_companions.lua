@@ -26,6 +26,11 @@ local function testKindCOnSpecFixture()
   expect(ns, "lf lionhaert", "stop:nomatch")
   expect(ns, "lf lionhaert boots leather", "item:lionheart helm", "a wordIndex word")
   expect(ns, "lf mongose", "item:enchant weapon - mongoose", "kind a by typo")
+  -- An enchant slot word (§6.2 item 4) is a companion too, for an exact or a typo hit (user
+  -- ruling 2026-10-20). A misspelled slot word is none: slot words are no typo targets.
+  expect(ns, "lf fiery for my weapon", "item:enchant weapon - fiery weapon", "a slot word")
+  expect(ns, "lf fierry weapon", "item:enchant weapon - fiery weapon", "a slot word, by typo")
+  expect(ns, "lf fiery weapn", "stop:nomatch", "a misspelled slot word")
   -- A step 4.2 set still standing at step 4.5 ("enchant" empties 4.4) is the companion.
   result = expect(ns, "lf hauberk leggings enchant lionhaert", "profession:" .. BS)
   Assert.equal(why(result), "lf+hauberk+leggings+lionhaert")

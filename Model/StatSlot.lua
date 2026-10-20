@@ -88,15 +88,19 @@ local function tierOf(words)
 end
 
 function StatSlot.Begin(index)
-  index.statSlotIndex = {}
+  index.statSlotIndex, index.enchantSlotWords = {}, {}
   ranks = {}
 end
 
 -- An "enchant <slot> ... <stat>" name (normalized words) adds its entry under every slot
--- word of that slot and every stat in the name.
+-- word of that slot and every stat in the name. Every "enchant <slot>" name, stat or not,
+-- adds the slot words to enchantSlotWords (companions, §6.2 item 1).
 function StatSlot.Add(index, name, words, entry)
   if words[1] ~= "enchant" or words[2] == nil then
     return
+  end
+  for _, slot in ipairs(slotWords(words[2])) do
+    index.enchantSlotWords[slot] = true
   end
   for k = 3, #words do
     local stat = statWords[words[k]]

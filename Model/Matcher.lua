@@ -133,10 +133,10 @@ local function matchWords(hasSet)
 end
 
 -- Step 4.5: the typo pass, only after steps 4.1-4.4 found nothing. hasPhrase: step 4.2 kept
--- a hit, which (like a wordIndex word) lets kind-c aliases and one-word full names count
--- (§6.2 item 1).
+-- a hit, which (like a wordIndex or enchant slot word) lets kind-c aliases and one-word full
+-- names count (§6.2 item 1).
 local function matchTypos(hasPhrase)
-  if TypoPass.Run(index, tokens, tokenCount, hasPhrase or PhraseMatch.HasIndexWord()) == 0 then
+  if TypoPass.Run(index, tokens, tokenCount, hasPhrase or PhraseMatch.HasCompanionWord()) == 0 then
     return false
   end
   Candidates.FromRecords(TypoPass.records, TypoPass.recordCount)

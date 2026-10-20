@@ -181,6 +181,9 @@ local function testStatSlotIndex()
   Assert.truthy(rawequal(index.statSlotIndex.robe.stamina, chest) or index.statSlotIndex.robe.stamina[1] == chest[1])
   Assert.equal(index.statSlotIndex.weapon, nil, "no stat word in the weapon enchants")
   Assert.equal(index.wordIndex.weapon, nil, "weapon is never a wordIndex word")
+  -- §6.2 item 1 (c): the slot words of every enchant, with or without a stat word.
+  Assert.truthy(index.enchantSlotWords.weapon and index.enchantSlotWords.robe, "weapon and chest enchants")
+  Assert.equal(index.enchantSlotWords.wrist, nil, "no bracer enchant")
 
   local db = Fixture.db(ns)
   db.characters["Ench-Realm"].recipes = {
@@ -203,6 +206,7 @@ local function testStatSlotIndex()
   -- Same tier: the larger numeric recipeKey wins.
   Assert.equal(index.statSlotIndex["2h"].agility[1].recipeKey, 45)
   Assert.equal(index.statSlotIndex.cape.agility[1].recipeKey, 46)
+  Assert.truthy(index.enchantSlotWords.wrist and index.enchantSlotWords["2h"] and index.enchantSlotWords.cape)
 
   -- Mixed key types (numeric keys next to Classic name keys): numbers first, larger first,
   -- then names. Numbers carry names that sort against them, which a name-only compare
