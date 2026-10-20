@@ -32,6 +32,8 @@ local SlashCommands = ns.SlashCommands or require("CraftAlert.Core.SlashCommands
 local Bootstrap = {}
 
 local concat = table.concat
+local ipairs = ipairs
+local pcall = pcall
 
 local ADDON = "CraftAlert"
 local ADDON_LOADED = "ADDON_LOADED"
@@ -92,26 +94,67 @@ local function printLoginLines()
   end
 end
 
-local function onLogin()
-  EventRouter.Off(PLAYER_LOGIN, onLogin)
-  PlayerName.Init()
-  local clock = _G["debugprofilestop"]
-  local started = clock()
-  ownKey = PlayerName.Own()
-  installProfessions()
+local function storeRealms()
   RealmTag.Store(db, ownKey)
+end
+
+local function wireIndex()
   Index.Configure(db, { professionOrder = ProfessionList.Order, ownKey = ownKey })
   Index.OnRebuilt(Matcher.SetIndex)
   Index.OnRebuilt(ScanGate.Evaluate)
-  wireLeads()
-  installReaders()
+end
+
+local function installScanGate()
   ScanGate.Install(db)
+end
+
+local function createLauncher()
   Launcher.Create()
   ScanGate.OnChange(Launcher.Refresh)
+end
+
+local function registerCategory()
   BlizzardCategory.Register()
-  SlashCommands.Register()
+end
+
+local function buildIndex()
   Index.Rebuild()
-  printLoginLines()
+end
+
+-- In dependency order. Each step runs on its own: one that raises is reported and the rest
+-- still run. Chat events stay fail-closed: only ScanGate.Evaluate registers them, and it needs
+-- the db, a built index and the resting gate.
+local LOGIN_STEPS = {
+  installProfessions,
+  storeRealms,
+  wireIndex,
+  wireLeads,
+  installReaders,
+  installScanGate,
+  createLauncher,
+  registerCategory,
+  buildIndex,
+  printLoginLines,
+}
+
+local function runStep(step)
+  local ok, err = pcall(step)
+  if not ok then
+    EventRouter.ReportError(err)
+  end
+end
+
+-- `/ca` is registered first, so it works whatever a later step does.
+local function onLogin()
+  EventRouter.Off(PLAYER_LOGIN, onLogin)
+  PlayerName.Init()
+  runStep(SlashCommands.Register)
+  local clock = _G["debugprofilestop"]
+  local started = clock()
+  ownKey = PlayerName.Own()
+  for _, step in ipairs(LOGIN_STEPS) do
+    runStep(step)
+  end
   Perf.loginMs = clock() - started
 end
 

@@ -86,11 +86,15 @@ local function startClient(db, slots)
 end
 
 -- Every TOC file into one ns, then the two events the client fires. The toast is counted
--- before login, so Bootstrap's Leads.On("new") subscribes the counting wrapper.
-local function login(session)
+-- before login, so Bootstrap's Leads.On("new") subscribes the counting wrapper. `prepare(ns)`,
+-- when given, runs between loading and the events.
+local function login(session, prepare)
   local ns = {}
   for _, path in ipairs(Toc.luaFiles()) do
     assert(loadfile(path))("CraftAlert", ns)
+  end
+  if prepare then
+    prepare(ns)
   end
   local show = ns.AlertToast.Show
   ns.AlertToast.Show = function(lead)
@@ -294,6 +298,51 @@ local function testPartialProfessionsAtLogin(db)
   Assert.same(ns.Index.Current().professionOrder, { ENCH, BS })
 end
 
+-- The errors the client's error handler receives from now on.
+local function recordErrors()
+  local errors = {}
+  Wow.stub("geterrorhandler", function()
+    return function(err)
+      errors[#errors + 1] = err
+    end
+  end)
+  return errors
+end
+
+-- A hand-edited db mixes number and string profession keys, and at login only the secondary
+-- slots have loaded: the order is seeded without raising and every install runs.
+local function testMixedKeysAtLogin(db)
+  db.characters[OWN_KEY].professions[tostring(ENCH)] = { name = "Enchanting", primary = false, read = true }
+  local session = startClient(db, { false, false, { name = "Cooking", skillLine = COOKING } })
+  local errors = recordErrors()
+  local ns = login(session)
+  Assert.same(errors, {}, "no error at login")
+  Assert.same(ns.ProfessionList.Order(), { BS })
+  Assert.equal(type(rawget(_G, "SlashCmdList").CRAFTALERT), "function")
+  Assert.truthy(rawget(_G, "CraftAlertLauncher"), "the launcher exists")
+  Assert.equal(ns.ScanGate.IsActive(), true)
+end
+
+-- One install step raising at login is reported, and every later step still runs; the chat
+-- events still come from the gate alone.
+local function testRaisingLoginStep(db)
+  local session = startClient(db)
+  local errors = recordErrors()
+  local ns = login(session, function(ns)
+    ns.RealmTag.Store = function()
+      error("realm list failed", 0)
+    end
+  end)
+  Assert.same(errors, { "realm list failed" }, "the error reaches the error handler")
+  Assert.equal(type(rawget(_G, "SlashCmdList").CRAFTALERT), "function", "/ca works")
+  Assert.truthy(rawget(_G, "CraftAlertLauncher"), "the launcher exists")
+  Assert.equal(#session.categories, 1, "the settings category is registered")
+  Assert.equal(ns.Index.Current().size, 3, "the index is built")
+  Assert.equal(ns.ScanGate.IsActive(), true)
+  Assert.truthy(isRegistered("CHAT_MSG_CHANNEL"), "the gate registered the chat events")
+  Assert.same(chatSince(0), { STATUS_ACTIVE }, "the login lines print")
+end
+
 local function deepCopy(value)
   if type(value) ~= "table" then
     return value
@@ -310,5 +359,7 @@ return function()
   local saved = deepCopy(db)
   testRestoredSession(deepCopy(saved))
   testPartialProfessionsAtLogin(deepCopy(saved))
+  testMixedKeysAtLogin(deepCopy(saved))
+  testRaisingLoginStep(deepCopy(saved))
   Wow.reset()
 end
