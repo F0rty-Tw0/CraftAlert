@@ -316,7 +316,25 @@ local function reportLearn(ctx)
   end
 end
 
--- Fires the event, then runs the timers it armed (rebuild coalescing, the bind debounce).
+-- Runs the timers armed for the same frame (index rebuild coalescing); longer timers stay
+-- pending, as in the game where no second passes between two sim steps.
+local function runFrameTimers()
+  local found = true
+  while found do
+    found = false
+    for i, timer in ipairs(Wow.timers) do
+      if timer.delay == 0 then
+        table.remove(Wow.timers, i)
+        timer.fn()
+        found = true
+        break
+      end
+    end
+  end
+end
+
+-- Fires the event, then runs the frame timers. Item data arriving is the one event that
+-- lets the 1 s bind debounce elapse too, so its result (bind stored, index rebuilt) shows.
 function STEPS.event(ctx, step)
   start(ctx)
   local args = {}
@@ -329,7 +347,11 @@ function STEPS.event(ctx, step)
   Wow.fireEvent(step.name, unpack(args, 1, #step.args))
   reportRead(ctx)
   reportLearn(ctx)
-  Wow.runTimers()
+  if step.name == "GET_ITEM_INFO_RECEIVED" then
+    Wow.runTimers()
+  else
+    runFrameTimers()
+  end
   flushBind(ctx)
 end
 
