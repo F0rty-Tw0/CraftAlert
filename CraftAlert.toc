@@ -51,4 +51,5 @@ Professions/BindLookup.lua
 Professions/ModernReader.lua
 Professions/LearnWatcher.lua
 Core/Status.lua
+Core/ScanGate.lua
 Bootstrap.lua
