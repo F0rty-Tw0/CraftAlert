@@ -134,9 +134,10 @@ end
 
 -- Step 4.5: the typo pass, only after steps 4.1-4.4 found nothing. hasPhrase: step 4.2 kept
 -- a hit, which (like a wordIndex or enchant slot word) lets kind-c aliases and one-word full
--- names count (§6.2 item 1).
+-- names count; so does a lone hit step 4.2 set aside, which then counts too (§6.2 item 1).
 local function matchTypos(hasPhrase)
-  if TypoPass.Run(index, tokens, tokenCount, hasPhrase or PhraseMatch.HasCompanionWord()) == 0 then
+  local companion = hasPhrase or PhraseMatch.HasCompanionWord()
+  if TypoPass.Run(index, tokens, tokenCount, companion, PhraseMatch.setAside) == 0 then
     return false
   end
   Candidates.FromRecords(TypoPass.records, TypoPass.recordCount)

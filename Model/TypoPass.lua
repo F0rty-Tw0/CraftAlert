@@ -142,8 +142,9 @@ local function eligible(index, token, length)
 end
 
 -- Keeps the token's hits; a kind-c alias or a one-word full name only with a companion (§6.2
--- item 1). The token is a why token when it kept something.
-local function keep(token, needsSecondWord, companion)
+-- item 1), which the set-aside record is for every other record. The token is a why token
+-- when it kept something.
+local function keep(token, needsSecondWord, companion, aside)
   local records, profs, profTokens = TypoPass.records, TypoPass.profs, TypoPass.profTokens
   local kept = false
   for k = 1, tokenHitCount do
@@ -153,7 +154,7 @@ local function keep(token, needsSecondWord, companion)
       profs[TypoPass.profCount] = value
       profTokens[TypoPass.profCount] = token
       kept = true
-    elseif companion or not needsSecondWord[value] then
+    elseif companion or not needsSecondWord[value] or (aside and value ~= aside) then
       TypoPass.recordCount = TypoPass.recordCount + 1
       records[TypoPass.recordCount] = value
       kept = true
@@ -166,9 +167,11 @@ local function keep(token, needsSecondWord, companion)
 end
 
 -- Tries the first MAX_TOKENS eligible tokens of tokens[1..count]; per token only the hits
--- at its smallest distance count. companion: the line has a wordIndex word or a step 4.2
--- hit, so kind-c aliases and one-word full names count. → the number of records hit.
-function TypoPass.Run(index, tokens, count, companion)
+-- at its smallest distance count. companion: the line has a wordIndex or enchant slot word or
+-- a step 4.2 hit, so kind-c aliases and one-word full names count. aside: the lone step 4.2
+-- hit the second-word rule set aside, or nil; it counts once a record is kept (§6.2 item 1).
+-- → the number of records hit.
+function TypoPass.Run(index, tokens, count, companion, aside)
   TypoPass.recordCount, TypoPass.profCount, TypoPass.whyCount = 0, 0, 0
   local typoBuckets = index.typoBuckets
   local tried = 0
@@ -179,9 +182,15 @@ function TypoPass.Run(index, tokens, count, companion)
       tried = tried + 1
       local byLength = typoBuckets[byte(token, 1)]
       if byLength and nearest(token, length, byLength) > 0 then
-        keep(token, index.needsSecondWord, companion)
+        keep(token, index.needsSecondWord, companion, aside)
       end
     end
+  end
+  -- The set-aside record is never kept above (it needs a companion, and the line has none
+  -- else it would not be aside), so it joins once, with its token as why token.
+  if aside and TypoPass.recordCount > 0 then
+    TypoPass.recordCount, TypoPass.whyCount = TypoPass.recordCount + 1, TypoPass.whyCount + 1
+    TypoPass.records[TypoPass.recordCount], TypoPass.why[TypoPass.whyCount] = aside, aside.phrase
   end
   return TypoPass.recordCount
 end

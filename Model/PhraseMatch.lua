@@ -43,13 +43,16 @@ PhraseMatch.why, PhraseMatch.whyCount = hitWhy, 0
 -- hitStamp[record] == hitRun: the record is in hits (a new run starts with each line and
 -- with each longer hit), so a repeated hit costs one lookup, not a scan of hits.
 local hitStamp, hitRun = {}, 0
+-- The lone hit the second-word rule set aside on the last line, else nil: it is the typo
+-- pass's companion and counts with its hits (§6.2 item 1).
+PhraseMatch.setAside = nil
 
 local NO_INDEX = {} -- Run always sets the real one first
 
 -- New index: drop the hits (records) and the index the last Run kept.
 function PhraseMatch.Reset()
   index, hits, hitCount, hitLength = NO_INDEX, {}, 0, 0
-  hitStamp = {}
+  hitStamp, PhraseMatch.setAside = {}, nil
 end
 
 function PhraseMatch.Begin(newIndex)
@@ -220,6 +223,7 @@ function PhraseMatch.Run(newIndex, count, intentToken)
   index, tokenCount = newIndex, count
   padded = " " .. Tokenizer.normalized .. " "
   hitCount, hitLength, hitWhyCount, hitRun = 0, 0, 0, hitRun + 1
+  PhraseMatch.setAside = nil
   local at = 2 -- position of token 1 in padded
   for i = 1, tokenCount do
     tokenAt[i] = at
@@ -247,7 +251,7 @@ function PhraseMatch.Run(newIndex, count, intentToken)
   -- link-name hit has either that record as its hit, a longer hit, or two hits: never dropped.
   local lone = hitCount == 1 and hitLength == 1 and not linked
   if lone and index.needsSecondWord[hits[1]] and not PhraseMatch.HasCompanionWord() then
-    hitCount, hitWhyCount = 0, 0
+    PhraseMatch.setAside, hitCount, hitWhyCount = hits[1], 0, 0
   end
   PhraseMatch.whyCount = hitWhyCount
   if hitCount == 0 then

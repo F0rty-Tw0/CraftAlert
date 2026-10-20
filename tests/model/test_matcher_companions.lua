@@ -4,7 +4,7 @@ local Fixture = require("tests.helpers.matcher_fixture")
 
 -- Words that count only beside a second word (user rulings 2026-10-20): kind-c aliases
 -- (§6.2 item 1) and the ambiguous slot word "ring" (§6.4), through Matcher.Match.
-local BS, TAILOR = Fixture.BS, Fixture.TAILOR
+local BS, ENCH, TAILOR = Fixture.BS, Fixture.ENCH, Fixture.TAILOR
 local JC = 755
 local character, expect, why = Fixture.character, Fixture.expect, Fixture.why
 
@@ -31,6 +31,14 @@ local function testKindCOnSpecFixture()
   expect(ns, "lf fiery for my weapon", "item:enchant weapon - fiery weapon", "a slot word")
   expect(ns, "lf fierry weapon", "item:enchant weapon - fiery weapon", "a slot word, by typo")
   expect(ns, "lf fiery weapn", "stop:nomatch", "a misspelled slot word")
+  -- A lone hit the rule set aside is a typo hit's companion and counts with it, so a typo line
+  -- behaves like its exact line (user ruling 2026-10-20).
+  expect(ns, "lf lionheart hauberk", "profession:" .. BS)
+  result = expect(ns, "lf lionhaert hauberk", "profession:" .. BS)
+  Assert.equal(why(result), "lf+lionhaert+hauberk")
+  expect(ns, "lf mongoose hauberk", "profession:" .. ENCH)
+  expect(ns, "lf mongose hauberk", "profession:" .. ENCH)
+  expect(ns, "lf lionheart lionhaert", "stop:nomatch", "the same alias twice is one hit")
   -- A step 4.2 set still standing at step 4.5 ("enchant" empties 4.4) is the companion.
   result = expect(ns, "lf hauberk leggings enchant lionhaert", "profession:" .. BS)
   Assert.equal(why(result), "lf+hauberk+leggings+lionhaert")
