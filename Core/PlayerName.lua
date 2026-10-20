@@ -13,8 +13,10 @@ local PlayerName = {}
 
 local find = string.find
 local gsub = string.gsub
+local lower = string.lower
 local match = string.match
 local sub = string.sub
+local upper = string.upper
 
 local DEFAULT_SURNAME_SEPARATOR = " "
 
@@ -63,6 +65,40 @@ function PlayerName.Normalize(raw)
     return name
   end
   return name .. "-" .. realm
+end
+
+local function sameRealm(realm, known)
+  return type(known) == "string" and lower(known) == lower(realm)
+end
+
+-- The spelling of `realm` among the own realm and `realms`, ignoring case; else as typed.
+local function knownSpelling(realm, realms)
+  if sameRealm(realm, ownRealm) then
+    return ownRealm
+  end
+  for _, known in ipairs(realms or {}) do
+    if sameRealm(realm, known) then
+      return known
+    end
+  end
+  return realm
+end
+
+-- A name the player typed (the block box), cased as the client spells chat senders: the name's
+-- first letter (and, on Forever, the surname's) upper case, the rest lower, ASCII letters only
+-- (UTF-8 bytes are left as typed); a realm matching the own realm or one of `realms` without
+-- regard to case takes that spelling. "bob" → "Bob-<own realm>". nil as Normalize.
+function PlayerName.FromTyped(raw, realms)
+  local key = PlayerName.Normalize(raw)
+  if key == nil then
+    return nil
+  end
+  local name, realm = match(key, "^([^-]*)%-?(.*)$")
+  name = gsub(gsub(gsub(name, "[A-Z]", lower), "^[a-z]", upper), " [a-z]", upper)
+  if realm == "" then
+    return name
+  end
+  return name .. "-" .. knownSpelling(realm, realms)
 end
 
 -- Forever's UnitName returns (firstName, surname); everywhere else the second value is a realm.

@@ -47,6 +47,29 @@ local function testKeywordsPage()
   Assert.falsy(texts():find("Customer1-Draenor", 1, true))
 end
 
+-- A typed name is cased as chat senders are, so the block matches them (§6.3 step 1).
+local function testBlockTypedName()
+  local ns, db = SettingsFixture.load({
+    db = function(accountDb)
+      for key, character in pairs(Fixture.db({ Defaults = require("CraftAlert.Persistence.Defaults") }).characters) do
+        accountDb.characters[key] = character
+      end
+      local far = Fixture.character({}, {})
+      far.realms = { "Area52" }
+      accountDb.characters["Far-Area52"] = far
+    end,
+  })
+  open(ns, "Keywords")
+  Widgets.type(row("Block a player").input, "bob")
+  Assert.same(db.ignored, { ["Bob-Realm"] = true })
+  ns.Matcher.SetIndex(Fixture.index(ns, db))
+  Assert.truthy(ns.Matcher.Match("trade", "lf lion heart", "Carl"), "another sender still matches")
+  Assert.equal(ns.Matcher.Match("trade", "lf lion heart", "Bob"), nil)
+  Assert.equal(ns.Matcher.lastStop, "blocked")
+  Widgets.type(row("Block a player").input, "alice-area 52")
+  Assert.equal(db.ignored["Alice-Area52"], true, "a known realm takes its stored spelling")
+end
+
 local BS, ENCH = 164, 333
 
 local function crafters(accountDb)
@@ -175,6 +198,7 @@ end
 
 return function()
   testKeywordsPage()
+  testBlockTypedName()
   testCraftersPage()
   testTestPage()
 end

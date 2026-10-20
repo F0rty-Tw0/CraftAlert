@@ -5,6 +5,7 @@ end
 
 local Constants = ns.Constants or require("CraftAlert.Core.Constants")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
@@ -123,12 +124,25 @@ local function showBlocked(row, key)
   row.name:SetText(key)
 end
 
+-- Every realm the db knows: those of the characters' keys and their connected realms.
+local function knownRealms()
+  local realms = {}
+  for key, character in pairs(db().characters) do
+    realms[#realms + 1] = PlayerName.RealmOf(key)
+    for _, realm in ipairs(character.realms or {}) do
+      realms[#realms + 1] = realm
+    end
+  end
+  return realms
+end
+
 local function blockedList(column, add)
   Controls.Section(column, Localization.Text("Blocked players"))
   local list
   local input = Controls.Input(column, Localization.Text("Block a player"), function(text)
     if find(text, "%S") then
-      Leads.Block(match(text, "^%s*(.-)%s*$"))
+      local key = PlayerName.FromTyped(match(text, "^%s*(.-)%s*$"), knownRealms())
+      Leads.Block(key)
     end
     list.Refresh()
   end)
