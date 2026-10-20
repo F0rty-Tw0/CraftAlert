@@ -19,6 +19,9 @@ local UNREAD_LINE = "Open Blacksmithing once to start listening."
 local FIRST_RUN_HINT = "After opening a profession, try /ca test LF <profession> crafter"
 local INSTALLED_EVENTS = { "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "NEW_RECIPE_LEARNED", "PLAYER_UPDATE_RESTING" }
 local WHISPER_EVENTS = { "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM" }
+-- The customer's realm is connected, so the lead carries no "can't order" tag.
+local CONNECTED_REALMS = { "OwnRealm", "Other Realm" }
+local DIM_ALPHA = 0.5
 
 local SLOTS = { { name = "Blacksmithing", skillLine = BS } }
 local RECIPES = {
@@ -40,7 +43,7 @@ local function startClient(db, slots)
   Wow.reset()
   Wow.flavor("retail")
   Wow.clock.time = START_TIME
-  local session = { sent = {}, toasts = 0, db = db }
+  local session = { sent = {}, toasts = 0, db = db, categories = {}, addOnCategories = {} }
   local function record(api)
     return function(...)
       session.sent[#session.sent + 1] = { api, ... }
@@ -49,6 +52,7 @@ local function startClient(db, slots)
   Wow.stub("C_ChatInfo", { SendAddonMessage = record("addon"), SendChatMessage = record("chat") })
   Wow.stub("ChatFrameUtil", { SendTellWithMessage = record("prefill"), SendTell = record("empty") })
   Wow.stub("SlashCmdList", {})
+  Wow.stub("UISpecialFrames", {})
   Wow.stub("IsResting", function()
     return true
   end)
@@ -61,6 +65,21 @@ local function startClient(db, slots)
   Wow.stub("GetNormalizedRealmName", function()
     return "OwnRealm"
   end)
+  Wow.stub("C_AutoComplete", {
+    GetAutoCompleteRealms = function()
+      return CONNECTED_REALMS
+    end,
+  })
+  Wow.stub("Settings", {
+    RegisterCanvasLayoutCategory = function(frame, name)
+      local category = { frame = frame, name = name }
+      session.categories[#session.categories + 1] = category
+      return category
+    end,
+    RegisterAddOnCategory = function(category)
+      session.addOnCategories[#session.addOnCategories + 1] = category
+    end,
+  })
   Wow.stub("CraftAlertDB", db)
   local state = ProfessionsRetail.install({ slots = slots or SLOTS, base = BS, recipes = RECIPES, items = ITEMS, bind = BIND, autoCache = true })
   return session, state
@@ -113,6 +132,25 @@ local function isRegistered(event)
   return false
 end
 
+-- The leads window's rows that show a lead.
+local function shownRows()
+  local rows = 0
+  for _, frame in ipairs(Wow.frames) do
+    if frame.isLeadRow and frame.lead and frame:IsShown() then
+      rows = rows + 1
+    end
+  end
+  return rows
+end
+
+-- Lit while scanning, dim while paused: the icon's colour and the button's alpha.
+local function isLit(launcher)
+  local lit = launcher:GetAlpha() == 1 and launcher.icon.desaturated == false
+  local dim = launcher:GetAlpha() == DIM_ALPHA and launcher.icon.desaturated == true
+  Assert.truthy(lit or dim, "the launcher is either lit or dim")
+  return lit
+end
+
 -- Runs the timers of this frame (delay 0: the coalesced index rebuild) and nothing later.
 local function runFrame()
   local found = true
@@ -149,9 +187,14 @@ local function testFreshInstall()
   Assert.equal(isRegistered("ADDON_LOADED"), false, "ADDON_LOADED is dropped once handled")
   Assert.equal(isRegistered("PLAYER_LOGIN"), false)
   Assert.equal(type(rawget(_G, "SlashCmdList").CRAFTALERT), "function")
-  Assert.truthy(rawget(_G, "CraftAlertLauncher"), "the launcher exists after login")
+  local launcher = rawget(_G, "CraftAlertLauncher")
+  Assert.truthy(launcher, "the launcher exists after login")
+  Assert.equal(isLit(launcher), false, "dim while paused")
   Assert.equal(isRegistered("CHAT_MSG_CHANNEL"), false, "paused: nothing read yet")
   Assert.same(ns.ProfessionList.Order(), { BS })
+  Assert.equal(#session.categories, 1, "one Blizzard Settings category")
+  Assert.same(session.addOnCategories, session.categories, "listed under AddOns once")
+  Assert.same(db.characters[OWN_KEY].realms, { "OwnRealm", "OtherRealm" }, "the connected realms are stored")
 
   -- Opening the window reads the 3 recipes; the coalesced rebuild activates the scan, and the
   -- first activation prints the status line.
@@ -162,9 +205,17 @@ local function testFreshInstall()
   Assert.equal(ns.ScanGate.IsActive(), true)
   Assert.truthy(isRegistered("CHAT_MSG_CHANNEL"))
   Assert.same(chatSince(before), { STATUS_ACTIVE })
+  Assert.equal(isLit(launcher), true, "lit once the scan is active, before any lead")
+
+  -- /ca opens the empty leads window; the request below fills its first row.
+  rawget(_G, "SlashCmdList").CRAFTALERT("")
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"):IsShown(), true)
+  Assert.equal(shownRows(), 0)
 
   -- A request for the belt: one toast, one lead, then the whisper events.
   trade("LF " .. BELT_LINK .. " crafter", CUSTOMER)
+  Assert.equal(shownRows(), 1, "the open window shows the new lead")
+  rawget(_G, "SlashCmdList").CRAFTALERT("")
   local lead = ns.Leads.Latest()
   Assert.truthy(lead, "the request made a lead")
   Assert.equal(lead.customer, CUSTOMER)
