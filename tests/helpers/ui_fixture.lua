@@ -32,6 +32,7 @@ local UI = {
   "UI.AlertToast",
   "UI.LeadRow",
   "UI.LeadsWindow",
+  "UI.Launcher",
 }
 -- Globals Core/Bindings.lua defines at load: stubbed first, so Wow.reset removes them again.
 UiFixture.BINDING_GLOBALS = {

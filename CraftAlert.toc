@@ -59,4 +59,5 @@ UI/ClickRouter.lua
 UI/AlertToast.lua
 UI/LeadRow.lua
 UI/LeadsWindow.lua
+UI/Launcher.lua
 Bootstrap.lua
