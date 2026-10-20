@@ -89,6 +89,7 @@ return function()
     booted({
       "sender: Customer-OtherRealm",
       "match: item group=190001 prof=164 why=lf+plate+belt",
+      "toast: shown lead=1 more=0",
       "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
       "greeting: Hi! I can craft Sim Plate Belt.",
       "sender: Customer-OtherRealm",
@@ -97,6 +98,7 @@ return function()
       "stop: nomatch",
       "sender: Customer-OtherRealm",
       "match: item group=enchant bracer - sim health prof=333 why=lf+enchant bracer sim health",
+      "toast: shown lead=2 more=1",
       "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
       "greeting: Hi! I can craft Enchant Bracer - Sim Health.",
       "sender: Customer-OtherRealm",
@@ -119,6 +121,7 @@ return function()
     booted({
       "sender: Bob-OwnRealm",
       "match: item group=190001 prof=164 why=lf+plate+belt",
+      "toast: shown lead=1 more=0",
       "lead: new customer=Bob-OwnRealm crafter=Crafter-OwnRealm cannotOrder=false",
       "greeting: Hi! I can craft Sim Plate Belt.",
     })
@@ -135,23 +138,33 @@ return function()
     "lead: new customer=Zoë-Kel'Thuzad crafter=Crafter-OwnRealm cannotOrder=true",
   })
 
+  -- The toast (Task 1.15): every AlertToast.Show prints the lead and its "+N more" badge; the
+  -- sim shows it for each new lead. An updated lead raises no second toast.
+  local toastLines = {}
+  for _, line in ipairs(Sim.Run({ "LF plate belt", "LF plate belt pls", "--sender", "Bob", "LF plate belt" })) do
+    if string.find(line, "^toast: ") then
+      toastLines[#toastLines + 1] = line
+    end
+  end
+  Assert.same(toastLines, { "toast: shown lead=1 more=0", "toast: shown lead=2 more=1" })
+
   -- Clicks act on the newest lead as if its toast had been up for a second (Task 1.13): left
   -- sends the disclosure then the whisper, a second left prefills (once per lead), a reply
   -- from the customer is tracked, shift prefills, ctrl opens an empty whisper, right dismisses.
   local customer = "Customer-OtherRealm"
   local greeting = "Hi! I can craft Sim Plate Belt."
   local clicked = stepLines(Sim.Run({ "LF plate belt", "--click", "left", "--click", "left" }))
-  Assert.same({ unpack(clicked, 8) }, {
+  Assert.same({ unpack(clicked, 9) }, {
     "send: SendAddonMessage robots.txt | Q:CraftAlert | WHISPER | " .. customer,
     "send: SendChatMessage " .. greeting .. " | WHISPER | nil | " .. customer,
     "lead: greeted customer=" .. customer,
     "send: SendTellWithMessage " .. customer .. " | " .. greeting,
   })
-  Assert.same({ unpack(stepLines(Sim.Run({ "LF plate belt", "--click", "shift", "--click", "ctrl" })), 8) }, {
+  Assert.same({ unpack(stepLines(Sim.Run({ "LF plate belt", "--click", "shift", "--click", "ctrl" })), 9) }, {
     "send: SendTellWithMessage " .. customer .. " | " .. greeting,
     "send: SendTell " .. customer,
   })
-  Assert.same({ unpack(stepLines(Sim.Run({ "LF plate belt", "--click", "right", "--click", "left" })), 8) }, {
+  Assert.same({ unpack(stepLines(Sim.Run({ "LF plate belt", "--click", "right", "--click", "left" })), 9) }, {
     "lead: dismissed customer=" .. customer,
     "error: --click left has no lead to act on",
   })
@@ -161,14 +174,14 @@ return function()
   local replied = stepLines(
     Sim.Run({ "LF plate belt", "--event", "CHAT_MSG_WHISPER", "hi", customer, "--click", "left", "--event", "CHAT_MSG_WHISPER", "hi", customer })
   )
-  Assert.same({ unpack(replied, 8) }, {
+  Assert.same({ unpack(replied, 9) }, {
     "send: SendAddonMessage robots.txt | Q:CraftAlert | WHISPER | " .. customer,
     "send: SendChatMessage " .. greeting .. " | WHISPER | nil | " .. customer,
     "lead: greeted customer=" .. customer,
     "lead: replied customer=" .. customer,
   })
   -- Whispering the customer by hand (a prefill sent) marks the lead greeted.
-  Assert.same({ unpack(stepLines(Sim.Run({ "LF plate belt", "--event", "CHAT_MSG_WHISPER_INFORM", "hello", customer })), 8) }, {
+  Assert.same({ unpack(stepLines(Sim.Run({ "LF plate belt", "--event", "CHAT_MSG_WHISPER_INFORM", "hello", customer })), 9) }, {
     "lead: greeted customer=" .. customer,
   })
 
@@ -183,6 +196,7 @@ return function()
     "chat: Craft Alert: Listening in Trade, Services — 4 recipes, 2 crafters",
     "sender: Customer-OtherRealm",
     "match: item group=190001 prof=164 why=lf+plate+belt",
+    "toast: shown lead=1 more=0",
     "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
     "greeting: Hi! I can craft Sim Plate Belt.",
   })
@@ -211,6 +225,7 @@ return function()
       "index: size=5",
       "sender: Customer-OtherRealm",
       "match: item group=190004 prof=164 why=lf+sim plate helm",
+      "toast: shown lead=1 more=0",
       "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
       "greeting: Hi! I can craft |cffffffff|Hitem:190004|h[Item 190004]|h|r.",
     })
