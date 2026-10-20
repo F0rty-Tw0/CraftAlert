@@ -412,6 +412,24 @@ return function()
   Assert.equal(#Wow.timers, 0, "the stale timer neither sweeps nor re-arms")
   Assert.equal(seen.change, changes + 1)
 
+  -- The stale timer firing while its lead is still listed does nothing either: the timer Rearm
+  -- started stays the only live one.
+  ns, db = setup()
+  Leads = ns.Leads
+  seen = listen(Leads)
+  lead = newLead(ns, "LF plate belt")
+  Wow.clock.time = T0 + 30
+  db.settings.leadTimeoutMin = 1
+  Leads.Rearm()
+  Assert.equal(#Wow.timers, 2)
+  Wow.clock.time = T0 + 40
+  changes = seen.change
+  table.remove(Wow.timers, 1).fn()
+  Assert.same(db.leads, { lead })
+  Assert.equal(seen.change, changes)
+  Assert.equal(#Wow.timers, 1, "no second live timer")
+  Assert.equal(Wow.timers[1].delay, 31, "the Rearm timer")
+
   -- Rearm sweeps at once what the new timeout already expired; a raised timeout or no leads
   -- arms nothing new (the pending timer fires early and re-arms itself).
   ns, db = setup()
