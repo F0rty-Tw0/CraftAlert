@@ -6,14 +6,25 @@ local Wow = require("tests.helpers.wow")
 local Toc = require("tests.helpers.toc")
 local RuntimeTraps = require("tests.helpers.runtime_traps")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
+local SettingsFixture = require("tests.helpers.settings_fixture")
 
 local OWN_KEY = "Crafter-OwnRealm"
 local CHANNEL, PLAYER_RESTING = "CHAT_MSG_CHANNEL", "PLAYER_UPDATE_RESTING"
--- Timer delays the plan allows (§4.3 rule 1): index coalescing 0, bind tick 1, lead expiry
--- (timeout + 1 s, 601 with the default 10 min).
-local ALLOWED_DELAYS = { [0] = true, [1] = true, [601] = true }
--- Own globals the tests below create (Wow.stub restores only what it stubbed).
-local OWN_GLOBALS_SET = { "CraftAlertDB", "CraftAlert_GreetLatest", "BINDING_NAME_CRAFTALERT_GREET", "SLASH_CRAFTALERT1" }
+-- Timer delays the plan allows (§4.3 rule 1): index coalescing 0, bind tick 1, toast auto-hide
+-- (20 s by default), lead expiry (timeout + 1 s, 601 with the default 10 min).
+local ALLOWED_DELAYS = { [0] = true, [1] = true, [20] = true, [601] = true }
+-- Own globals the tests below and Core/Bindings.lua create (Wow.stub restores only what it stubbed).
+local OWN_GLOBALS_SET = {
+  "CraftAlertDB",
+  "SLASH_CRAFTALERT1",
+  "CraftAlert_GreetLatest",
+  "CraftAlert_DismissLatest",
+  "CraftAlert_ToggleLeads",
+  "BINDING_HEADER_CRAFTALERT",
+  "BINDING_NAME_CRAFTALERT_GREET",
+  "BINDING_NAME_CRAFTALERT_DISMISS",
+  "BINDING_NAME_CRAFTALERT_TOGGLE",
+}
 
 -- A global by name: the language server must not infer a stub's type from these writes.
 local function G(name)
@@ -31,14 +42,25 @@ local function installBlizzard(sent)
   Wow.stub("ChatFrameUtil", { SendTellWithMessage = record("prefill"), SendTell = record("empty") })
   Wow.stub("GameTooltip", {
     shown = false,
+    SetOwner = function() end,
+    SetText = function() end,
+    AddLine = function() end,
     Show = function(self)
       self.shown = true
+    end,
+    Hide = function(self)
+      self.shown = false
     end,
   })
   Wow.stub("ProfessionsFrame", { CraftingPage = { RecipeList = { ScrollBox = {} } } })
   Wow.stub("SlashCmdList", {})
   Wow.stub("UISpecialFrames", {})
-  Wow.stub("Settings", {})
+  Wow.stub("Settings", {
+    RegisterCanvasLayoutCategory = function(frame, name)
+      return { frame = frame, name = name }
+    end,
+    RegisterAddOnCategory = function() end,
+  })
 end
 
 -- Every .lua file of the TOC, in order, into one ns; the require fallback must stay unused.
@@ -208,8 +230,9 @@ local function testTrapsCatchViolations()
     rawset(_G, "Foo", nil)
     verify()
 
-    -- Raw writes skip a proxy's __newindex; verify() finds what landed in it. Our own frame name
-    -- in UISpecialFrames is the one sanctioned insert (rule 3).
+    -- Raw writes skip a proxy's __newindex; verify() finds what landed in it. The leads and
+    -- settings windows' frame names in UISpecialFrames are the one sanctioned insert (rule 3):
+    -- any other name traps, our own prefix included.
     rawset(G("C_Timer"), "After", function() end)
     Assert.raises(verify, "raw write into Blizzard table C_Timer%[After%]")
     rawset(G("C_Timer"), "After", nil)
@@ -220,7 +243,12 @@ local function testTrapsCatchViolations()
     Assert.raises(verify, "UISpecialFrames%[1%]")
     rawset(G("UISpecialFrames"), 1, nil)
     table.insert(G("UISpecialFrames"), "CraftAlertWindow")
+    Assert.raises(verify, "UISpecialFrames%[1%]")
+    rawset(G("UISpecialFrames"), 1, nil)
+    table.insert(G("UISpecialFrames"), "CraftAlertLeadsWindow")
+    table.insert(G("UISpecialFrames"), "CraftAlertSettingsWindow")
     verify()
+    rawset(G("UISpecialFrames"), 2, nil)
     rawset(G("UISpecialFrames"), 1, nil)
 
     -- Frames: own names only, no OnUpdate, no public chat event while the scan is inactive.
@@ -331,8 +359,61 @@ local function testAddonObeysTheRules()
     Assert.equal(sent[4][1], "empty")
 
     -- The last lead gone: whisper events go too. Only the allowed timers are pending.
-    ns.Leads.Dismiss(lead.id)
+    -- The UI under the traps: the toast, the launcher and its tooltip, the leads window (its
+    -- UISpecialFrames insert) and the keybind functions.
+    ns.AlertToast.Show(lead)
+    local launcher = ns.Launcher.Create()
+    launcher:GetScript("OnEnter")(launcher)
+    launcher:GetScript("OnLeave")(launcher)
+    ns.Launcher.Refresh()
+    ns.LeadsWindow.Toggle()
+    ns.LeadsWindow.Refresh()
+    G("CraftAlert_GreetLatest")()
+    G("CraftAlert_ToggleLeads")()
+    G("CraftAlert_ToggleLeads")()
+    Assert.same({ rawget(G("UISpecialFrames"), 1), rawget(G("UISpecialFrames"), 2) }, { "CraftAlertLeadsWindow", nil })
+
+    G("CraftAlert_DismissLatest")()
+    Assert.equal(ns.Leads.HasActive(), false)
     Assert.same(publicChatEvents(), { CHANNEL })
+
+    -- The settings window under the traps: its Blizzard category and button, every page, and
+    -- settings that rebuild, re-evaluate, re-arm and repaint (its UISpecialFrames insert).
+    local category = ns.BlizzardCategory.Register()
+    Assert.truthy(category, "registered through the Settings API")
+    for _, frame in ipairs(Wow.frames) do
+      if frame.parent == category.frame and frame.frameType == "Button" then
+        frame:GetScript("OnClick")(frame, "LeftButton")
+      end
+    end
+    for _, title in ipairs({ "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" }) do
+      SettingsFixture.open(ns, title)
+    end
+    SettingsFixture.open(ns, "General")
+    local onlyResting = SettingsFixture.row("Only while resting (city or inn)").input
+    onlyResting:GetScript("OnClick")(onlyResting, "LeftButton")
+    onlyResting:GetScript("OnClick")(onlyResting, "LeftButton")
+    local guild = SettingsFixture.row("Guild").input
+    guild:GetScript("OnClick")(guild, "LeftButton")
+    Assert.same(publicChatEvents(), { CHANNEL, "CHAT_MSG_GUILD" }, "the gate registers a new channel at once")
+    guild:GetScript("OnClick")(guild, "LeftButton")
+    SettingsFixture.open(ns, "Alerts")
+    local timeout = SettingsFixture.row("Lead timeout").input
+    timeout:SetValue(5)
+    timeout:GetScript("OnMouseUp")(timeout, "LeftButton")
+    local hide = SettingsFixture.row("Hide the launcher when there are no leads").input
+    hide:GetScript("OnClick")(hide, "LeftButton")
+    hide:GetScript("OnClick")(hide, "LeftButton")
+    SettingsFixture.open(ns, "Test")
+    local line = SettingsFixture.row("Test a line").input
+    line:SetText("LF plate belt")
+    line:GetScript("OnEnterPressed")(line)
+    G("CraftAlert_ToggleLeads")()
+    Assert.same(
+      { rawget(G("UISpecialFrames"), 1), rawget(G("UISpecialFrames"), 2), rawget(G("UISpecialFrames"), 3) },
+      { "CraftAlertLeadsWindow", "CraftAlertSettingsWindow", nil }
+    )
+    Assert.same(publicChatEvents(), { CHANNEL }, "and drops it at once")
     for _, timer in ipairs(Wow.timers) do
       Assert.truthy(ALLOWED_DELAYS[timer.delay], "timer with delay " .. tostring(timer.delay))
     end

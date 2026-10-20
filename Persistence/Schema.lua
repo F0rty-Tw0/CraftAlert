@@ -27,8 +27,29 @@ local SETTING_OPTIONAL = { craftScanImported = "number", craftScanPrompted = "bo
 local PROFESSION_SHAPE = { name = "", primary = false, read = false }
 local RECIPE_FIELDS = { name = "string", prof = "key", item = "number", ranks = "table", bind = "number", muted = "boolean" }
 local CHARACTER_FIELDS = { source = "string", importedAt = "number", realms = "table", professions = "table", recipes = "table" }
+local LEAD_FIELDS = {
+  id = "number",
+  customer = "string",
+  crafter = "string",
+  time = "number",
+  guid = "string",
+  message = "string",
+  channel = "string",
+  kind = "string",
+  prof = "key",
+  group = "key",
+  why = "string",
+  cannotOrder = "boolean",
+  greeted = "boolean",
+  replied = "boolean",
+  arrivedWhileAfk = "boolean",
+  profName = "string",
+  recipeName = "string",
+  itemID = "number",
+  itemLink = "string",
+}
 local COUNTERS = { seen = 0, greeted = 0, replied = 0, filled = 0 }
-local UI_FRAMES = { toast = true, window = true, launcher = true }
+local UI_FRAMES = { toast = true, window = true, launcher = true, settings = true }
 local DAY_PATTERN = "^%d%d%d%d%-%d%d%-%d%d$"
 
 -- Set by Validate; read by every dropUnknown.
@@ -225,12 +246,23 @@ local function fixDay(record)
   return record
 end
 
--- The lead record is owned by Model/Leads.lua; only what pruning and display cannot do
--- without (a customer and a time) is required here.
+-- The lead record is owned by Model/Leads.lua. What pruning, display and the greeting cannot do
+-- without (a customer, a crafter and a time) is required; any other wrong-typed field is
+-- cleared, as a lead without it is valid. A bad id is cleared too: Leads.Restore gives a fresh one.
+local function fixLead(lead)
+  if type(lead) ~= "table" then
+    return false
+  end
+  local required = isName(lead.customer) and isName(lead.crafter) and isNumber(lead.time)
+  if not required then
+    return false
+  end
+  fixShape(lead, {}, LEAD_FIELDS)
+  return true
+end
+
 local function fixLeads(list)
-  return fixList(list, function(lead)
-    return type(lead) == "table" and isName(lead.customer) and isNumber(lead.time)
-  end) or {}
+  return fixList(list, fixLead) or {}
 end
 
 local function fixUi(ui)

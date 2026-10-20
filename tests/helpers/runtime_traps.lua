@@ -13,8 +13,8 @@
 --   verify() runs after the drive and raises for what a metatable cannot see: an existing
 --   global that was overwritten or removed (the snapshot is taken at the end of install, so the
 --   stubs a test makes before install are the baseline), a global made with rawset, and raw
---   writes (rawset, table.insert) that landed in a proxy. Own names pass; entries that are our
---   own frame names in the UISpecialFrames proxy pass (rule 3's one sanctioned insert).
+--   writes (rawset, table.insert) that landed in a proxy. Own names pass; in the UISpecialFrames
+--   proxy only the frame names in SPECIAL_FRAMES pass (rule 3's one sanctioned insert).
 -- Stubs the test installs with Wow.stub (rawset) before install() are never trapped on creation.
 local Wow = require("tests.helpers.wow")
 
@@ -34,6 +34,10 @@ local OWN_PREFIX = "^CraftAlert"
 
 -- Fields the addon may write on a Blizzard table, by global name (rule 3).
 local ALLOWED_FIELDS = { SlashCmdList = { CRAFTALERT = true } }
+-- The frames ESC may close (UI/LeadsWindow.lua, UI/Settings/SettingsWindow.lua). A
+-- table.insert into the proxy cannot be trapped where it happens (it writes raw), so verify()
+-- reports any other entry, our own prefix included.
+local SPECIAL_FRAMES = { CraftAlertLeadsWindow = true, CraftAlertSettingsWindow = true }
 
 RuntimeTraps.BLIZZARD_GLOBALS = {
   "UIParent",
@@ -157,13 +161,13 @@ local function guardGlobals()
 end
 
 -- Raw writes into a proxy bypass its __newindex; the proxies must still be empty. The one
--- exception is the sanctioned insert of our own frame name into UISpecialFrames.
+-- exception is the sanctioned insert of an allowed frame name into UISpecialFrames.
 local function proxyViolations()
   local found = {}
   for _, entry in ipairs(proxies) do
     for key, value in pairs(entry.proxy) do
-      local ownFrameName = entry.name == "UISpecialFrames" and type(key) == "number" and isOwnGlobal(value)
-      if not ownFrameName then
+      local specialFrame = entry.name == "UISpecialFrames" and type(key) == "number" and SPECIAL_FRAMES[value] == true
+      if not specialFrame then
         found[#found + 1] = string.format("raw write into Blizzard table %s[%s]", entry.name, tostring(key))
       end
     end

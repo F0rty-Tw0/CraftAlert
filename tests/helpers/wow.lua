@@ -5,6 +5,8 @@
 --   Wow.runTimers()         run queued C_Timer.After callbacks (lowest delay first)
 --   Wow.pendingTimers(d)    how many queued C_Timer.After callbacks have delay d
 --   Wow.secret(v)           wrap v so issecretvalue(wrapper) is true
+local Widgets = require("tests.helpers.widgets")
+
 local Wow = {}
 
 local MAX_TIMER_PASSES = 1000
@@ -31,8 +33,10 @@ function Wow.secret(value)
   return wrapper
 end
 
-local function newFrame(frameType, name)
-  local frame = { frameType = frameType, name = name, events = {}, scripts = {}, hooks = {}, shown = false }
+-- Frames start shown, as in the client; Widgets adds the region and child-creation methods.
+local function newFrame(frameType, name, parent, template)
+  local frame = { frameType = frameType, name = name, parent = parent, template = template, events = {}, scripts = {}, hooks = {}, shown = true }
+  Widgets.extend(frame)
 
   function frame:RegisterEvent(event)
     self.events[event] = true
@@ -69,6 +73,11 @@ local function newFrame(frameType, name)
 
   function frame:IsShown()
     return self.shown
+  end
+
+  -- As the client: shown, and so is every parent (UIParent:Hide() is Alt+Z).
+  function frame:IsVisible()
+    return self.shown and (self.parent == nil or self.parent:IsVisible())
   end
 
   -- Fire(event, ...) runs the OnEvent script as the client would; a no-op unless registered.
@@ -129,6 +138,7 @@ local function installDefaults()
   Wow.stub("CreateFrame", newFrame)
   Wow.stub("UIParent", newFrame("Frame", nil))
   table.remove(Wow.frames) -- UIParent never registers events; keep Wow.frames to the addon's frames
+  _G["UIParent"]:SetSize(1920, 1080)
   Wow.stub("C_Timer", {
     After = function(delay, fn)
       timerSeq = timerSeq + 1

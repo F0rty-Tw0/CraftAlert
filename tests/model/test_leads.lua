@@ -391,6 +391,66 @@ return function()
   fireTimer()
   Assert.same(db.leads, {})
 
+  -- Rearm after a lower timeout (settings page): the lead expires on the new timeout, not when
+  -- the timer armed for the old one fires; that stale timer then does nothing.
+  ns, db = setup()
+  Leads = ns.Leads
+  seen = listen(Leads)
+  newLead(ns, "LF plate belt")
+  Assert.equal(Wow.timers[1].delay, TIMEOUT + 1)
+  Wow.clock.time = T0 + 30
+  db.settings.leadTimeoutMin = 1
+  Leads.Rearm()
+  Assert.equal(#Wow.timers, 2, "a timer for the new deadline beside the stale one")
+  Assert.equal(Wow.timers[2].delay, 31, "60 s timeout, 30 s already gone, + 1")
+  Wow.clock.time = T0 + 61
+  changes = seen.change
+  table.remove(Wow.timers, 2).fn()
+  Assert.same(db.leads, {}, "expired on the new timeout")
+  Assert.equal(seen.change, changes + 1)
+  table.remove(Wow.timers, 1).fn()
+  Assert.equal(#Wow.timers, 0, "the stale timer neither sweeps nor re-arms")
+  Assert.equal(seen.change, changes + 1)
+
+  -- The stale timer firing while its lead is still listed does nothing either: the timer Rearm
+  -- started stays the only live one.
+  ns, db = setup()
+  Leads = ns.Leads
+  seen = listen(Leads)
+  lead = newLead(ns, "LF plate belt")
+  Wow.clock.time = T0 + 30
+  db.settings.leadTimeoutMin = 1
+  Leads.Rearm()
+  Assert.equal(#Wow.timers, 2)
+  Wow.clock.time = T0 + 40
+  changes = seen.change
+  table.remove(Wow.timers, 1).fn()
+  Assert.same(db.leads, { lead })
+  Assert.equal(seen.change, changes)
+  Assert.equal(#Wow.timers, 1, "no second live timer")
+  Assert.equal(Wow.timers[1].delay, 31, "the Rearm timer")
+
+  -- Rearm sweeps at once what the new timeout already expired; a raised timeout or no leads
+  -- arms nothing new (the pending timer fires early and re-arms itself).
+  ns, db = setup()
+  Leads = ns.Leads
+  newLead(ns, "LF plate belt")
+  Wow.clock.time = T0 + 120
+  db.settings.leadTimeoutMin = 1
+  Leads.Rearm()
+  Assert.same(db.leads, {}, "120 s old with a 60 s timeout")
+  Assert.equal(#Wow.timers, 1, "nothing left to arm for")
+  ns, db = setup()
+  Leads = ns.Leads
+  lead = newLead(ns, "LF plate belt")
+  db.settings.leadTimeoutMin = 30
+  Leads.Rearm()
+  Assert.equal(#Wow.timers, 1, "a later deadline keeps the pending timer")
+  Wow.clock.time = T0 + TIMEOUT + 1
+  fireTimer()
+  Assert.same(db.leads, { lead }, "the early timer sweeps nothing")
+  Assert.equal(Wow.timers[1].delay, 20 * 60, "re-armed for the 30 min deadline")
+
   -- Restore: sweeps what expired since the db was loaded, arms the timer, continues the ids.
   ns, db = setup()
   Leads = ns.Leads
@@ -404,6 +464,19 @@ return function()
   Assert.equal(Leads.FindActiveByCustomer("Live-Draenor"), live)
   Assert.equal(#Wow.timers, 1)
   Assert.equal(newLead(ns, "LF plate belt").id, 13)
+
+  -- A lead dated in the future (hand-edited, or the clock went back) counts as arrived now, so it
+  -- still expires after the timeout instead of never.
+  ns, db = setup()
+  Leads = ns.Leads
+  local future = { id = 1, customer = "Future-Draenor", time = T0 + 1e9, kind = "item", greeted = false, replied = false }
+  db.leads = { future }
+  Leads.Restore(db)
+  Assert.equal(future.time, T0)
+  Assert.equal(Wow.timers[1].delay, TIMEOUT + 1)
+  Wow.clock.time = T0 + TIMEOUT + 1
+  fireTimer()
+  Assert.same(db.leads, {}, "expired on the timeout")
 
   -- Restore keeps at most 100 leads, the newest, however many a hand-edited db holds.
   ns, db = setup()

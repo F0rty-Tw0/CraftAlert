@@ -1,0 +1,172 @@
+local addonName, ns = ...
+if type(ns) ~= "table" then
+  ns = {}
+end
+
+local Constants = ns.Constants or require("CraftAlert.Core.Constants")
+local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
+local Index = ns.Index or require("CraftAlert.Model.Index")
+local Leads = ns.Leads or require("CraftAlert.Model.Leads")
+local Theme = ns.Theme or require("CraftAlert.UI.Theme")
+local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
+
+-- Spec §9 Keywords: intent words, blocker words, extra slang (word → slot/type) and the
+-- blocked players (`ignored`; the player-facing word is "Block"). Every change rebuilds the
+-- index, which holds the word sets and the hot-path block set (§6.2). Blocking goes through
+-- Leads.Block, as the leads-window button does, so that customer's leads go too.
+local PageKeywords = { id = "keywords", title = Localization.Text("Keywords") }
+
+local find = string.find
+local gmatch = string.gmatch
+local lower = string.lower
+local match = string.match
+
+local BLOCKED_ROWS = 8
+local UNBLOCK_WIDTH = 64
+
+local function db()
+  return _G["CraftAlertDB"]
+end
+
+-- Lowercase words split on spaces and commas, each once, in typed order.
+local function splitWords(text)
+  local words, seen = {}, {}
+  for word in gmatch(lower(text), "[^%s,]+") do
+    if not seen[word] then
+      seen[word] = true
+      words[#words + 1] = word
+    end
+  end
+  return words
+end
+
+local function copy(list)
+  local result = {}
+  for i, value in ipairs(list) do
+    result[i] = value
+  end
+  return result
+end
+
+-- "word=target" pairs; a part without both sides is dropped.
+local function parseSlang(text)
+  local slang = {}
+  for _, part in ipairs(splitWords(text)) do
+    local word, target = match(part, "^([^=]+)=([^=]+)$")
+    if word then
+      slang[word] = target
+    end
+  end
+  return slang
+end
+
+local function sortedKeys(map)
+  local keys = {}
+  for key in pairs(map) do
+    keys[#keys + 1] = key
+  end
+  table.sort(keys)
+  return keys
+end
+
+local function formatSlang(slang)
+  local parts = {}
+  for _, word in ipairs(sortedKeys(slang)) do
+    parts[#parts + 1] = word .. "=" .. slang[word]
+  end
+  return table.concat(parts, " ")
+end
+
+local function wordsInput(column, add, label, key, fallback)
+  local input
+  input = Controls.Input(column, Localization.Text(label), function(text)
+    local words = splitWords(text)
+    if #words == 0 and fallback then
+      words = copy(fallback)
+    end
+    db().settings[key] = words
+    input.Set(table.concat(words, " "))
+    Index.RequestRebuild("keywords")
+  end)
+  add(function()
+    local words = db().settings[key]
+    input.Set(type(words) == "table" and table.concat(words, " ") or "")
+  end)
+end
+
+local function slangInput(column, add)
+  local input
+  input = Controls.Input(column, Localization.Text("Extra slang (word=slot)"), function(text)
+    db().settings.extraSlang = parseSlang(text)
+    input.Set(formatSlang(db().settings.extraSlang))
+    Index.RequestRebuild("keywords")
+  end)
+  add(function()
+    input.Set(formatSlang(db().settings.extraSlang))
+  end)
+end
+
+local function createBlockedRow(row)
+  row.name = FrameKit.Text(row, Theme.FONTS.body, Theme.COLORS.textPrimary)
+  row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
+  row.unblock = Controls.Button(row, Localization.Text("Unblock"), UNBLOCK_WIDTH, function()
+    db().ignored[row.key] = nil
+    Index.RequestRebuild("block")
+    row.list.Refresh()
+  end)
+  row.unblock:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+end
+
+local function showBlocked(row, key)
+  row.key = key
+  row.name:SetText(key)
+end
+
+-- Every realm the db knows: those of the characters' keys and their connected realms.
+local function knownRealms()
+  local realms = {}
+  for key, character in pairs(db().characters) do
+    realms[#realms + 1] = PlayerName.RealmOf(key)
+    for _, realm in ipairs(character.realms or {}) do
+      realms[#realms + 1] = realm
+    end
+  end
+  return realms
+end
+
+local function blockedList(column, add)
+  Controls.Section(column, Localization.Text("Blocked players"))
+  local list
+  local input = Controls.Input(column, Localization.Text("Block a player"), function(text)
+    if find(text, "%S") then
+      local key = PlayerName.FromTyped(match(text, "^%s*(.-)%s*$"), knownRealms())
+      Leads.Block(key)
+    end
+    list.Refresh()
+  end)
+  list = Controls.List(column, BLOCKED_ROWS, createBlockedRow)
+  function list.Refresh()
+    input.Set("")
+    list.Render(sortedKeys(db().ignored), showBlocked)
+  end
+  for _, row in ipairs(list.rows) do
+    row.list = list
+  end
+  add(list.Refresh)
+end
+
+function PageKeywords.Create(parent)
+  local column = Controls.Column(parent)
+  local add, refresh = Controls.Refresher()
+  Controls.Section(column, Localization.Text("Request words"))
+  wordsInput(column, add, "Intent words", "intentWords", Constants.intentWords)
+  wordsInput(column, add, "Blocker words", "blockerWords", nil)
+  slangInput(column, add)
+  blockedList(column, add)
+  return { Refresh = refresh }
+end
+
+ns.PageKeywords = PageKeywords
+return PageKeywords

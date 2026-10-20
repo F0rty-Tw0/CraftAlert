@@ -13,6 +13,7 @@ local SendGuard = ns.SendGuard or require("CraftAlert.Model.SendGuard")
 -- in the addon that sends an addon message, and it never listens for one.
 local GreetAction = {}
 
+local find = string.find
 local match = string.match
 local pcall = pcall
 local type = type
@@ -46,10 +47,16 @@ end
 -- Sends the greeting when the anti-bot rules allow it, else opens the edit box with it. A
 -- lead that is no longer listed (dismissed, expired, evicted) can never be marked greeted, so
 -- it would be sent to again on every click: it only prefills.
+-- A greeting with nothing to say (a hand-edited empty template, tags that all expand to "")
+-- is never sent: an empty whisper opens for the player to type into.
 -- shownAt: GetTime() when the toast or row showing the lead appeared, nil when none is visible.
 function GreetAction.Greet(lead, shownAt)
   local greeting = greetingFor(lead)
   local target = targetOf(lead)
+  if not find(greeting, "%S") then
+    FlavorCompat.SendTell(target)
+    return
+  end
   if not Leads.IsActive(lead.id) or not SendGuard.Check(lead, shownAt) then
     FlavorCompat.SendTellWithMessage(target, greeting)
     return

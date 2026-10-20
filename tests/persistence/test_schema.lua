@@ -1,6 +1,7 @@
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Fresh = require("tests.helpers.fresh")
+local Fixture = require("tests.helpers.matcher_fixture")
 
 local function load(flavorKey)
   Wow.reset()
@@ -41,8 +42,9 @@ local function testValidDbIsUntouched()
   db.ledger["2026-10-17"] = { seen = 3, greeted = 2, replied = 1, filled = 0 }
   db.recentGreeted["Cus-Realm"] = 100
   db.ignored["Bad-Realm"] = true
-  db.leads[1] = { id = 1, customer = "Cus-Realm", time = 100, message = "LF belt" }
+  db.leads[1] = { id = 1, customer = "Cus-Realm", crafter = "Me-Realm", time = 100, message = "LF belt" }
   db.ui.toast = { point = "TOP", x = 10, y = -20 }
+  db.ui.settings = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 40 }
   local before = deepCopy(db)
   Assert.same(Schema.Validate(db), before)
   Assert.equal(#printedLines(), 0)
@@ -196,11 +198,11 @@ local function testLedgerRecentIgnoredLeadsUi()
     recentGreeted = { ["A-Realm"] = 100, ["B-Realm"] = "soon", [5] = 100 },
     ignored = { ["A-Realm"] = true, ["B-Realm"] = false, ["C-Realm"] = "yes" },
     leads = {
-      { customer = "A-Realm", time = 10 },
+      { customer = "A-Realm", crafter = "Me-Realm", time = 10 },
       { customer = 5, time = 10 },
       { customer = "B-Realm", time = "soon" },
       "junk",
-      { customer = "C-Realm", time = 20 },
+      { customer = "C-Realm", crafter = "Me-Realm", time = 20 },
     },
     ui = { toast = { point = "TOP", x = 1, nested = {} }, window = 5, launcher = {}, other = {} },
   })
@@ -217,7 +219,7 @@ end
 local function testListWithHoles()
   local Schema = load()
   local db = Schema.Validate({
-    leads = { [3] = { customer = "B-Realm", time = 20 }, [2] = { customer = "A-Realm", time = 10 } },
+    leads = { [3] = { customer = "B-Realm", crafter = "Me-Realm", time = 20 }, [2] = { customer = "A-Realm", crafter = "Me-Realm", time = 10 } },
     settings = { intentWords = { [1] = "a", [0] = "zero", [1.5] = "half", foo = "b", [3] = "c" } },
   })
   Assert.equal(#db.leads, 2)
@@ -244,7 +246,9 @@ local function testNewerSchema()
     characters = {
       ["Bob-Realm"] = { futureField = 7, recipes = { [1] = { name = "x", prof = 1, futureRecipeField = true } } },
     },
+    leads = { { customer = "A-Realm", crafter = "Me-Realm", time = 10, futureLeadField = { a = 1 } } },
   })
+  Assert.same(db.leads[1].futureLeadField, { a = 1 }, "a newer schema keeps unknown lead fields")
   Assert.equal(db.schema, 2)
   Assert.equal(db.settings.toastDuration, 120)
   Assert.equal(db.settings.futureSetting, "keep")
@@ -263,6 +267,143 @@ local function testOlderSchemaIsRaisedAndNoWarning()
   Assert.equal(Schema.Validate({ schema = 0 }).schema, 1)
   Assert.equal(Schema.Validate({ schema = -3 }).schema, 1)
   Assert.equal(#printedLines(), 0)
+end
+
+-- Review Focus 5: a lead the UI or the greeting would choke on is dropped (no customer, crafter
+-- or time) or loses the wrong-typed field (nil is what a lead without that field has).
+local function testLeadFieldTypes()
+  local Schema = load()
+  local wellTyped = {
+    id = 5,
+    customer = "E-Realm",
+    crafter = "Alt-Realm",
+    time = 30,
+    guid = "Player-1-0A",
+    message = "LF belt",
+    channel = "trade",
+    kind = "item",
+    prof = 164,
+    group = 501,
+    why = "lf + belt",
+    cannotOrder = true,
+    greeted = true,
+    replied = true,
+    arrivedWhileAfk = true,
+    profName = "Blacksmithing",
+    recipeName = "Belt",
+    itemID = 501,
+    itemLink = "|cff1eff00|Hitem:501|h[Belt]|h|r",
+  }
+  local expected = deepCopy(wellTyped)
+  local db = Schema.Validate({
+    leads = {
+      { id = 1, customer = "A-Realm", crafter = "Me-Realm", time = 10, profName = true, junk = 1 },
+      { id = 2, customer = "B-Realm", crafter = {}, time = 10 },
+      { id = 3, customer = "C-Realm", time = 10 },
+      {
+        id = "x",
+        customer = "D-Realm",
+        crafter = "Me-Realm",
+        time = 20,
+        guid = 7,
+        message = {},
+        channel = 9,
+        kind = 5,
+        prof = {},
+        group = {},
+        why = {},
+        cannotOrder = "yes",
+        greeted = "no",
+        replied = 1,
+        arrivedWhileAfk = "x",
+        recipeName = 5,
+        itemID = "501",
+        itemLink = {},
+      },
+      wellTyped,
+    },
+  })
+  Assert.equal(#db.leads, 3)
+  Assert.same(db.leads[1], { id = 1, customer = "A-Realm", crafter = "Me-Realm", time = 10 }, "an unknown lead field is dropped")
+  Assert.same(db.leads[2], { customer = "D-Realm", crafter = "Me-Realm", time = 20 })
+  Assert.same(db.leads[3], expected, "a well-typed lead keeps every field")
+end
+
+-- Every field Model/Leads.lua writes survives a /reload: leads built by the real Leads.OnMatch
+-- (an item lead and a profession lead, greeted, replied, arrived while AFK, with a guid and a
+-- realm tag) come out of Schema.Validate unchanged.
+local LEAD_WRITES = {
+  "id",
+  "customer",
+  "crafter",
+  "time",
+  "guid",
+  "message",
+  "channel",
+  "kind",
+  "prof",
+  "group",
+  "why",
+  "cannotOrder",
+  "greeted",
+  "replied",
+  "arrivedWhileAfk",
+  "profName",
+  "recipeName",
+  "itemID",
+  "itemLink",
+}
+
+local function leadsFromOnMatch()
+  local ns = Fixture.load("retail")
+  Wow.clock.time = 1000
+  Wow.stub("UnitName", function()
+    return "Me"
+  end)
+  Wow.stub("GetNormalizedRealmName", function()
+    return "Realm"
+  end)
+  Wow.stub("UnitIsAFK", function()
+    return true
+  end)
+  local db
+  Fixture.itemIndex(ns, function(captured)
+    db = captured
+    db.characters["Alt-Realm"].realms = { "Realm" }
+    db.characters["Smith-Realm"].realms = { "Realm" }
+  end)
+  Wow.stub("C_Item", {
+    GetItemInfoInstant = _G["C_Item"].GetItemInfoInstant,
+    GetItemInfo = function(itemID)
+      return "Item " .. itemID, "|cff1eff00|Hitem:" .. itemID .. "|h[Item " .. itemID .. "]|h|r"
+    end,
+  })
+  ns.PlayerName.Init()
+  ns.RealmTag = Fresh.require("Model.RealmTag")
+  ns.CrafterRank = Fresh.require("Model.CrafterRank")
+  ns.Leads = Fresh.require("Model.Leads")
+  ns.Leads.Restore(db)
+  for _, text in ipairs({ "LF plate belt", "LF blacksmith" }) do
+    local lead = ns.Leads.OnMatch(ns.Matcher.Match("trade", text, "Someone-Else"), "Bob-Draenor", text, "trade", "Player-1-0A")
+    ns.Leads.MarkGreeted(lead.id)
+    ns.Leads.MarkReplied(lead.id)
+  end
+  return db
+end
+
+local function testLeadsFromOnMatchSurvive()
+  local db = leadsFromOnMatch()
+  local itemLead, professionLead = db.leads[1], db.leads[2]
+  Assert.equal(itemLead.kind, "item")
+  Assert.equal(professionLead.kind, "profession")
+  for _, field in ipairs(LEAD_WRITES) do
+    Assert.truthy(itemLead[field] ~= nil, "the item lead sets " .. field)
+  end
+  local expected = deepCopy(db.leads)
+  Fresh.require("Core.Localization")
+  Fresh.require("Core.ChatPrint")
+  local Schema = Fresh.require("Persistence.Schema")
+  Assert.same(Schema.Validate(db).leads, expected, "leads written by Leads.lua are unchanged")
 end
 
 local function testIdempotent()
@@ -287,5 +428,7 @@ return function()
   testNewerSchemaKeepsNestedUiValues()
   testNewerSchema()
   testOlderSchemaIsRaisedAndNoWarning()
+  testLeadFieldTypes()
+  testLeadsFromOnMatchSurvive()
   testIdempotent()
 end

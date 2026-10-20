@@ -196,6 +196,13 @@ end
 
 local function newContext(plan, out)
   local ctx = { out = out, flavor = plan.flavor, ns = {}, afk = false, resting = true, started = false, sender = DEFAULT_SENDER }
+  ctx.keys = { shift = false, ctrl = false }
+  Wow.stub("IsShiftKeyDown", function()
+    return ctx.keys.shift
+  end)
+  Wow.stub("IsControlKeyDown", function()
+    return ctx.keys.ctrl
+  end)
   Wow.stub("UnitIsAFK", function()
     return ctx.afk
   end)
@@ -274,6 +281,20 @@ local function reportMatches(ctx)
   end
 end
 
+-- `toast: shown lead=<id> more=<n>` whenever AlertToast.Show runs; the sim shows the toast
+-- for every new lead (Bootstrap takes over this wiring in Task 1.19).
+local function reportToasts(ctx)
+  local AlertToast = ctx.ns.AlertToast
+  local show = AlertToast.Show
+  AlertToast.Show = function(lead)
+    show(lead)
+    ctx.out[#ctx.out + 1] = string.format("toast: shown lead=%s more=%d", tostring(lead.id), AlertToast.more)
+  end
+  ctx.ns.Leads.On("new", function(lead)
+    AlertToast.Show(lead)
+  end)
+end
+
 -- Notes that the chat handler ran, so a line the scan never delivered can say so.
 local function watchHandler(ctx)
   local ScanGate = ctx.ns.ScanGate
@@ -315,6 +336,7 @@ local function start(ctx)
     ns.ScanGate.Install(ctx.db)
     ns.Index.OnRebuilt(ns.ScanGate.Evaluate)
     reportMatches(ctx)
+    reportToasts(ctx)
     watchHandler(ctx)
     ns.BindLookup.lastStored = nil
     ns.Index.Rebuild()
@@ -453,25 +475,16 @@ function STEPS.cmd(ctx, step)
   handler(args)
 end
 
--- What each click does to the newest lead (the §7.1 table; ClickRouter replaces it in Task 1.15).
+-- The mouse button and modifier each --click value stands for (the §7.1 table).
 local CLICKS = {
-  left = function(ctx, lead, shownAt)
-    ctx.ns.GreetAction.Greet(lead, shownAt)
-  end,
-  shift = function(ctx, lead)
-    ctx.ns.GreetAction.Prefill(lead)
-  end,
-  ctrl = function(ctx, lead)
-    ctx.ns.GreetAction.Empty(lead)
-  end,
-  right = function(ctx, lead)
-    ctx.ns.Leads.Dismiss(lead.id)
-    ctx.out[#ctx.out + 1] = "lead: dismissed customer=" .. lead.customer
-  end,
+  left = { button = "LeftButton" },
+  shift = { button = "LeftButton", shift = true },
+  ctrl = { button = "LeftButton", ctrl = true },
+  right = { button = "RightButton" },
 }
 
--- The newest lead, as if its toast had been shown for a second; the `send:` lines come from
--- the stubbed send APIs.
+-- The newest lead through ClickRouter, as if its toast had been shown for a second; the
+-- `send:` lines come from the stubbed send APIs.
 function STEPS.click(ctx, step)
   start(ctx)
   local lead = ctx.ns.Leads.Latest()
@@ -479,7 +492,13 @@ function STEPS.click(ctx, step)
     ctx.out[#ctx.out + 1] = "error: --click " .. step.button .. " has no lead to act on"
     return
   end
-  CLICKS[step.button](ctx, lead, rawget(_G, "GetTime")() - SHOWN_FOR_SECONDS)
+  local click = CLICKS[step.button]
+  ctx.keys.shift, ctx.keys.ctrl = click.shift == true, click.ctrl == true
+  local action = ctx.ns.ClickRouter.Handle(click.button, lead, rawget(_G, "GetTime")() - SHOWN_FOR_SECONDS)
+  ctx.keys.shift, ctx.keys.ctrl = false, false
+  if action == "dismiss" then
+    ctx.out[#ctx.out + 1] = "lead: dismissed customer=" .. lead.customer
+  end
 end
 
 function Sim.Run(argv)

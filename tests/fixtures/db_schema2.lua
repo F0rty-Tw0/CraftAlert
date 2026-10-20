@@ -3,7 +3,7 @@
 -- Lead times 1..5000 sit on the sim's clock of 0, so none is expired; the cap keeps 100.
 local leads = {}
 for i = 1, 5000 do
-  leads[i] = { id = i, customer = "Customer" .. i .. "-OtherRealm", message = "LF plate belt", time = i }
+  leads[i] = { id = i, customer = "Customer" .. i .. "-OtherRealm", crafter = "Crafter-OwnRealm", message = "LF plate belt", time = i }
 end
 
 return {

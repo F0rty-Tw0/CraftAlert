@@ -59,7 +59,7 @@ end
 
 -- Load runs at ADDON_LOADED, before PlayerName.Init: it must not touch the normalizer.
 local function testNeverCallsPlayerName()
-  local SavedState = load({ characters = { ["Bob-Realm"] = {} }, leads = { { customer = "Cus-Realm", time = NOW } } })
+  local SavedState = load({ characters = { ["Bob-Realm"] = {} }, leads = { { customer = "Cus-Realm", crafter = "Bob-Realm", time = NOW } } })
   local PlayerName = Fresh.require("Core.PlayerName")
   local function trap()
     error("PlayerName used during SavedState.Load")
@@ -80,7 +80,7 @@ end
 local function testNewerHandEditedDb()
   local leads = {}
   for i = 1, 5000 do
-    leads[i] = { id = i, customer = "Cus" .. i .. "-Realm", time = NOW - (5000 - i) * 0.5 }
+    leads[i] = { id = i, customer = "Cus" .. i .. "-Realm", crafter = "Me-Realm", time = NOW - (5000 - i) * 0.5 }
   end
   local SavedState = load({
     schema = 2,
@@ -103,7 +103,7 @@ local function testLeadCapKeepsNewest()
   local leads = {}
   for i = 1, 250 do
     -- Stored out of order on purpose: age, not position, decides who is dropped.
-    leads[i] = { id = i, customer = "Cus-Realm", time = NOW - (i % 250) }
+    leads[i] = { id = i, customer = "Cus-Realm", crafter = "Me-Realm", time = NOW - (i % 250) }
   end
   local db = load({ settings = { leadTimeoutMin = 60 }, leads = leads }).Load()
   Assert.equal(#db.leads, 100)
@@ -116,10 +116,10 @@ local function testLeadExpiryUsesTimeStubAndTimeout()
   local db = load({
     settings = { leadTimeoutMin = 1 },
     leads = {
-      { id = 1, customer = "A-Realm", time = NOW - 61 },
-      { id = 2, customer = "B-Realm", time = NOW - 60 },
-      { id = 3, customer = "C-Realm", time = NOW - 5 },
-      { id = 4, customer = "D-Realm", time = NOW + 500 },
+      { id = 1, customer = "A-Realm", crafter = "Me-Realm", time = NOW - 61 },
+      { id = 2, customer = "B-Realm", crafter = "Me-Realm", time = NOW - 60 },
+      { id = 3, customer = "C-Realm", crafter = "Me-Realm", time = NOW - 5 },
+      { id = 4, customer = "D-Realm", crafter = "Me-Realm", time = NOW + 500 },
     },
   }).Load()
   local ids = {}
