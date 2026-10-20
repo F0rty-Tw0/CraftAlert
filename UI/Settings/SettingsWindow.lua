@@ -114,21 +114,34 @@ function SettingsWindow.AddPage(page)
   end
 end
 
--- Opens the window on the page last shown (the first page at first), or closes it.
-function SettingsWindow.Toggle()
+local function ensureWindow()
   if window == nil then
     window = create()
     for _, page in ipairs(pages) do
       addNavButton(page)
     end
   end
-  local frame = window.frame
+  return window
+end
+
+-- Shows the window on the page last shown (the first page at first); already open: no change.
+function SettingsWindow.Open()
+  local frame = ensureWindow().frame
   if frame:IsShown() then
-    frame:Hide()
     return
   end
   frame:Show()
   showPage(window.selected or (pages[1] and pages[1].id))
+end
+
+-- Opens the window (as Open) or closes it.
+function SettingsWindow.Toggle()
+  local frame = ensureWindow().frame
+  if frame:IsShown() then
+    frame:Hide()
+    return
+  end
+  SettingsWindow.Open()
 end
 
 SettingsWindow.AddPage(PageGeneral)

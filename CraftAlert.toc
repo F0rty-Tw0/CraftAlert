@@ -68,5 +68,6 @@ UI/Settings/PageKeywords.lua
 UI/Settings/PageCrafters.lua
 UI/Settings/PageTest.lua
 UI/Settings/SettingsWindow.lua
+UI/Settings/BlizzardCategory.lua
 Core/Bindings.lua
 Bootstrap.lua
