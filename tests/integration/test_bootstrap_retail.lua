@@ -15,6 +15,8 @@ local EXPIRY_DELAY = 600 - LEAD_AGE + 1
 local BELT_LINK = "|cff0070dd|Hitem:190001::::::::70:::::|h[Sim Plate Belt]|h|r"
 local STATUS_ACTIVE = "Listening in Trade, Services — 3 recipes, 1 crafter"
 local STATUS_UNREAD = "Paused — no profession read yet: open Blacksmithing once"
+local STATUS_NOT_STARTED = "Paused — Craft Alert did not start; /reload to try again"
+local NO_DB = "Craft Alert's saved data did not load; /reload to try again"
 local UNREAD_LINE = "Open Blacksmithing once to start listening."
 local FIRST_RUN_HINT = "After opening a profession, try /ca test LF <profession> crafter"
 local INSTALLED_EVENTS = { "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "NEW_RECIPE_LEARNED", "PLAYER_UPDATE_RESTING" }
@@ -344,7 +346,8 @@ local function testRaisingLoginStep(db)
 end
 
 -- The resting events failing to register leave the gate without its db: no rebuild registers
--- the chat events, so scanning never runs outside a city.
+-- the chat events, so scanning never runs outside a city. The status line says the addon did
+-- not start, not that the player turned it off.
 local function testRaisingRestingRegistration(db)
   local session = startClient(db)
   local errors = recordErrors()
@@ -361,15 +364,17 @@ local function testRaisingRestingRegistration(db)
   Assert.same(errors, { "resting event failed" }, "the error reaches the error handler")
   Assert.equal(ns.ScanGate.IsActive(), false)
   Assert.equal(isRegistered("CHAT_MSG_CHANNEL"), false, "no chat event without the resting gate")
+  Assert.same(chatSince(0), { STATUS_NOT_STARTED })
 end
 
 -- The restored lead's expiry timer failing to start makes Leads.Restore raise: Leads stays
--- unbound, so a trade line makes no lead that no toast, launcher or window would show.
+-- unbound, so the gate does not scan (a match would make no lead that a toast, the launcher or
+-- the window could show) and a trade line makes no lead.
 local function testRaisingLeadsRestore(db)
   local session = startClient(db)
   local errors = recordErrors()
   local freshExpiryDelay = EXPIRY_DELAY + LEAD_AGE -- no minute has passed since the lead
-  login(session, function()
+  local ns = login(session, function()
     local after = _G["C_Timer"].After
     _G["C_Timer"].After = function(delay, fn)
       if delay == freshExpiryDelay then
@@ -379,6 +384,9 @@ local function testRaisingLeadsRestore(db)
     end
   end)
   Assert.same(errors, { "timer failed" }, "the error reaches the error handler")
+  Assert.equal(ns.ScanGate.IsActive(), false)
+  Assert.equal(isRegistered("CHAT_MSG_CHANNEL"), false, "no chat event without Leads")
+  Assert.same(chatSince(0), { STATUS_NOT_STARTED })
   trade("LF " .. BELT_LINK .. " crafter", "Buyer-OtherRealm")
   Assert.equal(#rawget(_G, "CraftAlertDB").leads, 1, "a trade line makes no lead")
   Assert.equal(session.toasts, 0)
@@ -397,6 +405,27 @@ local function testRaisingLoad(db)
   Assert.same(errors, { "load failed" }, "only the load error is reported")
   Assert.equal(type(rawget(_G, "SlashCmdList").CRAFTALERT), "function", "/ca works")
   Assert.equal(isRegistered("CHAT_MSG_CHANNEL"), false, "no chat event without a db")
+end
+
+-- A fresh install whose saved variables fail to load has no CraftAlertDB at all: the windows
+-- stay closed and say why instead of raising, and /ca test names the stage it stopped at.
+local function testRaisingLoadOnFreshInstall()
+  local session = startClient(nil)
+  local errors = recordErrors()
+  login(session, function(ns)
+    ns.SavedState.Load = function()
+      error("load failed", 0)
+    end
+  end)
+  Assert.equal(rawget(_G, "CraftAlertDB"), nil)
+  local slash = rawget(_G, "SlashCmdList").CRAFTALERT
+  slash("")
+  slash("config")
+  slash("test LF plate belt")
+  Assert.same(chatSince(0), { NO_DB, NO_DB, "No match (stopped at: noIndex)" })
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil, "no leads window without a db")
+  Assert.equal(rawget(_G, "CraftAlertSettingsWindow"), nil, "no settings window without a db")
+  Assert.same(errors, { "load failed" }, "only the load error is reported")
 end
 
 -- The player's name failing to resolve at login (`name`: "Init" or "Own") is reported once;
@@ -453,6 +482,7 @@ return function()
   testRaisingRestingRegistration(deepCopy(saved))
   testRaisingLeadsRestore(deepCopy(saved))
   testRaisingLoad(deepCopy(saved))
+  testRaisingLoadOnFreshInstall()
   testRaisingPlayerName(deepCopy(saved), "Init")
   testRaisingPlayerName(deepCopy(saved), "Own")
   testLoginTime(deepCopy(saved))
