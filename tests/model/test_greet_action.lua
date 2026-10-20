@@ -159,6 +159,33 @@ return function()
     Assert.equal(db.recentGreeted["Customer1-Draenor"], nil, name)
   end
 
+  -- A greeting with nothing to say (a hand-edited empty template, or tags that all expand to
+  -- nothing) is never sent: an empty whisper opens, with no notice, no count, nothing greeted.
+  local blank = {
+    empty = function(db)
+      db.settings.templates.profession = ""
+    end,
+    spaces = function(db)
+      db.settings.templates.profession = " {profession}\n "
+      db.leads[1].profName = nil
+    end,
+  }
+  for name, edit in pairs(blank) do
+    ns, db, calls = setup(function(data)
+      withLeads(1)(data)
+      edit(data)
+    end)
+    lead = ns.Leads.Latest()
+    ns.GreetAction.Greet(lead, 49)
+    Assert.same(calls, { { "empty", "Customer1-Draenor" } }, name)
+    Assert.equal(lead.greeted, false, name)
+    Assert.equal(db.recentGreeted["Customer1-Draenor"], nil, name)
+    for _ = 1, 5 do
+      ns.SendGuard.RecordSend()
+    end
+    Assert.equal(ns.SendGuard.Check(lead, 49), true, name .. ": five sends, so the blank one was not counted")
+  end
+
   -- The 7th greeting in 60 s prefills; a send made by Prefill or Empty never counted.
   ns, _, calls = setup(withLeads(8))
   for _ = 1, 3 do
