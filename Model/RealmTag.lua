@@ -47,7 +47,8 @@ function RealmTag.Store(db, charKey)
 end
 
 -- → true when the customer cannot send the crafter an order, false when they can, nil when
--- unknown (not Retail, no realm list stored for the crafter, no customer realm).
+-- unknown (not Retail, no realm list stored for the crafter, no customer realm). Stored realms
+-- are already stripped (Store, and Schema for a hand-edited db), so they compare as they are.
 function RealmTag.CannotOrder(db, crafterKey, customerKey)
   if not FlavorCompat.isRetail then
     return nil
@@ -59,8 +60,8 @@ function RealmTag.CannotOrder(db, crafterKey, customerKey)
     return nil
   end
   customerRealm = strip(customerRealm)
-  for _, realm in ipairs(realms) do
-    if type(realm) == "string" and strip(realm) == customerRealm then
+  for i = 1, #realms do
+    if realms[i] == customerRealm then
       return false
     end
   end

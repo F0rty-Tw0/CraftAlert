@@ -81,10 +81,12 @@ return function()
   Assert.equal(RealmTag.CannotOrder(db, ME, "Bob-Draenor"), true)
   Assert.equal(RealmTag.CannotOrder(db, ME, "Bob"), false, "a bare name is on the player's own realm")
 
-  -- A hand-written list with spaces still compares by the stripped form.
-  db = dbWith({ "Area 52" })
+  -- The customer's realm is stripped on every call; stored realms are compared as stored (Store
+  -- and the load-time Schema check strip them), so a hand-edited "Area 52" never gets here.
+  db = dbWith({ "Area52" })
   Assert.equal(RealmTag.CannotOrder(db, ME, "Bob-Area 52"), false)
-  Assert.equal(RealmTag.CannotOrder(db, ME, "Bob-Area52"), false)
+  Assert.equal(RealmTag.CannotOrder(db, ME, "Bob-Area-52"), false)
+  Assert.equal(RealmTag.CannotOrder(dbWith({ "Area 52" }), ME, "Bob-Area52"), true)
 
   -- No list known (empty, absent), unknown crafter, unusable customer → no tag.
   Assert.equal(RealmTag.CannotOrder(dbWith({}), ME, "Bob-Draenor"), nil)
