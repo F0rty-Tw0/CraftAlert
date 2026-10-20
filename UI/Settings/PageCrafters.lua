@@ -30,11 +30,14 @@ local function db()
 end
 
 -- Case-insensitive: names read before the client spelling was kept are stored lowercase. Equal
--- names fall back to the key, so the order never depends on pairs().
+-- names fall back to the key (recipe IDs in number order), so the order never depends on pairs().
 local function byText(a, b)
   local left, right = lower(a.text), lower(b.text)
   if left ~= right then
     return left < right
+  end
+  if type(a.key) == "number" and type(b.key) == "number" then
+    return a.key < b.key
   end
   return tostring(a.key) < tostring(b.key)
 end
