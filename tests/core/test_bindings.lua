@@ -133,6 +133,15 @@ local function testDismissAndToggle()
   Assert.equal(G("CraftAlertLeadsWindow"):IsShown(), true)
   G("CraftAlert_ToggleLeads")()
   Assert.equal(G("CraftAlertLeadsWindow"):IsShown(), false)
+
+  -- A fresh install whose saved data failed to load: the key does nothing, no error.
+  UiFixture.load()
+  local saved = _G["CraftAlertDB"]
+  _G["CraftAlertDB"] = nil
+  local ok, err = pcall(G("CraftAlert_ToggleLeads"))
+  _G["CraftAlertDB"] = saved
+  Assert.equal(ok, true, tostring(err))
+  Assert.equal(G("CraftAlertLeadsWindow"), nil, "no window is built without saved data")
 end
 
 return function()
