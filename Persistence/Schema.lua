@@ -17,6 +17,7 @@ local Defaults = ns.Defaults or require("CraftAlert.Persistence.Defaults")
 local Schema = {}
 
 local huge = math.huge
+local gsub = string.gsub
 local type = type
 local pairs = pairs
 local ipairs = ipairs
@@ -195,12 +196,22 @@ local function fixRecipe(record)
   return record
 end
 
+-- RealmTag.CannotOrder compares stored realms with plain ==, so a hand-edited "Area 52" is
+-- stripped like Store does, here, once.
+local function fixRealms(list)
+  local realms = fixList(list, isString) or {}
+  for i = 1, #realms do
+    realms[i] = (gsub(realms[i], "[ %-]", ""))
+  end
+  return realms
+end
+
 local function fixCharacter(record)
   if record.source ~= "local" and record.source ~= "import" then
     record.source = "local"
   end
   fixShape(record, { enabled = true }, CHARACTER_FIELDS)
-  record.realms = fixList(record.realms, isString) or {}
+  record.realms = fixRealms(record.realms)
   record.professions = fixRecords(record.professions, isKey, fixProfession)
   record.recipes = fixRecords(record.recipes, isKey, fixRecipe)
   return record
