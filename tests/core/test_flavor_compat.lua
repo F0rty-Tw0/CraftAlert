@@ -120,6 +120,39 @@ local function testWrappersPreferNamespacedApis()
   Assert.equal(FlavorCompat.GetAutoCompleteRealms(), nil)
 end
 
+-- /ca perf reads the addon's memory in KB: the usage is refreshed first (the client caches it),
+-- through C_AddOns when it has the functions, else the globals; nil when neither exists.
+local function testAddOnMemoryUsage()
+  local FlavorCompat = load("retail")
+  local calls = {}
+  local function api(source, usage)
+    return {
+      UpdateAddOnMemoryUsage = function()
+        calls[#calls + 1] = source .. ":update"
+      end,
+      GetAddOnMemoryUsage = function(name)
+        calls[#calls + 1] = source .. ":get:" .. name
+        return usage
+      end,
+    }
+  end
+  local globals = api("global", 12.5)
+  Wow.stub("UpdateAddOnMemoryUsage", globals.UpdateAddOnMemoryUsage)
+  Wow.stub("GetAddOnMemoryUsage", globals.GetAddOnMemoryUsage)
+  Assert.equal(FlavorCompat.GetAddOnMemoryUsage("CraftAlert"), 12.5)
+  Assert.same(calls, { "global:update", "global:get:CraftAlert" })
+
+  calls = {}
+  Wow.stub("C_AddOns", api("namespace", 34))
+  Assert.equal(FlavorCompat.GetAddOnMemoryUsage("CraftAlert"), 34)
+  Assert.same(calls, { "namespace:update", "namespace:get:CraftAlert" })
+
+  Wow.stub("C_AddOns", nil)
+  Wow.stub("UpdateAddOnMemoryUsage", nil)
+  Wow.stub("GetAddOnMemoryUsage", nil)
+  Assert.equal(FlavorCompat.GetAddOnMemoryUsage("CraftAlert"), nil)
+end
+
 local function testTellWrappers()
   local FlavorCompat = load("retail")
   local sent = {}
@@ -158,6 +191,7 @@ return function()
   testNoBuildInfoDefaultsToRetail()
   testHasCraftFrame()
   testWrappersPreferNamespacedApis()
+  testAddOnMemoryUsage()
   testTellWrappers()
   testIsSecretValue()
   Wow.reset()
