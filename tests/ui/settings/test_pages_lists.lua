@@ -79,7 +79,7 @@ local function testBlockTypedName()
         accountDb.characters[key] = character
       end
       local far = Fixture.character({}, {})
-      far.realms = { "Area52" }
+      far.realms = { "Area52", "Stormrage" }
       accountDb.characters["Far-Area52"] = far
     end,
   })
@@ -92,6 +92,8 @@ local function testBlockTypedName()
   Assert.equal(ns.Matcher.lastStop, "blocked")
   Widgets.type(row("Block a player").input, "alice-area 52")
   Assert.equal(db.ignored["Alice-Area52"], true, "a known realm takes its stored spelling")
+  Widgets.type(row("Block a player").input, "x-stormrage")
+  Assert.equal(db.ignored["X-Stormrage"], true, "a connected realm in no character key takes its stored spelling")
 end
 
 local BS, ENCH = 164, 333
