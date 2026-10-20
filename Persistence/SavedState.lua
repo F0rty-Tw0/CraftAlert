@@ -13,6 +13,10 @@ local SavedState = {}
 
 SavedState.isFirstRun = false
 
+-- Set while Load runs: a Load that raised leaves it set, with CraftAlertDB still the unchecked
+-- stored table.
+local unfinished = false
+
 local MAX_LEADS = 100
 local LEDGER_DAYS = 30
 local RECENT_GREETED_SECONDS = 24 * 60 * 60
@@ -74,6 +78,7 @@ end
 -- Binds the global CraftAlertDB and returns it. `isFirstRun` says whether it was absent
 -- or unusable (not a table), i.e. whether the player starts from a fresh db.
 function SavedState.Load()
+  unfinished = true
   local stored = _G.CraftAlertDB
   SavedState.isFirstRun = type(stored) ~= "table"
   local db = Schema.Validate(stored == nil and Defaults.Db() or stored)
@@ -82,7 +87,14 @@ function SavedState.Load()
   pruneLedger(db, now)
   pruneRecentGreeted(db, now)
   _G.CraftAlertDB = db
+  unfinished = false
   return db
+end
+
+-- Whether the windows may read CraftAlertDB: it exists and no Load raised partway through it
+-- (the failure was reported at ADDON_LOADED).
+function SavedState.Ready()
+  return _G.CraftAlertDB ~= nil and not unfinished
 end
 
 ns.SavedState = SavedState

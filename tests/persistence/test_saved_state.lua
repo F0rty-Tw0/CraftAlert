@@ -57,6 +57,27 @@ local function testExistingDbIsBoundNotReplaced()
   Assert.equal(SavedState.isFirstRun, false)
 end
 
+-- A Load that raised leaves CraftAlertDB as the unchecked stored table: not Ready, so the
+-- windows do not open on it. A later Load that finishes makes it Ready again.
+local function testReadyOnlyAfterLoadFinishes()
+  local stored = { schema = 1, settings = {}, characters = {} }
+  local SavedState = load(stored)
+  Assert.equal(SavedState.Ready(), true, "Load not run yet: the global is as the client stored it")
+  local Schema = require("CraftAlert.Persistence.Schema") -- the copy SavedState holds
+  local validate = Schema.Validate
+  Schema.Validate = function()
+    error("validate failed", 0)
+  end
+  Assert.equal(pcall(SavedState.Load), false)
+  Assert.equal(rawget(_G, "CraftAlertDB"), stored, "the stored table is left in place")
+  Assert.equal(SavedState.Ready(), false, "a Load that raised")
+  Schema.Validate = validate
+  SavedState.Load()
+  Assert.equal(SavedState.Ready(), true, "a Load that finished")
+  Wow.stub("CraftAlertDB", nil)
+  Assert.equal(SavedState.Ready(), false, "no saved data at all")
+end
+
 -- Load runs at ADDON_LOADED, before PlayerName.Init: it must not touch the normalizer.
 local function testNeverCallsPlayerName()
   local SavedState = load({ characters = { ["Bob-Realm"] = {} }, leads = { { customer = "Cus-Realm", crafter = "Bob-Realm", time = NOW } } })
@@ -168,6 +189,7 @@ return function()
   testFirstRun()
   testCorruptDbCountsAsFirstRun()
   testExistingDbIsBoundNotReplaced()
+  testReadyOnlyAfterLoadFinishes()
   testNeverCallsPlayerName()
   testNewerHandEditedDb()
   testLeadCapKeepsNewest()
