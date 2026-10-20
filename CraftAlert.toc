@@ -39,4 +39,5 @@ Model/TypoPass.lua
 Model/WordGroups.lua
 Model/Index.lua
 Model/Matcher.lua
+Professions/ProfessionList.lua
 Bootstrap.lua
