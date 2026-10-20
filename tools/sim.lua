@@ -8,6 +8,7 @@ package.path = ROOT .. "/?.lua;" .. package.path
 
 local Wow = require("tests.helpers.wow")
 local Toc = require("tests.helpers.toc")
+local ProfessionsRetail = require("tests.helpers.professions_retail")
 
 local DEFAULT_SENDER = "Customer-OtherRealm"
 local OWN_NAME = "Crafter"
@@ -20,8 +21,24 @@ local CHANNEL = "trade" -- every sim chat line arrives on Trade
 local SIM_ITEMS = {
   [190001] = { "INVTYPE_WAIST", 4, 4 }, -- Sim Plate Belt: plate belt
   [190003] = { "", 7, 0 }, -- Sim Iron Reagent: trade goods
+  [190004] = { "INVTYPE_HEAD", 4, 4 }, -- Sim Plate Helm: plate head
+  [190005] = { "", 7, 0 }, -- Sim Iron Bar: trade goods
+}
+-- Bind types the client reports once an item is loaded (0 none, 2 bind on equip).
+local SIM_BIND = { [190004] = 2, [190005] = 0 }
+-- The open Blacksmithing window (retail and forever): the fixture's belt and reagent, a
+-- recipe not learned yet (9004: NEW_RECIPE_LEARNED teaches it) and a new Iron Bar (9005).
+local WINDOW_PROFESSION = 164
+local SIM_RECIPES = {
+  { id = 9001, name = "Sim Plate Belt", item = 190001, learned = true },
+  { id = 9003, name = "Sim Iron Reagent", item = 190003, learned = true },
+  { id = 9004, name = "Sim Plate Helm", item = 190004, profession = { professionID = 2872, parentProfessionID = 164 } },
+  { id = 9005, name = "Sim Iron Bar", item = 190005, learned = true },
 }
 local ON_OFF = { on = true, off = false }
+-- Events with a known payload take exactly that many arguments, so a chat line may follow
+-- them; any other event takes every following non-`--` token.
+local EVENT_ARITY = { TRADE_SKILL_SHOW = 0, TRADE_SKILL_LIST_UPDATE = 0, NEW_RECIPE_LEARNED = 1, GET_ITEM_INFO_RECEIVED = 2 }
 
 local Sim = {}
 
@@ -74,15 +91,18 @@ local function parse(argv)
   while i <= #argv do
     local token = argv[i]
     if token == "--event" then
+      local name = argv[i + 1]
+      if name == nil or string.sub(name, 1, 2) == "--" then
+        return nil, "error: --event needs an event name"
+      end
+      i = i + 1
+      local arity = EVENT_ARITY[name]
       local args = {}
-      while argv[i + 1] and string.sub(argv[i + 1], 1, 2) ~= "--" do
+      while argv[i + 1] and string.sub(argv[i + 1], 1, 2) ~= "--" and (arity == nil or #args < arity) do
         args[#args + 1] = argv[i + 1]
         i = i + 1
       end
-      if #args == 0 then
-        return nil, "error: --event needs an event name"
-      end
-      plan.steps[#plan.steps + 1] = { kind = "event", name = table.remove(args, 1), args = args }
+      plan.steps[#plan.steps + 1] = { kind = "event", name = name, args = args }
     elseif isOneValueFlag(token) then
       local value = argv[i + 1]
       if value == nil then
@@ -176,29 +196,47 @@ local function newContext(plan, out)
   Wow.stub("GetRealmName", function()
     return OWN_REALM
   end)
-  Wow.stub("C_Item", {
-    GetItemInfoInstant = function(itemID)
-      local item = SIM_ITEMS[itemID]
-      if item then
-        return itemID, "type", "subtype", item[1], 0, item[2], item[3]
-      end
-    end,
+  ProfessionsRetail.install({
+    slots = { { name = "Blacksmithing", skillLine = 164 }, { name = "Enchanting", skillLine = 333 } },
+    base = WINDOW_PROFESSION,
+    recipes = SIM_RECIPES,
+    items = SIM_ITEMS,
+    bind = SIM_BIND,
+    autoCache = true,
   })
   return ctx
 end
 
--- Runs once before the first chat line, event, command or click: the initial index build
--- (as at PLAYER_LOGIN); scan evaluation joins it once that module exists.
+-- `bind: stored=<n>` once the 1 s timer has stored arrived bind types; printed just before
+-- the rebuild it requested, or after the timers when no rebuild followed.
+local function flushBind(ctx)
+  local stored = ctx.ns.BindLookup.lastStored
+  if stored ~= nil then
+    ctx.ns.BindLookup.lastStored = nil
+    ctx.out[#ctx.out + 1] = "bind: stored=" .. stored
+  end
+end
+
+-- Runs once before the first chat line, event, command or click: the profession list, the
+-- readers and the initial index build (as at PLAYER_LOGIN); scan evaluation joins it once
+-- that module exists.
 local function start(ctx)
   if not ctx.started then
     ctx.started = true
     local ns = ctx.ns
     ns.PlayerName.Init()
-    ns.Index.Configure(ctx.db, {})
+    if not ns.FlavorCompat.isClassic then
+      ns.ProfessionList.Refresh(ctx.db, ns.PlayerName.Own())
+      ns.ModernReader.Install(ctx.db)
+      ns.LearnWatcher.Install()
+    end
+    ns.Index.Configure(ctx.db, { professionOrder = ns.ProfessionList.Order })
     ns.Index.OnRebuilt(ns.Matcher.SetIndex)
     ns.Index.OnRebuilt(function(index)
+      flushBind(ctx)
       ctx.out[#ctx.out + 1] = "index: size=" .. index.size
     end)
+    ns.BindLookup.lastStored = nil
     ns.Index.Rebuild()
   end
 end
@@ -252,9 +290,69 @@ function STEPS.line(ctx, step)
   ctx.sender = DEFAULT_SENDER
 end
 
+-- Event arguments arrive as text: true/false and numbers become the values the client sends.
+local function eventArg(text)
+  if text == "true" or text == "false" then
+    return text == "true"
+  end
+  return tonumber(text) or text
+end
+
+-- `read: prof=<key> stored=<n> pendingBind=<n>` after a profession window read.
+local function reportRead(ctx)
+  local read = ctx.ns.ModernReader.lastRead
+  if read then
+    ctx.ns.ModernReader.lastRead = nil
+    ctx.out[#ctx.out + 1] = string.format("read: prof=%s stored=%d pendingBind=%d", tostring(read.prof), read.stored, read.pendingBind)
+  end
+end
+
+-- `learn: stored=<bool>` after a NEW_RECIPE_LEARNED.
+local function reportLearn(ctx)
+  local stored = ctx.ns.LearnWatcher.lastStored
+  if stored ~= nil then
+    ctx.ns.LearnWatcher.lastStored = nil
+    ctx.out[#ctx.out + 1] = "learn: stored=" .. tostring(stored)
+  end
+end
+
+-- Runs the timers armed for the same frame (index rebuild coalescing); longer timers stay
+-- pending, as in the game where no second passes between two sim steps.
+local function runFrameTimers()
+  local found = true
+  while found do
+    found = false
+    for i, timer in ipairs(Wow.timers) do
+      if timer.delay == 0 then
+        table.remove(Wow.timers, i)
+        timer.fn()
+        found = true
+        break
+      end
+    end
+  end
+end
+
+-- Fires the event, then runs the frame timers. Item data arriving is the one event that
+-- lets the 1 s bind debounce elapse too, so its result (bind stored, index rebuilt) shows.
 function STEPS.event(ctx, step)
   start(ctx)
-  Wow.fireEvent(step.name, unpack(step.args))
+  local args = {}
+  for i, text in ipairs(step.args) do
+    args[i] = eventArg(text)
+  end
+  ctx.ns.ModernReader.lastRead = nil
+  ctx.ns.LearnWatcher.lastStored = nil
+  ctx.ns.BindLookup.lastStored = nil
+  Wow.fireEvent(step.name, unpack(args, 1, #step.args))
+  reportRead(ctx)
+  reportLearn(ctx)
+  if step.name == "GET_ITEM_INFO_RECEIVED" then
+    Wow.runTimers()
+  else
+    runFrameTimers()
+  end
+  flushBind(ctx)
 end
 
 function STEPS.afk(ctx, step)
