@@ -3,13 +3,16 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 
 -- Builders the toast, leads window, rows and launcher share: the WhisperMessenger panel look
--- (dark surface, 1 px border), text, and dragging with the position saved account-wide in
--- `CraftAlertDB.ui[key]` (flat { point, relativePoint, x, y }, plus width/height for the window).
+-- (dark surface, 1 px border), text, the customer's class colour, and dragging with the
+-- position saved account-wide in `CraftAlertDB.ui[key]` (flat { point, relativePoint, x, y },
+-- plus width/height for the window).
 local FrameKit = {}
 
+local pcall = pcall
 local type = type
 
 local ANCHORS = {
@@ -63,6 +66,34 @@ function FrameKit.Text(parent, font, color)
     text:SetTextColor(color[1], color[2], color[3], color[4])
   end
   return text
+end
+
+-- RAID_CLASS_COLORS entry of the player with this chat GUID, or nil. A secret GUID or class is
+-- never passed on or compared (the secret test comes first: a secret value cannot be inspected).
+local function classColor(guid)
+  if FlavorCompat.issecretvalue(guid) or type(guid) ~= "string" then
+    return nil
+  end
+  local getInfo, colors = _G["GetPlayerInfoByGUID"], _G["RAID_CLASS_COLORS"]
+  if type(getInfo) ~= "function" or type(colors) ~= "table" then
+    return nil
+  end
+  local ok, _, classFile = pcall(getInfo, guid)
+  if not ok or FlavorCompat.issecretvalue(classFile) or classFile == nil then
+    return nil
+  end
+  return colors[classFile]
+end
+
+-- Colours a customer's name by class, or in the plain text colour when the class is unknown.
+function FrameKit.PaintName(text, guid)
+  local color = classColor(guid)
+  if color then
+    text:SetTextColor(color.r, color.g, color.b, 1)
+    return
+  end
+  local plain = Theme.COLORS.textPrimary
+  text:SetTextColor(plain[1], plain[2], plain[3], plain[4])
 end
 
 local function uiTable()

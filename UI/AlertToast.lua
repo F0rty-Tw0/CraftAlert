@@ -3,11 +3,11 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
-local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
 
 -- Spec §7.1: the one alert toast. Created on the first alert (§4.4 rule 5) as frame
@@ -21,7 +21,6 @@ AlertToast.more = 0
 
 local concat = table.concat
 local match = string.match
-local pcall = pcall
 local type = type
 
 local FRAME_NAME = "CraftAlertToast"
@@ -48,47 +47,13 @@ local function trim(text)
   return match(text or "", "^%s*(.-)%s*$")
 end
 
--- RAID_CLASS_COLORS entry of the customer's class, or nil. A secret GUID or class is never
--- passed on or compared (the GUID test comes first: a secret value cannot be inspected).
-local function classColor(guid)
-  if FlavorCompat.issecretvalue(guid) or type(guid) ~= "string" then
-    return nil
-  end
-  local getInfo, colors = _G["GetPlayerInfoByGUID"], _G["RAID_CLASS_COLORS"]
-  if type(getInfo) ~= "function" or type(colors) ~= "table" then
-    return nil
-  end
-  local ok, _, classFile = pcall(getInfo, guid)
-  if not ok or FlavorCompat.issecretvalue(classFile) or classFile == nil then
-    return nil
-  end
-  return colors[classFile]
-end
-
-local function paintName(lead)
-  local color = classColor(lead.guid)
-  if color then
-    toast.name:SetTextColor(color.r, color.g, color.b, 1)
-    return
-  end
-  local plain = Theme.COLORS.textPrimary
-  toast.name:SetTextColor(plain[1], plain[2], plain[3], plain[4])
-end
-
--- The matched item link, else the recipe, else the profession.
-local function whatText(lead)
-  return lead.itemLink or lead.recipeName or lead.profName or ""
-end
-
 -- Crafter, why, and the realm tag (§7.2) on one line.
 local function detailText(lead)
-  local parts = { Localization.Text("by %s", tostring(lead.crafter)) }
+  local parts = { LeadText.Crafter(lead) }
   if lead.why and lead.why ~= "" then
     parts[#parts + 1] = lead.why
   end
-  if lead.cannotOrder then
-    parts[#parts + 1] = Localization.Text("can't order (realm)")
-  end
+  parts[#parts + 1] = LeadText.RealmTag(lead)
   return concat(parts, " · ")
 end
 
@@ -105,10 +70,10 @@ end
 -- greeting: the test toast shows it where the message goes.
 local function render(lead, greeting)
   toast.name:SetText(tostring(lead.customer))
-  paintName(lead)
+  FrameKit.PaintName(toast.name, lead.guid)
   toast.badge:SetText(badgeText())
   toast.message:SetText(greeting or trim(lead.message))
-  toast.what:SetText(whatText(lead))
+  toast.what:SetText(LeadText.What(lead))
   toast.detail:SetText(detailText(lead))
   toast.frame:SetAlpha(settings().opacity or 1)
   toast.frame:Show()

@@ -54,6 +54,9 @@ Core/Status.lua
 Core/ScanGate.lua
 UI/Theme.lua
 UI/FrameKit.lua
+UI/LeadText.lua
 UI/ClickRouter.lua
 UI/AlertToast.lua
+UI/LeadRow.lua
+UI/LeadsWindow.lua
 Bootstrap.lua

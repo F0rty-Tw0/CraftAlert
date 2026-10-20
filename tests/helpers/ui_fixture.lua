@@ -20,12 +20,28 @@ local CHAIN = {
   "Model.CrafterRank",
   "Model.Leads",
   "Model.GreetAction",
+  "Professions.ProfessionList",
+  "Core.Status",
+  "Core.ScanGate",
 }
 local UI = {
   "UI.Theme",
   "UI.FrameKit",
+  "UI.LeadText",
   "UI.ClickRouter",
   "UI.AlertToast",
+  "UI.LeadRow",
+  "UI.LeadsWindow",
+}
+-- Globals Core/Bindings.lua defines at load: stubbed first, so Wow.reset removes them again.
+UiFixture.BINDING_GLOBALS = {
+  "BINDING_HEADER_CRAFTALERT",
+  "BINDING_NAME_CRAFTALERT_GREET",
+  "BINDING_NAME_CRAFTALERT_DISMISS",
+  "BINDING_NAME_CRAFTALERT_TOGGLE",
+  "CraftAlert_GreetLatest",
+  "CraftAlert_DismissLatest",
+  "CraftAlert_ToggleLeads",
 }
 
 -- An unexpired Blacksmithing profession lead from `customer` (default Customer<id>-Draenor).
@@ -72,6 +88,29 @@ local function stubSends(calls)
   Wow.stub("FlashClientIcon", record("flash"))
 end
 
+-- The Blizzard UI tables the window and launcher touch: UISpecialFrames, and a GameTooltip
+-- that records what it was given (tooltip.lines, tooltip.owner, tooltip.shown).
+local function stubBlizzardUi()
+  Wow.stub("UISpecialFrames", {})
+  local tooltip = { lines = {}, shown = false }
+  function tooltip:SetOwner(owner, anchor)
+    self.owner, self.anchor, self.lines = owner, anchor, {}
+  end
+  function tooltip:SetText(text)
+    self.lines = { text }
+  end
+  function tooltip:AddLine(text)
+    table.insert(self.lines, text)
+  end
+  function tooltip:Show()
+    self.shown = true
+  end
+  function tooltip:Hide()
+    self.shown = false
+  end
+  Wow.stub("GameTooltip", tooltip)
+end
+
 -- opts.leads: how many lead records db.leads starts with; opts.db(db): edits before Restore;
 -- opts.before(ns): runs after the chain loads and before the UI files do.
 function UiFixture.load(opts)
@@ -80,6 +119,7 @@ function UiFixture.load(opts)
   stubPlayer()
   local calls = {}
   stubSends(calls)
+  stubBlizzardUi()
   ns.PlayerName.Init()
   local db = ns.Defaults.Db()
   Wow.stub("CraftAlertDB", db)
@@ -95,6 +135,9 @@ function UiFixture.load(opts)
   ns.Leads.Restore(db)
   if opts.before then
     opts.before(ns)
+  end
+  for _, name in ipairs(UiFixture.BINDING_GLOBALS) do
+    Wow.stub(name, nil)
   end
   for _, path in ipairs(UI) do
     ns[string.match(path, "%.(%w+)$")] = Fresh.require(path)
