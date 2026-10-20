@@ -218,12 +218,16 @@ local function fixRecipe(record)
 end
 
 -- RealmTag.CannotOrder compares stored realms with plain ==, so a hand-edited "Area 52" is
--- stripped like Store does, here, once.
+-- stripped like Store does, here, once. A realm left blank names no realm and is dropped.
 local function fixRealms(list)
-  local realms = fixList(list, isString) or {}
-  for i = 1, #realms do
-    realms[i] = (gsub(realms[i], "[ %-]", ""))
+  local realms = {}
+  for _, realm in ipairs(fixList(list, isString) or {}) do
+    local stripped = gsub(realm, "[ %-]", "")
+    if stripped ~= "" then
+      realms[#realms + 1] = stripped
+    end
   end
+
   return realms
 end
 
