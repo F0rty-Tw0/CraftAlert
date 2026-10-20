@@ -126,6 +126,8 @@ local function testFromTyped()
   Assert.equal(PlayerName.FromTyped("bOB-ownrealm"), "Bob-OwnRealm")
   Assert.equal(PlayerName.FromTyped("alice-area 52", { "Kel'Thuzad", "Area52" }), "Alice-Area52")
   Assert.equal(PlayerName.FromTyped("alice-unknownrealm", { "Area52" }), "Alice-unknownrealm", "an unknown realm stays as typed")
+  Assert.equal(PlayerName.FromTyped("bob-kelthuzad", { "Kel'Thuzad" }), "Bob-Kel'Thuzad", "apostrophes do not count")
+  Assert.equal(PlayerName.FromTyped("bob-twisting nether", { "Twisting Nether" }), "Bob-TwistingNether", "nor do spaces; the key stays normalized")
   -- Only ASCII letters change case; UTF-8 bytes are left as they are.
   Assert.equal(PlayerName.FromTyped("zoË"), "ZoË-OwnRealm")
   Assert.equal(PlayerName.FromTyped("éLAN"), "élan-OwnRealm")
