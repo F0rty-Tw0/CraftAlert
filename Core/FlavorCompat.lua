@@ -128,5 +128,24 @@ end
 local issecretvalue = _G["issecretvalue"]
 FlavorCompat.issecretvalue = type(issecretvalue) == "function" and issecretvalue or neverSecret
 
+-- Class token of the player with this chat GUID, or nil. The one owner of the chat-GUID class
+-- guard (FrameKit's name colour, the Matcher's step 4.4 getter). A secret GUID or class is never
+-- passed on or compared (the secret test comes first: a secret value cannot be inspected). The API
+-- is read on each call, so a client that defines it late is still seen.
+function FlavorCompat.ClassOf(guid)
+  if FlavorCompat.issecretvalue(guid) or type(guid) ~= "string" then
+    return nil
+  end
+  local getInfo = _G["GetPlayerInfoByGUID"]
+  if type(getInfo) ~= "function" then
+    return nil
+  end
+  local ok, _, classToken = pcall(getInfo, guid)
+  if not ok or FlavorCompat.issecretvalue(classToken) or classToken == nil then
+    return nil
+  end
+  return classToken
+end
+
 ns.FlavorCompat = FlavorCompat
 return FlavorCompat

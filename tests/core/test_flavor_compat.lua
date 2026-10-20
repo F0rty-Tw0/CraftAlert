@@ -185,6 +185,39 @@ local function testIsSecretValue()
   Assert.equal(FlavorCompat.issecretvalue("plain"), false)
 end
 
+-- The chat-GUID class guard: the API is read per call, and a secret, missing or raising answer is nil.
+local function testClassOf()
+  local FlavorCompat = load("retail")
+  local calls = 0
+  local reply = function()
+    return "Warrior", "WARRIOR"
+  end
+  Wow.stub("GetPlayerInfoByGUID", function()
+    calls = calls + 1
+    return reply()
+  end)
+  Assert.equal(FlavorCompat.ClassOf("Player-1-0A"), "WARRIOR", "stubbed after load: read per call")
+  Assert.equal(calls, 1)
+  Assert.equal(FlavorCompat.ClassOf(Wow.secret("Player-1-0B")), nil, "secret GUID")
+  Assert.equal(FlavorCompat.ClassOf(nil), nil, "no GUID")
+  Assert.equal(FlavorCompat.ClassOf(42), nil, "not a string")
+  Assert.equal(calls, 1, "none of the three reached the API")
+  reply = function()
+    error("boom")
+  end
+  Assert.equal(FlavorCompat.ClassOf("Player-1-0C"), nil, "API raises")
+  reply = function()
+    return "Warrior", nil
+  end
+  Assert.equal(FlavorCompat.ClassOf("Player-1-0D"), nil, "no class token")
+  reply = function()
+    return "Warrior", Wow.secret("WARRIOR")
+  end
+  Assert.equal(FlavorCompat.ClassOf("Player-1-0E"), nil, "secret class token")
+  Wow.stub("GetPlayerInfoByGUID", nil)
+  Assert.equal(FlavorCompat.ClassOf("Player-1-0F"), nil, "API missing")
+end
+
 return function()
   testFlavorKeys()
   testForeverSignals()
@@ -194,5 +227,6 @@ return function()
   testAddOnMemoryUsage()
   testTellWrappers()
   testIsSecretValue()
+  testClassOf()
   Wow.reset()
 end
