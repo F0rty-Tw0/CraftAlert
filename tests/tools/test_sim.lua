@@ -218,6 +218,15 @@ return function()
   )
   Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "TRADE_SKILL_SHOW" })), booted({}, "Trade"))
 
+  -- A recipe read from the window keeps Blizzard's spelling, so the greeting names it as the game does.
+  local greeted = {}
+  for _, line in ipairs(Sim.Run({ "--event", "TRADE_SKILL_SHOW", "LF plate belt crafter" })) do
+    if string.find(line, "^greeting: ") then
+      greeted[#greeted + 1] = line
+    end
+  end
+  Assert.same(greeted, { "greeting: Hi! I can craft Sim Plate Belt." })
+
   -- The pending lead expiry timer (601 s) does not run when item data arrives.
   for _, line in ipairs(Sim.Run({ "LF plate belt", "--event", "TRADE_SKILL_SHOW", "--event", "GET_ITEM_INFO_RECEIVED", "190005", "true" })) do
     assert(not string.find(line, "^error: "), line)

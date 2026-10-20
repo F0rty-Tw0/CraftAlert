@@ -50,7 +50,7 @@ return function()
     state.recipes = { recipe(1) }
     Wow.fireEvent(EVENT, 1)
     Assert.equal(LearnWatcher.lastStored, true)
-    Assert.same(db.characters[CHAR].recipes[1], { item = 1001, name = "recipe 1", prof = BS })
+    Assert.same(db.characters[CHAR].recipes[1], { item = 1001, name = "Recipe 1", prof = BS })
     Assert.equal(Wow.pendingTimers(0), 1)
     Wow.runTimers()
     Assert.same(run.reasons, { "learn" })

@@ -16,7 +16,6 @@ local BindLookup = ns.BindLookup or require("CraftAlert.Professions.BindLookup")
 local ModernReader = {}
 
 local ipairs = ipairs
-local lower = string.lower
 local type = type
 
 local SHOW_EVENT = "TRADE_SKILL_SHOW"
@@ -92,7 +91,8 @@ local function readRecipe(api, recipeID, requireLearned)
     return nil
   end
   local schematic = api.GetRecipeSchematic(recipeID, false)
-  return { item = schematic and schematic.outputItemID, ranks = copyList(info.qualityItemIDs), name = lower(info.name) }
+  -- Blizzard's spelling: the greeting names the recipe with it; Index lowercases for matching.
+  return { item = schematic and schematic.outputItemID, ranks = copyList(info.qualityItemIDs), name = info.name }
 end
 
 -- Adds the recipe or updates it in place (mute and bind survive) → whether storage changed.
