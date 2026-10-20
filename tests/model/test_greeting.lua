@@ -122,6 +122,26 @@ return function()
   Assert.equal(Greeting.Build(itemLead("Me-Realm"), settings), string.rep("x", 220), "a link that does not fit is dropped whole")
   settings.templates.item = string.rep("x", 190) .. "{item}"
   Assert.equal(Greeting.Build(itemLead("Me-Realm"), settings), string.rep("x", 190) .. LINK, "a link that fits stays whole")
+  -- Retail's named colour form (|cnIQ4:...|r) is cut the same way, before a link and at the end.
+  local namedLead = itemLead("Me-Realm")
+  namedLead.itemLink = "|cnIQ4:|Hitem:190001::::::::60:::::|h[Thick Plate Belt]|h|r"
+  settings.templates.item = string.rep("x", 190) .. "{item}"
+  Assert.equal(Greeting.Build(namedLead, settings), string.rep("x", 190) .. namedLead.itemLink, "a named-colour link that fits stays whole")
+  settings.templates.item = string.rep("x", 220) .. "{item}"
+  Assert.equal(Greeting.Build(namedLead, settings), string.rep("x", 220), "the cut link takes its named colour with it")
+  for pad = 150, 250 do
+    settings.templates.item = string.rep("x", pad) .. "{item}"
+    local greeting = Greeting.Build(namedLead, settings)
+    Assert.truthy(#greeting <= 255)
+    local opened = select(2, string.gsub(greeting, "|H", ""))
+    local closed = select(2, string.gsub(greeting, "|h", ""))
+    Assert.equal(closed, opened * 2, "pad " .. pad .. " leaves a complete link or none")
+    Assert.falsy(string.find(greeting, "|cn[%w_]*:?$"), "pad " .. pad .. " ends in a named colour start")
+  end
+  for _, pad in ipairs({ 248, 249, 250, 252, 253 }) do -- the cut keeps "|cnIQ4:", "|cnIQ4", "|cnIQ", "|cn", "|c"
+    settings.templates.item = string.rep("x", pad) .. "|cnIQ4:abc"
+    Assert.equal(Greeting.Build(lead, settings), string.rep("x", pad), "pad " .. pad .. " drops the colour start")
+  end
   settings.templates.item = string.rep("x", 254) .. "||"
   Assert.equal(Greeting.Build(lead, settings), string.rep("x", 254), "an escaped pipe is not cut in half")
 end

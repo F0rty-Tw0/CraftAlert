@@ -52,14 +52,16 @@ local function cap(text)
     at = find(kept, "|H", at + 1, true)
   end
   if open and not find(kept, "|h.-|h", open) then
-    -- Drop the half link and the colour code in front of it.
+    -- Drop the half link and the colour code in front of it. A named colour (|cnIQ4:) is left
+    -- at the end by that cut, so the partial-code cleanup below takes it.
     local colored = open > 10 and find(sub(kept, open - 10, open - 1), "^|c%x%x%x%x%x%x%x%x$")
     kept = sub(kept, 1, colored and open - 11 or open - 1)
   end
-  kept = gsub(kept, "|c%x?%x?%x?%x?%x?%x?%x?$", "")
   if #match(kept, "|*$") % 2 == 1 then
     kept = sub(kept, 1, -2)
   end
+  kept = gsub(kept, "|c%x?%x?%x?%x?%x?%x?%x?$", "")
+  kept = gsub(kept, "|cn[%w_]*:?$", "")
   return kept
 end
 
