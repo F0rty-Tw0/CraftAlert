@@ -291,6 +291,11 @@ function Leads.FindActiveByCustomer(key)
   return nil
 end
 
+-- Whether the lead is still listed; a dismissed, expired or evicted one is not.
+function Leads.IsActive(id)
+  return find(id) ~= nil
+end
+
 function Leads.Dismiss(id)
   local lead, position = find(id)
   if lead then

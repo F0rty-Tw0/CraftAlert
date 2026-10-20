@@ -215,7 +215,12 @@ return function()
   local newer = newLead(ns, "LF plate greaves")
   Assert.equal(Leads.FindActiveByCustomer(CUSTOMER), newer)
   Assert.equal(Leads.FindActiveByCustomer("Nobody-Draenor"), nil)
+
+  -- IsActive: whether the id is still in the list (not dismissed, expired or evicted).
+  Assert.equal(Leads.IsActive(newer.id), true)
+  Assert.equal(Leads.IsActive(nil), false)
   Leads.Dismiss(newer.id)
+  Assert.equal(Leads.IsActive(newer.id), false)
   Assert.equal(Leads.FindActiveByCustomer(CUSTOMER), lead)
 
   -- Dismiss, DismissCustomer: one change each, no event for unknown ids.
