@@ -41,4 +41,5 @@ Model/Index.lua
 Model/Matcher.lua
 Professions/ProfessionList.lua
 Professions/BindLookup.lua
+Professions/ModernReader.lua
 Bootstrap.lua
