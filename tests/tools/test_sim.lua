@@ -90,6 +90,17 @@ return function()
     }
   )
 
+  -- Opening the profession window reads it (a new Iron Bar, bind unknown) and rebuilds once;
+  -- the item data arriving 1 s later stores bind 0, so the rebuild drops the bar again.
+  local window = { "index: size=4", "read: prof=164 stored=3 pendingBind=1", "index: size=5" }
+  Assert.same(stepLines(Sim.Run({ "--event", "TRADE_SKILL_SHOW" })), window)
+  Assert.same(stepLines(Sim.Run({ "--flavor", "forever", "--event", "TRADE_SKILL_SHOW" })), window)
+  Assert.same(
+    stepLines(Sim.Run({ "--event", "TRADE_SKILL_SHOW", "--event", "GET_ITEM_INFO_RECEIVED", "190005", "true" })),
+    { "index: size=4", "read: prof=164 stored=3 pendingBind=1", "index: size=5", "bind: stored=1", "index: size=4" }
+  )
+  Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "TRADE_SKILL_SHOW" })), { "index: size=4" })
+
   local unknownFlag = Sim.Run({ "--nope" })
   Assert.equal(#unknownFlag, 1)
   assert(string.find(tostring(unknownFlag[1]), "^error: unknown flag"), unknownFlag[1])
