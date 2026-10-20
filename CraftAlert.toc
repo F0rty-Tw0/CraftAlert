@@ -43,6 +43,7 @@ Model/RealmTag.lua
 Model/CrafterRank.lua
 Model/Leads.lua
 Model/Greeting.lua
+Model/SendGuard.lua
 Professions/ProfessionList.lua
 Professions/BindLookup.lua
 Professions/ModernReader.lua
