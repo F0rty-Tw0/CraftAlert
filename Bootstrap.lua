@@ -146,11 +146,15 @@ local function runStep(step)
   end
 end
 
--- `/ca` is registered first, so it works whatever a later step does.
+-- `/ca` is registered first, so it works whatever a later step does. Without a db (the load
+-- raised at ADDON_LOADED and was reported there) no step can work, so none runs.
 local function onLogin()
   EventRouter.Off(PLAYER_LOGIN, onLogin)
   PlayerName.Init()
   runStep(SlashCommands.Register)
+  if db == nil then
+    return
+  end
   local clock = _G["debugprofilestop"]
   local started = clock()
   ownKey = PlayerName.Own()

@@ -384,6 +384,21 @@ local function testRaisingLeadsRestore(db)
   Assert.equal(session.toasts, 0)
 end
 
+-- The saved variables failing to load leave no db: the load error is the only one reported,
+-- /ca is still there, and nothing listens to chat.
+local function testRaisingLoad(db)
+  local session = startClient(db)
+  local errors = recordErrors()
+  login(session, function(ns)
+    ns.SavedState.Load = function()
+      error("load failed", 0)
+    end
+  end)
+  Assert.same(errors, { "load failed" }, "only the load error is reported")
+  Assert.equal(type(rawget(_G, "SlashCmdList").CRAFTALERT), "function", "/ca works")
+  Assert.equal(isRegistered("CHAT_MSG_CHANNEL"), false, "no chat event without a db")
+end
+
 -- §4.4: the login time counts the saved-variable load and check at ADDON_LOADED and the
 -- PLAYER_LOGIN work, not the time between the two events.
 local function testLoginTime(db)
@@ -422,6 +437,7 @@ return function()
   testRaisingLoginStep(deepCopy(saved))
   testRaisingRestingRegistration(deepCopy(saved))
   testRaisingLeadsRestore(deepCopy(saved))
+  testRaisingLoad(deepCopy(saved))
   testLoginTime(deepCopy(saved))
   Wow.reset()
 end
