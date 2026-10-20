@@ -22,6 +22,20 @@ local function stepLines(lines)
   error("no db: line in " .. table.concat(lines, " / "))
 end
 
+-- The lines the first step prints before its own: the index build and scan activation
+-- (Trade and Services listen on Retail; on TBC only Trade exists), then `lines`.
+local function booted(lines, channels)
+  local boot = {
+    "index: size=4",
+    "scan: active",
+    "chat: Craft Alert: Listening in " .. (channels or "Trade, Services") .. " — 4 recipes, 2 crafters",
+  }
+  for _, line in ipairs(lines) do
+    boot[#boot + 1] = line
+  end
+  return boot
+end
+
 return function()
   _G.CRAFTALERT_SIM_NO_MAIN = true
   local Sim = dofile("tools/sim.lua")
@@ -57,7 +71,8 @@ return function()
   Assert.equal(senderLines(Sim.Run({ "--sender", "Bob", "hi" }))[1], "sender: Bob-OwnRealm")
 
   -- The first step builds the index from the fixture (bind 0 reagent left out: 2 chars x 2);
-  -- each line then reports its Matcher result or the step that stopped it.
+  -- each line then reports its Matcher result or the step that stopped it, and a match its lead:
+  -- the same sender asking for the same thing again updates the lead.
   local link = "|cff1eff00|Hitem:2575::::::::60:::::|h[Red Linen Shirt]|h|r"
   Assert.same(
     stepLines(Sim.Run({
@@ -71,45 +86,136 @@ return function()
       "Crafter-OwnRealm",
       "LF plate belt",
     })),
-    {
-      "index: size=4",
+    booted({
       "sender: Customer-OtherRealm",
       "match: item group=190001 prof=164 why=lf+plate+belt",
+      "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+      "greeting: Hi! I can craft Sim Plate Belt.",
       "sender: Customer-OtherRealm",
       "stop: prefilter",
       "sender: Customer-OtherRealm",
       "stop: nomatch",
       "sender: Customer-OtherRealm",
       "match: item group=enchant bracer - sim health prof=333 why=lf+enchant bracer sim health",
+      "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+      "greeting: Hi! I can craft Enchant Bracer - Sim Health.",
       "sender: Customer-OtherRealm",
       "match: item group=enchant bracer - sim health prof=333 why=lf+wrist+8hp",
+      "lead: updated customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+      "greeting: Hi! I can craft Enchant Bracer - Sim Health.",
       "sender: Customer-OtherRealm",
       "match: item group=190001 prof=164 why=wtb+190001",
+      "lead: updated customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+      "greeting: Hi! I can craft Sim Plate Belt.",
       "sender: Crafter-OwnRealm",
       "stop: self",
-    }
+    })
   )
+
+  -- Leads (Task 1.11): one new, then one updated; another customer is a new lead, and on
+  -- Forever, which has no crafting orders, nobody "cannot order".
+  Assert.same(
+    stepLines(Sim.Run({ "--flavor", "forever", "--sender", "Bob", "LF plate belt" })),
+    booted({
+      "sender: Bob-OwnRealm",
+      "match: item group=190001 prof=164 why=lf+plate+belt",
+      "lead: new customer=Bob-OwnRealm crafter=Crafter-OwnRealm cannotOrder=false",
+      "greeting: Hi! I can craft Sim Plate Belt.",
+    })
+  )
+  local leadLines = {}
+  for _, line in ipairs(Sim.Run({ "LF plate belt", "LF plate belt pls", "--sender", "Zoë-Kel'Thuzad", "LF plate belt" })) do
+    if string.find(line, "^lead: ") then
+      leadLines[#leadLines + 1] = line
+    end
+  end
+  Assert.same(leadLines, {
+    "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+    "lead: updated customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+    "lead: new customer=Zoë-Kel'Thuzad crafter=Crafter-OwnRealm cannotOrder=true",
+  })
+
+  -- Clicks act on the newest lead as if its toast had been up for a second (Task 1.13): left
+  -- sends the disclosure then the whisper, a second left prefills (once per lead), a reply
+  -- from the customer is tracked, shift prefills, ctrl opens an empty whisper, right dismisses.
+  local customer = "Customer-OtherRealm"
+  local greeting = "Hi! I can craft Sim Plate Belt."
+  local clicked = stepLines(Sim.Run({ "LF plate belt", "--click", "left", "--click", "left" }))
+  Assert.same({ unpack(clicked, 8) }, {
+    "send: SendAddonMessage robots.txt | Q:CraftAlert | WHISPER | " .. customer,
+    "send: SendChatMessage " .. greeting .. " | WHISPER | nil | " .. customer,
+    "lead: greeted customer=" .. customer,
+    "send: SendTellWithMessage " .. customer .. " | " .. greeting,
+  })
+  Assert.same({ unpack(stepLines(Sim.Run({ "LF plate belt", "--click", "shift", "--click", "ctrl" })), 8) }, {
+    "send: SendTellWithMessage " .. customer .. " | " .. greeting,
+    "send: SendTell " .. customer,
+  })
+  Assert.same({ unpack(stepLines(Sim.Run({ "LF plate belt", "--click", "right", "--click", "left" })), 8) }, {
+    "lead: dismissed customer=" .. customer,
+    "error: --click left has no lead to act on",
+  })
+  Assert.same(stepLines(Sim.Run({ "--click", "left" })), booted({ "error: --click left has no lead to act on" }))
+
+  -- A whisper from the customer after the greeting marks the lead replied; before it, nothing.
+  local replied = stepLines(
+    Sim.Run({ "LF plate belt", "--event", "CHAT_MSG_WHISPER", "hi", customer, "--click", "left", "--event", "CHAT_MSG_WHISPER", "hi", customer })
+  )
+  Assert.same({ unpack(replied, 8) }, {
+    "send: SendAddonMessage robots.txt | Q:CraftAlert | WHISPER | " .. customer,
+    "send: SendChatMessage " .. greeting .. " | WHISPER | nil | " .. customer,
+    "lead: greeted customer=" .. customer,
+    "lead: replied customer=" .. customer,
+  })
+  -- Whispering the customer by hand (a prefill sent) marks the lead greeted.
+  Assert.same({ unpack(stepLines(Sim.Run({ "LF plate belt", "--event", "CHAT_MSG_WHISPER_INFORM", "hello", customer })), 8) }, {
+    "lead: greeted customer=" .. customer,
+  })
+
+  -- Scan activation (Task 1.14): lines arrive as Trade channel events, so they only count while
+  -- the scan is active: paused (no resting), no lead; resting again, active, a lead.
+  Assert.same(stepLines(Sim.Run({ "--resting", "off", "LF plate belt", "--resting", "on", "--event", "PLAYER_UPDATE_RESTING", "LF plate belt" })), {
+    "index: size=4",
+    "scan: paused (notResting)",
+    "sender: Customer-OtherRealm",
+    "stop: paused",
+    "scan: active",
+    "chat: Craft Alert: Listening in Trade, Services — 4 recipes, 2 crafters",
+    "sender: Customer-OtherRealm",
+    "match: item group=190001 prof=164 why=lf+plate+belt",
+    "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+    "greeting: Hi! I can craft Sim Plate Belt.",
+  })
 
   -- Opening the profession window reads it (a new Iron Bar, bind unknown) and rebuilds once;
   -- the item data arriving 1 s later stores bind 0, so the rebuild drops the bar again.
-  local window = { "index: size=4", "read: prof=164 stored=3 pendingBind=1", "index: size=5" }
+  local window = booted({ "read: prof=164 stored=3 pendingBind=1", "index: size=5" })
   Assert.same(stepLines(Sim.Run({ "--event", "TRADE_SKILL_SHOW" })), window)
   Assert.same(stepLines(Sim.Run({ "--flavor", "forever", "--event", "TRADE_SKILL_SHOW" })), window)
   Assert.same(
     stepLines(Sim.Run({ "--event", "TRADE_SKILL_SHOW", "--event", "GET_ITEM_INFO_RECEIVED", "190005", "true" })),
-    { "index: size=4", "read: prof=164 stored=3 pendingBind=1", "index: size=5", "bind: stored=1", "index: size=4" }
+    booted({ "read: prof=164 stored=3 pendingBind=1", "index: size=5", "bind: stored=1", "index: size=4" })
   )
-  Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "TRADE_SKILL_SHOW" })), { "index: size=4" })
+  Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "TRADE_SKILL_SHOW" })), booted({}, "Trade"))
+
+  -- The pending lead expiry timer (601 s) does not run when item data arrives.
+  for _, line in ipairs(Sim.Run({ "LF plate belt", "--event", "TRADE_SKILL_SHOW", "--event", "GET_ITEM_INFO_RECEIVED", "190005", "true" })) do
+    assert(not string.find(line, "^error: "), line)
+  end
 
   -- A learned recipe is stored at once; the coalesced rebuild makes it matchable.
-  Assert.same(stepLines(Sim.Run({ "--event", "NEW_RECIPE_LEARNED", "9004", "LF Sim Plate Helm" })), {
-    "index: size=4",
-    "learn: stored=true",
-    "index: size=5",
-    "sender: Customer-OtherRealm",
-    "match: item group=190004 prof=164 why=lf+sim plate helm",
-  })
-  Assert.same(stepLines(Sim.Run({ "--event", "NEW_RECIPE_LEARNED", "123" })), { "index: size=4", "learn: stored=false" })
+  Assert.same(
+    stepLines(Sim.Run({ "--event", "NEW_RECIPE_LEARNED", "9004", "LF Sim Plate Helm" })),
+    booted({
+      "learn: stored=true",
+      "index: size=5",
+      "sender: Customer-OtherRealm",
+      "match: item group=190004 prof=164 why=lf+sim plate helm",
+      "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+      "greeting: Hi! I can craft |cffffffff|Hitem:190004|h[Item 190004]|h|r.",
+    })
+  )
+  Assert.same(stepLines(Sim.Run({ "--event", "NEW_RECIPE_LEARNED", "123" })), booted({ "learn: stored=false" }))
 
   Assert.equal(Sim.Run({ "--event" })[1], "error: --event needs an event name")
 
@@ -137,8 +243,8 @@ return function()
   Assert.equal(rawget(_G, "IsResting")(), true)
 
   -- Commands without a registered handler report it instead of crashing.
-  -- (stepLines[1] is the `index:` line of the start-up build.)
-  assert(string.find(tostring(stepLines(Sim.Run({ "--cmd", "/ca" }))[2]), "^error: no slash handler"))
+  -- (stepLines[1..3] are the start-up build: `index:`, `scan:`, `chat:`.)
+  assert(string.find(tostring(stepLines(Sim.Run({ "--cmd", "/ca" }))[4]), "^error: no slash handler"))
 
   -- The account DB goes through SavedState.Load first: one `db:` line, preceded by one
   -- `chat:` line per Schema warning.

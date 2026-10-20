@@ -135,7 +135,7 @@ local function testCharactersUnknownKeysAndBadRecords()
       ["Bob-Realm"] = {
         source = "weird",
         enabled = "yes",
-        realms = { "A", 5, "B" },
+        realms = { "A", 5, "B", "Area 52", "Twisting-Nether", "Kel'Thuzad" },
         extra = true,
         professions = {
           [164] = { name = "Blacksmithing", primary = true, read = true, junk = 1 },
@@ -159,7 +159,7 @@ local function testCharactersUnknownKeysAndBadRecords()
   Assert.equal(bob.source, "local")
   Assert.equal(bob.enabled, true)
   Assert.equal(bob.extra, nil)
-  Assert.same(bob.realms, { "A", "B" })
+  Assert.same(bob.realms, { "A", "B", "Area52", "TwistingNether", "Kel'Thuzad" }, "realms lose spaces and hyphens once, here")
   Assert.same(bob.professions, { [164] = { name = "Blacksmithing", primary = true, read = true } })
   Assert.same(bob.recipes[9001], { item = 190001, name = "Belt", prof = 164, bind = 2, muted = true })
   Assert.same(bob.recipes[9002], { ranks = { 1, 2 }, name = "Enchant", prof = 333 })

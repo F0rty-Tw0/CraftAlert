@@ -97,7 +97,8 @@ local function installItems(state)
     end,
     GetItemInfo = function(itemID)
       if state.cached[itemID] then
-        return "Item " .. itemID, "link", 1, 1, 1, "type", "subtype", 1, "", 0, 0, 0, 0, state.bind[itemID]
+        local link = "|cffffffff|Hitem:" .. itemID .. "|h[Item " .. itemID .. "]|h|r"
+        return "Item " .. itemID, link, 1, 1, 1, "type", "subtype", 1, "", 0, 0, 0, 0, state.bind[itemID]
       end
     end,
     RequestLoadItemDataByID = function(itemID)

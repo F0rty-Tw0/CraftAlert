@@ -15,7 +15,11 @@ local OWN_NAME = "Crafter"
 local OWN_REALM = "OwnRealm"
 local DEFAULT_FLAVOR = "retail"
 local CLICK_BUTTONS = { left = true, shift = true, ctrl = true, right = true }
-local CHANNEL = "trade" -- every sim chat line arrives on Trade
+-- Every sim chat line arrives on Trade: zone channel ID 2 (flavor-choices.md), as the
+-- CHAT_MSG_CHANNEL payload carries it.
+local TRADE_ZONE_CHANNEL_ID = 2
+local TRADE_CHANNEL_NAME = "2. Trade - City"
+local TRADE_BASE_NAME = "Trade - City"
 -- Item data of the fixture items (tools/sim_fixture.lua) for GetItemInfoInstant:
 -- itemID -> { equipLoc, classID, subclassID }.
 local SIM_ITEMS = {
@@ -35,10 +39,22 @@ local SIM_RECIPES = {
   { id = 9004, name = "Sim Plate Helm", item = 190004, profession = { professionID = 2872, parentProfessionID = 164 } },
   { id = 9005, name = "Sim Iron Bar", item = 190005, learned = true },
 }
+local BIND_DEBOUNCE_SECONDS = 1
 local ON_OFF = { on = true, off = false }
 -- Events with a known payload take exactly that many arguments, so a chat line may follow
 -- them; any other event takes every following non-`--` token.
-local EVENT_ARITY = { TRADE_SKILL_SHOW = 0, TRADE_SKILL_LIST_UPDATE = 0, NEW_RECIPE_LEARNED = 1, GET_ITEM_INFO_RECEIVED = 2 }
+local EVENT_ARITY = {
+  TRADE_SKILL_SHOW = 0,
+  TRADE_SKILL_LIST_UPDATE = 0,
+  NEW_RECIPE_LEARNED = 1,
+  GET_ITEM_INFO_RECEIVED = 2,
+  CHAT_MSG_WHISPER = 2, -- text, sender
+  CHAT_MSG_WHISPER_INFORM = 2, -- text, target
+  PLAYER_UPDATE_RESTING = 0,
+  ZONE_CHANGED_NEW_AREA = 0,
+}
+-- How long the toast counts as shown (seconds) when --click acts on the newest lead (§7.5 rule 3).
+local SHOWN_FOR_SECONDS = 1
 
 local Sim = {}
 
@@ -217,14 +233,71 @@ local function flushBind(ctx)
   end
 end
 
+-- `match: <kind> group=<group> prof=<prof> why=<a+b+c>` for the Matcher's result.
+local function matchLine(result)
+  local why = {}
+  for i = 1, result.whyCount do
+    why[i] = tostring(result.why[i])
+  end
+  local group, prof = tostring(result.group), tostring(result.prof)
+  return string.format("match: %s group=%s prof=%s why=%s", result.kind, group, prof, table.concat(why, "+"))
+end
+
+-- `lead: new|updated customer=<key> crafter=<key> cannotOrder=<bool>` (§6.3 steps 5-7), or
+-- `lead: none` when no crafter qualifies.
+local function leadLine(lead, isNew)
+  if not lead then
+    return "lead: none"
+  end
+  return string.format(
+    "lead: %s customer=%s crafter=%s cannotOrder=%s",
+    isNew and "new" or "updated",
+    lead.customer,
+    lead.crafter,
+    tostring(lead.cannotOrder == true)
+  )
+end
+
+-- Prints the match, lead and greeting lines of every line that reaches Leads.OnMatch: the
+-- chat handler (ScanGate.HandleChat) calls it, so the sim wraps it to look.
+local function reportMatches(ctx)
+  local Leads = ctx.ns.Leads
+  local onMatch = Leads.OnMatch
+  Leads.OnMatch = function(result, customerKey, text, channelKey, guid)
+    ctx.out[#ctx.out + 1] = matchLine(result)
+    local lead, isNew = onMatch(result, customerKey, text, channelKey, guid)
+    ctx.out[#ctx.out + 1] = leadLine(lead, isNew)
+    if lead then
+      ctx.out[#ctx.out + 1] = "greeting: " .. ctx.ns.Greeting.Build(lead, ctx.db.settings)
+    end
+    return lead, isNew
+  end
+end
+
+-- Notes that the chat handler ran, so a line the scan never delivered can say so.
+local function watchHandler(ctx)
+  local ScanGate = ctx.ns.ScanGate
+  ScanGate.SetHandler(function(...)
+    ctx.handled = true
+    return ScanGate.HandleChat(...)
+  end)
+end
+
 -- Runs once before the first chat line, event, command or click: the profession list, the
--- readers and the initial index build (as at PLAYER_LOGIN); scan evaluation joins it once
--- that module exists.
+-- readers, the scan gate and the initial index build (as at PLAYER_LOGIN).
 local function start(ctx)
   if not ctx.started then
     ctx.started = true
     local ns = ctx.ns
     ns.PlayerName.Init()
+    ns.Leads.Restore(ctx.db)
+    ns.WhisperTracker.Install()
+    ns.Leads.On("greeted", function(lead)
+      ctx.out[#ctx.out + 1] = "lead: greeted customer=" .. lead.customer
+    end)
+    ns.Leads.On("replied", function(lead)
+      ctx.out[#ctx.out + 1] = "lead: replied customer=" .. lead.customer
+    end)
     if not ns.FlavorCompat.isClassic then
       ns.ProfessionList.Refresh(ctx.db, ns.PlayerName.Own())
       ns.ModernReader.Install(ctx.db)
@@ -236,23 +309,16 @@ local function start(ctx)
       flushBind(ctx)
       ctx.out[#ctx.out + 1] = "index: size=" .. index.size
     end)
+    ns.ScanGate.OnChange(function(active, state)
+      ctx.out[#ctx.out + 1] = "scan: " .. (active and "active" or string.format("paused (%s)", state.reason))
+    end)
+    ns.ScanGate.Install(ctx.db)
+    ns.Index.OnRebuilt(ns.ScanGate.Evaluate)
+    reportMatches(ctx)
+    watchHandler(ctx)
     ns.BindLookup.lastStored = nil
     ns.Index.Rebuild()
   end
-end
-
--- `match: <kind> group=<group> prof=<prof> why=<a+b+c>` or `stop: <Matcher.lastStop>`.
-local function matchLine(Matcher, text, sender)
-  local result = Matcher.Match(CHANNEL, text, sender)
-  if not result then
-    return "stop: " .. Matcher.lastStop
-  end
-  local why = {}
-  for i = 1, result.whyCount do
-    why[i] = tostring(result.why[i])
-  end
-  local group, prof = tostring(result.group), tostring(result.prof)
-  return string.format("match: %s group=%s prof=%s why=%s", result.kind, group, prof, table.concat(why, "+"))
 end
 
 local function count(map)
@@ -282,11 +348,20 @@ function STEPS.sender(ctx, step)
   ctx.sender = step.name
 end
 
+-- The line as a CHAT_MSG_CHANNEL event from the current sender on Trade. A line the paused
+-- scan never receives prints `stop: paused`; one the Matcher stopped prints `stop: <step>`.
 function STEPS.line(ctx, step)
   start(ctx)
-  ctx.lastLine = { text = step.text, sender = ctx.sender }
-  ctx.out[#ctx.out + 1] = "sender: " .. tostring(ctx.ns.PlayerName.Normalize(ctx.sender))
-  ctx.out[#ctx.out + 1] = matchLine(ctx.ns.Matcher, step.text, ctx.sender)
+  local sender = ctx.sender
+  ctx.out[#ctx.out + 1] = "sender: " .. tostring(ctx.ns.PlayerName.Normalize(sender))
+  ctx.handled = false
+  Wow.fireEvent("CHAT_MSG_CHANNEL", step.text, sender, "", TRADE_CHANNEL_NAME, sender, "", TRADE_ZONE_CHANNEL_ID, 2, TRADE_BASE_NAME, 0, 1, nil)
+  local lastStop = ctx.ns.Matcher.lastStop
+  if not ctx.handled then
+    ctx.out[#ctx.out + 1] = "stop: paused"
+  elseif lastStop ~= "match" then
+    ctx.out[#ctx.out + 1] = "stop: " .. lastStop
+  end
   ctx.sender = DEFAULT_SENDER
 end
 
@@ -316,14 +391,15 @@ local function reportLearn(ctx)
   end
 end
 
--- Runs the timers armed for the same frame (index rebuild coalescing); longer timers stay
--- pending, as in the game where no second passes between two sim steps.
-local function runFrameTimers()
+-- Runs the timers armed for `maxDelay` seconds or less (0: the same frame, index rebuild
+-- coalescing); longer ones, such as the lead expiry, stay pending, as in the game where no
+-- second passes between two sim steps.
+local function runFrameTimers(maxDelay)
   local found = true
   while found do
     found = false
     for i, timer in ipairs(Wow.timers) do
-      if timer.delay == 0 then
+      if timer.delay <= maxDelay then
         table.remove(Wow.timers, i)
         timer.fn()
         found = true
@@ -347,11 +423,7 @@ function STEPS.event(ctx, step)
   Wow.fireEvent(step.name, unpack(args, 1, #step.args))
   reportRead(ctx)
   reportLearn(ctx)
-  if step.name == "GET_ITEM_INFO_RECEIVED" then
-    Wow.runTimers()
-  else
-    runFrameTimers()
-  end
+  runFrameTimers(step.name == "GET_ITEM_INFO_RECEIVED" and BIND_DEBOUNCE_SECONDS or 0)
   flushBind(ctx)
 end
 
@@ -381,9 +453,33 @@ function STEPS.cmd(ctx, step)
   handler(args)
 end
 
+-- What each click does to the newest lead (the §7.1 table; ClickRouter replaces it in Task 1.15).
+local CLICKS = {
+  left = function(ctx, lead, shownAt)
+    ctx.ns.GreetAction.Greet(lead, shownAt)
+  end,
+  shift = function(ctx, lead)
+    ctx.ns.GreetAction.Prefill(lead)
+  end,
+  ctrl = function(ctx, lead)
+    ctx.ns.GreetAction.Empty(lead)
+  end,
+  right = function(ctx, lead)
+    ctx.ns.Leads.Dismiss(lead.id)
+    ctx.out[#ctx.out + 1] = "lead: dismissed customer=" .. lead.customer
+  end,
+}
+
+-- The newest lead, as if its toast had been shown for a second; the `send:` lines come from
+-- the stubbed send APIs.
 function STEPS.click(ctx, step)
   start(ctx)
-  ctx.out[#ctx.out + 1] = "error: --click " .. step.button .. " has no lead to act on yet"
+  local lead = ctx.ns.Leads.Latest()
+  if not lead then
+    ctx.out[#ctx.out + 1] = "error: --click " .. step.button .. " has no lead to act on"
+    return
+  end
+  CLICKS[step.button](ctx, lead, rawget(_G, "GetTime")() - SHOWN_FOR_SECONDS)
 end
 
 function Sim.Run(argv)
