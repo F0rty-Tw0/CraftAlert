@@ -12,7 +12,9 @@ local pcall = pcall
 local frame = nil
 local handlers = {} -- event -> array of functions; replaced, never edited, so Dispatch can walk it safely
 
-local function reportError(err)
+-- Hands a caught error to the client's error handler (BugSack and the like); raises it when
+-- there is none, so bare tests see it. Dispatch and Bootstrap's login steps use it.
+function EventRouter.ReportError(err)
   local getHandler = _G["geterrorhandler"]
   if type(getHandler) ~= "function" then
     error(err, 0)
@@ -28,7 +30,7 @@ function EventRouter.Dispatch(event, ...)
   for i = 1, #list do
     local ok, err = pcall(list[i], ...)
     if not ok then
-      reportError(err)
+      EventRouter.ReportError(err)
     end
   end
 end

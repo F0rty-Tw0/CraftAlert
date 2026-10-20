@@ -107,12 +107,18 @@ local function testFailingHandlerDoesNotBlockOthers()
   EventRouter.Dispatch("PLAYER_LOGIN")
   Assert.truthy(ran)
   Assert.same(reported, { "boom" })
+  -- Bootstrap reports its own failed steps the same way.
+  EventRouter.ReportError("step failed")
+  Assert.same(reported, { "boom", "step failed" })
 
   -- Without an error handler (bare tests) the error surfaces.
   Wow.stub("geterrorhandler", nil)
   Assert.raises(function()
     EventRouter.Dispatch("PLAYER_LOGIN")
   end, "boom")
+  Assert.raises(function()
+    EventRouter.ReportError("step failed")
+  end, "step failed")
 end
 
 local function testFailedRegisterKeepsNoHandler()
