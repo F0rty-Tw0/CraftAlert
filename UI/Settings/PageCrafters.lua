@@ -6,6 +6,7 @@ end
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Index = ns.Index or require("CraftAlert.Model.Index")
+local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
@@ -131,9 +132,10 @@ local function createCharacterRows(column, page)
     local key = page.character.Value()
     db().characters[key] = nil
     -- The current character is stored again from the client, as at login: the profession
-    -- readers only record a character that is stored.
+    -- readers only record a character that is stored, and the realm tag needs its realms.
     if key == PlayerName.Own() then
       ProfessionList.Refresh(db(), key)
+      RealmTag.Store(db(), key)
     end
     Index.RequestRebuild("crafter")
     page.Refresh()

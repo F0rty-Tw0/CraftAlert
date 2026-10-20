@@ -199,6 +199,11 @@ local function testRemoveOwnCharacter()
   Wow.stub("GetProfessionInfo", function()
     return "Blacksmithing", nil, 1, 100, nil, nil, BS
   end)
+  Wow.stub("C_AutoComplete", {
+    GetAutoCompleteRealms = function()
+      return { "Realm", "Twisting Nether" }
+    end,
+  })
   open(ns, "Crafters")
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Remove character"))
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Click again to remove"))
@@ -207,6 +212,9 @@ local function testRemoveOwnCharacter()
   Assert.same(me.recipes, {}, "its recipes are gone")
   Assert.same(me.professions, { [BS] = { name = "Blacksmithing", primary = false, read = false } })
   Assert.equal(ns.ProfessionList.IsStored(db, "Me-Realm", BS), true)
+  -- Its connected realms are stored again too, as at login, so the realm tag knows them now.
+  Assert.same(me.realms, { "Realm", "TwistingNether" })
+  Assert.equal(ns.RealmTag.CannotOrder(db, "Me-Realm", "Bob-Draenor"), true)
   Assert.truthy(db.characters["Alt-Realm"].recipes[9001], "other characters are untouched")
 
   -- Another character is not the client's: it stays removed.
