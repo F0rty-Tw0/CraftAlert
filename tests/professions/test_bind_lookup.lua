@@ -140,6 +140,13 @@ return function()
   Assert.same(run.reasons, { "bind" })
   Assert.equal(BindLookup.lastStored, 120, "stored over the whole drain")
   Assert.falsy(registered())
+  -- A later drain reports and rebuilds for its own stores only.
+  BindLookup.Queue(101)
+  arrive(state, 101, false)
+  tick()
+  Wow.runTimers()
+  Assert.equal(BindLookup.lastStored, 0, "the next drain starts from 0")
+  Assert.equal(run.builds, 1, "a drain that stores nothing rebuilds nothing")
 
   -- An item that never answers is given up after 10 ticks, so it cannot block the window or
   -- keep the event registered; it is not retried this session.
@@ -154,9 +161,14 @@ return function()
   Assert.equal(#state.requests, BATCH, "still waiting at tick 9")
   tick()
   Assert.equal(#state.requests, BATCH + 1, "tick 10 gives up and sends the next item")
-  Assert.truthy(registered())
+  -- The item sent at tick 10 gets its own 10 ticks.
+  for _ = 11, 19 do
+    tick()
+  end
+  Assert.truthy(registered(), "the late item is still in flight at tick 19")
+  tick()
+  Assert.falsy(registered(), "everything given up at tick 20: unregistered")
   Wow.runTimers()
-  Assert.falsy(registered(), "everything given up: unregistered")
   Assert.equal(run.builds, 0)
   Assert.equal(db.characters["A-Realm"].recipes[1001].bind, nil)
   BindLookup.Queue(1001)
