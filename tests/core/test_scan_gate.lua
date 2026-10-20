@@ -10,8 +10,9 @@ local WHISPER = "CHAT_MSG_WHISPER"
 
 -- Fresh modules for one flavor, the player Me-Realm resting in a city, Smith-Realm knowing a
 -- plate belt. `edit(db)` changes the db before the index is built. Install and the first
--- Evaluate are left to the test. → ns, db, state ({ resting = bool } the IsResting stub reads).
-local function setup(flavor, edit)
+-- Evaluate are left to the test; `unbound` leaves Leads without its db, as a Restore that
+-- raised at login. → ns, db, state ({ resting = bool } the IsResting stub reads).
+local function setup(flavor, edit, unbound)
   local ns = Fixture.load(flavor)
   Wow.clock.time = 1000
   local state = { resting = true }
@@ -46,7 +47,9 @@ local function setup(flavor, edit)
   if edit then
     edit(db)
   end
-  ns.Leads.Restore(db)
+  if not unbound then
+    ns.Leads.Restore(db)
+  end
   ns.Index.Configure(db, {
     professionOrder = function()
       return { BS }
@@ -181,6 +184,15 @@ return function()
   ns = setup("retail")
   ns.ScanGate.Evaluate()
   Assert.equal(ns.ScanGate.IsActive(), false)
+  Assert.same(listening(), {})
+  Assert.equal(ns.ScanGate.State().reason, "notStarted", "not installed is not switched off")
+
+  -- Leads without its db (its Restore raised at login) would drop every match: nothing listens,
+  -- and the status says the addon did not start.
+  ns, db = setup("retail", nil, true)
+  start(ns, db)
+  Assert.equal(ns.ScanGate.IsActive(), false)
+  Assert.equal(ns.ScanGate.State().reason, "notStarted")
   Assert.same(listening(), {})
 
   -- Install re-evaluates on PLAYER_UPDATE_RESTING and ZONE_CHANGED_NEW_AREA.

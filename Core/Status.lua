@@ -20,6 +20,9 @@ local function pausedText(state)
   if reason == "notResting" then
     return Localization.Text("Paused — not in a city or inn")
   end
+  if reason == "notStarted" then
+    return Localization.Text("Paused — Craft Alert did not start; /reload to try again")
+  end
   if reason == "disabled" then
     return Localization.Text("Paused — Craft Alert is turned off")
   end

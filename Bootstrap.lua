@@ -125,7 +125,7 @@ end
 -- In dependency order. Each step runs on its own: one that raises is reported and the rest
 -- still run. ScanGate and Leads bind the db last, so a raising install leaves its module
 -- unbound and fail-closed: only ScanGate.Evaluate registers the chat events, and only once the
--- resting events are registered and the index is built; Leads makes no lead without its db.
+-- resting events are registered, Leads holds its db and the index is built.
 local LOGIN_STEPS = {
   installProfessions,
   storeRealms,

@@ -29,4 +29,5 @@ return function()
   Assert.equal(Status.Text(paused("empty", "Tailoring")), "Paused — no profession read yet: open Tailoring once")
   Assert.equal(Status.Text(paused("empty")), "Paused — no recipes to listen for")
   Assert.equal(Status.Text(paused("disabled")), "Paused — Craft Alert is turned off")
+  Assert.equal(Status.Text(paused("notStarted")), "Paused — Craft Alert did not start; /reload to try again")
 end
