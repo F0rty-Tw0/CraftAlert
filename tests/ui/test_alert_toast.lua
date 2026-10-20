@@ -210,7 +210,7 @@ end
 
 local function testClassColor()
   local looked = {}
-  local function withGuid(guid)
+  local function withGuid(guid, noColors)
     local ns = UiFixture.load({
       leads = 1,
       db = function(accountDb)
@@ -221,7 +221,7 @@ local function testClassColor()
       looked[#looked + 1] = value
       return "Warrior", "WARRIOR"
     end)
-    Wow.stub("RAID_CLASS_COLORS", { WARRIOR = { r = 0.78, g = 0.61, b = 0.43 } })
+    Wow.stub("RAID_CLASS_COLORS", not noColors and { WARRIOR = { r = 0.78, g = 0.61, b = 0.43 } } or nil)
     ns.AlertToast.Show(ns.Leads.Latest())
     return fontStringWith("Customer1-Draenor").textColor
   end
@@ -232,6 +232,9 @@ local function testClassColor()
   Assert.same(looked, { "Player-1-0001" })
   Assert.same(plain, { 0.92, 0.92, 0.95, 1.0 })
   Assert.same(withGuid(nil), plain)
+  -- No colour table: plain name, and the class API is not called at all.
+  Assert.same(withGuid("Player-1-0003", true), plain)
+  Assert.same(looked, { "Player-1-0001" })
 end
 
 local function testSavedPosition()
