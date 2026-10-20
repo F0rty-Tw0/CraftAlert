@@ -276,6 +276,27 @@ local function describeCrafter(lead, result, crafter)
   end
 end
 
+-- The lead for a matched line from `crafter`, copied out of the Matcher's reused result;
+-- numbered and stored by the caller.
+local function buildLead(result, customerKey, text, channelKey, crafter, cannotOrder)
+  local lead = {
+    customer = customerKey,
+    message = text,
+    channel = channelKey,
+    kind = result.kind,
+    prof = result.prof,
+    group = result.group,
+    why = joinWhy(result),
+    crafter = crafter,
+    cannotOrder = cannotOrder,
+    time = now(),
+    greeted = false,
+    replied = false,
+  }
+  describeCrafter(lead, result, crafter)
+  return lead
+end
+
 -- nil when the player is not AFK-flagged or the flag is secret (§7.6).
 local function afkNow()
   local isAfk = _G["UnitIsAFK"]
@@ -309,24 +330,10 @@ function Leads.OnMatch(result, customerKey, text, channelKey, guid)
   if crafter == nil then
     return nil
   end
-  lead = {
-    id = nextId,
-    customer = customerKey,
-    guid = type(guid) == "string" and not FlavorCompat.issecretvalue(guid) and guid or nil,
-    message = text,
-    channel = channelKey,
-    kind = result.kind,
-    prof = result.prof,
-    group = result.group,
-    why = joinWhy(result),
-    crafter = crafter,
-    cannotOrder = cannotOrder,
-    time = now(),
-    greeted = false,
-    replied = false,
-    arrivedWhileAfk = afkNow(),
-  }
-  describeCrafter(lead, result, crafter)
+  lead = buildLead(result, customerKey, text, channelKey, crafter, cannotOrder)
+  lead.id = nextId
+  lead.guid = type(guid) == "string" and not FlavorCompat.issecretvalue(guid) and guid or nil
+  lead.arrivedWhileAfk = afkNow()
   nextId = nextId + 1
   leads[#leads + 1] = lead
   if #leads > MAX_LEADS then
@@ -336,6 +343,21 @@ function Leads.OnMatch(result, customerKey, text, channelKey, guid)
   fire("new", lead)
   fire("change")
   return lead, true
+end
+
+-- `/ca test` (§7.3): the lead `text` would make if "Test" on the player's realm had sent it in
+-- Trade, with the ignore list skipped. Not numbered, stored, counted or announced.
+-- → lead or nil when no enabled crafter qualifies.
+function Leads.Preview(result, text)
+  if db == nil then
+    return nil
+  end
+  local customerKey = PlayerName.TestCustomer()
+  local crafter, cannotOrder = CrafterRank.Pick(result, customerKey, db, { skipIgnore = true })
+  if crafter == nil then
+    return nil
+  end
+  return buildLead(result, customerKey, text, "trade", crafter, cannotOrder)
 end
 
 -- The first time a lead is greeted, however it was sent (§7.1). → whether this was the first.
