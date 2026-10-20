@@ -219,6 +219,8 @@ local function testOldIndexReleased()
   }) do
     Assert.truthy(ns.Matcher.Match("trade", line, SENDER), line)
   end
+  -- Leaves a set-aside record behind, which SetIndex must clear too.
+  Assert.equal(ns.Matcher.Match("trade", "lf hauberk", SENDER), nil, "lf hauberk")
   fixture(ns, Fixture.index(ns))
   collectgarbage("collect")
   collectgarbage("collect")
