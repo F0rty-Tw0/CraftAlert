@@ -60,4 +60,5 @@ UI/AlertToast.lua
 UI/LeadRow.lua
 UI/LeadsWindow.lua
 UI/Launcher.lua
+Core/Bindings.lua
 Bootstrap.lua
