@@ -77,6 +77,7 @@ return function()
       "sender: Customer-OtherRealm",
       "match: item group=190001 prof=164 why=lf+plate+belt",
       "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+      "greeting: Hi! I can craft Sim Plate Belt.",
       "sender: Customer-OtherRealm",
       "stop: prefilter",
       "sender: Customer-OtherRealm",
@@ -84,12 +85,15 @@ return function()
       "sender: Customer-OtherRealm",
       "match: item group=enchant bracer - sim health prof=333 why=lf+enchant bracer sim health",
       "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+      "greeting: Hi! I can craft Enchant Bracer - Sim Health.",
       "sender: Customer-OtherRealm",
       "match: item group=enchant bracer - sim health prof=333 why=lf+wrist+8hp",
       "lead: updated customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+      "greeting: Hi! I can craft Enchant Bracer - Sim Health.",
       "sender: Customer-OtherRealm",
       "match: item group=190001 prof=164 why=wtb+190001",
       "lead: updated customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+      "greeting: Hi! I can craft Sim Plate Belt.",
       "sender: Crafter-OwnRealm",
       "stop: self",
     }
@@ -102,6 +106,7 @@ return function()
     "sender: Bob-OwnRealm",
     "match: item group=190001 prof=164 why=lf+plate+belt",
     "lead: new customer=Bob-OwnRealm crafter=Crafter-OwnRealm cannotOrder=false",
+    "greeting: Hi! I can craft Sim Plate Belt.",
   })
   local leadLines = {}
   for _, line in ipairs(Sim.Run({ "LF plate belt", "LF plate belt pls", "--sender", "Zoë-Kel'Thuzad", "LF plate belt" })) do
@@ -139,6 +144,7 @@ return function()
     "sender: Customer-OtherRealm",
     "match: item group=190004 prof=164 why=lf+sim plate helm",
     "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=true",
+    "greeting: Hi! I can craft |cffffffff|Hitem:190004|h[Item 190004]|h|r.",
   })
   Assert.same(stepLines(Sim.Run({ "--event", "NEW_RECIPE_LEARNED", "123" })), { "index: size=4", "learn: stored=false" })
 

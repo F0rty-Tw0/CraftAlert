@@ -259,20 +259,21 @@ local function matchLine(Matcher, text, sender)
 end
 
 -- `lead: new|updated customer=<key> crafter=<key> cannotOrder=<bool>` (§6.3 steps 5-7), or
--- `lead: none` when no crafter qualifies.
+-- `lead: none` when no crafter qualifies. Also returns the lead.
 local function leadLine(ctx, result, text)
   local customer = ctx.ns.PlayerName.Normalize(ctx.sender)
   local lead, isNew = ctx.ns.Leads.OnMatch(result, customer, text, CHANNEL, nil)
   if not lead then
     return "lead: none"
   end
-  return string.format(
+  local text = string.format(
     "lead: %s customer=%s crafter=%s cannotOrder=%s",
     isNew and "new" or "updated",
     lead.customer,
     lead.crafter,
     tostring(lead.cannotOrder == true)
   )
+  return text, lead
 end
 
 local function count(map)
@@ -309,7 +310,11 @@ function STEPS.line(ctx, step)
   local line, result = matchLine(ctx.ns.Matcher, step.text, ctx.sender)
   ctx.out[#ctx.out + 1] = line
   if result then
-    ctx.out[#ctx.out + 1] = leadLine(ctx, result, step.text)
+    local leadText, lead = leadLine(ctx, result, step.text)
+    ctx.out[#ctx.out + 1] = leadText
+    if lead then
+      ctx.out[#ctx.out + 1] = "greeting: " .. ctx.ns.Greeting.Build(lead, ctx.db.settings)
+    end
   end
   ctx.sender = DEFAULT_SENDER
 end
