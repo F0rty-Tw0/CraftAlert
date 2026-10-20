@@ -215,12 +215,18 @@ local function testCraftersRecipeOrder()
         [9005] = { name = "Bronze Bar", prof = BS },
         [10] = { name = "Copper Bar", prof = BS },
         [9] = { name = "copper bar", prof = BS },
+        [30] = { name = "Copper Bar", prof = BS },
+        -- Name keys (as Classic stores recipes) among the IDs: text order alone would loop
+        -- (9 < 10 by number, 10 < "1x" and "1x" < 9 as text).
+        ["3z"] = { name = "Copper Bar", prof = BS },
+        ["1x"] = { name = "Copper Bar", prof = BS },
+        ["25y"] = { name = "Copper Bar", prof = BS },
       }
     end,
   })
   open(ns, "Crafters")
-  -- Equal names: recipe IDs in number order (9 before 10), not text order. The page shows 8 rows.
-  Assert.same(shownRecipeKeys(), { 9005, 9006, 9, 10, 9003, 9004, 9002, 9001 })
+  -- Equal names: recipe IDs in number order (9 before 10), then name keys. The page shows 8 rows.
+  Assert.same(shownRecipeKeys(), { 9005, 9006, 9, 10, 30, "1x", "25y", "3z" })
 end
 
 -- Removing the current character stores it again from the client at once (as at login), so its
