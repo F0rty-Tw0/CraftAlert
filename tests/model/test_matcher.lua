@@ -34,8 +34,11 @@ end
 -- §6.3 step 1 gate and lastStop per drop reason.
 local function testGate()
   local ns = Fixture.load()
-  fixture(ns)
   local Matcher = ns.Matcher
+  -- No index yet (login stopped early or the build raised): /ca test says so, not "nomatch".
+  Assert.equal(Matcher.MatchUngated("lf fiery weapon"), nil)
+  Assert.equal(Matcher.lastStop, "noIndex")
+  fixture(ns)
   ns.PlayerName.Init()
   Assert.equal(Matcher.Match("general", "lf fiery weapon", SENDER), nil)
   Assert.equal(Matcher.lastStop, "channel", "disabled channel dropped at step 1")

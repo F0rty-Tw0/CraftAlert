@@ -101,14 +101,16 @@ local function onExpiry(generation)
   armExpiry(leads, limit)
 end
 
+-- The state changes only once C_Timer.After returned: if it raises, the timer pending before
+-- (if any) stays the live one, and the next lead tries again.
 local function startTimer(delay)
-  timerArmed = true
-  timerGeneration = timerGeneration + 1
-  timerDeadline = now() + delay
-  local generation = timerGeneration
+  local generation = timerGeneration + 1
   _G["C_Timer"].After(delay, function()
     onExpiry(generation)
   end)
+  timerArmed = true
+  timerGeneration = generation
+  timerDeadline = now() + delay
 end
 
 local function delayForOldest(list, limit)
@@ -161,8 +163,9 @@ local function fixIds(list)
   nextId = 1
   for i = 1, #list do
     local id = list[i].id
-    -- NaN can't be a table key and inf + 1 == inf, so only finite numbers count as ids.
-    if type(id) == "number" and id == id and id > -math.huge and id < math.huge and not seen[id] then
+    -- NaN can't be a table key and inf + 1 == inf, so only finite numbers count as ids. NaN
+    -- fails every comparison, so the bounds check drops it too.
+    if type(id) == "number" and id > -math.huge and id < math.huge and not seen[id] then
       seen[id] = true
       nextId = max(nextId, id + 1)
     else
@@ -214,6 +217,11 @@ function Leads.Restore(accountDb)
   if removed then
     fire("change")
   end
+end
+
+-- Whether Restore bound the db; until then no match makes a lead (ScanGate does not scan).
+function Leads.IsBound()
+  return db ~= nil
 end
 
 local function find(id)

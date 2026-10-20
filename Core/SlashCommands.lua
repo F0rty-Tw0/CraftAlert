@@ -65,9 +65,21 @@ local function togglePerf()
   end
 end
 
+-- The windows read their settings from CraftAlertDB, which a fresh install whose saved data
+-- failed to load (reported at ADDON_LOADED) does not have. → whether it exists.
+local function hasDb()
+  if _G["CraftAlertDB"] ~= nil then
+    return true
+  end
+  ChatPrint.Line(Localization.Text("Craft Alert's saved data did not load; /reload to try again"))
+  return false
+end
+
 local COMMANDS = {
   config = function()
-    SettingsWindow.Toggle()
+    if hasDb() then
+      SettingsWindow.Toggle()
+    end
   end,
   test = runTest,
   perf = togglePerf,
@@ -77,7 +89,9 @@ local function onSlash(message)
   local name, rest = match(message or "", "^%s*(%S*)%s*(.-)%s*$")
   name = lower(name)
   if name == "" then
-    LeadsWindow.Toggle()
+    if hasDb() then
+      LeadsWindow.Toggle()
+    end
     return
   end
   local command = COMMANDS[name]

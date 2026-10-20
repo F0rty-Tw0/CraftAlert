@@ -179,7 +179,10 @@ end
 
 -- Steps 2-4 without the gate (/ca test). → result or nil; lastStop says why.
 function Matcher.MatchUngated(text)
-  if index == nil or type(text) ~= "string" then
+  if index == nil then
+    return stop("noIndex") -- never built: login stopped early or the build raised
+  end
+  if type(text) ~= "string" then
     return stop("nomatch")
   end
   local lower = Scan(text)

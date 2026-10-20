@@ -29,8 +29,14 @@ local function db()
   return _G["CraftAlertDB"]
 end
 
+-- Case-insensitive: names read before the client spelling was kept are stored lowercase. Equal
+-- names fall back to the key, so the order never depends on pairs().
 local function byText(a, b)
-  return a.text < b.text
+  local left, right = lower(a.text), lower(b.text)
+  if left ~= right then
+    return left < right
+  end
+  return tostring(a.key) < tostring(b.key)
 end
 
 local function characterOptions()
@@ -49,7 +55,7 @@ end
 local function professionOptions(character)
   local options = {}
   for key, profession in pairs(character and character.professions or {}) do
-    options[#options + 1] = { value = key, text = profession.name ~= "" and profession.name or tostring(key) }
+    options[#options + 1] = { value = key, text = profession.name ~= "" and profession.name or tostring(key), key = key }
   end
   table.sort(options, byText)
   return options

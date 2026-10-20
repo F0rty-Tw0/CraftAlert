@@ -189,6 +189,39 @@ local function testCraftersPage()
   Assert.equal(character.label:GetText(), "Alt-Realm (same account)")
 end
 
+-- The recipe keys of the visible recipe rows, top to bottom.
+local function shownRecipeKeys()
+  local keys = {}
+  for _, frame in ipairs(Wow.frames) do
+    if frame.bell and frame.item and SettingsFixture.visible(frame) then
+      keys[#keys + 1] = frame.item.key
+    end
+  end
+  return keys
+end
+
+-- Names stored lowercase (read before the client spelling was kept) sort among the others, not
+-- after them; names equal but for case keep one order, by recipe key.
+local function testCraftersRecipeOrder()
+  local ns = SettingsFixture.load({
+    db = function(accountDb)
+      crafters(accountDb)
+      accountDb.characters["Me-Realm"].recipes = {
+        [9001] = { name = "Thick Plate Belt", prof = BS },
+        [9002] = { name = "plate greaves", prof = BS },
+        [9003] = { name = "Iron Rivet", prof = BS },
+        [9004] = { name = "iron rivet", prof = BS },
+        [9008] = { name = "Bronze Bar", prof = BS },
+        [9006] = { name = "Bronze Bar", prof = BS },
+        [9005] = { name = "Bronze Bar", prof = BS },
+        [9007] = { name = "Bronze Bar", prof = BS },
+      }
+    end,
+  })
+  open(ns, "Crafters")
+  Assert.same(shownRecipeKeys(), { 9005, 9006, 9007, 9008, 9003, 9004, 9002, 9001 })
+end
+
 -- Removing the current character stores it again from the client at once (as at login), so its
 -- profession windows keep recording instead of waiting for the next login.
 local function testRemoveOwnCharacter()
@@ -270,6 +303,7 @@ return function()
   testKeywordsPage()
   testBlockTypedName()
   testCraftersPage()
+  testCraftersRecipeOrder()
   testRemoveOwnCharacter()
   testTestPage()
 end

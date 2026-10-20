@@ -50,8 +50,12 @@ function Bindings.DismissLatest()
   end
 end
 
+-- The window reads its settings from CraftAlertDB, missing when the saved data failed to load
+-- (already reported at ADDON_LOADED).
 function Bindings.ToggleLeads()
-  LeadsWindow.Toggle()
+  if _G["CraftAlertDB"] ~= nil then
+    LeadsWindow.Toggle()
+  end
 end
 
 _G.BINDING_HEADER_CRAFTALERT = Localization.Text("Craft Alert")

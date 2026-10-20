@@ -120,17 +120,20 @@ local function isResting()
   return type(resting) == "function" and resting() == true
 end
 
--- Why scanning is paused, or nil while it runs.
+-- Why scanning is paused, or nil while it runs. A login step that raised leaves the gate or
+-- Leads without the db: then a match would make no lead, so nothing is scanned.
 local function pauseReason()
-  local settings = db and db.settings
-  if settings == nil or not settings.enable then
+  if db == nil or not Leads.IsBound() then
+    return "notStarted"
+  end
+  if not db.settings.enable then
     return "disabled"
   end
   local index = Index.Current()
   if index == nil or index.size == 0 then
     return "empty"
   end
-  if settings.onlyResting and not isResting() then
+  if db.settings.onlyResting and not isResting() then
     return "notResting"
   end
   return nil
