@@ -215,11 +215,42 @@ local function testSavedFrameAndOpacity()
   Assert.same({ point, relativePoint, x, y, window():GetWidth(), window():GetHeight() }, { "LEFT", "LEFT", 30, 40, 500, 400 })
 end
 
+-- Review Focus 5: whatever a hand-edited SavedVariables holds, every lead the load-time Schema
+-- check keeps renders on the toast and in the window and can be greeted.
+local function testCorruptedSavedLeads()
+  local corrupted = {
+    { profName = true },
+    { crafter = {} },
+    { itemLink = {}, recipeName = 5, why = {}, message = {}, guid = 7, cannotOrder = "yes" },
+    { greeted = "no", replied = 1, kind = 5, prof = {}, group = {}, itemID = "501" },
+  }
+  local ns, _, calls = load({}, function(accountDb)
+    for id, fields in ipairs(corrupted) do
+      local lead = UiFixture.lead(id)
+      for key, value in pairs(fields) do
+        lead[key] = value
+      end
+      accountDb.leads[id] = lead
+    end
+    Fresh.require("Persistence.Schema").Validate(accountDb)
+  end)
+  Assert.equal(#ns.Leads.List(), 3, "the lead without a usable crafter is dropped")
+  ns.LeadsWindow.Toggle()
+  Assert.equal(#rows(), 3)
+  Wow.clock.gettime = 60
+  for _, lead in ipairs(ns.Leads.List()) do
+    ns.AlertToast.Show(lead)
+    ns.GreetAction.Greet(lead, 50)
+  end
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 3)
+end
+
 return function()
   testLazyAndEscape()
   testRowFields()
   testBlockAndClicks()
   testVisibleLatestAndScroll()
   testSavedFrameAndOpacity()
+  testCorruptedSavedLeads()
   Wow.reset()
 end

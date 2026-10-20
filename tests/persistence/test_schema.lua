@@ -41,7 +41,7 @@ local function testValidDbIsUntouched()
   db.ledger["2026-10-17"] = { seen = 3, greeted = 2, replied = 1, filled = 0 }
   db.recentGreeted["Cus-Realm"] = 100
   db.ignored["Bad-Realm"] = true
-  db.leads[1] = { id = 1, customer = "Cus-Realm", time = 100, message = "LF belt" }
+  db.leads[1] = { id = 1, customer = "Cus-Realm", crafter = "Me-Realm", time = 100, message = "LF belt" }
   db.ui.toast = { point = "TOP", x = 10, y = -20 }
   db.ui.settings = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 40 }
   local before = deepCopy(db)
@@ -197,11 +197,11 @@ local function testLedgerRecentIgnoredLeadsUi()
     recentGreeted = { ["A-Realm"] = 100, ["B-Realm"] = "soon", [5] = 100 },
     ignored = { ["A-Realm"] = true, ["B-Realm"] = false, ["C-Realm"] = "yes" },
     leads = {
-      { customer = "A-Realm", time = 10 },
+      { customer = "A-Realm", crafter = "Me-Realm", time = 10 },
       { customer = 5, time = 10 },
       { customer = "B-Realm", time = "soon" },
       "junk",
-      { customer = "C-Realm", time = 20 },
+      { customer = "C-Realm", crafter = "Me-Realm", time = 20 },
     },
     ui = { toast = { point = "TOP", x = 1, nested = {} }, window = 5, launcher = {}, other = {} },
   })
@@ -218,7 +218,7 @@ end
 local function testListWithHoles()
   local Schema = load()
   local db = Schema.Validate({
-    leads = { [3] = { customer = "B-Realm", time = 20 }, [2] = { customer = "A-Realm", time = 10 } },
+    leads = { [3] = { customer = "B-Realm", crafter = "Me-Realm", time = 20 }, [2] = { customer = "A-Realm", crafter = "Me-Realm", time = 10 } },
     settings = { intentWords = { [1] = "a", [0] = "zero", [1.5] = "half", foo = "b", [3] = "c" } },
   })
   Assert.equal(#db.leads, 2)
@@ -266,6 +266,65 @@ local function testOlderSchemaIsRaisedAndNoWarning()
   Assert.equal(#printedLines(), 0)
 end
 
+-- Review Focus 5: a lead the UI or the greeting would choke on is dropped (no customer, crafter
+-- or time) or loses the wrong-typed field (nil is what a lead without that field has).
+local function testLeadFieldTypes()
+  local Schema = load()
+  local db = Schema.Validate({
+    leads = {
+      { id = 1, customer = "A-Realm", crafter = "Me-Realm", time = 10, profName = true },
+      { id = 2, customer = "B-Realm", crafter = {}, time = 10 },
+      { id = 3, customer = "C-Realm", time = 10 },
+      {
+        id = "x",
+        customer = "D-Realm",
+        crafter = "Me-Realm",
+        time = 20,
+        guid = 7,
+        message = {},
+        channel = 9,
+        kind = 5,
+        prof = {},
+        group = {},
+        why = {},
+        cannotOrder = "yes",
+        greeted = "no",
+        replied = 1,
+        arrivedWhileAfk = "x",
+        recipeName = 5,
+        itemID = "501",
+        itemLink = {},
+      },
+      {
+        id = 5,
+        customer = "E-Realm",
+        crafter = "Alt-Realm",
+        time = 30,
+        guid = "Player-1-0A",
+        message = "LF belt",
+        channel = "trade",
+        kind = "item",
+        prof = 164,
+        group = 501,
+        why = "lf + belt",
+        cannotOrder = true,
+        greeted = false,
+        replied = false,
+        arrivedWhileAfk = false,
+        profName = "Blacksmithing",
+        recipeName = "Belt",
+        itemID = 501,
+        itemLink = "|cff1eff00|Hitem:501|h[Belt]|h|r",
+      },
+    },
+  })
+  Assert.equal(#db.leads, 3)
+  Assert.same(db.leads[1], { id = 1, customer = "A-Realm", crafter = "Me-Realm", time = 10 })
+  Assert.same(db.leads[2], { customer = "D-Realm", crafter = "Me-Realm", time = 20 })
+  Assert.equal(db.leads[3].itemLink, "|cff1eff00|Hitem:501|h[Belt]|h|r", "a well-typed lead keeps every field")
+  Assert.equal(db.leads[3].cannotOrder, true)
+end
+
 local function testIdempotent()
   local Schema = load()
   local db = Schema.Validate({
@@ -288,5 +347,6 @@ return function()
   testNewerSchemaKeepsNestedUiValues()
   testNewerSchema()
   testOlderSchemaIsRaisedAndNoWarning()
+  testLeadFieldTypes()
   testIdempotent()
 end
