@@ -43,6 +43,7 @@ local SKILL_LINES_CHANGED = "SKILL_LINES_CHANGED"
 ---@type table
 local db = nil
 local ownKey = nil
+local loadMs = 0 -- SavedState.Load at ADDON_LOADED, added into Perf.loginMs
 
 -- At login the profession slots may not have loaded yet (ProfessionList keeps what is stored
 -- then); once they change, a new profession order rebuilds the index.
@@ -155,16 +156,20 @@ local function onLogin()
   for _, step in ipairs(LOGIN_STEPS) do
     runStep(step)
   end
-  Perf.loginMs = clock() - started
+  Perf.loginMs = loadMs + clock() - started
 end
 
--- No PlayerName call here: the realm is not known before PLAYER_LOGIN on every flavor.
+-- No PlayerName call here: the realm is not known before PLAYER_LOGIN on every flavor. The
+-- load and schema check count toward the login time (§4.4).
 local function onAddonLoaded(name)
   if name ~= ADDON then
     return
   end
   EventRouter.Off(ADDON_LOADED, onAddonLoaded)
+  local clock = _G["debugprofilestop"]
+  local started = clock()
   db = SavedState.Load()
+  loadMs = clock() - started
 end
 
 EventRouter.On(ADDON_LOADED, onAddonLoaded)

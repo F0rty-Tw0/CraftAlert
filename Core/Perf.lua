@@ -15,7 +15,8 @@ local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 -- periodic report is printed from inside the timed handler (no timer, §4.3 rule 1).
 local Perf = {}
 
--- Milliseconds from login to the end of PLAYER_LOGIN work (Bootstrap sets it), shown in every report.
+-- Milliseconds of login work, the saved-variable load and the PLAYER_LOGIN installs (Bootstrap
+-- sets it), shown in every report.
 Perf.loginMs = nil
 
 local ADDON = "CraftAlert"

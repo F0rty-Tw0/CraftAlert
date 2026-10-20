@@ -343,6 +343,24 @@ local function testRaisingLoginStep(db)
   Assert.same(chatSince(0), { STATUS_ACTIVE }, "the login lines print")
 end
 
+-- §4.4: the login time counts the saved-variable load and check at ADDON_LOADED and the
+-- PLAYER_LOGIN work, not the time between the two events.
+local function testLoginTime(db)
+  local session = startClient(db)
+  local function spend(fn, ms)
+    return function(...)
+      Wow.clock.profile = Wow.clock.profile + ms
+      return fn(...)
+    end
+  end
+  local ns = login(session, function(ns)
+    ns.SavedState.Load = spend(ns.SavedState.Load, 7)
+    ns.PlayerName.Init = spend(ns.PlayerName.Init, 1000)
+    ns.Index.Rebuild = spend(ns.Index.Rebuild, 3)
+  end)
+  Assert.equal(ns.Perf.loginMs, 10)
+end
+
 local function deepCopy(value)
   if type(value) ~= "table" then
     return value
@@ -361,5 +379,6 @@ return function()
   testPartialProfessionsAtLogin(deepCopy(saved))
   testMixedKeysAtLogin(deepCopy(saved))
   testRaisingLoginStep(deepCopy(saved))
+  testLoginTime(deepCopy(saved))
   Wow.reset()
 end
