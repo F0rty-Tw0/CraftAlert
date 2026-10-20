@@ -87,6 +87,12 @@ local function testHideWhenNoLeads()
   db.settings.hideLauncherWhenNoLeads = false
   ns.Launcher.Refresh()
   Assert.equal(frame:IsShown(), true)
+
+  -- The setting on and a lead listed: shown.
+  ns, db = UiFixture.load({ leads = 1 })
+  db.settings.hideLauncherWhenNoLeads = true
+  setScan(ns, true)
+  Assert.equal(ns.Launcher.Create():IsShown(), true, "shown: a lead is listed")
 end
 
 local function testSavedPosition()
