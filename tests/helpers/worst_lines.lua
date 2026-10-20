@@ -100,6 +100,13 @@ local SEARCH_LINE = "lf aa int ha ba cloth of ea ca rakufabq na 8x ribicaq ja in
   .. "plate enchant of 8x of ca ca int storm green ribagababaq ribagababaq rigadabq da renugababaq "
   .. "ruvadababaq ribagababaq ribagababaq renedaq iron na rupagaq storm"
 
+-- Two slot words (so the inferred armor word empties the intersection) then 3 typo near
+-- misses: the lookup, the append, the empty intersection and the typo pass.
+function WorstLines.inferredEmpty(index)
+  local misses = string.match(WorstLines.typo(index), "^lf (%S+ %S+ %S+)")
+  return "lf belt boots " .. misses
+end
+
 -- → { { name, line }, ... }
 function WorstLines.cases(index)
   local fill = WorstLines.fill
@@ -120,6 +127,9 @@ function WorstLines.cases(index)
     { "a", fill("lf", "a") }, -- the most tokens a line can hold
     { "8x", fill("lf", "8x") }, -- 4.3: digits then letters, no stat word
     { "search", SEARCH_LINE },
+    { "bareslot", fill("lf", "belt") }, -- 4.4: a bare slot word, so the armor word is inferred
+    { "admit", fill("lf crafter", "head") }, -- 4.4: unpartnered cued ambiguous word, admitted
+    { "inferred_empty", WorstLines.inferredEmpty(index) }, -- 4.4: lookup, append, empty, typo
   }
 end
 

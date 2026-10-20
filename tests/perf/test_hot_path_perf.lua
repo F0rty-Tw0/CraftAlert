@@ -19,6 +19,7 @@ local RUNS = 3 -- the 10,000-line mean: median of 3 (plan A4)
 local BEST_OF = 5 -- build and each worst line: the fastest of 5, since noise only adds time
 local WORST_REPS = 300
 local SENDER = "Customer-Other"
+local GUID = "Player-1-PERF"
 
 local Synthetic = require("tests.helpers.synthetic_index")
 local WorstLines = require("tests.helpers.worst_lines")
@@ -52,6 +53,7 @@ local REQUESTS = {
   "LF enchanter +8stam to chest %d",
   "need Green Iron Belt %d",
   "LF someone to make stuff %d",
+  "LF belt %d",
 }
 
 -- About 90% non-requests; each line unique through its number.
@@ -78,7 +80,7 @@ local function meanMicros(Matcher, lines)
   for r = 1, RUNS do
     local started = os.clock()
     for i = 1, #lines do
-      Matcher.Match("trade", lines[i], SENDER)
+      Matcher.Match("trade", lines[i], SENDER, GUID)
     end
     runs[r] = os.clock() - started
   end
@@ -87,7 +89,7 @@ end
 
 local function pass(Matcher, lines)
   for i = 1, #lines do
-    Matcher.Match("trade", lines[i], SENDER)
+    Matcher.Match("trade", lines[i], SENDER, GUID)
   end
 end
 
@@ -139,7 +141,7 @@ local function worstMicros(Matcher, line)
   for _ = 1, BEST_OF do
     local started = os.clock()
     for _ = 1, WORST_REPS do
-      Matcher.Match("trade", line, SENDER)
+      Matcher.Match("trade", line, SENDER, GUID)
     end
     best = math.min(best, (os.clock() - started) * 1e6 / WORST_REPS)
   end
@@ -161,14 +163,23 @@ return function()
   local indexKB = collectgarbage("count") - idleBefore
   ns.Matcher.SetIndex(index)
   local Matcher = ns.Matcher
+  local classCalls = { n = 0 }
+  Wow.stub("GetPlayerInfoByGUID", function()
+    classCalls.n = classCalls.n + 1
+    return "Warrior", "WARRIOR"
+  end)
+  local inferredEmpty = WorstLines.inferredEmpty(index)
+  Assert.equal(Matcher.Match("trade", inferredEmpty, SENDER, GUID), nil, "inferred_empty must not match")
+  Assert.equal(Matcher.lastStop, "nomatch")
+  Assert.equal(classCalls.n, 1, "inferred_empty pays the lookup")
 
   local mixed = mixedLines(LINES)
   local quiet = nonMatchingLines(LINES, LINES)
   local worst = WorstLines.typo(index)
-  Assert.equal(Matcher.Match("trade", worst, SENDER), nil, "worst line must not match")
+  Assert.equal(Matcher.Match("trade", worst, SENDER, GUID), nil, "worst line must not match")
   Assert.equal(Matcher.lastStop, "nomatch")
   Assert.truthy(#worst > 240 and #worst <= 255, "worst line length " .. #worst)
-  Assert.truthy(Matcher.Match("trade", mixed[10], SENDER), "requests in the mix do match")
+  Assert.truthy(Matcher.Match("trade", mixed[10], SENDER, GUID), "requests in the mix do match")
   Assert.truthy(index.joinIndex.ca and not index.joinIndex.ca.phrase, "join_ca hits a shared join left side")
   local worstCases = WorstLines.cases(index)
   local worstLines, worstText = {}, {}
@@ -181,7 +192,9 @@ return function()
   end
   worstLines[#worstLines + 1] = mixed[10]
 
+  classCalls.n = 0
   local mean = meanMicros(Matcher, mixed)
+  Assert.truthy(classCalls.n > 0, "the mixed lines pass a GUID, so bare-slot requests pay the lookup")
   local retained = retainedKB(Matcher, quiet)
   local retainedMatching = retainedKB(Matcher, mixed, 5)
   local growth = warmGrowthKB(Matcher, mixed)
