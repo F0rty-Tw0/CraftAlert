@@ -52,4 +52,5 @@ Professions/ModernReader.lua
 Professions/LearnWatcher.lua
 Core/Status.lua
 Core/ScanGate.lua
+UI/ClickRouter.lua
 Bootstrap.lua
