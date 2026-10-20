@@ -79,14 +79,17 @@ local function sameOrder(a, b)
   return true
 end
 
--- Before the first usable read of a session, the stored professions stand in, sorted.
+-- Before the first usable read of a session, the stored professions stand in, sorted. Only the
+-- skill-line IDs Refresh writes: the Schema also keeps string keys, and sorting a mix raises.
 local function seedOrder(character)
   if #order > 0 or character == nil then
     return
   end
   local keys = {}
   for key in pairs(character.professions) do
-    keys[#keys + 1] = key
+    if type(key) == "number" then
+      keys[#keys + 1] = key
+    end
   end
   sort(keys)
   order = keys

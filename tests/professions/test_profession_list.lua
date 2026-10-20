@@ -162,4 +162,13 @@ return function()
   ProfessionList = load() -- Wow.reset drops the profession API stubs
   ProfessionList.Refresh(db, CHAR)
   Assert.same(ProfessionList.Order(), { BS, ENCH }, "a missing API seeds the order too")
+
+  -- A hand-edited db can mix key types (the Schema keeps number and string keys): the seed takes
+  -- the skill-line IDs this flavor writes and leaves the rest out, without raising.
+  ProfessionList = load()
+  db.characters[CHAR].professions[tostring(ENCH)] = { name = "Enchanting", primary = false, read = true }
+  db.characters[CHAR].professions.Tailoring = { name = "Tailoring", primary = false, read = true }
+  ProfessionsRetail.install({ slots = { false, false, slot("Cooking", COOKING) } })
+  Assert.equal(ProfessionList.Refresh(db, CHAR), false)
+  Assert.same(ProfessionList.Order(), { BS, ENCH }, "string keys are left out of the seed")
 end
