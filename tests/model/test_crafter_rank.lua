@@ -138,6 +138,27 @@ return function()
   Assert.equal(picked, "Me-Realm")
   Assert.equal(cannotOrder, false)
 
+  -- One Pick asks about each character once, however many entries name it and for the winner too
+  -- (Pick runs per matched line; a long realm list times many entries is the cost to avoid).
+  local RealmTag = require("CraftAlert.Model.RealmTag")
+  local cannotOrderOf = RealmTag.CannotOrder
+  local function pickCounting(keys)
+    local questions = {}
+    rawset(RealmTag, "CannotOrder", function(db2, crafter, customer)
+      questions[crafter] = (questions[crafter] or 0) + 1
+      return cannotOrderOf(db2, crafter, customer)
+    end)
+    local winner, tag = CrafterRank.Pick(result(keys), CUSTOMER, data)
+    rawset(RealmTag, "CannotOrder", cannotOrderOf)
+    return winner, tag, questions
+  end
+  local winner, tag, counts = pickCounting({ "Me-Realm", "Alt-Realm", "Zed-Realm", "Alt-Realm", "Me-Realm" })
+  Assert.same({ winner, tag }, { "Alt-Realm", false })
+  Assert.same(counts, { ["Me-Realm"] = 1, ["Alt-Realm"] = 1, ["Zed-Realm"] = 1 })
+  winner, tag, counts = pickCounting({ "Imp-Realm", "Imp-Realm" })
+  Assert.same({ winner, tag }, { "Imp-Realm", nil })
+  Assert.same(counts, { ["Imp-Realm"] = 1 }, "an unknown answer (nil) is remembered too")
+
   -- A crafter with no realm list is unknown, not "cannot": never demoted, never tagged.
   picked, cannotOrder = CrafterRank.Pick(result({ "Me-Realm", "Imp-Realm" }), CUSTOMER, data)
   Assert.equal(picked, "Imp-Realm")

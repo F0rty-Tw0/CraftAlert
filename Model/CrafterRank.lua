@@ -48,9 +48,18 @@ function CrafterRank.Pick(result, customerKey, db, opts)
     return nil
   end
   local bestKey, bestScore = nil, nil
+  -- Asked once per character: an entry per recipe names the same few characters again and again.
+  local cannotOrderBy, asked = {}, {}
+  local function cannotOrder(key)
+    if not asked[key] then
+      asked[key] = true
+      cannotOrderBy[key] = RealmTag.CannotOrder(db, key, customerKey)
+    end
+    return cannotOrderBy[key]
+  end
   local function consider(key, prof)
     local score = tierOf(db.characters[key], key, prof)
-    if RealmTag.CannotOrder(db, key, customerKey) == true then
+    if cannotOrder(key) == true then
       score = score + CANNOT_ORDER
     end
     if bestKey == nil or score < bestScore or (score == bestScore and key < bestKey) then
@@ -72,7 +81,7 @@ function CrafterRank.Pick(result, customerKey, db, opts)
   if bestKey == nil then
     return nil
   end
-  return bestKey, RealmTag.CannotOrder(db, bestKey, customerKey)
+  return bestKey, cannotOrder(bestKey)
 end
 
 ns.CrafterRank = CrafterRank
