@@ -31,6 +31,8 @@ local db = nil
 local leads = nil -- db.leads, edited in place
 local nextId = 1
 local timerArmed = false
+local timerGeneration = 0 -- only the timer started last acts when it fires
+local timerDeadline = 0 -- time() when the pending timer fires
 local listeners = { new = {}, change = {}, greeted = {}, replied = {} }
 
 local function now()
@@ -89,7 +91,10 @@ end
 
 local armExpiry
 
-local function onExpiry()
+local function onExpiry(generation)
+  if generation ~= timerGeneration then
+    return
+  end
   timerArmed = false
   if sweep() then
     fire("change")
@@ -97,16 +102,48 @@ local function onExpiry()
   armExpiry()
 end
 
+local function startTimer(delay)
+  timerArmed = true
+  timerGeneration = timerGeneration + 1
+  timerDeadline = now() + delay
+  local generation = timerGeneration
+  _G["C_Timer"].After(delay, function()
+    onExpiry(generation)
+  end)
+end
+
+local function delayForOldest()
+  return max(1, leads[1].time + timeoutSeconds() - now() + 1)
+end
+
 -- Waits for the oldest lead to pass the timeout (strictly, as the sweep counts it). A timer
 -- that is already pending is kept: if its lead was dismissed or refreshed, it fires early,
 -- sweeps nothing and re-arms.
 armExpiry = function()
-  local first = leads[1]
-  if timerArmed or first == nil then
+  if timerArmed or leads[1] == nil then
     return
   end
-  timerArmed = true
-  _G["C_Timer"].After(max(1, first.time + timeoutSeconds() - now() + 1), onExpiry)
+  startTimer(delayForOldest())
+end
+
+-- After a leadTimeoutMin change (settings page): sweeps what the new timeout already expired,
+-- and when the oldest lead's new deadline comes before the pending timer, arms one for it. The
+-- timer it replaces cannot be cancelled; it fires later and does nothing. A later deadline
+-- keeps the pending timer, which fires early and re-arms.
+function Leads.Rearm()
+  if db == nil then
+    return
+  end
+  if sweep() then
+    fire("change")
+  end
+  if leads[1] == nil then
+    return
+  end
+  local delay = delayForOldest()
+  if not timerArmed or now() + delay < timerDeadline then
+    startTimer(delay)
+  end
 end
 
 -- Oldest first; leads of the same second keep their id order (ids are unique by now).
