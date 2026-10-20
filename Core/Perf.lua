@@ -88,17 +88,18 @@ function Perf.IsRunning()
   return running
 end
 
--- Starts timing (no-op while running): swaps the chat handler, prints one notice.
+-- Starts timing (no-op while running): swaps the chat handler, prints one notice. The memory is
+-- read first: if that raises, perf stays off with HandleChat in place.
 function Perf.Start()
   if running then
     return
   end
-  running = true
+  startMemory = FlavorCompat.GetAddOnMemoryUsage(ADDON)
   clock = _G["debugprofilestop"]
   lastReportAt = clock()
   lines, linesTotal, linesMax = 0, 0, 0
   matched, matchedTotal, matchedMax = 0, 0, 0
-  startMemory = FlavorCompat.GetAddOnMemoryUsage(ADDON)
+  running = true
   ScanGate.SetHandler(timedHandler)
   local notice = Localization.Text("Perf on: timing each chat line, a report every 60 s. /ca perf again stops it.")
   if startMemory then

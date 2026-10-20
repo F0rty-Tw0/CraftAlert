@@ -83,6 +83,18 @@ return function()
   Perf.Stop()
   Assert.equal(#Wow.chat, 3, "stopping twice prints nothing")
 
+  -- A memory API that raises leaves perf off, HandleChat in place.
+  calls = scriptClock({ 0 })
+  Wow.stub("GetAddOnMemoryUsage", function()
+    error("memory failed", 0)
+  end)
+  Assert.raises(function()
+    Perf.Start()
+  end, "memory failed")
+  Assert.equal(Perf.IsRunning(), false)
+  SlashFixture.fireTrade("hello there", "Ed-Draenor")
+  Assert.equal(calls(), 0, "no timed handler, no clock read")
+
   -- A run with no lines, no login time and no memory API says so instead of dividing by zero.
   Perf.loginMs = nil
   ns.Index.lastBuildMs = nil
