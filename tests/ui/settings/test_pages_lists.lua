@@ -206,6 +206,14 @@ local function testRemoveOwnCharacter()
   Assert.same(me.professions, { [BS] = { name = "Blacksmithing", primary = false, read = false } })
   Assert.equal(ns.ProfessionList.IsStored(db, "Me-Realm", BS), true)
   Assert.truthy(db.characters["Alt-Realm"].recipes[9001], "other characters are untouched")
+
+  -- Another character is not the client's: it stays removed.
+  local character = row("Character").input
+  Widgets.click(character, "LeftButton")
+  Assert.equal(character.label:GetText(), "Alt-Realm (same account)")
+  Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Remove character"))
+  Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Click again to remove"))
+  Assert.equal(db.characters["Alt-Realm"], nil, "an alt is not stored again")
 end
 
 -- §9 Test: a line → result and "why", through Matcher.MatchUngated (no gate, no lead, no
