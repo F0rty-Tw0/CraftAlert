@@ -1,4 +1,5 @@
 local Assert = require("tests.helpers.assert")
+local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local Fixture = require("tests.helpers.matcher_fixture")
 local SettingsFixture = require("tests.helpers.settings_fixture")
@@ -70,6 +71,16 @@ local function crafters(accountDb)
   accountDb.characters["Far-Away"] = { source = "import", importedAt = 1, enabled = true, realms = {}, professions = {}, recipes = {} }
 end
 
+-- The bell of the visible recipe row showing recipe `key`.
+local function bellOf(key)
+  for _, frame in ipairs(Wow.frames) do
+    if frame.bell and frame.item and frame.item.key == key and SettingsFixture.visible(frame) then
+      return frame.bell
+    end
+  end
+  error("no visible recipe row " .. tostring(key))
+end
+
 -- §6.2: crafter enable/disable, removal and mute rebuild the index; the primary crafter is
 -- read when a lead picks its crafter (§6.3 step 5), so it rebuilds nothing.
 local function testCraftersPage()
@@ -94,6 +105,10 @@ local function testCraftersPage()
   Widgets.click(row("Primary crafter for this profession").input)
   Assert.equal(me.professions[BS].primary, true)
   Assert.equal(db.characters["Alt-Realm"].professions[BS].primary, false, "the other primary is cleared")
+  Widgets.click(row("Primary crafter for this profession").input)
+  Assert.equal(me.professions[BS].primary, false, "switched off again")
+  Assert.equal(db.characters["Alt-Realm"].professions[BS].primary, false, "nobody else gains it")
+  Widgets.click(row("Primary crafter for this profession").input)
   Assert.same(take(refreshes), {})
 
   -- Recipes of that profession by name, with search; mute toggles the bell and rebuilds.
@@ -106,8 +121,10 @@ local function testCraftersPage()
   Assert.equal(me.recipes[9001].muted, true)
   Assert.same(take(refreshes), { "rebuild:mute" })
   Assert.truthy(texts():find("Thick Plate Belt / Unmute", 1, true))
+  Assert.equal(bellOf(9001).desaturated, true, "a muted recipe's bell is grey")
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Unmute"))
   Assert.equal(me.recipes[9001].muted, nil)
+  Assert.equal(bellOf(9001).desaturated, false)
   Assert.same(take(refreshes), { "rebuild:mute" })
   Widgets.click(row("Profession").input)
   Assert.truthy(texts():find("Enchant Bracer - Health", 1, true), "the search clears with the profession")
