@@ -43,6 +43,7 @@ local function testValidDbIsUntouched()
   db.ignored["Bad-Realm"] = true
   db.leads[1] = { id = 1, customer = "Cus-Realm", time = 100, message = "LF belt" }
   db.ui.toast = { point = "TOP", x = 10, y = -20 }
+  db.ui.settings = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 40 }
   local before = deepCopy(db)
   Assert.same(Schema.Validate(db), before)
   Assert.equal(#printedLines(), 0)

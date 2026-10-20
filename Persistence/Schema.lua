@@ -28,7 +28,7 @@ local PROFESSION_SHAPE = { name = "", primary = false, read = false }
 local RECIPE_FIELDS = { name = "string", prof = "key", item = "number", ranks = "table", bind = "number", muted = "boolean" }
 local CHARACTER_FIELDS = { source = "string", importedAt = "number", realms = "table", professions = "table", recipes = "table" }
 local COUNTERS = { seen = 0, greeted = 0, replied = 0, filled = 0 }
-local UI_FRAMES = { toast = true, window = true, launcher = true }
+local UI_FRAMES = { toast = true, window = true, launcher = true, settings = true }
 local DAY_PATTERN = "^%d%d%d%d%-%d%d%-%d%d$"
 
 -- Set by Validate; read by every dropUnknown.
