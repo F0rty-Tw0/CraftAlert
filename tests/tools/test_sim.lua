@@ -1,6 +1,28 @@
 local Assert = require("tests.helpers.assert")
 local Toc = require("tests.helpers.toc")
 
+-- Runs tools/sim.lua as `python scripts/sim.py ...argv` would: its main block prints every line
+-- and exits. print and os.exit are captured, then restored. → the printed lines, the exit code
+-- (nil when the sim did not exit).
+local function runMain(argv)
+  local printed, code = {}, nil
+  local savedPrint, savedExit, savedArg = print, os.exit, rawget(_G, "arg")
+  _G.print = function(line)
+    printed[#printed + 1] = line
+  end
+  rawset(os, "exit", function(status)
+    code = status
+  end)
+  _G.arg = argv
+  _G.CRAFTALERT_SIM_NO_MAIN = nil
+  local ok, err = pcall(dofile, "tools/sim.lua")
+  _G.CRAFTALERT_SIM_NO_MAIN = true
+  rawset(os, "exit", savedExit)
+  _G.print, _G.arg = savedPrint, savedArg
+  assert(ok, err)
+  return printed, code
+end
+
 -- Only the `sender:` lines of a run.
 local function senderLines(lines)
   local senders = {}
@@ -294,4 +316,16 @@ return function()
   Assert.equal(#newer, 3)
   assert(string.find(newer[2], "^chat: Craft Alert: .*newer"), newer[2])
   Assert.equal(newer[3], "db: schema=2 characters=1 recipes=2 leads=100")
+
+  -- Run from the command line, any `error:` line makes the sim exit 1, so a Proof run notices a
+  -- broken invocation: a bad flag (the only line) or a step that fails after others printed.
+  local printed, code = runMain({ "--nope" })
+  Assert.equal(code, 1)
+  assert(string.find(printed[1], "^error: unknown flag"), printed[1])
+  printed, code = runMain({ "--click", "left" })
+  Assert.equal(code, 1)
+  Assert.equal(printed[#printed], "error: --click left has no lead to act on")
+  printed, code = runMain({ "LF plate belt" })
+  Assert.equal(code, nil, "a clean run does not exit")
+  Assert.truthy(#printed > 1)
 end

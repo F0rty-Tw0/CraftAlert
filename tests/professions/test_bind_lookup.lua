@@ -148,6 +148,27 @@ return function()
   Assert.equal(BindLookup.lastStored, 0, "the next drain starts from 0")
   Assert.equal(run.builds, 1, "a drain that stores nothing rebuilds nothing")
 
+  -- A waiting item whose data the client cached meanwhile is stored on the tick that sends it:
+  -- that tick does not end the drain early, and the drain rebuilds once for all of it.
+  state, BindLookup, db, run = setup(BATCH + 1)
+  for i = 1, BATCH + 1 do
+    state.bind[1000 + i] = 1
+    BindLookup.Queue(1000 + i)
+  end
+  for i = 1, BATCH do
+    arrive(state, 1000 + i)
+  end
+  state.cached[1000 + BATCH + 1] = true
+  tick()
+  Assert.equal(#state.requests, BATCH, "the cached item needs no request")
+  Assert.equal(BindLookup.lastStored, nil, "the drain is not over")
+  Assert.equal(Wow.pendingTimers(0), 0, "no rebuild yet")
+  tick()
+  Assert.equal(db.characters["A-Realm"].recipes[1000 + BATCH + 1].bind, 1)
+  Assert.equal(BindLookup.lastStored, BATCH + 1)
+  Wow.runTimers()
+  Assert.equal(run.builds, 1, "one rebuild for the whole drain")
+
   -- An item that never answers is given up after 10 ticks, so it cannot block the window or
   -- keep the event registered; it is not retried this session.
   state, BindLookup, db, run = setup(60)
