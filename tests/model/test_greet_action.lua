@@ -6,10 +6,10 @@ local Fixture = require("tests.helpers.matcher_fixture")
 local T0 = 1000
 local CUSTOMER = "Bob-Draenor"
 
--- Fresh modules; the player is Me-Realm, not AFK, GetTime() is 50. Every send lands in
--- `calls` as { api, args... } in call order. → ns, db, calls.
-local function setup(extra)
-  local ns = Fixture.load("retail")
+-- Fresh modules for `flavor` (default Retail); the player is Me-Realm, not AFK, GetTime() is
+-- 50. Every send lands in `calls` as { api, args... } in call order. → ns, db, calls.
+local function setup(extra, flavor)
+  local ns = Fixture.load(flavor or "retail")
   Wow.clock.time = T0
   Wow.clock.gettime = 50
   Wow.stub("UnitName", function()
@@ -178,6 +178,26 @@ return function()
   ns.GreetAction.Greet(all[7], 49)
   Assert.same(calls[#calls], { "prefill", all[7].customer, GREETING })
   Assert.equal(all[7].greeted, false)
+
+  -- Forever names are region-unique: the stored key carries the own realm, but every whisper
+  -- goes to the full name without a realm (spec §10); the lead and the greeting keep the key.
+  ns, _, calls = setup(function(db)
+    db.leads[1] = leadRecord(1, "Bob Smith-Realm")
+  end, "forever")
+  lead = ns.Leads.Latest()
+  ns.GreetAction.Greet(lead, 49)
+  ns.GreetAction.Greet(lead, 49)
+  ns.GreetAction.Prefill(lead)
+  ns.GreetAction.Empty(lead)
+  Assert.same(calls, {
+    { "addon", "robots.txt", "Q:CraftAlert", "WHISPER", "Bob Smith" },
+    { "chat", "Hi! I have Blacksmithing, what do you need?", "WHISPER", nil, "Bob Smith" },
+    { "prefill", "Bob Smith", "Hi! I have Blacksmithing, what do you need?" },
+    { "prefill", "Bob Smith", "Hi! I have Blacksmithing, what do you need?" },
+    { "empty", "Bob Smith" },
+  })
+  Assert.equal(lead.customer, "Bob Smith-Realm")
+  Assert.equal(lead.greeted, true)
 
   -- Prefill and Empty open the whisper box for the lead's customer and mark nothing.
   ns, _, calls = setup(withLeads(1))
