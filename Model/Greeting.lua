@@ -68,9 +68,12 @@ local function cap(text)
     following = byte(text, cut + 1)
   end
   local kept = sub(text, 1, cut)
+  -- The last real link start: an escaped "||H" is text.
   local open, at = nil, find(kept, "|H", 1, true)
   while at do
-    open = at
+    if startsCode(kept, at) then
+      open = at
+    end
     at = find(kept, "|H", at + 1, true)
   end
   if open and not find(kept, "|h.-|h", open) then

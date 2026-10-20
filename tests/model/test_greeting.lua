@@ -166,4 +166,11 @@ return function()
   Assert.equal(Greeting.Build(lead, settings), string.rep("x", 200) .. "||cffffffff", "the escaped text before a cut link stays")
   settings.templates.item = string.rep("x", 248) .. "|||cafe" .. "zz"
   Assert.equal(Greeting.Build(lead, settings), string.rep("x", 248) .. "||", "an escaped pipe, then a real colour start")
+  -- An escaped "||H" is text, not a link start: the cut keeps everything up to the limit.
+  local escapedH = string.rep("x", 200) .. "||Hello " .. string.rep("y", 60)
+  settings.templates.item = escapedH
+  Assert.equal(Greeting.Build(lead, settings), string.sub(escapedH, 1, 255), "an escaped ||H is not a half link")
+  -- A real link after an escaped pipe ("|||H...") is still cut whole.
+  settings.templates.item = string.rep("x", 200) .. "|||Hitem:1|h[" .. string.rep("a", 60) .. "]|h"
+  Assert.equal(Greeting.Build(lead, settings), string.rep("x", 200) .. "||", "a real link after an escaped pipe")
 end
