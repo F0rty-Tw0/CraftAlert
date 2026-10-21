@@ -49,7 +49,8 @@ local ranks = {} -- entry -> { tier, name } while a build runs
 
 local slotCache = {} -- Slang is static data, so the merged lists never change
 
--- Slang.slots lists holding the slot word, merged; just the word when none does ("weapon").
+-- Slang.slots lists holding the slot word, merged, without the Slang.wordGroupsOnly words
+-- (user ruling 2026-10-22); just the word when none does ("weapon").
 local function slotWords(slot)
   if slotCache[slot] then
     return slotCache[slot]
@@ -59,7 +60,7 @@ local function slotWords(slot)
     for _, word in ipairs(list) do
       if word == slot then
         for _, other in ipairs(list) do
-          if not seen[other] then
+          if not seen[other] and not Slang.wordGroupsOnly[other] then
             seen[other] = true
             words[#words + 1] = other
           end

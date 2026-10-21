@@ -79,6 +79,11 @@ for _, word in ipairs(Constants.ambiguousWords) do
   Slang.ambiguous[word] = true
 end
 
+-- User ruling 2026-10-22: slot words only step 4.4 (WordGroups) reads. They are no companion
+-- word (§6.2 item 1, steps 4.2 and 4.5) and no stat + slot slot word (§6.3 step 4.3), so "be
+-- back in 5" never completes an alias or a stat. The other ambiguous words stay companions.
+Slang.wordGroupsOnly = { back = true }
+
 -- Class-armor spec §4 rule 1: armor slot words -> "slot", armor type words -> "type". Step 4.4
 -- reads them (through index.armorTags) to see a slot named without an armor type.
 local ARMOR_SLOTS = {

@@ -120,9 +120,40 @@ local function testRing()
   expect(ns, "lf ring for my finger", "item:801")
 end
 
+-- User ruling 2026-10-22: "back" names a cloak in step 4.4 only. It is no companion of a lone
+-- step 4.2 or 4.5 hit and no stat + slot slot word (step 4.3), so "be back in 5" completes
+-- nothing; "cloak" and the other ambiguous words ("legs") keep both roles.
+local function testBackIsNoCompanion()
+  local ns = Fixture.load()
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Tai-Realm"] = character({ TAILOR }, { [9] = { item = 606, name = "Silk Cloak", prof = TAILOR } })
+    db.characters["Smith2-Realm"] = character({ BS }, {
+      [4] = { item = 910, name = "Shadowfang", prof = BS },
+      [5] = { name = "Heavy Copper Maul", prof = BS },
+    })
+    db.characters["Ench-Realm"] = character({ ENCH }, {
+      [11] = { name = "Enchant Cloak - Greater Agility", prof = ENCH },
+      [12] = { name = "Enchant Cloak - Superior Mana", prof = ENCH },
+    })
+  end)
+  expect(ns, "need heavy hitters for raid, be back in 5", "stop:nomatch", "step 4.2: a kind-c alias")
+  expect(ns, "LF shadowfang run, back in 10", "stop:nomatch", "step 4.2: a one-word full name")
+  expect(ns, "LF shadowfnag run, back in 10", "stop:nomatch", "step 4.5: by typo")
+  expect(ns, "LF healer w mana, back in 5", "stop:nomatch", "step 4.3: no stat + slot")
+  -- With "back" no stat + slot word, step 4.4 counts it through its cue word "enchant" and
+  -- narrows to Enchanting, which has no cloak item: step 4.6 alerts Enchanting (the ruling
+  -- accepts this over the cloak agility enchant).
+  expect(ns, "LF agi back enchant", "profession:" .. ENCH)
+  expect(ns, "LF agi cloak enchant", "item:enchant cloak - greater agility", "cloak is a stat + slot word")
+  expect(ns, "LF shadowfang cloak", "item:910", "cloak is a companion")
+  expect(ns, "LF shadowfang legs", "item:910", "another ambiguous word is a companion")
+  expect(ns, "LF tailor back", "item:606", "step 4.4 still reads back")
+end
+
 return function()
   testKindCOnSpecFixture()
   testKindCOnTradeWords()
   testRing()
+  testBackIsNoCompanion()
   Wow.reset()
 end
