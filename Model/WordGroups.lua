@@ -140,9 +140,21 @@ local function infoFor(list, rank, seenIn)
   return { groupCount = #firstOfGroup, prof = prof, entries = entries }
 end
 
--- info.byProf for list: the entries of each profession, then their infoFor in place. nil when
+-- infoFor over the entries of profession prof alone: the tie-break would pick prof and the
+-- filter would copy list, so only the distinct recipes are counted.
+local function soleInfo(list, prof, seenIn)
+  local groupCount = 0
+  for _, entry in ipairs(list) do
+    if seenIn[entry.group] ~= list then
+      seenIn[entry.group], groupCount = list, groupCount + 1
+    end
+  end
+  return { groupCount = groupCount, prof = prof, entries = list }
+end
+
+-- info.byProf for list: the entries of each profession, then their soleInfo in place. nil when
 -- one profession has every entry (most words), so the index holds no table for it.
-local function byProfession(list, rank, seenIn)
+local function byProfession(list, seenIn)
   local only = list[1] and list[1].prof
   for _, entry in ipairs(list) do
     if entry.prof ~= only then
@@ -163,7 +175,7 @@ local function byProfession(list, rank, seenIn)
     end
   end
   for prof, entries in pairs(byProf) do
-    byProf[prof] = infoFor(entries, rank, seenIn)
+    byProf[prof] = soleInfo(entries, prof, seenIn)
   end
   return byProf
 end
@@ -196,7 +208,7 @@ function WordGroups.Build(index)
   local seenIn = {}
   index.wordInfo = {}
   for word, list in pairs(index.wordIndex) do
-    local info, byProf = infoFor(list, rank, seenIn), byProfession(list, rank, seenIn)
+    local info, byProf = infoFor(list, rank, seenIn), byProfession(list, seenIn)
     if byProf ~= nil and info.groupCount > 1 and info.prof ~= nil then
       info.entries = byProf[info.prof].entries -- the same entries in the same order, held once
     end
