@@ -235,17 +235,34 @@ return function()
   Assert.equal(recipesOf(db)[4].prof, BS)
   Assert.equal(db.characters[CHAR].professions[BS].read, true)
 
-  -- A Cooking recipe an older read saved as Blacksmithing is dropped once the window's own
-  -- profession is read, and kept while the list gives the window nothing.
-  state, _, db = setup()
+  -- Saved recipes an older read tagged Blacksmithing, though their own lookup names Cooking,
+  -- are dropped on a Blacksmithing read, in the list or not, once some recipe's own lookup
+  -- names Blacksmithing. A recipe the lookup does not resolve stays.
+  state, _, db, run = setup()
   recipesOf(db)[3] = { item = 300, name = "Belt 3", prof = BS }
+  recipesOf(db)[7] = { item = 700, name = "Belt 7", prof = BS, muted = true }
+  recipesOf(db)[9] = { item = 900, name = "Belt 9", prof = BS }
+  state.lookups = { [7] = ownCooking }
   state.recipes = { belt(3, 300, { profession = ownCooking }), belt(5, 500, { profession = ownEnch }) }
   Wow.fireEvent("TRADE_SKILL_SHOW")
-  Assert.truthy(recipesOf(db)[3], "no Blacksmithing recipe in the list: the lookup proves nothing")
+  Assert.truthy(recipesOf(db)[3], "no recipe named Blacksmithing: the lookup proves nothing")
+  Assert.truthy(recipesOf(db)[7])
+  state.recipes = { belt(4, 400, { profession = { professionID = 0 } }) }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.truthy(recipesOf(db)[7], "a recipe filed under the window by a 0 lookup proves nothing")
   state.recipes = { belt(1, 100, { profession = ownBs }), belt(3, 300, { profession = ownCooking }) }
-  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
-  Assert.equal(recipesOf(db)[3], nil, "a recipe of a profession the character does not have")
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(recipesOf(db)[3], nil, "in the list: a profession the character does not have")
+  Assert.equal(recipesOf(db)[7], nil, "not in the list: the lookup names Cooking")
+  Assert.truthy(recipesOf(db)[9], "no lookup answer: kept")
   Assert.equal(recipesOf(db)[1].prof, BS)
+  Wow.runTimers()
+  local builds = run.builds
+  recipesOf(db)[7] = { item = 700, name = "Belt 7", prof = BS }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(recipesOf(db)[7], nil)
+  Wow.runTimers()
+  Assert.equal(run.builds, builds + 1, "a read that only drops a recipe still rebuilds the index")
 
   -- Opening the window reads even while the data source is still rebuilding.
   state, _, db = setup()

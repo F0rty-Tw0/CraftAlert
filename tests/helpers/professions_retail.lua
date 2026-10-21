@@ -6,6 +6,7 @@
 -- state.slots: GetProfessions positions, each { name = "Blacksmithing", skillLine = 164 } or false.
 -- state.base: professionID C_TradeSkillUI.GetBaseProfessionInfo reports for the open window.
 -- state.changing: C_TradeSkillUI.IsDataSourceChanging() (the list is still rebuilding).
+-- state.lookups[id]: what GetProfessionInfoByRecipeID reports for a recipe not in the list.
 -- A recipe: { id, name, item, ranks, learned, profession = {professionID, parentProfessionID},
 -- isRecraft, isDummyRecipe, isSalvageRecipe, isGatheringRecipe }.
 local Wow = require("tests.helpers.wow")
@@ -74,7 +75,10 @@ local function installTradeSkill(state)
     end,
     GetProfessionInfoByRecipeID = function(id)
       local recipe = findRecipe(state, id)
-      return recipe and recipe.profession or nil
+      if recipe == nil then
+        return state.lookups and state.lookups[id] or nil
+      end
+      return recipe.profession
     end,
     IsDataSourceChanging = function()
       return state.changing == true

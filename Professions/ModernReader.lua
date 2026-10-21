@@ -152,38 +152,58 @@ end
 -- Mid-switch the list may still hold another profession's recipes: each is stored under its
 -- own profession when the character stores that one, and skipped (nil) otherwise. A recipe
 -- with no profession info (nil, or 0 before the data loads) belongs to the window.
+-- → the key to store under (nil: skip), and whether the recipe's own lookup named the window.
 local function storeKey(charKey, recipeID, key)
   local own = ModernReader.ProfessionOf(recipeID)
-  if own == nil or own == 0 or own == key then
-    return key
+  if own == key then
+    return key, true
   end
-  return ProfessionList.IsStored(db, charKey, own) and own or nil
+  if own == nil or own == 0 then
+    return key, false
+  end
+  return ProfessionList.IsStored(db, charKey, own) and own or nil, false
+end
+
+-- Drops the saved recipes tagged with the window's profession whose own lookup names a
+-- profession the character does not store (an older read tagged a mid-switch list with the
+-- window's). A recipe the lookup does not resolve is kept. → whether any was dropped.
+local function dropForeign(character, charKey, key)
+  local dropped = false
+  for recipeID, recipe in pairs(character.recipes) do
+    if recipe.prof == key then
+      local own = ModernReader.ProfessionOf(recipeID)
+      if own ~= nil and own ~= 0 and own ~= key and not ProfessionList.IsStored(db, charKey, own) then
+        character.recipes[recipeID] = nil
+        dropped = true
+      end
+    end
+  end
+  return dropped
 end
 
 -- Marks read only the professions that got a recipe. → whether the window's profession did.
--- A saved recipe of a profession the character does not store (an older read tagged it with
--- the window's) is dropped, but only once the window's own profession got a recipe from this
--- list: a lookup that resolves nothing to a stored profession must not empty the saved data.
+-- Saved recipes of other professions are dropped only when some recipe's own lookup named
+-- the window's profession: a lookup that resolves nothing (not loaded, or a shape this code
+-- does not read) must never empty the saved data.
 local function readWindow(api, character, charKey, key, recipeIDs)
-  local stored, pendingBind, anyChanged, readKeys, stale = 0, 0, false, {}, {}
+  local stored, pendingBind, anyChanged, readKeys, named = 0, 0, false, {}, false
   for _, recipeID in ipairs(recipeIDs) do
     local info = usableInfo(api, recipeID, true)
-    local professionKey = info and storeKey(charKey, recipeID, key)
+    local professionKey, ownNamed
+    if info then
+      professionKey, ownNamed = storeKey(charKey, recipeID, key)
+      named = named or ownNamed
+    end
     if professionKey then
       local changed, unknownBind = store(character.recipes, recipeID, readFields(api, recipeID, info), professionKey)
       stored = stored + 1
       anyChanged = anyChanged or changed
       pendingBind = pendingBind + (unknownBind and 1 or 0)
       readKeys[professionKey] = true
-    elseif info and character.recipes[recipeID] then
-      stale[#stale + 1] = recipeID
     end
   end
-  if readKeys[key] then
-    for _, recipeID in ipairs(stale) do
-      character.recipes[recipeID] = nil
-      anyChanged = true
-    end
+  if named and dropForeign(character, charKey, key) then
+    anyChanged = true
   end
   for professionKey in pairs(readKeys) do
     character.professions[professionKey].read = true
@@ -195,8 +215,8 @@ local function readWindow(api, character, charKey, key, recipeIDs)
   return readKeys[key] == true
 end
 
--- Blizzard's ProfessionsFrame yields a list update while the data source is rebuilding; a
--- later update follows with the finished list.
+-- A list update while the data source is rebuilding is yielded; a later update brings the
+-- finished list.
 local function isDataSourceChanging(api)
   local changing = api.IsDataSourceChanging
   return type(changing) == "function" and changing() == true
