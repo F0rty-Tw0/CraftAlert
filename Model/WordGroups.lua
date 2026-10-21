@@ -455,7 +455,8 @@ end
 -- for tokens (Matcher always passes it); nil only from a direct caller, whose tokens then
 -- have nothing but spaces between them. A line naming professions narrows to the first in
 -- named order that still has a candidate (user ruling 2026-10-22); when none has one, no
--- match, and step 4.6 alerts a named profession. → whether it produced a match (left in
+-- match, and steps 4.5 and 4.6 follow (4.6: the first profession word in the line). →
+-- whether it produced a match (left in
 -- Candidates' result).
 function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, setWhyCount, classArmor, breakBefore)
   local whyCount, inferred = collectLine(index, tokens, count, breakBefore or noBreak, hasSet, classArmor)
