@@ -107,23 +107,30 @@ local function cuedAt(ns, tokens, i)
   return false
 end
 
--- Reference step 4.4 over tokens (and a 4.2 set of entries, or nil). → outcome text, and
--- whether the 6-word cap left a word out.
+-- Reference step 4.4 over tokens (and a 4.2 set of entries, or nil). → outcome text,
+-- whether the 6-word cap left a word out, and whether a named profession after the first
+-- narrowed (the first had no candidate).
 local function reference44(ns, index, tokens, set)
   local wordIndex, Slang = index.wordIndex, ns.Slang
-  local first, other, narrow
+  local first, other, named = nil, nil, {}
   for _, t in ipairs(tokens) do
     if wordIndex[t] and first == nil then
       first = t
     elseif wordIndex[t] and other == nil and t ~= first then
       other = t
     end
-    narrow = narrow or ns.ProfessionWords.KeyFor(t, false) -- the first profession word
-  end
-  for _, t in ipairs(tokens) do
-    if ns.ProfessionWords.KeyFor(t, false) == ENCH then
-      narrow = ENCH -- Enchanting before any other
+    local key = ns.ProfessionWords.KeyFor(t, false)
+    if key ~= nil and not isIn(named, key) then
+      named[#named + 1] = key -- the named professions in line order
     end
+  end
+  if isIn(named, ENCH) then
+    for k = #named, 1, -1 do
+      if named[k] == ENCH then
+        table.remove(named, k)
+      end
+    end
+    table.insert(named, 1, ENCH) -- Enchanting before any other
   end
   local lists, taken, takenCount, capped = {}, {}, 0, false
   for i, t in ipairs(tokens) do
@@ -147,18 +154,31 @@ local function reference44(ns, index, tokens, set)
   if base == nil then
     return "nil", capped
   end
-  local kept = {}
+  local inAll = {}
   for _, e in ipairs(base) do
-    local inAll = true
+    local all = true
     for _, list in ipairs(lists) do
       local found = false
       for _, x in ipairs(list) do
         found = found or x == e
       end
-      inAll = inAll and found
+      all = all and found
     end
-    if inAll and (narrow == nil or e.prof == narrow) then
-      kept[#kept + 1] = e
+    if all then
+      inAll[#inAll + 1] = e
+    end
+  end
+  -- The first named profession that keeps a candidate narrows; none keeps one → nothing.
+  local kept, later = #named == 0 and inAll or {}, false
+  for n, prof in ipairs(named) do
+    for _, e in ipairs(inAll) do
+      if e.prof == prof then
+        kept[#kept + 1] = e
+      end
+    end
+    if #kept > 0 then
+      later = n > 1
+      break
     end
   end
   local seen, firstOf = {}, {}
@@ -171,7 +191,7 @@ local function reference44(ns, index, tokens, set)
   if #firstOf == 0 then
     return "nil", capped
   elseif #firstOf == 1 then
-    return "item " .. tostring(firstOf[1].group) .. " " .. entryText(kept, #kept), capped
+    return "item " .. tostring(firstOf[1].group) .. " " .. entryText(kept, #kept), capped, later
   end
   local counts, rank = {}, {}
   for i, key in ipairs(ORDER) do
@@ -193,14 +213,16 @@ local function reference44(ns, index, tokens, set)
       entries[#entries + 1] = e
     end
   end
-  return "profession " .. tostring(best) .. " " .. entryText(entries, #entries), capped
+  return "profession " .. tostring(best) .. " " .. entryText(entries, #entries), capped, later
 end
 
 local AMBIGUOUS, CUES, GAPS = { "legs", "head", "feet", "ring", "hands" }, { "crafter", "bs", "tailor", "ench" }, { "for", "my", "x", "lf" }
+local NAMES = { "bs", "tailor", "lw", "ench" }
 
 -- A random line: an ambiguous word and a cue word with 0-2 filler or other words between, 1-4
 -- words, or a group's own words in random order with 1-3 random words put in anywhere (so the
--- 6-word cap decides lines that still match).
+-- 6-word cap decides lines that still match), and in some two profession words (so a named
+-- profession after the first narrows when the first has no candidate).
 local function randomTokens(index, all)
   local tokens = {}
   if rand(1, 5) == 1 then
@@ -230,12 +252,16 @@ local function randomTokens(index, all)
   for _ = 1, rand(1, 3) do
     table.insert(tokens, rand(1, #tokens + 1), pick(WORDS))
   end
+  if rand(1, 3) == 1 then
+    table.insert(tokens, rand(1, #tokens + 1), pick(NAMES))
+    table.insert(tokens, rand(1, #tokens + 1), pick(NAMES))
+  end
   return tokens
 end
 
 local function testWordGroupsDifferential()
   local ns = Fixture.load()
-  local checked, cappedHits, enchantHits, namedHits, ambiguousSetHits, ambiguousCueHits = 0, 0, 0, 0, 0, 0
+  local checked, cappedHits, enchantHits, namedHits, laterHits, ambiguousSetHits, ambiguousCueHits = 0, 0, 0, 0, 0, 0, 0
   for _ = 1, 60 do
     local db = randomItemDb(ns)
     local index = ns.Index.Build(db, db.settings, {
@@ -278,7 +304,7 @@ local function testWordGroupsDifferential()
         local r = ns.MatchCandidates.result
         got = r.kind .. " " .. tostring(r.kind == "item" and r.group or r.prof) .. " " .. entryText(r.entries, r.entryCount)
       end
-      local want, capped = reference44(ns, index, tokens, set)
+      local want, capped, later = reference44(ns, index, tokens, set)
       Assert.equal(got, want, table.concat(tokens, " "))
       checked = checked + (got ~= "nil" and 1 or 0)
       cappedHits = cappedHits + ((capped and got ~= "nil") and 1 or 0)
@@ -292,15 +318,17 @@ local function testWordGroupsDifferential()
       end
       enchantHits = enchantHits + ((enchant and got ~= "nil") and 1 or 0)
       namedHits = namedHits + ((named and not enchant and got ~= "nil") and 1 or 0)
+      laterHits = laterHits + ((later and got ~= "nil") and 1 or 0)
       ambiguousSetHits = ambiguousSetHits + ((ambiguousSet and got ~= "nil") and 1 or 0)
       ambiguousCueHits = ambiguousCueHits + ((ambiguousCued and got ~= "nil") and 1 or 0)
     end
   end
-  -- Each rule decides enough matching lines (338 / 33 / 61 / 47 / 35 / 65 with this seed).
+  -- Each rule decides enough matching lines (317 / 16 / 58 / 54 / 19 / 29 / 56 with this seed).
   Assert.truthy(checked > 150, "lines that match: " .. checked)
   Assert.truthy(cappedHits > 10, "matching lines the 6-word cap decided: " .. cappedHits)
   Assert.truthy(enchantHits > 20, "matching lines with an Enchanting word: " .. enchantHits)
   Assert.truthy(namedHits > 20, "matching lines with another profession word: " .. namedHits)
+  Assert.truthy(laterHits > 10, "matching lines a named profession after the first narrowed: " .. laterHits)
   Assert.truthy(ambiguousSetHits > 8, "matching lines with a 4.2 set and an ambiguous word: " .. ambiguousSetHits)
   Assert.truthy(ambiguousCueHits > 30, "matching lines with an ambiguous word next to a cue word: " .. ambiguousCueHits)
 end

@@ -118,7 +118,9 @@ local function slotIndex(ns)
 end
 
 -- §6.3 4.4: any profession word narrows the candidates to that profession, as an Enchanting
--- word does (user ruling 2026-10-21); nothing left falls through to step 4.6.
+-- word does (user ruling 2026-10-21); with several, the first that still has a candidate,
+-- Enchanting before the others in line order (user ruling 2026-10-22); nothing left falls
+-- through to step 4.6.
 local function testNamedProfessionNarrowing()
   local ns = Fixture.load()
   slotIndex(ns)
@@ -129,8 +131,11 @@ local function testNamedProfessionNarrowing()
   expect(ns, "LF cloth legs", "item:604")
   expect(ns, "LF lw cloth legs", "profession:" .. LW, "several words, nothing left: step 4.6")
   expect(ns, "LF blacksmith, back in 10 min", "profession:" .. BS, "never a Tailoring cloak")
-  expect(ns, "LF lw bs legs", "item:703", "two professions: the first named")
-  expect(ns, "LF bs enchanter belt", "profession:" .. BS, "Enchanting first, so no plate belt; step 4.6")
+  expect(ns, "LF lw bs legs", "item:703", "two professions, both with a candidate: the first named")
+  expect(ns, "LF tailor or bs for plate legs", "item:502", "Tailoring has no plate legs: the next named")
+  expect(ns, "LF jc and bs plate legs", "item:502", "Jewelcrafting has no plate legs: the next named")
+  expect(ns, "LF bs enchanter belt", "item:501", "Enchanting first, but it has no belt: Blacksmithing")
+  expect(ns, "LF lw jc plate legs", "profession:" .. LW, "no named profession has one: step 4.6")
 end
 
 -- §6.4, user ruling 2026-10-21: a crafting cue word partners an ambiguous word only as the
@@ -151,6 +156,7 @@ local function testCueAdjacency()
   expect(ns, "LF alchemist for flasks, back soon", "stop:nomatch")
   expect(ns, "LF scribe, ring me when ready", "stop:nomatch")
   expect(ns, "LF crafter, hands down best tip", "stop:nomatch", "punctuation ends the neighbourhood")
+  expect(ns, "LF legs, crafter for legs", "profession:" .. TAILOR, "an uncued word counts where it is cued")
   local result = expect(ns, "LF tailor, will pay you back", "profession:" .. TAILOR)
   Assert.equal(why(result), "lf+tailor", "the profession word alone")
   result = expect(ns, "LF bs crafter, back from afk", "profession:" .. BS)

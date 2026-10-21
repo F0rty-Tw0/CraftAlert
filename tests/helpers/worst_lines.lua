@@ -129,6 +129,11 @@ function WorstLines.cases(index)
     { "search", SEARCH_LINE },
     { "bareslot", fill("lf", "belt") }, -- 4.4: a bare slot word, so the armor word is inferred
     { "admit", fill("lf crafter", "head") }, -- 4.4: an ambiguous word counted through its cue word
+    -- 4.4: an uncounted ambiguous word repeated, each next to filler words (§6.4 cue adjacency)
+    { "legs_for", fill("lf", "legs for") },
+    { "fillers", fill("lf", "for my the a some me legs") },
+    { "back", fill("lf", "back") }, -- 4.4 only: no companion, no stat + slot word
+    { "cue_break", fill("lf crafter.", "head a for my") }, -- punctuation ends the cue's reach
     { "inferred_empty", WorstLines.inferredEmpty(index) }, -- 4.4: lookup, append, empty, typo
   }
 end
