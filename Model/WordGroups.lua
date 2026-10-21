@@ -20,10 +20,10 @@ local Candidates = ns.MatchCandidates or require("CraftAlert.Model.MatchCandidat
 --     alone, and byProf[key] the same decision over one profession's entries only (absent
 --     when it has none), for a line that names a profession; byProf is nil when one
 --     profession has every entry (narrowedInfo).
--- A line that names an armor slot without an armor type or an Enchanting word takes the
--- sender's armor word (docs/specs/2026-10-20-class-armor-design.md §4 rules 2-7, and the
--- 2026-10-20 enchanting ruling in the -notes.md beside it): one class lookup at most, only
--- adding words, never uncounting one that counts today.
+-- A line that names an armor slot without an armor type takes the sender's armor word
+-- (docs/specs/2026-10-20-class-armor-design.md §4 rules 2-7), except while an Enchanting word
+-- is tried (the 2026-10-20 and 2026-10-22 rulings in the -notes.md beside it): one class
+-- lookup at most, only adding words, never uncounting one that counts today.
 -- Every wordIndex list keeps one global entry order (build order), so an intersection walked
 -- in any list's order comes out in the first list's order. Match is hot path: module-level
 -- buffers only.
@@ -235,9 +235,10 @@ local stamp = 0
 -- The profession keys the line names, in narrowing order (Enchanting first, then line order,
 -- each once: namedStamp[key] == stamp): named[1..namedCount].
 local named, namedCount, namedStamp = {}, 0, {}
--- Per-line state collect leaves for inferArmor: whether the sender's armor word may be
--- inferred (class-armor §4 rule 2).
-local inferable = false
+-- Per-line state collect leaves for Match: whether the sender's armor word may be inferred
+-- (class-armor §4 rule 2: a slot without an armor type), and whether the line names an
+-- Enchanting word (then named[1] is its key).
+local inferable, enchantingNamed = false, false
 
 -- New index: drop the lists the last line kept, the stamps and the set marks.
 function WordGroups.Reset()
@@ -363,8 +364,7 @@ local function collect(index, tokens, count, breakBefore, hasSet)
       end
     end
   end
-  local slotWithoutType = not sawType and (sawPlainSlot or sawCuedSlot)
-  inferable = slotWithoutType and not enchanting
+  inferable, enchantingNamed = not sawType and (sawPlainSlot or sawCuedSlot), enchanting
   return whyCount
 end
 
@@ -387,29 +387,22 @@ local function inferArmor(index, hasSet, classArmor, whyCount)
   return whyCount + 1, true
 end
 
--- collect, then the sender's armor word when §4 rule 2 holds. classArmor: nil or a function
--- → armorWord, whyLabel or nil, called at most once per line (§4 rule 8). → why count or
--- nil, and whether the armor word was added (last in lineWords and the why).
-local function collectLine(index, tokens, count, breakBefore, hasSet, classArmor)
-  local whyCount = collect(index, tokens, count, breakBefore, hasSet)
-  local inferred = nil
-  if whyCount ~= nil and inferable and classArmor ~= nil then
-    whyCount, inferred = inferArmor(index, hasSet, classArmor, whyCount)
-  end
-  return whyCount, inferred
-end
-
--- Narrows step 4.2's set by the line's words, then to the first named profession that keeps
--- a candidate (none left when no named one does). An inferred armor word goes last and only
--- when some recipe is left: a named set never loses to the sender's class (user ruling
--- 2026-10-20), so the word and its why label drop out. → why count.
-local function keepSetWords(index, whyCount, inferred)
-  local groupWords, own = index.groupWords, inferred and lineCount - 1 or lineCount
+-- Narrows step 4.2's set by lineWords[1..own].
+local function keepOwnWords(index, own)
+  local groupWords = index.groupWords
   for k = 1, own do
     Candidates.KeepWord(groupWords, lineWords[k])
   end
+end
+
+-- Narrows step 4.2's set by the line's words, then to the first of named[from..namedCount]
+-- that keeps a candidate (none left when no named one does). An inferred armor word goes last
+-- and only when some recipe is left: a named set never loses to the sender's class (user
+-- ruling 2026-10-20), so the word and its why label drop out. → why count.
+local function keepSetWords(index, whyCount, inferred, from)
+  keepOwnWords(index, inferred and lineCount - 1 or lineCount)
   local kept = namedCount == 0
-  for n = 1, namedCount do
+  for n = from, namedCount do
     if Candidates.KeepProf(named[n], true) then
       kept = true
       break
@@ -418,6 +411,7 @@ local function keepSetWords(index, whyCount, inferred)
   if not kept then
     Candidates.KeepProf(named[1])
   end
+  local groupWords = index.groupWords
   if inferred and not Candidates.KeepWord(groupWords, lineWords[lineCount], true) then
     return whyCount - 1
   end
@@ -450,33 +444,16 @@ local function noBreak()
   return false
 end
 
--- Step 4.4. hasSet: step 4.2 left several recipes in Candidates (setWhy[1..setWhyCount]).
--- classArmor: the sender's armor word getter (collectLine). breakBefore: Tokenizer.BreakBefore
--- for tokens (Matcher always passes it); nil only from a direct caller, whose tokens then
--- have nothing but spaces between them. A line naming professions narrows to the first in
--- named order that still has a candidate (user ruling 2026-10-22); when none has one, no
--- match, and steps 4.5 and 4.6 follow (4.6: the first profession word in the line). →
--- whether it produced a match (left in
--- Candidates' result).
-function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, setWhyCount, classArmor, breakBefore)
-  local whyCount, inferred = collectLine(index, tokens, count, breakBefore or noBreak, hasSet, classArmor)
-  if whyCount == nil then
-    return false
-  end
-  local why = Candidates.wordWhy
-  if hasSet then
-    whyCount = keepSetWords(index, whyCount, inferred)
-    return Candidates.count > 0 and Candidates.Decide(intentToken, setWhy, setWhyCount, why, whyCount)
-  end
-  if lineCount == 0 then
-    return false
-  end
+-- Step 4.4 over lineWords[1..lineCount] (at least one), narrowed to the first of
+-- named[from..to] that has a candidate, or not narrowed when the line names no profession.
+-- mark: this walk's setMark value. → whether it produced a match.
+local function walkNamed(index, intentToken, why, whyCount, from, to, mark)
   if lineCount == 1 then
     local info = index.wordInfo[lineWords[1]]
     if namedCount == 0 then
       return Candidates.DecideWord(intentToken, info, why, whyCount)
     end
-    for n = 1, namedCount do
+    for n = from, to do
       local narrowed = narrowedInfo(info, named[n])
       if narrowed ~= nil then
         return Candidates.DecideWord(intentToken, narrowed, why, whyCount)
@@ -487,22 +464,66 @@ function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, set
   -- The word sets holding every word are the same whichever word's sets are walked, so they
   -- are marked once, from the first narrowed list found.
   local marked = nil
-  for n = 1, namedCount > 0 and namedCount or 1 do
+  for n = from, namedCount > 0 and to or from do
     local list, smallest = smallestListFor(index, namedCount > 0 and named[n] or nil)
     if list ~= nil then
       if marked == nil then
-        marked = markSetsWithAll(index.wordSets[lineWords[smallest]], lineWords, lineCount, stamp)
+        marked = markSetsWithAll(index.wordSets[lineWords[smallest]], lineWords, lineCount, mark)
       end
       if not marked then
         return false
       end
-      Candidates.FromListMarked(list, index.groupWords, setMark, stamp)
+      Candidates.FromListMarked(list, index.groupWords, setMark, mark)
       if Candidates.count > 0 then
         return Candidates.Decide(intentToken, nil, 0, why, whyCount)
       end
     end
   end
   return false
+end
+
+-- Step 4.4. hasSet: step 4.2 left several recipes in Candidates (setWhy[1..setWhyCount]).
+-- classArmor: nil or the sender's armor word getter → armorWord, whyLabel or nil, called at
+-- most once per line (class-armor §4 rule 8). breakBefore: Tokenizer.BreakBefore for tokens
+-- (Matcher always passes it); nil only from a direct caller, whose tokens then have nothing
+-- but spaces between them. A line naming professions narrows to the first in named order that
+-- still has a candidate (user ruling 2026-10-22); when none has one, no match, and steps 4.5
+-- and 4.6 follow (4.6: the first profession word in the line). → whether it produced a match
+-- (left in Candidates' result).
+function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, setWhyCount, classArmor, breakBefore)
+  local whyCount = collect(index, tokens, count, breakBefore or noBreak, hasSet)
+  if whyCount == nil then
+    return false
+  end
+  local why, from, inferred = Candidates.wordWhy, 1, nil
+  if inferable and classArmor ~= nil then
+    -- An Enchanting word is tried first, without the sender's armor and before the class
+    -- lookup: an enchant ignores the asker's armor (user ruling 2026-10-20). Only the
+    -- professions named after it get the armor word (user ruling 2026-10-22).
+    if enchantingNamed then
+      if hasSet then
+        keepOwnWords(index, lineCount)
+        if Candidates.KeepProf(named[1], true) then
+          return Candidates.Decide(intentToken, setWhy, setWhyCount, why, whyCount)
+        end
+      elseif lineCount > 0 and walkNamed(index, intentToken, why, whyCount, 1, 1, -stamp) then
+        return true
+      end
+      if namedCount == 1 then
+        return false -- nothing named after Enchanting, so no class lookup
+      end
+      from = 2
+    end
+    whyCount, inferred = inferArmor(index, hasSet, classArmor, whyCount)
+    if whyCount == nil then
+      return false
+    end
+  end
+  if hasSet then
+    whyCount = keepSetWords(index, whyCount, inferred, from)
+    return Candidates.count > 0 and Candidates.Decide(intentToken, setWhy, setWhyCount, why, whyCount)
+  end
+  return lineCount > 0 and walkNamed(index, intentToken, why, whyCount, from, namedCount, stamp)
 end
 
 ns.WordGroups = WordGroups

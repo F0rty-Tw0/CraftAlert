@@ -239,6 +239,15 @@ local function testEnchantingLines()
   ns.Matcher.SetIndex(Fixture.index(ns))
   Assert.equal(outcome(ns, "LF enchant chest"), "profession:" .. ENCH, "enchanting today")
   check(ns, "enchanting", "LF enchant chest", W, "profession:" .. ENCH, 0)
+  -- User ruling 2026-10-22: an Enchanting word with no candidate falls through to the next
+  -- named profession, and that one takes the sender's armor word (a plate and a leather belt).
+  ns = Fixture.load()
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Smith-Realm"].recipes[3] = { item = 701, name = "Hide Strap", prof = BS }
+  end)
+  check(ns, "enchanting", "LF bs belt", W, "item:501", 1)
+  check(ns, "enchanting", "LF ench or bs belt", W, "item:501", 1)
+  check(ns, "enchanting", "LF bs or ench belt", W, "item:501", 1)
 end
 
 -- Review Focus 2: inference never removes a word that counts today (§4 rule 5).
