@@ -141,12 +141,17 @@ local function windowProfession(api)
   return nil
 end
 
--- The base profession of a recipe: the parent skill line when there is one, else nil.
-function ModernReader.ProfessionOf(recipeID)
+local function professionInfo(recipeID)
   local api = tradeSkillApi()
   local getInfo = api and api.GetProfessionInfoByRecipeID
   local info = type(getInfo) == "function" and getInfo(recipeID) or nil
-  return type(info) == "table" and (info.parentProfessionID or info.professionID) or nil
+  return type(info) == "table" and info or nil
+end
+
+-- The base profession of a recipe: the parent skill line when there is one, else nil.
+function ModernReader.ProfessionOf(recipeID)
+  local info = professionInfo(recipeID)
+  return info and (info.parentProfessionID or info.professionID) or nil
 end
 
 -- Mid-switch the list may still hold another profession's recipes: each is stored under its
@@ -166,12 +171,14 @@ end
 
 -- Drops the saved recipes tagged with the window's profession whose own lookup names a
 -- profession the character does not store (an older read tagged a mid-switch list with the
--- window's). A recipe the lookup does not resolve is kept. → whether any was dropped.
+-- window's). Only a parented answer counts: a recipe the lookup does not resolve, or answers
+-- with a bare skill line, is kept. → whether any was dropped.
 local function dropForeign(character, charKey, key)
   local dropped = false
   for recipeID, recipe in pairs(character.recipes) do
     if recipe.prof == key then
-      local own = ModernReader.ProfessionOf(recipeID)
+      local info = professionInfo(recipeID)
+      local own = info and info.parentProfessionID
       if own ~= nil and own ~= 0 and own ~= key and not ProfessionList.IsStored(db, charKey, own) then
         character.recipes[recipeID] = nil
         dropped = true

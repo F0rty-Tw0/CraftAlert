@@ -242,7 +242,9 @@ return function()
   recipesOf(db)[3] = { item = 300, name = "Belt 3", prof = BS }
   recipesOf(db)[7] = { item = 700, name = "Belt 7", prof = BS, muted = true }
   recipesOf(db)[9] = { item = 900, name = "Belt 9", prof = BS }
-  state.lookups = { [7] = ownCooking }
+  recipesOf(db)[10] = { item = 1000, name = "Belt 10", prof = BS, muted = true }
+  recipesOf(db)[11] = { item = 1100, name = "Belt 11", prof = BS, muted = true }
+  state.lookups = { [7] = ownCooking, [10] = ownEnch, [11] = { professionID = 2872 } }
   state.recipes = { belt(3, 300, { profession = ownCooking }), belt(5, 500, { profession = ownEnch }) }
   Wow.fireEvent("TRADE_SKILL_SHOW")
   Assert.truthy(recipesOf(db)[3], "no recipe named Blacksmithing: the lookup proves nothing")
@@ -255,6 +257,8 @@ return function()
   Assert.equal(recipesOf(db)[3], nil, "in the list: a profession the character does not have")
   Assert.equal(recipesOf(db)[7], nil, "not in the list: the lookup names Cooking")
   Assert.truthy(recipesOf(db)[9], "no lookup answer: kept")
+  Assert.same(recipesOf(db)[10], { item = 1000, name = "Belt 10", prof = BS, muted = true }, "a stored profession: kept")
+  Assert.truthy(recipesOf(db)[11], "a bare skill line without a parent: kept")
   Assert.equal(recipesOf(db)[1].prof, BS)
   Wow.runTimers()
   local builds = run.builds
