@@ -161,8 +161,11 @@ local function storeKey(charKey, recipeID, key)
 end
 
 -- Marks read only the professions that got a recipe. → whether the window's profession did.
+-- A saved recipe of a profession the character does not store (an older read tagged it with
+-- the window's) is dropped, but only once the window's own profession got a recipe from this
+-- list: a lookup that resolves nothing to a stored profession must not empty the saved data.
 local function readWindow(api, character, charKey, key, recipeIDs)
-  local stored, pendingBind, anyChanged, readKeys = 0, 0, false, {}
+  local stored, pendingBind, anyChanged, readKeys, stale = 0, 0, false, {}, {}
   for _, recipeID in ipairs(recipeIDs) do
     local info = usableInfo(api, recipeID, true)
     local professionKey = info and storeKey(charKey, recipeID, key)
@@ -172,6 +175,14 @@ local function readWindow(api, character, charKey, key, recipeIDs)
       anyChanged = anyChanged or changed
       pendingBind = pendingBind + (unknownBind and 1 or 0)
       readKeys[professionKey] = true
+    elseif info and character.recipes[recipeID] then
+      stale[#stale + 1] = recipeID
+    end
+  end
+  if readKeys[key] then
+    for _, recipeID in ipairs(stale) do
+      character.recipes[recipeID] = nil
+      anyChanged = true
     end
   end
   for professionKey in pairs(readKeys) do

@@ -235,6 +235,18 @@ return function()
   Assert.equal(recipesOf(db)[4].prof, BS)
   Assert.equal(db.characters[CHAR].professions[BS].read, true)
 
+  -- A Cooking recipe an older read saved as Blacksmithing is dropped once the window's own
+  -- profession is read, and kept while the list gives the window nothing.
+  state, _, db = setup()
+  recipesOf(db)[3] = { item = 300, name = "Belt 3", prof = BS }
+  state.recipes = { belt(3, 300, { profession = ownCooking }), belt(5, 500, { profession = ownEnch }) }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.truthy(recipesOf(db)[3], "no Blacksmithing recipe in the list: the lookup proves nothing")
+  state.recipes = { belt(1, 100, { profession = ownBs }), belt(3, 300, { profession = ownCooking }) }
+  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  Assert.equal(recipesOf(db)[3], nil, "a recipe of a profession the character does not have")
+  Assert.equal(recipesOf(db)[1].prof, BS)
+
   -- Opening the window reads even while the data source is still rebuilding.
   state, _, db = setup()
   state.recipes = { belt(1, 100) }
