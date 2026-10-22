@@ -293,30 +293,6 @@ return function()
   Assert.equal(#seen, 1)
   Assert.equal(ns.Leads.Latest().customer, "Gus-Draenor")
 
-  -- Blocking a customer end to end: the Block button drops their leads and asks for a rebuild;
-  -- once it ran, their next Trade line stops at the block set and makes no lead.
-  ns, db = setup("retail")
-  start(ns, db)
-  fireChannel("LF plate belt", "Bob-Draenor", 2, nil)
-  fireChannel("LF plate belt", "Cy-Draenor", 2, nil)
-  Assert.equal(#ns.Leads.List(), 2)
-  ns.Leads.Block("Bob-Draenor")
-  Assert.equal(#ns.Leads.List(), 1, "Bob's lead is dismissed")
-  Assert.equal(Wow.pendingTimers(0), 1, "a rebuild is queued")
-  for i, timer in ipairs(Wow.timers) do
-    if timer.delay == 0 then
-      table.remove(Wow.timers, i).fn()
-      break
-    end
-  end
-  fireChannel("LF plate belt", "Bob-Draenor", 2, nil)
-  Assert.equal(ns.Matcher.lastStop, "blocked")
-  Assert.equal(#ns.Leads.List(), 1, "no new lead for the blocked customer")
-  Assert.equal(ns.Leads.FindActiveByCustomer("Bob-Draenor"), nil)
-  fireChannel("LF plate belt", "Di-Draenor", 2, nil)
-  Assert.equal(ns.Matcher.lastStop, "match", "other customers still match")
-  Assert.equal(#ns.Leads.List(), 2)
-
   -- Whisper events are not the scan's business.
   Assert.falsy(Wow.frames[1]:IsEventRegistered(WHISPER))
 end

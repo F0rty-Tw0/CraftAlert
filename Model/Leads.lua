@@ -5,7 +5,6 @@ end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
-local Index = ns.Index or require("CraftAlert.Model.Index")
 local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
 
 -- Spec §7.2: the leads (matched requests) the player can answer. Steps 5-7 of §6.3 run here
@@ -435,30 +434,6 @@ function Leads.DismissIgnored()
   if removed then
     fire("change")
   end
-end
-
-function Leads.DismissCustomer(key)
-  local removed = false
-  for i = #leads, 1, -1 do
-    if leads[i].customer == key then
-      remove(leads, i)
-      removed = true
-    end
-  end
-  if removed then
-    fire("change")
-  end
-end
-
--- The row "Block" button (§7.3): hot-path block set rebuilt, customer's leads dismissed.
-function Leads.Block(key)
-  key = PlayerName.Normalize(key)
-  if key == nil then
-    return
-  end
-  db.ignored[key] = true
-  Leads.DismissCustomer(key)
-  Index.RequestRebuild("block")
 end
 
 function Leads.Latest()

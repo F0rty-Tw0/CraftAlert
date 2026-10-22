@@ -304,39 +304,21 @@ return function()
   Assert.equal(Leads.IsActive(newer.id), false)
   Assert.equal(Leads.FindActiveByCustomer(CUSTOMER), lead)
 
-  -- Dismiss, DismissCustomer: one change each, no event for unknown ids.
+  -- Dismiss: one change, no event for unknown ids.
   changes = seen.change
   Leads.Dismiss(9999)
   Assert.equal(seen.change, changes)
-  newLead(ns, "LF plate greaves")
-  newLead(ns, "LF plate belt", "Carl-Draenor")
+  local carl = newLead(ns, "LF plate belt", "Carl-Draenor")
   changes = seen.change
-  Leads.DismissCustomer(CUSTOMER)
+  Leads.Dismiss(carl.id)
   Assert.equal(seen.change, changes + 1)
+  Assert.equal(Leads.IsActive(carl.id), false)
   Assert.equal(#db.leads, 1)
-  Assert.equal(db.leads[1].customer, "Carl-Draenor")
-  Leads.DismissCustomer("Nobody-Draenor")
-  Assert.equal(seen.change, changes + 1)
-  Leads.Dismiss(db.leads[1].id)
+  Assert.equal(db.leads[1], lead)
+  Leads.Dismiss(lead.id)
   Assert.equal(Leads.HasActive(), false)
   Assert.equal(Leads.Latest(), nil)
   Assert.same(Leads.List(), {})
-
-  -- Block: ignored, every lead of the customer dismissed, one rebuild asked for.
-  ns, db = setup()
-  Leads = ns.Leads
-  newLead(ns, "LF plate belt")
-  newLead(ns, "LF plate greaves")
-  local keep = newLead(ns, "LF plate belt", "Carl-Draenor")
-  Assert.equal(Wow.pendingTimers(0), 0)
-  Leads.Block("Bob-Dra enor")
-  Assert.equal(db.ignored["Bob-Draenor"], true)
-  Assert.same(db.leads, { keep })
-  Assert.equal(ns.Index.lastReason, "block")
-  Assert.equal(Wow.pendingTimers(0), 1)
-  Leads.Block("Dan")
-  Assert.equal(db.ignored["Dan-Realm"], true, "keys are normalized")
-  Leads.Block(nil)
 
   -- Review Focus 3: eight alts know the recipe → one lead, the best crafter.
   ns, db = setup(nil, function(data)
