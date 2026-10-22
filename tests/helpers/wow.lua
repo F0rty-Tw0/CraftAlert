@@ -172,6 +172,8 @@ local function newTooltip()
 
   function tooltip:AddLine() end
 
+  function tooltip:ClearLines() end
+
   function tooltip:SetHyperlink() end
 
   function tooltip:Show()
@@ -189,9 +191,48 @@ local function newTooltip()
   return tooltip
 end
 
+-- The font colours the client defines before FrameXML loads (not in the FrameXML sources).
+local function newColor(r, g, b)
+  return {
+    GetRGB = function()
+      return r, g, b
+    end,
+  }
+end
+
+-- Blizzard_SharedXML/SharedTooltipTemplates.lua:116-171, loaded on every flavour: the tooltip
+-- line helpers, each ending in tooltip:AddLine as there.
+local function installTooltipHelpers()
+  Wow.stub("NORMAL_FONT_COLOR", newColor(1, 0.82, 0))
+  Wow.stub("HIGHLIGHT_FONT_COLOR", newColor(1, 1, 1))
+  Wow.stub("GREEN_FONT_COLOR", newColor(0.1, 1, 0.1))
+  local function addColoredLine(tooltip, text, color, wrap, leftOffset)
+    local r, g, b = color:GetRGB()
+    if wrap == nil then
+      wrap = true
+    end
+    tooltip:AddLine(text, r, g, b, wrap, leftOffset)
+  end
+  Wow.stub("GameTooltip_AddColoredLine", addColoredLine)
+  Wow.stub("GameTooltip_AddBlankLineToTooltip", function(tooltip)
+    tooltip:AddLine(" ")
+  end)
+  Wow.stub("GameTooltip_SetTitle", function(tooltip, text, overrideColor, wrap)
+    tooltip:ClearLines()
+    addColoredLine(tooltip, text, overrideColor or _G["HIGHLIGHT_FONT_COLOR"], wrap)
+  end)
+  Wow.stub("GameTooltip_AddHighlightLine", function(tooltip, text, wrap, leftOffset)
+    addColoredLine(tooltip, text, _G["HIGHLIGHT_FONT_COLOR"], wrap, leftOffset)
+  end)
+  Wow.stub("GameTooltip_AddInstructionLine", function(tooltip, text, wrap, leftOffset)
+    addColoredLine(tooltip, text, _G["GREEN_FONT_COLOR"], wrap, leftOffset)
+  end)
+end
+
 local timerSeq = 0
 local function installDefaults()
   Wow.stub("GameTooltip", newTooltip())
+  installTooltipHelpers()
   Wow.stub("CreateFrame", newFrame)
   Wow.stub("UIParent", newFrame("Frame", nil))
   table.remove(Wow.frames) -- UIParent never registers events; keep Wow.frames to the addon's frames

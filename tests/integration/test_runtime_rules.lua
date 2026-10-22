@@ -46,6 +46,7 @@ local function installBlizzard(sent)
     SetOwner = function() end,
     SetText = function() end,
     AddLine = function() end,
+    ClearLines = function() end,
     Show = function(self)
       self.shown = true
     end,
