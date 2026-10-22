@@ -138,6 +138,11 @@ local function jobCases()
     switched = function(tripped)
       tripped.base = ENCH
     end,
+    replaced = function(tripped)
+      tripped.base = ENCH
+      tripped.recipes = {}
+      Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+    end,
   }
   for name, trip in pairs(trips) do
     local tripped, _, tripDb, tripRun, tripSlicer = setup()
@@ -153,6 +158,21 @@ local function jobCases()
     Assert.equal(tripSlicer.IsRunning("read"), false, name)
     Assert.same(tripRun.reasons, { "read" }, name)
   end
+
+  -- A resumed job that changes nothing more requests no second rebuild.
+  local resumed, _, resumedDb, resumedRun = setup()
+  resumed.recipes = threeBelts()
+  recipesOf(resumedDb)[2] = { item = 200, name = "Belt 2", prof = BS }
+  recipesOf(resumedDb)[3] = { item = 300, name = "Belt 3", prof = BS }
+  logRecipeReads()
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  runOneTick()
+  Wow.fireEvent("TRADE_SKILL_CLOSE")
+  Wow.runTimers()
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Wow.runTimers()
+  Assert.equal(resumedDb.characters[CHAR].professions[BS].read, true)
+  Assert.same(resumedRun.reasons, { "read" })
 
   -- An interrupted read stores what an uninterrupted one does.
   local plain, _, plainDb, _, plainSlicer = setup()
