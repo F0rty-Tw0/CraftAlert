@@ -502,6 +502,10 @@ local function testIgnoreDropsLead(db)
     Assert.equal(lead.customer ~= buyer, true, "no lead of the ignored customer is left")
   end
   Assert.equal(rawget(_G, "CraftAlertToast"):IsShown(), false, "the toast hides with its lead")
+  -- Their next Trade line, through the whole chat path, makes no lead.
+  trade("LF " .. BELT_LINK .. " crafter", buyer)
+  Assert.equal(#ns.Leads.List(), before - 1, "an ignored customer's line makes no lead")
+  Assert.equal(rawget(_G, "CraftAlertToast"):IsShown(), false, "and no toast")
   Wow.stub("C_FriendList", nil)
 end
 

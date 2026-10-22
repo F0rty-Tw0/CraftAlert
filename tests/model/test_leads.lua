@@ -141,6 +141,8 @@ local function testIgnoreList()
   local text = "LF plate belt"
   local first = newLead(ns, text)
   local time, message = first.time, first.message
+  -- A second open lead of the same customer, next to the first: the pass must drop both.
+  Assert.truthy(newLead(ns, "LF plate greaves"), "a second lead for the customer")
   Wow.clock.time = Wow.clock.time + 30
   Wow.stub("C_FriendList", {
     IsIgnored = function(name)
@@ -154,7 +156,7 @@ local function testIgnoreList()
   local seen = listen(Leads)
   Leads.DismissIgnored()
   Assert.equal(seen.change, 1, "one change for the whole pass")
-  Assert.equal(#Leads.List(), 1)
+  Assert.equal(#Leads.List(), 1, "both of the customer's leads went")
   Assert.equal(Leads.List()[1].customer, "Other-Draenor")
 
   Wow.stub("C_FriendList", nil)
