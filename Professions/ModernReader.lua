@@ -148,7 +148,8 @@ local function professionInfo(recipeID)
   return type(info) == "table" and info or nil
 end
 
--- The base profession of a recipe: the parent skill line when there is one, else nil.
+-- The base profession of a recipe: the parent skill line when there is one, else the skill
+-- line itself; nil when the lookup gives nothing.
 function ModernReader.ProfessionOf(recipeID)
   local info = professionInfo(recipeID)
   return info and (info.parentProfessionID or info.professionID) or nil
@@ -156,17 +157,24 @@ end
 
 -- Mid-switch the list may still hold another profession's recipes: each is stored under its
 -- own profession when the character stores that one, and skipped (nil) otherwise. A recipe
--- with no profession info (nil, or 0 before the data loads) belongs to the window.
+-- with no profession info (nil, or 0 before the data loads) belongs to the window, and so
+-- does one answered with a bare skill line the character does not store: like dropForeign,
+-- only a parented answer proves another profession.
 -- → the key to store under (nil: skip), and whether the recipe's own lookup named the window.
 local function storeKey(charKey, recipeID, key)
-  local own = ModernReader.ProfessionOf(recipeID)
+  local info = professionInfo(recipeID)
+  local parent = info and info.parentProfessionID
+  local own = parent or (info and info.professionID)
   if own == key then
     return key, true
   end
   if own == nil or own == 0 then
     return key, false
   end
-  return ProfessionList.IsStored(db, charKey, own) and own or nil, false
+  if ProfessionList.IsStored(db, charKey, own) then
+    return own, false
+  end
+  return parent == nil and key or nil, false
 end
 
 -- Drops the saved recipes tagged with the window's profession whose own lookup names a
