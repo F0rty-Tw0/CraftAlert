@@ -161,7 +161,7 @@ local function testRowHighlight()
       fills = fills + 1
     end
   end
-  Assert.truthy(hover, "a HIGHLIGHT-layer texture")
+  assert(hover, "a HIGHLIGHT-layer texture")
   Assert.equal(hover.texture, ns.Theme.ART.LIST_HOVER)
   Assert.equal(hover.blendMode, "ADD")
   Assert.equal(hover:GetAlpha(), 0.18)
