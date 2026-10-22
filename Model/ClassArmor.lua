@@ -47,7 +47,7 @@ local TOKENS = {
   "WARLOCK",
 }
 
--- A new array of every class token, in class-list order. The caller may mutate it.
+-- A new array of every class token, in armor order (plate, mail, leather, cloth). The caller may mutate it.
 function ClassArmor.Tokens()
   local copy = {}
   for i, token in ipairs(TOKENS) do
