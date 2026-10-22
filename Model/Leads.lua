@@ -282,32 +282,42 @@ local function joinWhy(result)
   return concat(parts, " + ")
 end
 
+-- The recipe key of the crafter's first entry in the match.
+local function firstKey(result, crafter)
+  for i = 1, result.entryCount do
+    local entry = result.entries[i]
+    if entry.character == crafter then
+      return entry.recipeKey
+    end
+  end
+  return nil
+end
+
 -- What the chosen crafter's own record says about the match: its recipe (item results) and
--- the name of the profession.
-local function describeCrafter(lead, result, crafter)
+-- the name of the profession. `recipeKey` is the entry Pick ranked; nil falls back to the
+-- crafter's first entry.
+local function describeCrafter(lead, result, crafter, recipeKey)
   local character = db.characters[crafter]
   local profession = character and character.professions and character.professions[result.prof]
   lead.profName = profession and profession.name or (type(result.prof) == "string" and result.prof or nil)
   if result.kind ~= "item" then
     return
   end
-  for i = 1, result.entryCount do
-    local entry = result.entries[i]
-    if entry.character == crafter then
-      local recipe = character and character.recipes and character.recipes[entry.recipeKey]
-      lead.recipeName = recipe and recipe.name or (type(entry.recipeKey) == "string" and entry.recipeKey or nil)
-      lead.itemID = recipe and recipe.item or nil
-      if lead.itemID then
-        lead.itemLink = select(2, FlavorCompat.GetItemInfo(lead.itemID))
-      end
-      return
-    end
+  local key = recipeKey or firstKey(result, crafter)
+  if key == nil then
+    return
+  end
+  local recipe = character and character.recipes and character.recipes[key]
+  lead.recipeName = recipe and recipe.name or (type(key) == "string" and key or nil)
+  lead.itemID = recipe and recipe.item or nil
+  if lead.itemID then
+    lead.itemLink = select(2, FlavorCompat.GetItemInfo(lead.itemID))
   end
 end
 
 -- The lead for a matched line from `crafter`, copied out of the Matcher's reused result;
 -- numbered and stored by the caller.
-local function buildLead(result, customerKey, text, channelKey, crafter, cannotOrder)
+local function buildLead(result, customerKey, text, channelKey, pick)
   local lead = {
     customer = customerKey,
     message = text,
@@ -316,13 +326,15 @@ local function buildLead(result, customerKey, text, channelKey, crafter, cannotO
     prof = result.prof,
     group = result.group,
     why = joinWhy(result),
-    crafter = crafter,
-    cannotOrder = cannotOrder,
+    crafter = pick.crafter,
+    cannotOrder = pick.cannotOrder,
+    rank = pick.rank,
+    rankConc = pick.rankConc,
     time = now(),
     greeted = false,
     replied = false,
   }
-  describeCrafter(lead, result, crafter)
+  describeCrafter(lead, result, pick.crafter, pick.recipeKey)
   return lead
 end
 
@@ -359,11 +371,12 @@ function Leads.OnMatch(result, customerKey, text, channelKey, guid)
     fire("change")
     return lead, false
   end
-  local crafter, cannotOrder = CrafterRank.Pick(result, customerKey, db)
+  local crafter, cannotOrder, rank, rankConc, recipeKey = CrafterRank.Pick(result, customerKey, db)
   if crafter == nil then
     return nil
   end
-  lead = buildLead(result, customerKey, text, channelKey, crafter, cannotOrder)
+  local pick = { crafter = crafter, cannotOrder = cannotOrder, rank = rank, rankConc = rankConc, recipeKey = recipeKey }
+  lead = buildLead(result, customerKey, text, channelKey, pick)
   lead.id = nextId
   lead.guid = type(guid) == "string" and not FlavorCompat.issecretvalue(guid) and guid or nil
   if FlavorCompat.IsTestGuid(lead.guid) then

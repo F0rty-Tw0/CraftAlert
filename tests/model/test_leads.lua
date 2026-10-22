@@ -160,10 +160,32 @@ local function testTestGuards()
   Assert.same(Leads.List(), { realLead })
 end
 
+-- The lead keeps the rank Pick chose, and names the recipe of the entry that won.
+local function testRankOnLead()
+  local ns, db = setup(nil, function(data)
+    data.characters["Alt-Realm"].recipes[7] = { item = 502, name = "Other Belt", prof = BS }
+  end)
+  local pick = ns.CrafterRank.Pick
+  ns.CrafterRank.Pick = function()
+    return "Alt-Realm", false, 2, true, 7
+  end
+  local lead = newLead(ns, "LF plate belt")
+  Assert.same({ lead.crafter, lead.rank, lead.rankConc, lead.recipeName }, { "Alt-Realm", 2, true, "Other Belt" })
+  Assert.same(db.leads, { lead })
+
+  ns.CrafterRank.Pick = function()
+    return "Alt-Realm", false, nil, nil, nil
+  end
+  local plain = newLead(ns, "LF plate belt", "Other-Realm")
+  Assert.same({ plain.rank, plain.rankConc }, { nil, nil }, "no rank, no fields")
+  ns.CrafterRank.Pick = pick
+end
+
 return function()
   testIgnoreList()
   testTestFlag()
   testTestGuards()
+  testRankOnLead()
   -- A new lead copies what it keeps out of the Matcher's result (§6.3 step 7).
   local ns, db = setup()
   local Leads = ns.Leads
