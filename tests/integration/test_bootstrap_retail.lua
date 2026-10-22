@@ -443,7 +443,10 @@ local function testRaisingLoadOnFreshInstall()
   slash("")
   slash("config")
   slash("test LF plate belt")
-  Assert.same(chatSince(0), { NO_DB, NO_DB, "No match (stopped at: noIndex)" })
+  Assert.same(
+    chatSince(0),
+    { NO_DB, NO_DB, "Test: Paused — Craft Alert did not start; /reload to try again, a real Trade line would be ignored too" }
+  )
   Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil, "no leads window without a db")
   Assert.equal(rawget(_G, "CraftAlertSettingsWindow"), nil, "no settings window without a db")
   Assert.same(errors, { "load failed" }, "only the load error is reported")

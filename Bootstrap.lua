@@ -24,6 +24,7 @@ local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
 local BlizzardCategory = ns.BlizzardCategory or require("CraftAlert.UI.Settings.BlizzardCategory")
 local Perf = ns.Perf or require("CraftAlert.Core.Perf")
+local TestLine = ns.TestLine or require("CraftAlert.Core.TestLine")
 local SlashCommands = ns.SlashCommands or require("CraftAlert.Core.SlashCommands")
 
 -- Single owner of cross-module wiring: ADDON_LOADED loads the account DB, PLAYER_LOGIN
@@ -70,7 +71,7 @@ local function installReaders()
   LearnWatcher.Install()
 end
 
--- AlertToast and WhisperTracker subscribe themselves to "change".
+-- AlertToast and WhisperTracker subscribe themselves to "change", TestReport to "new" and "change".
 local function wireLeads()
   Leads.Restore(db)
   EventRouter.On("IGNORELIST_UPDATE", Leads.DismissIgnored)
@@ -78,6 +79,7 @@ local function wireLeads()
   Leads.On("change", Launcher.Refresh)
   Leads.On("change", LeadsWindow.Refresh)
   WhisperTracker.Install()
+  TestLine.Install()
 end
 
 -- §7.6 and §5.2: the status line, the professions not read yet, and on a fresh DB the first-run

@@ -4,7 +4,6 @@ if type(ns) ~= "table" then
 end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
-local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
 
 -- Spec §7.2: the leads (matched requests) the player can answer. Steps 5-7 of §6.3 run here
@@ -271,6 +270,9 @@ local function findDuplicate(customerKey, result)
   return nil
 end
 
+-- For /ca test: the lead a matched line from `customerKey` would update, or nil.
+Leads.FindDuplicate = findDuplicate
+
 -- Joins the Matcher's why tokens (the intent word, then what matched; item IDs are numbers).
 local function joinWhy(result)
   local parts = {}
@@ -377,21 +379,6 @@ function Leads.OnMatch(result, customerKey, text, channelKey, guid)
   fire("new", lead)
   fire("change")
   return lead, true
-end
-
--- `/ca test` (§7.3): the lead `text` would make if "Test" on the player's realm had sent it in
--- Trade, with the ignore list skipped. Not numbered, stored, counted or announced.
--- → lead or nil when no enabled crafter qualifies.
-function Leads.Preview(result, text)
-  if db == nil then
-    return nil
-  end
-  local customerKey = PlayerName.TestCustomer()
-  local crafter, cannotOrder = CrafterRank.Pick(result, customerKey, db, { skipIgnore = true })
-  if crafter == nil then
-    return nil
-  end
-  return buildLead(result, customerKey, text, "trade", crafter, cannotOrder)
 end
 
 -- The first time a lead is greeted, however it was sent (§7.1). → whether this was the first.

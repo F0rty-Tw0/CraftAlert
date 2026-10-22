@@ -31,7 +31,7 @@ local LINE_GAP = 3
 
 ---@type table
 local toast = nil -- { frame, name, badge, message, what, detail }, nil until the first alert
-local current = { lead = nil, shownAt = nil, isTest = false }
+local current = { lead = nil, shownAt = nil }
 local hideAt = 0
 local timerPending = false
 
@@ -58,7 +58,10 @@ local function detailText(lead)
 end
 
 local function badgeText()
-  if current.isTest then
+  if current.lead and current.lead.test then
+    if AlertToast.more > 0 then
+      return Localization.Text("Test · +%d more", AlertToast.more)
+    end
     return Localization.Text("Test")
   end
   if AlertToast.more > 0 then
@@ -67,12 +70,11 @@ local function badgeText()
   return ""
 end
 
--- greeting: the test toast shows it where the message goes.
-local function render(lead, greeting)
+local function render(lead)
   toast.name:SetText(tostring(lead.customer))
   FrameKit.PaintName(toast.name, lead.guid)
   toast.badge:SetText(badgeText())
-  toast.message:SetText(greeting or trim(lead.message))
+  toast.message:SetText(trim(lead.message))
   toast.what:SetText(LeadText.What(lead))
   toast.detail:SetText(detailText(lead))
   toast.frame:SetAlpha(settings().opacity or 1)
@@ -80,7 +82,7 @@ local function render(lead, greeting)
 end
 
 local function hide()
-  current.lead, current.shownAt, current.isTest = nil, nil, false
+  current.lead, current.shownAt = nil, nil
   AlertToast.more = 0
   toast.frame:Hide()
 end
@@ -114,12 +116,6 @@ local function startHideTimer()
 end
 
 local function onClick(_, button)
-  if current.isTest then
-    if button == "RightButton" then
-      hide()
-    end
-    return
-  end
   if ClickRouter.Handle(button, current.lead, current.shownAt) then
     hide()
   end
@@ -136,7 +132,7 @@ end
 -- Hides the toast once its lead is dismissed, ignored or expired.
 local function onLeadsChange()
   local lead = current.lead
-  if lead and not current.isTest and not Leads.IsActive(lead.id) then
+  if lead and not Leads.IsActive(lead.id) then
     hide()
   end
 end
@@ -188,29 +184,19 @@ end
 -- A new lead (Leads.On("new"), wired by Bootstrap): show it, sound, flash.
 function AlertToast.Show(lead)
   toast = toast or create()
-  local replacing = toast.frame:IsShown() and current.lead ~= nil and not current.isTest and current.lead ~= lead
+  local replacing = toast.frame:IsShown() and current.lead ~= nil and current.lead ~= lead
   AlertToast.more = replacing and AlertToast.more + 1 or 0
-  current.lead, current.shownAt, current.isTest = lead, now(), false
+  current.lead, current.shownAt = lead, now()
   render(lead)
   alert()
   startHideTimer()
 end
 
--- `/ca test` (§7.3): marked "Test", shows the greeting that would be sent; right-click hides
--- it and nothing else does anything. No sound, no flash, no lead.
-function AlertToast.ShowTest(lead, greeting)
-  toast = toast or create()
-  current.lead, current.shownAt, current.isTest = lead, now(), true
-  AlertToast.more = 0
-  render(lead, greeting)
-  startHideTimer()
-end
-
--- The lead on the toast and GetTime() when it appeared, or nil (hidden, also by Alt+Z, test
--- toast, lead gone). IsVisible, not IsShown: a toast under a hidden UIParent stays shown.
+-- The lead on the toast and GetTime() when it appeared, or nil (hidden, also by Alt+Z, or
+-- lead gone). IsVisible, not IsShown: a toast under a hidden UIParent stays shown.
 function AlertToast.VisibleLead()
   local lead = current.lead
-  if toast == nil or not toast.frame:IsVisible() or current.isTest or lead == nil or not Leads.IsActive(lead.id) then
+  if toast == nil or not toast.frame:IsVisible() or lead == nil or not Leads.IsActive(lead.id) then
     return nil
   end
   return lead, current.shownAt

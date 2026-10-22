@@ -313,12 +313,18 @@ return function()
 
   -- --cmd routes through SlashCmdList.CRAFTALERT (registered by Bootstrap at PLAYER_LOGIN);
   -- what the command prints arrives as `chat:` lines, after the start-up build's three.
-  local test = stepLines(Sim.Run({ "--cmd", "/ca test LF plate belt" }))
-  Assert.equal(test[4], "chat: Craft Alert: Item: Sim Plate Belt")
-  Assert.equal(test[5], "chat: Craft Alert: Why: lf + plate + belt")
-  Assert.equal(test[6], "chat: Craft Alert: Crafter: Crafter-OwnRealm")
-  Assert.equal(test[7], "chat: Craft Alert: Greeting: Hi! I can craft Sim Plate Belt.")
-  Assert.equal(#test, 7, "no lead, no toast line, no send")
+  -- A test line makes a test lead and a toast; the click prints what it would send and sends nothing.
+  local test = stepLines(Sim.Run({ "--cmd", "/ca test LF plate belt crafter", "--click", "left" }))
+  Assert.equal(test[4], "match: item group=190001 prof=164 why=lf+plate+belt")
+  Assert.equal(test[5], "toast: shown lead=1 more=0")
+  Assert.equal(test[6], "lead: new customer=Test0-OwnRealm crafter=Crafter-OwnRealm cannotOrder=false")
+  Assert.equal(test[8], "chat: Craft Alert: Item: Sim Plate Belt")
+  Assert.equal(test[11], "chat: Craft Alert: Greeting: Hi! I can craft Sim Plate Belt.")
+  Assert.equal(test[13], "chat: Craft Alert: Test, would whisper Test0-OwnRealm: Hi! I can craft Sim Plate Belt.")
+  Assert.equal(test[14], "lead: greeted customer=Test0-OwnRealm")
+  for _, line in ipairs(test) do
+    Assert.falsy(string.find(line, "^send: "), line)
+  end
   Assert.equal(rawget(_G, "SLASH_CRAFTALERT2"), "/ca")
   Assert.equal(stepLines(Sim.Run({ "--cmd", "/ca test hello there" }))[4], "chat: Craft Alert: No match (stopped at: prefilter)")
   Assert.equal(

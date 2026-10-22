@@ -34,7 +34,7 @@ local result = Candidates.result
 local index = nil
 local tokenCount = 0
 local intentToken = nil
-local lineGuid = nil -- the sender GUID of the line in flight; nil for /ca test
+local lineGuid = nil -- the sender GUID of the line in flight; nil for MatchUngated (the Settings Test page)
 
 Matcher.lastStop = "nomatch"
 
@@ -212,7 +212,7 @@ local function matchText(text)
   return result
 end
 
--- Steps 2-4 without the gate (/ca test); never uses a GUID.
+-- Steps 2-4 without the gate (only the Settings Test page); never uses a GUID.
 function Matcher.MatchUngated(text)
   lineGuid = nil
   return matchText(text)

@@ -52,7 +52,7 @@ local function listensFor(key, prof)
 end
 
 -- → characterKey, cannotOrder; nil when the customer is on Blizzard's ignore list (unless
--- opts.skipIgnore, which /ca test passes) or no character qualifies. `result` is the
+-- opts.skipIgnore, which only the Settings Test page passes) or no character qualifies. `result` is the
 -- Matcher's reused result: only read here. A match without entries (a profession word) is
 -- answered by every enabled character with that profession that still listens for it.
 function CrafterRank.Pick(result, customerKey, db, opts)

@@ -9,9 +9,10 @@ local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
--- Spec §9 Test: a text box → the result and its "why". The line runs §6.3 steps 2-5 as
--- `/ca test` does (Matcher.MatchUngated, sender "Test" on the player's realm, ignore check
--- skipped); it creates no lead, sends nothing and counts nothing.
+-- Spec §9 Test: a text box → the result and its "why". This page only previews: it runs
+-- §6.3 steps 2-5 (Matcher.MatchUngated, sender "Test" on the player's realm, ignore check
+-- skipped), creates no lead, sends nothing and counts nothing. `/ca test` is separate: it
+-- makes a real test lead through the real path.
 local PageTest = { id = "test", title = Localization.Text("Test") }
 
 local concat = table.concat
