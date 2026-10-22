@@ -147,15 +147,15 @@ local function testDetailLine()
 end
 
 local function testHeight()
+  local short = UiFixture.load({ leads = 1 })
+  short.AlertToast.Show(short.Leads.Latest())
+  local shortHeight = toastFrame():GetHeight()
   local ns = UiFixture.load({
     leads = 1,
     db = function(accountDb)
       accountDb.leads[1].message = CORPUS
     end,
   })
-  local short = UiFixture.load({ leads = 1 })
-  short.AlertToast.Show(short.Leads.Latest())
-  local shortHeight = toastFrame():GetHeight()
   ns.AlertToast.Show(ns.Leads.Latest())
   local frame = toastFrame()
   local message -- the badge shares GameFontHighlightSmall, so pick the string holding the message
