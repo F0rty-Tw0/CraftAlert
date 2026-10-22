@@ -70,6 +70,12 @@ local function testLazyAndEscape()
   -- The close button hides it.
   Widgets.click(window().CloseButton, "LeftButton")
   Assert.equal(window():IsShown(), false)
+  -- In combat HideUIPanel returns without hiding (addon code may not call protected functions),
+  -- yet the close button still closes the window.
+  ns.LeadsWindow.Toggle()
+  Wow.stub("HideUIPanel", function() end)
+  Widgets.click(window().CloseButton, "LeftButton")
+  Assert.equal(window():IsShown(), false, "the close button hides the window in combat")
 end
 
 local function testRowFields()

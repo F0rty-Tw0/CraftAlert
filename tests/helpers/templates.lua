@@ -79,7 +79,8 @@ end
 
 -- Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml:680 (CloseButton), :684-693 (Inset at
 -- TOPLEFT (4, -60) / BOTTOMRIGHT (-6, 26)) and :576-585 (TitleContainer.TitleText);
--- SharedUIPanelTemplates.lua:144 (the close button hides its parent) and
+-- SharedUIPanelTemplates.lua:144-155 (UIPanelCloseButton_OnClick: the parent's onCloseCallback first,
+-- then HideUIPanel(parent) only when there is none or it returns truthy) and
 -- Blizzard_SharedXML/PortraitFrame.lua:4-14 (TitledPanelMixin GetTitleText and SetTitle).
 -- Children come from the stubbed CreateFrame: they are complete frames, unlike `frame` here.
 function Templates.fakes.ButtonFrameTemplate(frame)
@@ -92,7 +93,14 @@ function Templates.fakes.ButtonFrameTemplate(frame)
 
   local close = createFrame("Button", nil, frame)
   close:SetScript("OnClick", function(self)
-    self.parent:Hide()
+    local parent = self:GetParent()
+    local continueHide = true
+    if parent.onCloseCallback then
+      continueHide = parent.onCloseCallback(self)
+    end
+    if continueHide then
+      _G["HideUIPanel"](parent)
+    end
   end)
   frame.CloseButton = close
 

@@ -139,8 +139,19 @@ local function createTexts(frame)
   return empty
 end
 
+-- The template's close button runs UIPanelCloseButton_OnClick
+-- (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.lua:144-155): this callback first, and
+-- HideUIPanel only when it returns truthy. HideUIPanel
+-- (Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:886-897) returns without hiding
+-- in combat when called from addon code, so the callback hides the frame itself.
+local function onClose(closeButton)
+  closeButton:GetParent():Hide()
+  return false
+end
+
 local function create()
   local frame = _G["CreateFrame"]("Frame", FRAME_NAME, _G["UIParent"], "ButtonFrameTemplate")
+  frame.onCloseCallback = onClose
   frame:SetFrameStrata("HIGH")
   _G["ButtonFrameTemplate_HidePortrait"](frame)
   frame:SetTitle(Localization.Text("Craft Alert — Leads"))

@@ -97,6 +97,10 @@ local function newFrame(frameType, name, parent, template)
     return self.shown
   end
 
+  function frame:GetParent()
+    return self.parent
+  end
+
   -- As the client: shown, and so is every parent (UIParent:Hide() is Alt+Z).
   function frame:IsVisible()
     return self.shown and (self.parent == nil or self.parent:IsVisible())
@@ -201,6 +205,12 @@ local function installDefaults()
   -- Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.lua:111-117: swaps the border; recorded only.
   Wow.stub("ButtonFrameTemplate_HidePortrait", function(frame)
     frame.portraitHidden = true
+  end)
+  -- Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:886-901: out of combat a frame
+  -- with no panel attribute just hides; in combat (CheckProtectedFunctionsAllowed, :844-850) it
+  -- returns first, which a test models by re-stubbing this.
+  Wow.stub("HideUIPanel", function(frame)
+    frame:Hide()
   end)
   Wow.stub("SetItemRef", function(link, text, button, frame)
     table.insert(Wow.itemRefs, { link, text, button, frame })
