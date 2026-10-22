@@ -93,18 +93,12 @@ end
 local function testListHighlight()
   local FrameKit = load({})
   local Theme = require("CraftAlert.UI.Theme")
-  Assert.same(Theme.ART, {
-    LIST_SELECTED = "Interface\\QuestFrame\\UI-QuestLogTitleHighlight",
-    LIST_HOVER = "Interface\\QuestFrame\\UI-QuestTitleHighlight",
-    LIST_SELECTED_ALPHA = 0.45,
-    LIST_HOVER_ALPHA = 0.18,
-  })
   local button = rawget(_G, "CreateFrame")("Button")
   local texture = FrameKit.ListHighlight(button)
   Assert.equal(texture.layer, "HIGHLIGHT")
   Assert.equal(texture.texture, Theme.ART.LIST_HOVER)
   Assert.equal(texture.blendMode, "ADD")
-  Assert.equal(texture:GetAlpha(), 0.18)
+  Assert.equal(texture:GetAlpha(), Theme.ART.LIST_HOVER_ALPHA)
   Assert.same(texture.points, { { "ALL", button } })
 end
 

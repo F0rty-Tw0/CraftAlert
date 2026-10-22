@@ -26,8 +26,18 @@ local function rows()
   return shown
 end
 
-local function rowText(row)
-  return table.concat(Widgets.texts(row, Wow.frames), " / ")
+-- Every text shown in `frame` and its descendants, joined.
+local function textOf(frame)
+  return table.concat(Widgets.texts(frame, Wow.frames), " / ")
+end
+
+-- `n` customer names, Customer1-Draenor (oldest) to Customer<n>-Draenor.
+local function customerNames(n)
+  local names = {}
+  for i = 1, n do
+    names[i] = "Customer" .. i .. "-Draenor"
+  end
+  return names
 end
 
 -- A fixture whose leads come from `customers` (oldest first), the window subscribed to
@@ -91,7 +101,7 @@ local function testRowFields()
   local shown = rows()
   Assert.equal(#shown, 2)
   -- §7.3: newest first, with age, customer, item/profession, crafter, greeted and replied.
-  local first, second = rowText(shown[1]), rowText(shown[2])
+  local first, second = textOf(shown[1]), textOf(shown[2])
   for _, part in ipairs({ "Bob-Draenor", "30s", "[Sim Plate Belt]", "Me-Realm", "can't order (realm)" }) do
     Assert.truthy(string.find(first, part, 1, true), part .. " missing from: " .. first)
   end
@@ -106,14 +116,14 @@ local function testRowFields()
   -- Ages are refreshed on each refresh (window open or lead event), never by a ticker.
   Wow.clock.time = UiFixture.T0 + 60
   ns.LeadsWindow.Refresh()
-  Assert.truthy(string.find(rowText(rows()[1]), "1m", 1, true), rowText(rows()[1]))
+  Assert.truthy(string.find(textOf(rows()[1]), "1m", 1, true), textOf(rows()[1]))
   Assert.equal(#db.leads, 2)
 
   -- No leads: an empty-state line, no rows.
   ns = load({})
   ns.LeadsWindow.Toggle()
   Assert.equal(#rows(), 0)
-  Assert.truthy(string.find(table.concat(Widgets.texts(window(), Wow.frames), " / "), "No leads", 1, true))
+  Assert.truthy(string.find(textOf(window()), "No leads", 1, true))
 end
 
 -- §4.5: the rank sits between the crafter and the realm tag.
@@ -124,7 +134,7 @@ local function testRowRank()
   end)
   ns.LeadsWindow.Toggle()
   local shown = rows()
-  local conc, plain = rowText(shown[1]), rowText(shown[2])
+  local conc, plain = textOf(shown[1]), textOf(shown[2])
   Assert.truthy(string.find(conc, "by Me-Realm · R2 (conc) · can't order (realm)", 1, true), conc)
   Assert.truthy(string.find(plain, "by Me-Realm · R2", 1, true), plain)
   Assert.falsy(string.find(plain, "(conc)", 1, true), plain)
@@ -135,7 +145,7 @@ local function testRowClicks()
   ns.LeadsWindow.Toggle()
   local left = rows()
   Assert.equal(#left, 1)
-  Assert.truthy(string.find(rowText(left[1]), "Bob-Draenor", 1, true))
+  Assert.truthy(string.find(textOf(left[1]), "Bob-Draenor", 1, true))
   -- With no button on the right, the replied tag sits at the row's right edge, inset by PADDING.
   local point, relativeTo, relativePoint, x, y = left[1].repliedTag:GetPoint()
   Assert.equal(point, "RIGHT")
@@ -154,56 +164,49 @@ local function testRowClicks()
   Assert.equal(#rows(), 0)
 end
 
--- Spec §6: no fill on a row; the quest-log hover texture lights it.
+-- native-HUD spec §6: no fill on a row; the quest-log hover texture lights it.
 local function testRowHighlight()
   local ns = load({ "Ann-Draenor" })
   ns.LeadsWindow.Toggle()
-  local hover, fills = nil, 0
-  for _, region in ipairs(rows()[1].regions) do
-    if region.layer == "HIGHLIGHT" then
-      hover = region
-    end
+  local row = rows()[1]
+  local fills = 0
+  for _, region in ipairs(row.regions) do
     if region.color then
       fills = fills + 1
     end
   end
-  assert(hover, "a HIGHLIGHT-layer texture")
+  local hover = assert(row.hover, "the row's hover texture")
+  Assert.equal(hover.layer, "HIGHLIGHT")
   Assert.equal(hover.texture, ns.Theme.ART.LIST_HOVER)
   Assert.equal(hover.blendMode, "ADD")
-  Assert.equal(hover:GetAlpha(), 0.18)
+  Assert.equal(hover:GetAlpha(), ns.Theme.ART.LIST_HOVER_ALPHA)
   Assert.equal(fills, 0, "no colour fill on the row")
 end
 
--- Spec §6, §4.5, §4.6: the item link in the detail line hovers, clicks through SetItemRef, and guards the row's clicks.
+-- native-HUD spec §6, §4.5, §4.6: the item link in the detail line hovers, clicks through SetItemRef, and guards the row's clicks.
 local function testRowLinkHover()
   local ns, _, calls = load({ "Ann-Draenor", "Bob-Draenor" }, function(accountDb)
     accountDb.leads[2].kind, accountDb.leads[2].itemLink = "item", LINK_TEXT
   end)
   local tip = rawget(_G, "GameTooltip")
-  function tip:SetHyperlink(link)
-    self.hyperlink = link
-  end
-  local clicked = {}
-  Wow.stub("SetItemRef", function(...)
-    clicked[#clicked + 1] = { ... }
-  end)
   ns.LeadsWindow.Toggle()
   local row = rows()[1] -- Bob, the newest lead, holds the item link
   Assert.truthy(row.scripts.OnHyperlinkEnter and row.scripts.OnHyperlinkLeave and row.scripts.OnHyperlinkClick)
 
   row.scripts.OnHyperlinkEnter(row, LINK, LINK_TEXT)
   Assert.equal(row.hoveredLink, LINK)
-  Assert.same({ tip.hyperlink, tip.owner, tip.shown }, { LINK, row, true })
+  Assert.same({ tip.hyperlinks, tip.owner, tip.shown }, { { LINK }, row, true })
 
   -- While a link is hovered no click greets or dismisses.
   Wow.clock.gettime = 51
   Widgets.click(row, "LeftButton")
   Widgets.click(row, "RightButton")
   Assert.equal(#UiFixture.callsTo(calls, "chat"), 0, "a click on a link never greets")
-  Assert.equal(ns.Leads.HasActive(), true)
+  Assert.equal(row.lead.customer, "Bob-Draenor")
+  Assert.equal(ns.Leads.IsActive(row.lead.id), true, "a right-click on a link never dismisses")
 
   row.scripts.OnHyperlinkClick(row, LINK, LINK_TEXT, "LeftButton")
-  Assert.same(clicked, { { LINK, LINK_TEXT, "LeftButton", row } })
+  Assert.same(Wow.itemRefs, { { LINK, LINK_TEXT, "LeftButton", row } })
 
   -- After the link is left, a plain click greets.
   row.scripts.OnHyperlinkLeave(row, LINK)
@@ -227,18 +230,14 @@ end
 
 -- Rows sit in the inset and fit its height (320 high: inset 320 - 28 - 26 = 266; floor((266 - 16 + 2) / 38) = 6).
 local function testRowsFitTheInset()
-  local customers = {}
-  for i = 1, 12 do
-    customers[i] = "Customer" .. i .. "-Draenor"
-  end
-  local ns = load(customers)
+  local ns = load(customerNames(12))
   ns.LeadsWindow.Toggle()
   local frame = window()
   Assert.equal(#rows(), 6)
   Assert.equal(rows()[1].parent, frame.Inset)
   Assert.same({ rows()[1]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -8 })
   Assert.same({ rows()[2]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -46 })
-  Assert.truthy(string.find(table.concat(Widgets.texts(frame, Wow.frames), " / "), "Click: greet", 1, true), "footer hint")
+  Assert.truthy(string.find(textOf(frame), "Click: greet", 1, true), "footer hint")
   -- The hint's right edge stops at the resize button, so the button exists before the texts.
   local hintRight
   for _, region in ipairs(frame.regions) do
@@ -263,15 +262,12 @@ local function testRowsFitTheInset()
   Assert.equal(#rows(), 6, "rows fit before the inset is laid out")
   ns = load({})
   ns.LeadsWindow.Toggle()
-  Assert.truthy(string.find(table.concat(Widgets.texts(window().Inset, Wow.frames), " / "), "No leads", 1, true), "empty text is in the inset")
+  Assert.truthy(string.find(textOf(window().Inset), "No leads", 1, true), "empty text is in the inset")
 end
 
 -- Review Focus 5: resize wrapping, minimum, save, close-and-reopen, reload.
 local function testResizeButton()
-  local customers = {}
-  for i = 1, 12 do
-    customers[i] = "Customer" .. i .. "-Draenor"
-  end
+  local customers = customerNames(12)
   local ns, db = load(customers)
   ns.LeadsWindow.Toggle()
   local frame, screen = window(), rawget(_G, "UIParent")
@@ -311,11 +307,7 @@ local function testResizeButton()
 end
 
 local function testVisibleLatestAndScroll()
-  local customers = {}
-  for i = 1, 12 do
-    customers[i] = "Customer" .. i .. "-Draenor"
-  end
-  local ns = load(customers)
+  local ns = load(customerNames(12))
   ns.LeadsWindow.Toggle()
   -- The newest lead is in the top row, shown since the window opened (GetTime() 50).
   local lead, shownAt = ns.LeadsWindow.VisibleLatest()
@@ -327,17 +319,17 @@ local function testVisibleLatestAndScroll()
   Assert.equal(select(2, ns.LeadsWindow.VisibleLatest()), 50)
   ns.Leads.Dismiss(ns.Leads.Latest().id)
   Assert.same({ ns.LeadsWindow.VisibleLatest() }, { ns.Leads.Latest(), 55 })
-  Assert.truthy(string.find(rowText(rows()[1]), "Customer11-Draenor", 1, true), rowText(rows()[1]))
+  Assert.truthy(string.find(textOf(rows()[1]), "Customer11-Draenor", 1, true), textOf(rows()[1]))
   local visibleRows = #rows()
   Assert.truthy(visibleRows > 0 and visibleRows < 11, "only the rows that fit are shown")
   -- The mouse wheel scrolls; the latest lead is then off screen.
   window().scripts.OnMouseWheel(window(), -1)
-  Assert.truthy(string.find(rowText(rows()[1]), "Customer10-Draenor", 1, true), rowText(rows()[1]))
+  Assert.truthy(string.find(textOf(rows()[1]), "Customer10-Draenor", 1, true), textOf(rows()[1]))
   Assert.equal(ns.LeadsWindow.VisibleLatest(), nil)
   for _ = 1, 20 do
     window().scripts.OnMouseWheel(window(), -1)
   end
-  Assert.truthy(string.find(rowText(rows()[#rows()]), "Customer1-Draenor", 1, true), "stops at the oldest lead")
+  Assert.truthy(string.find(textOf(rows()[#rows()]), "Customer1-Draenor", 1, true), "stops at the oldest lead")
   -- Closing and reopening starts at the top again, shown from the new open time.
   ns.LeadsWindow.Toggle()
   Assert.equal(ns.LeadsWindow.VisibleLatest(), nil)

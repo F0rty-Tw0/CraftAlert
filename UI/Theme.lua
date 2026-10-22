@@ -82,6 +82,9 @@ Theme.LAYOUT = {
 }
 
 Theme.ICON = "Interface\\Icons\\INV_Misc_Bell_01"
+-- Textures every flavor's UI source references (ui_live, ui_forever, ui_classic, ui_classic_era).
+Theme.BADGE_TEXTURE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
+Theme.GREETED_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
 -- Quest-log list art (plain files, not atlases): selected and hover row highlights, drawn ADD.
 Theme.ART = {
   LIST_SELECTED = "Interface\\QuestFrame\\UI-QuestLogTitleHighlight",
@@ -89,9 +92,6 @@ Theme.ART = {
   LIST_SELECTED_ALPHA = 0.45,
   LIST_HOVER_ALPHA = 0.18,
 }
--- Textures every flavor's UI source references (ui_live, ui_forever, ui_classic, ui_classic_era).
-Theme.BADGE_TEXTURE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
-Theme.GREETED_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
 Theme.DIM_ALPHA = 0.5
 
 ns.Theme = Theme
