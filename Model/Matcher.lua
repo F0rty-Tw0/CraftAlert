@@ -27,7 +27,7 @@ local type = type
 local issecretvalue = FlavorCompat.issecretvalue
 local Normalize = PlayerName.Normalize
 local Scan, Tokenize = Tokenizer.Scan, Tokenizer.Tokenize
-local tokens, itemIDs = Tokenizer.tokens, Tokenizer.itemIDs
+local tokens, itemIDs, BreakBefore = Tokenizer.tokens, Tokenizer.itemIDs, Tokenizer.BreakBefore
 
 local result = Candidates.result
 ---@type table
@@ -139,7 +139,7 @@ end
 
 -- Step 4.4 (WordGroups). hasSet: step 4.2 left several recipes in Candidates.
 local function matchWords(hasSet)
-  return WordGroups.Match(index, tokens, tokenCount, intentToken, hasSet, PhraseMatch.why, PhraseMatch.whyCount, senderArmor)
+  return WordGroups.Match(index, tokens, tokenCount, intentToken, hasSet, PhraseMatch.why, PhraseMatch.whyCount, senderArmor, BreakBefore)
 end
 
 -- Step 4.5: the typo pass, only after steps 4.1-4.4 found nothing. hasPhrase: step 4.2 kept

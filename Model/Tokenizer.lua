@@ -23,6 +23,7 @@ local type = type
 
 -- Word characters: ASCII letters and digits, the apostrophe, and every byte >= 128 (UTF-8).
 local WORD = "[%w'\128-\255]+"
+local SPACES = "^%s*" -- anchored, so BreakBefore reads only the gap between two tokens
 local ITEM_LINK = "^|hitem:(%d+)"
 local ENCHANT_LINK = "^|henchant:"
 local ANY_LINK = "^|h%a+:"
@@ -39,6 +40,7 @@ local intents = {}
 local intentCount = 0
 
 local tokens = {}
+local starts = {} -- starts[k]: where token k begins in the line (BreakBefore)
 local itemIDs = {}
 local linkNames = {}
 Tokenizer.WORD = WORD -- Index normalizes recipe phrases with the same word class
@@ -54,6 +56,7 @@ local count, items, names = 0, 0, 0
 local lastCount, lastItems, lastNames = 0, 0, 0
 local linkEnd = nil -- position of the open named link's closing `|h`
 local linkFirst = 0 -- first token index of the open named link's text
+local line = "" -- the lowercase text of the last Tokenize call (BreakBefore)
 
 -- Replaces the intent list (lowercased here, once, so Scan never lowercases a word).
 function Tokenizer.Configure(intentWords)
@@ -144,7 +147,7 @@ end
 -- Clears what the previous line left past this line's counts, then publishes the counts.
 local function finish()
   for k = count + 1, lastCount do
-    tokens[k] = nil
+    tokens[k], starts[k] = nil, nil
   end
   for k = items + 1, lastItems do
     itemIDs[k] = nil
@@ -161,7 +164,7 @@ end
 -- Fills the buffers from lowercase text; returns the token count. `normalized` is the tokens
 -- joined by one space: every run of non-word characters collapsed, no edge spaces.
 function Tokenizer.Tokenize(lower)
-  count, items, names, linkEnd = 0, 0, 0, nil
+  count, items, names, linkEnd, line = 0, 0, 0, nil, lower
   local afterEnd = #lower + 1
   local i = 1
   local bar = find(lower, "|", 1, true) or afterEnd
@@ -185,6 +188,7 @@ function Tokenizer.Tokenize(lower)
     elseif first and (count < MAX_TOKENS or linkEnd) then -- link text leaves the buffer at its |h
       count = count + 1
       tokens[count] = sub(lower, first, last)
+      starts[count] = first
       i = last + 1
       first, last = find(lower, WORD, i)
     elseif first and bar < afterEnd then
@@ -198,6 +202,17 @@ function Tokenizer.Tokenize(lower)
   end
   finish()
   return count
+end
+
+-- §6.4 cue adjacency: whether anything but spaces (punctuation, an escape, a link) sits
+-- between tokens k - 1 and k of the last line; never before the first. Asked only for the few
+-- tokens an ambiguous word needs, so Tokenize pays one store per token, not a search.
+function Tokenizer.BreakBefore(k)
+  if k <= 1 or k > count then
+    return false
+  end
+  local _, spaceEnd = find(line, SPACES, starts[k - 1] + #tokens[k - 1])
+  return spaceEnd + 1 < starts[k]
 end
 
 ns.Tokenizer = Tokenizer

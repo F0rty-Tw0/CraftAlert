@@ -5,6 +5,7 @@ end
 
 local Tokenizer = ns.Tokenizer or require("CraftAlert.Model.Tokenizer")
 local Candidates = ns.MatchCandidates or require("CraftAlert.Model.MatchCandidates")
+local Slang = ns.Slang or require("CraftAlert.Model.Slang")
 
 -- Spec §6.3 step 4.2: full names and aliases (phrase records), join pairs and link names.
 -- Build side (Aliases calls Add per new record): phraseIds[firstWord] = id,
@@ -30,6 +31,7 @@ local LENGTH_UNIT = KEY_WORDS * WORDS_UNIT
 local ID_UNIT = KEY_LENGTHS * LENGTH_UNIT
 
 local tokens, linkNames = Tokenizer.tokens, Tokenizer.linkNames
+local wordGroupsOnly = Slang.wordGroupsOnly
 ---@type table
 local index = nil
 local tokenCount = 0
@@ -204,13 +206,13 @@ local function phrasesAt(i, token, id, found)
   end
 end
 
--- Whether a token of the last Run's line is a wordIndex word or an enchant slot word, the
--- companions of §6.2 item 1.
+-- Whether a token of the last Run's line is a wordIndex word (except a Slang.wordGroupsOnly
+-- one) or an enchant slot word, the companions of §6.2 item 1.
 function PhraseMatch.HasCompanionWord()
   local wordIndex, enchantSlotWords = index.wordIndex, index.enchantSlotWords
   for i = 1, tokenCount do
     local token = tokens[i]
-    if wordIndex[token] or enchantSlotWords[token] then
+    if (wordIndex[token] and not wordGroupsOnly[token]) or enchantSlotWords[token] then
       return true
     end
   end

@@ -124,8 +124,9 @@ end
 local function testBaselines()
   local ns = fullIndex()
   Assert.equal(outcome(ns, "LF belt"), "profession:" .. BS, "baseline: three belts, profession order")
-  Assert.equal(outcome(ns, "LF head crafter"), "stop:nomatch", "baseline: head has no partner")
-  Assert.equal(outcome(ns, "LF bs for legs"), "profession:" .. BS, "baseline: legs has no partner")
+  -- §6.4, user ruling 2026-10-21: a crafting cue word partners an ambiguous word.
+  Assert.equal(outcome(ns, "LF head crafter"), "profession:" .. BS, "baseline: head counts through the cue word")
+  Assert.equal(outcome(ns, "LF bs for legs"), "item:502", "baseline: legs counts through bs, narrowed to Blacksmithing")
   Assert.equal(outcome(ns, "LF belt and head"), "stop:nomatch", "baseline: head counts through belt")
 end
 
@@ -151,18 +152,19 @@ local function testRows6To10()
   local ns = fullIndex()
   check(ns, "row 6", "LF head crafter", W, "item:504", nil, "lf+head+plate (warrior)")
   check(ns, "row 6 repeated", "LF head crafter head", W, "item:504", 1, "lf+head+head+plate (warrior)")
-  -- The admitted word belongs to its own line: the next line does not intersect with it.
-  check(ns, "admit is per line", "LF belt crafter", W, "item:501", 1, "lf+belt+plate (warrior)")
+  -- The cued word belongs to its own line: the next line does not intersect with it.
+  check(ns, "cued word is per line", "LF belt crafter", W, "item:501", 1, "lf+belt+plate (warrior)")
   check(ns, "row 7", "LF bs for legs", P, "item:502", nil, "lf+legs+plate (paladin)")
   check(ns, "row 9", "LF healer, head to Deadmines", P, "stop:nomatch", 0)
   check(ns, "row 10", "need legs", W, "stop:nomatch", 0)
+  -- User ruling 2026-10-21: a named profession wins; no enabled crafter of it → no alert.
   ns = fullIndex({ disable = { "Tai-Realm" } })
-  check(ns, "row 8", "LF tailor for head", W, "item:504")
+  check(ns, "row 8", "LF tailor for head", W, "stop:nomatch")
 end
 
 local function testRows11To12()
   local ns = fullIndex()
-  check(ns, "row 11", "LF head crafter", U, "stop:nomatch", 1)
+  check(ns, "row 11", "LF head crafter", U, "profession:" .. BS, 1, "lf+head")
   check(ns, "row 12", "LF belt and boots", W, "stop:nomatch", 1)
 end
 
@@ -222,7 +224,9 @@ local function testSetKeptOverClass()
 end
 
 -- User ruling 2026-10-20 (supersedes Review Focus 1): a line with an Enchanting word infers
--- no armor word and looks up no class, since an enchant does not depend on the asker's armor.
+-- no armor word and looks up no class, since an enchant does not depend on the asker's armor,
+-- unless Enchanting has no candidate and a profession named after it falls through (user
+-- ruling 2026-10-22).
 local function testEnchantingLines()
   local ns = Fixture.load()
   Fixture.itemIndex(ns, function(db)
@@ -237,6 +241,31 @@ local function testEnchantingLines()
   ns.Matcher.SetIndex(Fixture.index(ns))
   Assert.equal(outcome(ns, "LF enchant chest"), "profession:" .. ENCH, "enchanting today")
   check(ns, "enchanting", "LF enchant chest", W, "profession:" .. ENCH, 0)
+  -- User ruling 2026-10-22: an Enchanting word with no candidate falls through to the next
+  -- named profession, and that one takes the sender's armor word (a plate and a leather belt).
+  ns = Fixture.load()
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Smith-Realm"].recipes[3] = { item = 701, name = "Hide Strap", prof = BS }
+  end)
+  check(ns, "enchanting", "LF bs belt", W, "item:501", 1)
+  check(ns, "enchanting", "LF ench or bs belt", W, "item:501", 1)
+  check(ns, "enchanting", "LF bs or ench belt", W, "item:501", 1)
+  -- The same on a step 4.2 set ("green iron"): Enchanting is tried on the set first, without
+  -- the armor word and the class lookup; the professions named after it get the armor word.
+  local function greenIron(enchanting)
+    ns = Fixture.load()
+    Fixture.itemIndex(ns, function(db)
+      db.characters["Smith-Realm"].recipes[3] = { item = 505, name = "Green Iron Girdle", prof = BS }
+      db.characters["Tai-Realm"] = Fixture.character({ TAILOR }, { [5] = { item = 605, name = "Green Iron Cord", prof = TAILOR } })
+      db.characters["Ench-Realm"] = Fixture.character({ ENCH }, { [44] = enchanting })
+    end)
+  end
+  greenIron({ name = "Green Iron Sigil", prof = ENCH })
+  check(ns, "enchanting set", "LF ench or bs green iron belt", W, "item:505", 1)
+  check(ns, "enchanting set", "LF ench or tailor green iron belt", W, "item:605", 1)
+  check(ns, "enchanting set", "LF ench green iron belt", W, "profession:" .. ENCH, 0)
+  greenIron({ item = 602, name = "Green Iron Sash", prof = ENCH })
+  check(ns, "enchanting set", "LF ench or bs green iron belt", W, "item:602", 0)
 end
 
 -- Review Focus 2: inference never removes a word that counts today (§4 rule 5).

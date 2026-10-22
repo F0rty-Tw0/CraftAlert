@@ -116,8 +116,9 @@ function MatchCandidates.KeepWord(groupWords, word, soft)
   return true
 end
 
--- Keeps the candidates of profession prof (§6.3 step 4.4: a line with an Enchanting word).
-function MatchCandidates.KeepProf(prof)
+-- Keeps the candidates of profession prof (§6.3 step 4.4: a line naming a profession). soft:
+-- when no candidate has prof, keep every candidate (nothing was moved) → false.
+function MatchCandidates.KeepProf(prof, soft)
   local kept = 0
   for k = 1, count do
     local entry = candidates[k]
@@ -126,8 +127,12 @@ function MatchCandidates.KeepProf(prof)
       candidates[kept] = entry
     end
   end
+  if kept == 0 and soft then
+    return false
+  end
   count = kept
   MatchCandidates.count = count
+  return true
 end
 
 -- The entries of list whose group's word set is marked (marks[set] == mark, WordGroups).

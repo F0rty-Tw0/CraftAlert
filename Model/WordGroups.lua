@@ -16,12 +16,14 @@ local Candidates = ns.MatchCandidates or require("CraftAlert.Model.MatchCandidat
 --     group's words come from its item, so membership is a per-group question);
 --   wordSets[word] = { set, ... }: the distinct groupWords sets holding word (a few dozen), so
 --     a line whose words no group has together is rejected without walking a list;
---   wordInfo[word] = { groupCount, prof, entries, enchanting }: step 4.4's decision for that
---     word alone, and the same decision over its Enchanting entries only (nil when none).
--- A line that names an armor slot without an armor type or an Enchanting word takes the
--- sender's armor word (docs/specs/2026-10-20-class-armor-design.md §4 rules 2-7, and the
--- 2026-10-20 enchanting ruling in the -notes.md beside it): one class lookup at most, only
--- adding words, never uncounting one that counts today.
+--   wordInfo[word] = { groupCount, prof, entries, byProf }: step 4.4's decision for that word
+--     alone, and byProf[key] the same decision over one profession's entries only (absent
+--     when it has none), for a line that names a profession; byProf is nil when one
+--     profession has every entry (narrowedInfo).
+-- A line that names an armor slot without an armor type takes the sender's armor word
+-- (docs/specs/2026-10-20-class-armor-design.md §4 rules 2-7), except while an Enchanting word
+-- is tried (the 2026-10-20 and 2026-10-22 rulings in the -notes.md beside it): one class
+-- lookup at most, only adding words, never uncounting one that counts today.
 -- Every wordIndex list keeps one global entry order (build order), so an intersection walked
 -- in any list's order comes out in the first list's order. Match is hot path: module-level
 -- buffers only.
@@ -32,11 +34,17 @@ local ipairs = ipairs
 local slangWords, ambiguous = Slang.wordSet, Slang.ambiguous
 local MAX_WORDS = 6 -- distinct slang words per line (§6.3 step 4.4; bounds the §4.4 max)
 
--- §6.4 Enchanting profession words: a line holding one narrows step 4.4 to Enchanting.
--- Class-armor §4 rule 2(c) crafting cues: the fixed cue words and every profession word.
-local enchantingWords, cueWords = {}, {}
+-- §6.4 profession words: a line holding one narrows step 4.4 to that profession (user ruling
+-- 2026-10-21); with several, to the first that still has a candidate, Enchanting before the
+-- others in line order (user ruling 2026-10-22).
+-- Class-armor §4 rule 2(c) crafting cues: the fixed cue words and every profession word;
+-- fillers may sit between a cue word and the ambiguous word it partners.
+local enchantingWords, cueWords, fillerWords = {}, {}, {}
 for _, word in ipairs(Constants.craftCueWords) do
   cueWords[word] = true
+end
+for _, word in ipairs(Constants.cueFillerWords) do
+  fillerWords[word] = true
 end
 for _, entry in ipairs(ProfessionWords.entries) do
   for _, word in ipairs(entry.words) do
@@ -133,36 +141,90 @@ local function infoFor(list, rank, seenIn)
   return { groupCount = #firstOfGroup, prof = prof, entries = entries }
 end
 
--- Index build (also after a test adds wordIndex words): fills groupWords and wordInfo.
+-- infoFor over the entries of profession prof alone: the tie-break would pick prof and the
+-- filter would copy list, so only the distinct recipes are counted.
+local function soleInfo(list, prof, seenIn)
+  local groupCount = 0
+  for _, entry in ipairs(list) do
+    if seenIn[entry.group] ~= list then
+      seenIn[entry.group], groupCount = list, groupCount + 1
+    end
+  end
+  return { groupCount = groupCount, prof = prof, entries = list }
+end
+
+-- info.byProf for list: the entries of each profession, then their soleInfo in place. nil when
+-- one profession has every entry (most words), so the index holds no table for it.
+local function byProfession(list, seenIn)
+  local only = list[1] and list[1].prof
+  for _, entry in ipairs(list) do
+    if entry.prof ~= only then
+      only = nil
+      break
+    end
+  end
+  if only ~= nil then
+    return nil
+  end
+  local byProf = {}
+  for _, entry in ipairs(list) do
+    local prof = entry.prof
+    if prof ~= nil then
+      local entries = byProf[prof] or {}
+      byProf[prof] = entries
+      entries[#entries + 1] = entry
+    end
+  end
+  for prof, entries in pairs(byProf) do
+    byProf[prof] = soleInfo(entries, prof, seenIn)
+  end
+  return byProf
+end
+
+-- A word's step 4.4 decision over profession prof's entries only, or nil when it has none.
+local function narrowedInfo(info, prof)
+  local byProf = info.byProf
+  if byProf == nil then
+    return info.prof == prof and info or nil
+  end
+  return byProf[prof]
+end
+
+-- Index build (also after a test adds wordIndex words): fills groupWords, wordInfo and the
+-- profession key of every profession word (professionKeys).
 function WordGroups.Build(index)
   buildGroupWords(index)
   local rank = {}
   for i, key in ipairs(index.professionOrder or {}) do
     rank[key] = i
   end
-  local enchantingKey = ProfessionWords.KeyFor("enchanting", FlavorCompat.isClassic)
-  index.enchantingKey = enchantingKey
+  local isClassic = FlavorCompat.isClassic
+  index.enchantingKey = ProfessionWords.KeyFor("enchanting", isClassic)
+  index.professionKeys = {}
+  for _, entry in ipairs(ProfessionWords.entries) do
+    for _, word in ipairs(entry.words) do
+      index.professionKeys[word] = ProfessionWords.KeyFor(word, isClassic)
+    end
+  end
   local seenIn = {}
   index.wordInfo = {}
   for word, list in pairs(index.wordIndex) do
-    local info, enchanting = infoFor(list, rank, seenIn), {}
-    for _, entry in ipairs(list) do
-      if entry.prof == enchantingKey then
-        enchanting[#enchanting + 1] = entry
-      end
+    local info, byProf = infoFor(list, rank, seenIn), byProfession(list, seenIn)
+    if byProf ~= nil and info.groupCount > 1 and info.prof ~= nil then
+      info.entries = byProf[info.prof].entries -- the same entries in the same order, held once
     end
-    info.enchanting = enchanting[1] and infoFor(enchanting, rank, seenIn) or nil
+    info.byProf = byProf
     index.wordInfo[word] = info
   end
 end
 
--- §6.4: an ambiguous word counts only when another wordIndex word or a step 4.2 phrase
--- match (hasSet) is in the line.
-local function counts(token, first, other, hasSet)
+-- §6.4: an ambiguous word counts only when another wordIndex word or a step 4.2 phrase match
+-- (hasSet) is in the line, or a crafting cue word is next to it (cued, cuedAt).
+local function counts(token, first, other, hasSet, cued)
   if not ambiguous[token] then
     return true
   end
-  return hasSet or (first ~= nil and first ~= token) or other ~= nil
+  return hasSet or cued or (first ~= nil and first ~= token) or other ~= nil
 end
 
 -- Per-line buffers: the distinct counted words (a repeated word intersects once), found
@@ -170,10 +232,13 @@ end
 local lineWords, lineLists, lineCount = {}, {}, 0
 local wordStamp = {}
 local stamp = 0
--- Per-line state collect leaves for inferArmor: whether the sender's armor word may be
--- inferred (class-armor §4 rule 2), and an ambiguous slot word left uncounted (no partner)
--- with how many times it was seen (§4 rule 5); admit is nil without a crafting cue.
-local inferable, admit, admitCount = false, nil, 0
+-- The profession keys the line names, in narrowing order (Enchanting first, then line order,
+-- each once: namedStamp[key] == stamp): named[1..namedCount].
+local named, namedCount, namedStamp = {}, 0, {}
+-- Per-line state collect leaves for Match: whether the sender's armor word may be inferred
+-- (class-armor §4 rule 2: a slot without an armor type), and whether the line names an
+-- Enchanting word (then named[1] is its key).
+local inferable, enchantingNamed = false, false
 
 -- New index: drop the lists the last line kept, the stamps and the set marks.
 function WordGroups.Reset()
@@ -194,159 +259,177 @@ local function firstWords(wordIndex, tokens, count)
   return first, other
 end
 
+-- Whether the first non-filler token from tokens[i] in direction step (-1 or 1) is a cue
+-- word with nothing but spaces between (breakBefore: Tokenizer.BreakBefore). The words are
+-- read first and breakBefore, a string search, is asked only when a cue word was reached, so
+-- an uncued repeat of an ambiguous word costs table lookups alone.
+local function cuedFrom(tokens, count, breakBefore, i, step)
+  local k = i + step
+  while k >= 1 and k <= count and fillerWords[tokens[k]] do
+    k = k + step
+  end
+  if k < 1 or k > count or not cueWords[tokens[k]] then
+    return false
+  end
+  local low, high = i, k
+  if step < 0 then
+    low, high = k, i
+  end
+  for j = low + 1, high do
+    if breakBefore(j) then
+      return false
+    end
+  end
+  return true
+end
+
+-- §6.4, user ruling 2026-10-21: whether a crafting cue word is the token right before or
+-- after tokens[i], past filler words but never past punctuation.
+local function cuedAt(tokens, count, breakBefore, i)
+  return cuedFrom(tokens, count, breakBefore, i, -1) or cuedFrom(tokens, count, breakBefore, i, 1)
+end
+
+-- Adds a profession key the line names to named once: an Enchanting key in front, any other
+-- after the keys already there (line order).
+local function addNamed(key, front)
+  if namedStamp[key] == stamp then
+    return
+  end
+  namedStamp[key], namedCount = stamp, namedCount + 1
+  if not front then
+    named[namedCount] = key
+    return
+  end
+  for n = namedCount, 2, -1 do
+    named[n] = named[n - 1]
+  end
+  named[1] = key
+end
+
 -- Fills lineWords/lineLists (the first MAX_WORDS distinct counted words; later new words
--- are skipped), Candidates.wordWhy and the inferArmor line state. → why count, or nil when a
--- known slang word nobody can craft empties the intersection; and whether the line holds an
--- Enchanting word. inferable (§4 rule 2) is decided on every scanned word, counted or not:
--- a slot without an armor type (an ambiguous slot needs a cue) and no Enchanting word (user
--- ruling 2026-10-20: an enchant ignores the asker's armor). tags: index.armorTags. A repeat
--- of a word already decided (wordStamp: stamp counted, -stamp unpartnered) takes the same
--- decision at once, since nothing it depends on changed. The first two wordIndex words are
--- found only when an ambiguous word needs them (most lines have none).
-local function collect(wordIndex, tokens, count, hasSet, tags)
-  local first, other, scanned, enchanting, cue = nil, nil, false, false, false
-  local sawType, sawPlainSlot, sawAmbiguousSlot = false, false, false
+-- are skipped), Candidates.wordWhy, named and the inferArmor line state. → why count, or nil
+-- when a known slang word nobody can craft empties the intersection.
+-- inferable (§4 rule 2) is decided on every scanned word, counted or not: a slot without an
+-- armor type (an ambiguous slot needs a cue next to it); an Enchanting word is tried first
+-- without it (Match; user rulings 2026-10-20 and 2026-10-22). A repeat of a word already decided
+-- (wordStamp: stamp counted, -stamp an ambiguous word left uncounted) takes the same decision
+-- at once, since nothing it depends on changed; only a cue next to the repeat (cuedAt) can
+-- count an uncounted one. The first two wordIndex words are found only when an ambiguous word
+-- needs them (most lines have none).
+local function collect(index, tokens, count, breakBefore, hasSet)
+  local wordIndex, tags, professionKeys = index.wordIndex, index.armorTags, index.professionKeys
+  local first, other, scanned, enchanting = nil, nil, false, false
+  local sawType, sawPlainSlot, sawCuedSlot = false, false, false
   local why, whyCount = Candidates.wordWhy, 0
-  lineCount, stamp, admit, admitCount = 0, stamp + 1, nil, 0
+  lineCount, namedCount, stamp = 0, 0, stamp + 1
   for i = 1, count do
     local token = tokens[i]
     local seen = wordStamp[token]
     if seen == stamp then
       whyCount = whyCount + 1
       why[whyCount] = token
-    elseif seen == -stamp then
-      admitCount = admitCount + 1
-    else
-      enchanting = enchanting or enchantingWords[token] == true
-      cue = cue or cueWords[token] == true
+    elseif seen ~= -stamp or cuedAt(tokens, count, breakBefore, i) then
+      local key = professionKeys[token]
+      if key ~= nil then
+        local isEnchanting = enchantingWords[token] == true
+        enchanting = enchanting or isEnchanting
+        addNamed(key, isEnchanting)
+      end
       local list = wordIndex[token]
       if (list or slangWords[token]) and lineCount < MAX_WORDS then
-        local tag, ambiguousSlot = tags[token], false
+        local tag, ambiguousSlot, cued = tags[token], false, false
         if ambiguous[token] then
           if not scanned then
             first, other = firstWords(wordIndex, tokens, count)
             scanned = true
           end
-          ambiguousSlot = tag == "slot"
+          ambiguousSlot, cued = tag == "slot", cuedAt(tokens, count, breakBefore, i)
         end
-        local counted = counts(token, first, other, hasSet)
+        local counted = counts(token, first, other, hasSet, cued)
         sawType = sawType or tag == "type"
         sawPlainSlot = sawPlainSlot or (tag == "slot" and not ambiguousSlot)
-        sawAmbiguousSlot = sawAmbiguousSlot or ambiguousSlot
-        if ambiguousSlot and not counted then
-          wordStamp[token] = -stamp
-          admit, admitCount = token, admitCount + 1
-        elseif counted then
+        sawCuedSlot = sawCuedSlot or (ambiguousSlot and cued)
+        if counted then
           if list == nil then
-            return nil, enchanting
+            return nil
           end
           wordStamp[token] = stamp
           lineCount = lineCount + 1
           lineWords[lineCount], lineLists[lineCount] = token, list
           whyCount = whyCount + 1
           why[whyCount] = token
+        else
+          wordStamp[token] = -stamp
         end
       end
     end
   end
-  local slotWithoutType = not sawType and (sawPlainSlot or (sawAmbiguousSlot and cue))
-  inferable, admit = slotWithoutType and not enchanting, cue and admit or nil
-  return whyCount, enchanting
+  inferable, enchantingNamed = not sawType and (sawPlainSlot or sawCuedSlot), enchanting
+  return whyCount
 end
 
--- Class-armor §4 rules 5 and 7: the sender's armor word joins the counted words (after the
--- line's own, outside the MAX_WORDS cap) with its "<armor> (<class>)" why label. admit: an
--- unpartnered ambiguous slot word (collect), seen admitCount times, that counts too with the
--- armor word as its partner. Being unpartnered, it is the line's only wordIndex word, so the
--- line counted nothing else: admitting it makes it the one word, admitCount times in the why.
+-- Class-armor §4 rule 7: the sender's armor word joins the counted words (after the line's
+-- own, outside the MAX_WORDS cap) with its "<armor> (<class>)" why label. A cued ambiguous
+-- slot word (§4 rule 5) already counts through its cue word (collect).
 -- → why count, or nil when the intersection is empty. No class → the line as collected.
 local function inferArmor(index, hasSet, classArmor, whyCount)
   local armor, label = classArmor()
   if armor == nil then
     return whyCount
   end
-  local wordIndex, why = index.wordIndex, Candidates.wordWhy
-  if admit ~= nil then
-    local list = wordIndex[admit]
-    if list == nil then -- a recognized slang word with no entries empties the intersection
-      return nil
-    end
-    lineCount, lineWords[1], lineLists[1], whyCount = 1, admit, list, admitCount
-    for k = 1, admitCount do
-      why[k] = admit
-    end
-  end
-  local list = wordIndex[armor]
+  local list = index.wordIndex[armor]
   if list == nil then -- a recognized slang word with no entries empties the intersection,
     return hasSet and whyCount or nil -- but a step 4.2 set ignores it (see keepSetWords)
   end
   lineCount = lineCount + 1
   lineWords[lineCount], lineLists[lineCount] = armor, list
-  why[whyCount + 1] = label
+  Candidates.wordWhy[whyCount + 1] = label
   return whyCount + 1, true
 end
 
--- collect, then the sender's armor word when §4 rule 2 holds. classArmor: nil or a function
--- → armorWord, whyLabel or nil, called at most once per line (§4 rule 8). → why count or
--- nil, enchanting, and whether the armor word was added (last in lineWords and the why).
-local function collectLine(index, tokens, count, hasSet, classArmor)
-  local whyCount, enchanting = collect(index.wordIndex, tokens, count, hasSet, index.armorTags)
-  local inferred = nil
-  if whyCount ~= nil and inferable and classArmor ~= nil then
-    whyCount, inferred = inferArmor(index, hasSet, classArmor, whyCount)
-  end
-  return whyCount, enchanting, inferred
-end
-
--- Narrows step 4.2's set by the line's words (and Enchanting). An inferred armor word goes
--- last and only when some recipe is left: a named set never loses to the sender's class
--- (user ruling 2026-10-20), so the word and its why label drop out. → why count.
-local function keepSetWords(index, enchanting, whyCount, inferred)
-  local groupWords, own = index.groupWords, inferred and lineCount - 1 or lineCount
+-- Narrows step 4.2's set by lineWords[1..own].
+local function keepOwnWords(index, own)
+  local groupWords = index.groupWords
   for k = 1, own do
     Candidates.KeepWord(groupWords, lineWords[k])
   end
-  if enchanting then
-    Candidates.KeepProf(index.enchantingKey)
+end
+
+-- Narrows step 4.2's set by the line's words, then to the first of named[from..namedCount]
+-- that keeps a candidate (none left when no named one does). An inferred armor word goes last
+-- and only when some recipe is left: a named set never loses to the sender's class (user
+-- ruling 2026-10-20), so the word and its why label drop out. → why count.
+local function keepSetWords(index, whyCount, inferred, from)
+  keepOwnWords(index, inferred and lineCount - 1 or lineCount)
+  local kept = namedCount == 0
+  for n = from, namedCount do
+    if Candidates.KeepProf(named[n], true) then
+      kept = true
+      break
+    end
   end
+  if not kept then
+    Candidates.KeepProf(named[1])
+  end
+  local groupWords = index.groupWords
   if inferred and not Candidates.KeepWord(groupWords, lineWords[lineCount], true) then
     return whyCount - 1
   end
   return whyCount
 end
 
--- Step 4.4. hasSet: step 4.2 left several recipes in Candidates (setWhy[1..setWhyCount]).
--- classArmor: the sender's armor word getter (collectLine). → whether it produced a match
--- (left in Candidates' result).
-function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, setWhyCount, classArmor)
-  local whyCount, enchanting, inferred = collectLine(index, tokens, count, hasSet, classArmor)
-  if whyCount == nil then
-    return false
-  end
-  local why = Candidates.wordWhy
-  if hasSet then
-    whyCount = keepSetWords(index, enchanting, whyCount, inferred)
-    return Candidates.count > 0 and Candidates.Decide(intentToken, setWhy, setWhyCount, why, whyCount)
-  end
-  if lineCount == 0 then
-    return false
-  end
-  if lineCount == 1 then
-    local info = index.wordInfo[lineWords[1]]
-    if enchanting then
-      info = info.enchanting
-    end
-    return info ~= nil and Candidates.DecideWord(intentToken, info, why, whyCount)
-  end
-  -- Walk the smallest list; with an Enchanting word, the smallest Enchanting-only list (each
-  -- word's precomputed one), so the narrowing never walks a big list of other professions.
+-- The list step 4.4 walks for the line's words narrowed to profession prof (nil: not
+-- narrowed): the smallest one; with a profession, of each word's precomputed list of that
+-- profession only, so the narrowing never walks a big list of other professions. → the list
+-- and its word's position, or nil when a word has no entry of prof (an empty intersection).
+local function smallestListFor(index, prof)
   local smallest, smallestList = 0, nil
   for k = 1, lineCount do
     local list = lineLists[k]
-    if enchanting then
-      local info = index.wordInfo[lineWords[k]].enchanting
+    if prof ~= nil then
+      local info = narrowedInfo(index.wordInfo[lineWords[k]], prof)
       if info == nil then
-        return false -- a word with no Enchanting entry empties the narrowed intersection
+        return nil
       end
       list = info.entries
     end
@@ -354,11 +437,93 @@ function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, set
       smallest, smallestList = k, list
     end
   end
-  if not markSetsWithAll(index.wordSets[lineWords[smallest]], lineWords, lineCount, stamp) then
+  return smallestList, smallest
+end
+
+local function noBreak()
+  return false
+end
+
+-- Step 4.4 over lineWords[1..lineCount] (at least one), narrowed to the first of
+-- named[from..to] that has a candidate, or not narrowed when the line names no profession.
+-- mark: this walk's setMark value. → whether it produced a match.
+local function walkNamed(index, intentToken, why, whyCount, from, to, mark)
+  if lineCount == 1 then
+    local info = index.wordInfo[lineWords[1]]
+    if namedCount == 0 then
+      return Candidates.DecideWord(intentToken, info, why, whyCount)
+    end
+    for n = from, to do
+      local narrowed = narrowedInfo(info, named[n])
+      if narrowed ~= nil then
+        return Candidates.DecideWord(intentToken, narrowed, why, whyCount)
+      end
+    end
     return false
   end
-  Candidates.FromListMarked(smallestList, index.groupWords, setMark, stamp)
-  return Candidates.count > 0 and Candidates.Decide(intentToken, nil, 0, why, whyCount)
+  -- The word sets holding every word are the same whichever word's sets are walked, so they
+  -- are marked once, from the first narrowed list found.
+  local marked = nil
+  for n = from, namedCount > 0 and to or from do
+    local list, smallest = smallestListFor(index, namedCount > 0 and named[n] or nil)
+    if list ~= nil then
+      if marked == nil then
+        marked = markSetsWithAll(index.wordSets[lineWords[smallest]], lineWords, lineCount, mark)
+      end
+      if not marked then
+        return false
+      end
+      Candidates.FromListMarked(list, index.groupWords, setMark, mark)
+      if Candidates.count > 0 then
+        return Candidates.Decide(intentToken, nil, 0, why, whyCount)
+      end
+    end
+  end
+  return false
+end
+
+-- Step 4.4. hasSet: step 4.2 left several recipes in Candidates (setWhy[1..setWhyCount]).
+-- classArmor: nil or the sender's armor word getter → armorWord, whyLabel or nil, called at
+-- most once per line (class-armor §4 rule 8). breakBefore: Tokenizer.BreakBefore for tokens
+-- (Matcher always passes it); nil only from a direct caller, whose tokens then have nothing
+-- but spaces between them. A line naming professions narrows to the first in named order that
+-- still has a candidate (user ruling 2026-10-22); when none has one, no match, and steps 4.5
+-- and 4.6 follow (4.6: the first profession word in the line). → whether it produced a match
+-- (left in Candidates' result).
+function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, setWhyCount, classArmor, breakBefore)
+  local whyCount = collect(index, tokens, count, breakBefore or noBreak, hasSet)
+  if whyCount == nil then
+    return false
+  end
+  local why, from, inferred = Candidates.wordWhy, 1, nil
+  if inferable and classArmor ~= nil then
+    -- An Enchanting word is tried first, without the sender's armor and before the class
+    -- lookup: an enchant ignores the asker's armor (user ruling 2026-10-20). Only the
+    -- professions named after it get the armor word (user ruling 2026-10-22).
+    if enchantingNamed then
+      if hasSet then
+        keepOwnWords(index, lineCount)
+        if Candidates.KeepProf(named[1], true) then
+          return Candidates.Decide(intentToken, setWhy, setWhyCount, why, whyCount)
+        end
+      elseif lineCount > 0 and walkNamed(index, intentToken, why, whyCount, 1, 1, -stamp) then
+        return true
+      end
+      if namedCount == 1 then
+        return false -- nothing named after Enchanting, so no class lookup
+      end
+      from = 2
+    end
+    whyCount, inferred = inferArmor(index, hasSet, classArmor, whyCount)
+    if whyCount == nil then
+      return false
+    end
+  end
+  if hasSet then
+    whyCount = keepSetWords(index, whyCount, inferred, from)
+    return Candidates.count > 0 and Candidates.Decide(intentToken, setWhy, setWhyCount, why, whyCount)
+  end
+  return lineCount > 0 and walkNamed(index, intentToken, why, whyCount, from, namedCount, stamp)
 end
 
 ns.WordGroups = WordGroups
