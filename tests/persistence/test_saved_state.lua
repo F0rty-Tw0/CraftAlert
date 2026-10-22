@@ -150,6 +150,18 @@ local function testLeadExpiryUsesTimeStubAndTimeout()
   Assert.same(ids, { 2, 3, 4 })
 end
 
+-- A synthetic (/ca test) lead never survives a reload.
+local function testTestLeadsAreNotKept()
+  local db = load({
+    leads = {
+      { id = 1, customer = "Test0-Realm", crafter = "Me-Realm", time = NOW - 5, test = true },
+      { id = 2, customer = "Real-Realm", crafter = "Me-Realm", time = NOW - 5 },
+    },
+  }).Load()
+  Assert.equal(#db.leads, 1)
+  Assert.equal(db.leads[1].customer, "Real-Realm")
+end
+
 local function testLedgerKeeps30Days()
   local db = load({
     ledger = {
@@ -194,6 +206,7 @@ return function()
   testNewerHandEditedDb()
   testLeadCapKeepsNewest()
   testLeadExpiryUsesTimeStubAndTimeout()
+  testTestLeadsAreNotKept()
   testLedgerKeeps30Days()
   testRecentGreetedKeeps24Hours()
   testRecipeRecordKeepsMutedDropsUnknown()
