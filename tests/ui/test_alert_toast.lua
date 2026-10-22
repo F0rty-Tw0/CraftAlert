@@ -208,6 +208,43 @@ local function testTestToast()
   Assert.falsy(string.find(texts(), "more", 1, true), texts())
 end
 
+local function loadTestLeads(count)
+  local ns, _, calls = UiFixture.load({ leads = count })
+  local leads = ns.Leads.List() -- newest first
+  for _, lead in ipairs(leads) do
+    lead.test = true
+  end
+  return ns, leads, calls
+end
+
+local function testRealPathTestLead()
+  -- A lead flagged `test` by Leads.OnMatch is badged "Test" and clicks through ClickRouter.
+  local ns, leads, calls = loadTestLeads(1)
+  ns.AlertToast.Show(leads[1])
+  Assert.truthy(string.find(texts(), "Test", 1, true), texts())
+  Wow.clock.gettime = 51
+  Widgets.click(toastFrame(), "LeftButton")
+  Assert.equal(leads[1].greeted, true)
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 0, "a test lead never reaches a send API")
+  Assert.equal(toastFrame():IsShown(), false)
+
+  -- Replacements keep the badge and count: "Test · +2 more".
+  ns, leads = loadTestLeads(3)
+  ns.AlertToast.Show(leads[3])
+  ns.AlertToast.Show(leads[2])
+  ns.AlertToast.Show(leads[1])
+  Assert.truthy(string.find(texts(), "Test · +2 more", 1, true), texts())
+  Assert.equal(ns.AlertToast.more, 2)
+
+  -- A real lead after a test lead shows "+1 more" and no "Test".
+  ns, leads = loadTestLeads(2)
+  leads[1].test = nil
+  ns.AlertToast.Show(leads[2])
+  ns.AlertToast.Show(leads[1])
+  Assert.truthy(string.find(texts(), "+1 more", 1, true), texts())
+  Assert.falsy(string.find(texts(), "Test", 1, true), texts())
+end
+
 local function testClassColor()
   local looked = {}
   local function withGuid(guid, noColors)
@@ -266,6 +303,7 @@ return function()
   testNewerLeadAndAutoHide()
   testClicks()
   testTestToast()
+  testRealPathTestLead()
   testClassColor()
   testSavedPosition()
   Wow.reset()

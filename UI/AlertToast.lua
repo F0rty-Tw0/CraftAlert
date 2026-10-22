@@ -61,6 +61,13 @@ local function badgeText()
   if current.isTest then
     return Localization.Text("Test")
   end
+  if current.lead and current.lead.test then
+    if AlertToast.more > 0 then
+      return Localization.Text("Test · +%d more", AlertToast.more)
+    end
+
+    return Localization.Text("Test")
+  end
   if AlertToast.more > 0 then
     return Localization.Text("+%d more", AlertToast.more)
   end
