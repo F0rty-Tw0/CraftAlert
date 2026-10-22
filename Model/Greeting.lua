@@ -26,7 +26,7 @@ local function nameOf(key)
 end
 
 -- The player's own realm is dropped, as Ambiguate does; an alt on another realm keeps it.
-local function crafterName(key)
+function Greeting.CrafterName(key)
   if PlayerName.RealmOf(key) == PlayerName.RealmOf(PlayerName.Own()) then
     return nameOf(key)
   end
@@ -103,7 +103,7 @@ function Greeting.Build(lead, settings)
   local text = settings.templates[templates[lead.kind == "profession" and "profession" or "item"]] or ""
   local values = {
     customer = nameOf(lead.customer),
-    crafter = crafterName(lead.crafter),
+    crafter = Greeting.CrafterName(lead.crafter),
     item = lead.itemLink or lead.recipeName or lead.profName or "",
     profession = lead.profName or "",
   }

@@ -48,10 +48,12 @@ local ownKey = nil
 local loadMs = 0 -- SavedState.Load at ADDON_LOADED, added into Perf.loginMs
 
 -- At login the profession slots may not have loaded yet (ProfessionList keeps what is stored
--- then); once they change, a new profession order rebuilds the index.
+-- then); once they change, a new profession order rebuilds the index and refreshes the
+-- launcher's idle icon (the first profession; Launcher.Refresh is a no-op before Create).
 local function onSkillLinesChanged()
   if ProfessionList.Refresh(db, ownKey) then
     Index.RequestRebuild("professions")
+    Launcher.Refresh()
   end
 end
 
@@ -122,6 +124,7 @@ end
 
 local function createLauncher()
   Launcher.Create()
+  Launcher.OnMoved(AlertToast.Dock)
   ScanGate.OnChange(Launcher.Refresh)
 end
 

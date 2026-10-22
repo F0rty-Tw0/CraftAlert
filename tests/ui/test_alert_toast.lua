@@ -5,8 +5,26 @@ local UiFixture = require("tests.helpers.ui_fixture")
 
 local TOAST_SECONDS = 20 -- the default toast duration
 
+-- A real Trade line from CraftAlertProbe.lua (runs[*].chat[*].text): 254 visible characters,
+-- 3 item: and 6 trade: links.
+local CORPUS =
+  [=[LFW All Items Crafting MAX Rank R5 Guarantee 100% [PVP 276-344 PVE 292-331 ]  |cffffd000|Htrade:Player-1305-0D49F592:2018:164|h[Blacksmithing]|h|r |cffffd000|Htrade:Player-3391-0CF6BD98:25229:755|h[Jewelcrafting]|h|r |cffffd000|Htrade:Player-1305-0D72650B:2108:165|h[Leatherworking]|h|r |cffffd000|Htrade:Player-3391-0CC42D6C:45357:773|h[Inscription]|h|r |cffffd000|Htrade:Player-1403-0B312ED9:3908:197|h[Tailoring]|h|r |cffffd000|Htrade:Player-1403-0B312ED9:4036:202|h[Engineering]|h|r |cnIQ4:|Hitem:245770::::::::70:62::13:1:3524:2:40:2907:38:8:::::|h[Aln'hara Cane |A:Professions-ChatIcon-Quality-Tier5:17:15::1|a]|h|r|cnIQ4:|Hitem:240949::::::::70:62::13:1:3524:4:40:3122:38:8:46:274476:48:245786:::::|h[Masterwork Sin'dorei Band |A:Professions-ChatIcon-Quality-Tier5:17:15::1|a]|h|r|cnIQ4:|Hitem:244576::::::::70:62::13:1:3524:6:40:4006:38:8:47:274476:48:240167:49:245786:50:-2147480202:::::|h[Silvermoon Agent's Deflectors |A:Professions-ChatIcon-Quality-Tier5:17:15::1|a]|h|r/w Me 4info]=]
+
 local function toastFrame()
   return rawget(_G, "CraftAlertToast")
+end
+
+-- The toast font strings using this font object, in creation order (name, then headline, share
+-- GameFontNormal).
+local function part(font)
+  local found = {}
+  for _, region in ipairs(toastFrame().regions) do
+    if region.font == font then
+      found[#found + 1] = region
+    end
+  end
+
+  return found
 end
 
 local function texts()
@@ -60,12 +78,15 @@ local function testLazyFrameAndContent()
   Assert.truthy(#Wow.frames > framesBefore)
   Assert.equal(frame:IsShown(), true)
   Assert.equal(frame.clamped, true)
-  Assert.equal(frame.movable, true)
-  -- Customer, the trimmed message, what matched, the crafter and the why line.
+  Assert.equal(frame.template, "TooltipBackdropTemplate")
+  Assert.equal(frame:GetWidth(), 320)
+  -- Customer, the headline and the trimmed message; the crafter and the why stay off the face.
   local shown = texts()
-  for _, part in ipairs({ "Customer1-Draenor", "LF plate belt", "Blacksmithing", "Me-Realm", "lf + blacksmith" }) do
+  for _, part in ipairs({ "Customer1-Draenor", "LF plate belt", "Wants Blacksmithing — you have it" }) do
     Assert.truthy(string.find(shown, part, 1, true), part .. " missing from: " .. shown)
   end
+  Assert.falsy(string.find(shown, "lf + blacksmith", 1, true), "why left the face")
+  Assert.falsy(string.find(shown, "Me-Realm", 1, true))
   Assert.falsy(string.find(shown, "  LF", 1, true), "message is trimmed")
   Assert.falsy(string.find(shown, "more", 1, true), "no badge for the first lead")
   -- Sound on the Master channel (default kit) and the taskbar flash.
@@ -84,20 +105,21 @@ local function testLazyFrameAndContent()
   Assert.equal(toastFrame():GetAlpha(), 0.6)
 
   -- An item lead shows its link; a lead whose customer cannot order says so (§7.2).
+  local link = "|cff1eff00|Hitem:190001|h[Sim Plate Belt]|h|r"
   ns = UiFixture.load({
     leads = 1,
     db = function(accountDb)
       local record = accountDb.leads[1]
-      record.kind, record.itemLink, record.cannotOrder = "item", "|cff1eff00|Hitem:190001|h[Sim Plate Belt]|h|r", true
+      record.kind, record.itemLink, record.cannotOrder = "item", link, true
     end,
   })
   ns.AlertToast.Show(ns.Leads.Latest())
   shown = texts()
-  Assert.truthy(string.find(shown, "[Sim Plate Belt]", 1, true), shown)
+  Assert.truthy(string.find(shown, "Wants " .. link .. " — you can craft it", 1, true), shown)
   Assert.truthy(string.find(shown, "can't order (realm)", 1, true), shown)
   Assert.falsy(string.find(shown, "R2", 1, true), "no rank, no R part: " .. shown)
 
-  -- §4.5: the rank follows the crafter.
+  -- Native-HUD spec §4.1: the rank sits on the detail line; the crafter is not drawn.
   ns = UiFixture.load({
     leads = 1,
     db = function(accountDb)
@@ -105,8 +127,103 @@ local function testLazyFrameAndContent()
     end,
   })
   ns.AlertToast.Show(ns.Leads.Latest())
-  shown = texts()
-  Assert.truthy(string.find(shown, "by Me-Realm · R2 (conc) · lf + blacksmith", 1, true), shown)
+  Assert.truthy(string.find(texts(), "R2 (conc)", 1, true), texts())
+  Assert.falsy(string.find(texts(), "by Me-Realm", 1, true), texts())
+end
+
+local function testDetailLine()
+  local ns = UiFixture.load({ leads = 1 })
+  ns.AlertToast.Show(ns.Leads.Latest())
+  local detail = part("GameFontDisableSmall")[1]
+  Assert.equal(detail:IsShown(), false, "no rank, no realm tag: the line is hidden")
+  Assert.falsy(string.find(texts(), "·", 1, true))
+  ns = UiFixture.load({
+    leads = 1,
+    db = function(accountDb)
+      accountDb.leads[1].rank, accountDb.leads[1].rankConc, accountDb.leads[1].cannotOrder = 2, true, true
+    end,
+  })
+  ns.AlertToast.Show(ns.Leads.Latest())
+  Assert.equal(part("GameFontDisableSmall")[1].text, "R2 (conc) · can't order (realm)")
+end
+
+local function testHeight()
+  local short = UiFixture.load({ leads = 1 })
+  short.AlertToast.Show(short.Leads.Latest())
+  local shortHeight = toastFrame():GetHeight()
+  local ns = UiFixture.load({
+    leads = 1,
+    db = function(accountDb)
+      accountDb.leads[1].message = CORPUS
+    end,
+  })
+  ns.AlertToast.Show(ns.Leads.Latest())
+  local frame = toastFrame()
+  local message -- the badge shares GameFontHighlightSmall, so pick the string holding the message
+  for _, candidate in ipairs(part("GameFontHighlightSmall")) do
+    if candidate.text == CORPUS then
+      message = candidate
+    end
+  end
+  Assert.equal(message.text, CORPUS)
+  Assert.truthy(message:GetStringHeight() >= 5 * Widgets.LINE_HEIGHT, "254 visible characters wrap past one line")
+  Assert.truthy(frame:GetHeight() > shortHeight, "the toast grows")
+  -- Native-HUD spec §4.3: PADDING + name + gap + headline + gap + message + PADDING (no detail line).
+  local name, headline = part("GameFontNormal")[1], part("GameFontNormal")[2]
+  Assert.equal(frame:GetHeight(), 8 + name:GetStringHeight() + 3 + headline:GetStringHeight() + 3 + message:GetStringHeight() + 8)
+  Assert.equal(message:GetWidth(), 320 - 2 * 8)
+end
+
+local function testTooltip()
+  local ns = UiFixture.load({ leads = 1 })
+  ns.AlertToast.Show(ns.Leads.Latest())
+  local frame, tip = toastFrame(), rawget(_G, "GameTooltip")
+  frame.scripts.OnEnter(frame)
+  Assert.same({ tip.owner, tip.anchor, tip.shown }, { frame, "ANCHOR_TOP", true })
+  Assert.same(tip.lines, { "Craft Alert", "Matched: lf + blacksmith", "Click: greet · Shift: edit first · Ctrl: empty whisper · Right: dismiss" })
+  frame.scripts.OnLeave(frame)
+  Assert.equal(tip.shown, false)
+  ns.Leads.Latest().why = ""
+  ns.AlertToast.Show(ns.Leads.Latest())
+  frame.scripts.OnEnter(frame)
+  Assert.same(tip.lines, { "Craft Alert", "Click: greet · Shift: edit first · Ctrl: empty whisper · Right: dismiss" })
+end
+
+local function testLinks()
+  local ns, _, calls = UiFixture.load({ leads = 2 })
+  local tip = rawget(_G, "GameTooltip")
+  local leads = ns.Leads.List() -- newest first
+  leads[2].message = CORPUS
+  ns.AlertToast.Show(leads[2])
+  local frame = toastFrame()
+  local links = {}
+  for link in string.gmatch(CORPUS, "|H(item:[^|]*)|h") do
+    links[#links + 1] = link
+  end
+  Assert.equal(#links, 3)
+  -- Every item link in the real line is hoverable, in order.
+  for _, link in ipairs(links) do
+    frame.scripts.OnHyperlinkEnter(frame, link, "[x]")
+    Assert.equal(tip.hyperlinks[#tip.hyperlinks], link)
+    frame.scripts.OnHyperlinkLeave(frame)
+  end
+  -- Review Focus 2: a click on a hovered link does nothing; after the link leave it greets.
+  Wow.clock.gettime = 51
+  local before = #calls -- the sound and flash of Show
+  frame.scripts.OnHyperlinkEnter(frame, links[1], "[x]")
+  Widgets.click(frame, "LeftButton")
+  Assert.equal(#calls, before, "no greet, prefill or dismissal while over a link")
+  Assert.equal(frame:IsShown(), true)
+  frame.scripts.OnHyperlinkLeave(frame)
+  -- A new lead replaces the toast while the cursor is on a link: tooltip and hover state are gone.
+  frame.scripts.OnHyperlinkEnter(frame, links[2], "[x]")
+  Assert.equal(tip.shown, true)
+  ns.AlertToast.Show(leads[1])
+  Assert.same({ ns.LinkHover.IsOverLink(frame), tip.shown }, { false, false })
+  Wow.clock.gettime = 52
+  Widgets.click(frame, "LeftButton")
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 1, "the next plain click greets the new lead")
+  Assert.equal(leads[1].greeted, true)
 end
 
 local function testNewerLeadAndAutoHide()
@@ -271,37 +388,118 @@ local function testClassColor()
   Assert.same(looked, { "Player-1-0001" })
 end
 
-local function testSavedPosition()
-  local ns, db = UiFixture.load({ leads = 1 })
-  ns.AlertToast.Show(ns.Leads.Latest())
-  local frame = toastFrame()
-  frame.scripts.OnDragStart(frame)
-  Assert.equal(frame.moving, true)
-  frame:ClearAllPoints()
-  frame:SetPoint("TOPLEFT", rawget(_G, "UIParent"), "TOPLEFT", 100, -50)
-  frame.scripts.OnDragStop(frame)
-  Assert.same(db.ui.toast, { point = "TOPLEFT", relativePoint = "TOPLEFT", x = 100, y = -50 })
+local ROWS = { -- launcher centre, toast point → launcher point, x
+  { 100, 900, "TOPLEFT", "TOPRIGHT", 8 },
+  { 100, 100, "BOTTOMLEFT", "BOTTOMRIGHT", 8 },
+  { 1800, 900, "TOPRIGHT", "TOPLEFT", -8 },
+  { 1800, 100, "BOTTOMRIGHT", "BOTTOMLEFT", -8 },
+}
 
-  -- After a /reload the toast opens where it was dropped.
-  local saved = db.ui.toast
-  ns = UiFixture.load({
+local function dockedAt(frame, launcher, row)
+  local point, relativeTo, relativePoint, x, y = frame:GetPoint()
+  Assert.truthy(rawequal(relativeTo, launcher))
+  Assert.same({ point, relativePoint, x, y }, { row[3], row[4], row[5], 0 })
+end
+
+local function testDock()
+  for _, row in ipairs(ROWS) do
+    local ns = UiFixture.load({ leads = 1 })
+    ns.ScanGate.IsActive = function()
+      return true
+    end
+    local launcher = ns.Launcher.Create()
+    launcher.center = { row[1], row[2] }
+    ns.AlertToast.Show(ns.Leads.Latest())
+    dockedAt(toastFrame(), launcher, row)
+  end
+
+  -- Drag: the toast moves the launcher, the drop saves ui.launcher and re-docks; ui.toast is untouched.
+  local ns, db = UiFixture.load({
     leads = 1,
     db = function(accountDb)
-      accountDb.ui.toast = saved
+      accountDb.ui.toast = { point = "BOTTOM", relativePoint = "BOTTOM", x = 5, y = 5 }
     end,
   })
+  ns.ScanGate.IsActive = function()
+    return true
+  end
+  local launcher = ns.Launcher.Create()
+  ns.Launcher.OnMoved(ns.AlertToast.Dock)
   ns.AlertToast.Show(ns.Leads.Latest())
-  local point, _, relativePoint, x, y = toastFrame():GetPoint()
-  Assert.same({ point, relativePoint, x, y }, { "TOPLEFT", "TOPLEFT", 100, -50 })
+  local frame = toastFrame()
+  Assert.equal(frame:GetPoint(), "TOPLEFT", "nil centres: left/upper; the saved ui.toast is ignored")
+  frame.scripts.OnDragStart(frame)
+  Assert.equal(launcher.moving, true)
+  launcher:ClearAllPoints()
+  launcher:SetPoint("BOTTOMRIGHT", rawget(_G, "UIParent"), "BOTTOMRIGHT", -20, 80)
+  launcher.center = { 1800, 100 }
+  frame.scripts.OnDragStop(frame)
+  Assert.equal(launcher.moving, false)
+  Assert.same(db.ui.launcher, { point = "BOTTOMRIGHT", relativePoint = "BOTTOMRIGHT", x = -20, y = 80 })
+  dockedAt(frame, launcher, ROWS[4])
+  Assert.same(db.ui.toast, { point = "BOTTOM", relativePoint = "BOTTOM", x = 5, y = 5 }, "ui.toast neither read nor written")
+  -- The launcher's own drop re-docks too.
+  launcher.center = { 100, 900 }
+  launcher.scripts.OnDragStop(launcher)
+  dockedAt(frame, launcher, ROWS[1])
+
+  -- No launcher yet: the fixed spot on UIParent. Dock before the toast exists does nothing.
+  ns = UiFixture.load({ leads = 1 })
+  ns.AlertToast.Dock()
+  Assert.equal(toastFrame(), nil)
+  ns.AlertToast.Show(ns.Leads.Latest())
+  local point, relativeTo, relativePoint, x, y = toastFrame():GetPoint()
+  Assert.truthy(rawequal(relativeTo, rawget(_G, "UIParent")))
+  Assert.same({ point, relativePoint, x, y }, { "TOP", "TOP", 0, -160 })
+end
+
+local function testHiddenLauncherAndPulse()
+  -- Review Focus 3: "Hide when no leads", launcher hidden, first lead arrives.
+  local ns, db = UiFixture.load({ leads = 1 })
+  db.settings.hideLauncherWhenNoLeads = true
+  local active = false
+  ns.ScanGate.IsActive = function()
+    return true
+  end
+  ns.Leads.HasActive = function()
+    return active
+  end
+  local launcher = ns.Launcher.Create()
+  -- Bootstrap subscribes Launcher.Refresh to "change" at login, before the toast subscribes on
+  -- its first alert. Once shown, the launcher has a centre: the right half, like its default spot.
+  ns.Leads.On("change", function()
+    ns.Launcher.Refresh()
+    launcher.center = { 1800, 900 }
+  end)
+  Assert.equal(launcher:IsShown(), false)
+  ns.AlertToast.Show(ns.Leads.Latest()) -- GetCenter() is nil: no error, left/upper row
+  dockedAt(toastFrame(), launcher, ROWS[1])
+  active = true
+  ns.Leads.MarkGreeted(ns.Leads.Latest().id) -- a "change", as the one fired after "new"
+  Assert.equal(launcher:IsShown(), true)
+  dockedAt(toastFrame(), launcher, ROWS[3])
+
+  -- Pulse: a new lead plays the one-shot and the looping pulse; the hide (timer, click or
+  -- dismissal) stops the looping pulse.
+  Assert.same({ launcher.pulseOnce:IsPlaying(), launcher.pulseLoop:IsPlaying() }, { true, true })
+  Wow.clock.gettime = 50 + TOAST_SECONDS
+  runTimersUpTo(TOAST_SECONDS)
+  Assert.equal(toastFrame():IsShown(), false)
+  Assert.equal(launcher.pulseLoop:IsPlaying(), false)
 end
 
 return function()
   testLazyFrameAndContent()
+  testDetailLine()
+  testHeight()
+  testTooltip()
+  testLinks()
   testNewerLeadAndAutoHide()
   testClicks()
   testNoTestToast()
   testRealPathTestLead()
   testClassColor()
-  testSavedPosition()
+  testDock()
+  testHiddenLauncherAndPulse()
   Wow.reset()
 end

@@ -7,7 +7,83 @@
 --   Widgets.type(editBox, text)     types text into an EditBox and presses Enter
 --   Widgets.texts(frame, frames)    the shown texts under frame (itself and its descendants
 --                                   among `frames`, usually Wow.frames), in creation order
+--   Widgets.fire(frame, name, ...)  runs the `name` script, then its HookScript hooks
+--   Widgets.LINE_HEIGHT, Widgets.CHAR_WIDTH   the fake font metrics GetStringHeight wraps with
+-- A frame made with a template name gets that template's fake (tests/helpers/templates.lua).
+local Templates = require("tests.helpers.templates")
+
 local Widgets = {}
+
+Widgets.LINE_HEIGHT = 12
+Widgets.CHAR_WIDTH = 6
+
+local ceil = math.ceil
+local unpack = unpack
+
+-- As the client: an animation records every call made on it in `calls` as { method, args... }.
+local function newAnimation(kind)
+  local animation = { kind = kind, calls = {} }
+
+  return setmetatable(animation, {
+    __index = function(self, method)
+      return function(_, ...)
+        table.insert(self.calls, { method, ... })
+      end
+    end,
+  })
+end
+
+local function runGroupScript(group, scriptName)
+  local script = group.scripts[scriptName]
+  if script then
+    script(group)
+  end
+end
+
+-- As the client: a group runs OnPlay when it starts, OnStop when stopped while playing, and
+-- OnFinished when it finishes.
+local function newAnimationGroup()
+  local group = { playing = false, scripts = {}, animations = {} }
+
+  function group:CreateAnimation(kind)
+    local animation = newAnimation(kind)
+    table.insert(self.animations, animation)
+
+    return animation
+  end
+
+  function group:SetLooping(mode)
+    self.looping = mode
+  end
+
+  function group:SetScript(scriptName, fn)
+    self.scripts[scriptName] = fn
+  end
+
+  function group:Play()
+    self.playing = true
+    runGroupScript(self, "OnPlay")
+  end
+
+  function group:Stop()
+    if not self.playing then
+      return
+    end
+    self.playing = false
+    runGroupScript(self, "OnStop")
+  end
+
+  function group:Finish()
+    self.playing = false
+    runGroupScript(self, "OnFinished")
+  end
+
+  function group:IsPlaying()
+    return self.playing
+  end
+
+  return group
+end
 
 local function addRegion(region)
   region.points = {}
@@ -62,6 +138,10 @@ local function addRegion(region)
   function region:GetAlpha()
     return self.alpha
   end
+
+  function region:CreateAnimationGroup()
+    return newAnimationGroup()
+  end
 end
 
 local function newTexture(parent, layer)
@@ -72,8 +152,22 @@ local function newTexture(parent, layer)
     self.color = { r, g, b, a }
   end
 
-  function texture:SetTexture(path)
+  function texture:SetTexture(path, horizontalWrap, verticalWrap)
     self.texture = path
+    self.wrap = { horizontalWrap, verticalWrap }
+  end
+
+  function texture:SetAtlas(atlas)
+    self.atlas = atlas
+  end
+
+  function texture:SetBlendMode(mode)
+    self.blendMode = mode
+  end
+
+  function texture:AddMaskTexture(mask)
+    self.masks = self.masks or {}
+    table.insert(self.masks, mask)
   end
 
   function texture:SetTexCoord(...)
@@ -101,6 +195,20 @@ local function newTexture(parent, layer)
   end
 
   return texture
+end
+
+-- The text as drawn: colour, link, atlas and texture escapes removed, "||" shown as one "|".
+-- ASCII only: the client counts characters, this counts bytes.
+local function visibleLength(text)
+  local shown = string.gsub(text, "||", "\1")
+  shown = string.gsub(shown, "|c%x%x%x%x%x%x%x%x", "")
+  shown = string.gsub(shown, "|cn[^:]*:", "")
+  shown = string.gsub(shown, "|H[^|]*|h", "")
+  shown = string.gsub(shown, "|A[^|]*|a", "")
+  shown = string.gsub(shown, "|T[^|]*|t", "")
+  shown = string.gsub(shown, "|[hr]", "")
+
+  return #shown
 end
 
 local function newFontString(parent, layer, template)
@@ -133,6 +241,25 @@ local function newFontString(parent, layer, template)
 
   function fontString:SetWordWrap(wrap)
     self.wordWrap = wrap
+  end
+
+  function fontString:SetNonSpaceWrap(wrap)
+    self.nonSpaceWrap = wrap
+  end
+
+  -- 0 for no text; one line when wrapping is off or the width is unset; else LINE_HEIGHT per
+  -- row of CHAR_WIDTH-wide characters the visible text fills.
+  function fontString:GetStringHeight()
+    local text = self.text
+    if text == nil or text == "" then
+      return 0
+    end
+    if not self.wordWrap or self.width == 0 then
+      return Widgets.LINE_HEIGHT
+    end
+    local rows = ceil(visibleLength(text) * Widgets.CHAR_WIDTH / self.width)
+
+    return Widgets.LINE_HEIGHT * math.max(rows, 1)
   end
 
   function fontString:Show()
@@ -209,6 +336,49 @@ local function addFrameState(frame)
 
   function frame:GetName()
     return self.name
+  end
+
+  function frame:SetHyperlinksEnabled(enabled)
+    self.hyperlinksEnabled = enabled
+  end
+
+  -- Tests set `mouseOver` to put the cursor on the frame.
+  function frame:IsMouseOver()
+    return self.mouseOver == true
+  end
+
+  -- Tests set `center = { x, y }`; without one the frame reports nothing, like an unlaid-out frame.
+  function frame:GetCenter()
+    if self.center == nil then
+      return
+    end
+
+    return unpack(self.center)
+  end
+
+  -- Button textures are stored as given (a path or a texture); the highlight keeps its blend mode too.
+  function frame:SetNormalTexture(texture)
+    self.normalTexture = texture
+  end
+
+  function frame:GetNormalTexture()
+    return self.normalTexture
+  end
+
+  function frame:SetPushedTexture(texture)
+    self.pushedTexture = texture
+  end
+
+  function frame:GetPushedTexture()
+    return self.pushedTexture
+  end
+
+  function frame:SetHighlightTexture(texture, mode)
+    self.highlightTexture, self.highlightMode = texture, mode
+  end
+
+  function frame:GetHighlightTexture()
+    return self.highlightTexture
   end
 end
 
@@ -331,7 +501,30 @@ function Widgets.extend(frame)
     return fontString
   end
 
+  function frame:CreateMaskTexture()
+    local mask = newTexture(self, "ARTWORK")
+    mask.isMask = true
+    table.insert(self.regions, mask)
+
+    return mask
+  end
+
+  if frame.template then
+    Templates.Apply(frame, frame.template)
+  end
+
   return frame
+end
+
+-- As the client: the frame's script runs, then every HookScript hook, each with the frame first.
+function Widgets.fire(frame, scriptName, ...)
+  local script = frame.scripts[scriptName]
+  if script then
+    script(frame, ...)
+  end
+  for _, hook in ipairs(frame.hooks[scriptName] or {}) do
+    hook(frame, ...)
+  end
 end
 
 function Widgets.click(frame, button)

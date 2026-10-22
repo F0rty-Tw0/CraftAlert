@@ -29,10 +29,14 @@ local UI = {
   "UI.FrameKit",
   "UI.LeadText",
   "UI.ClickRouter",
-  "UI.AlertToast",
+  "UI.LinkHover",
+  "UI.Dock",
   "UI.LeadRow",
   "UI.LeadsWindow",
+  "UI.LauncherArt",
   "UI.Launcher",
+  "UI.ToastLayout",
+  "UI.AlertToast",
   "UI.Settings.Controls",
   "UI.Settings.PageGeneral",
   "UI.Settings.PageAlerts",
@@ -104,10 +108,10 @@ local function stubSends(calls)
 end
 
 -- The Blizzard UI tables the window and launcher touch: UISpecialFrames, and a GameTooltip
--- that records what it was given (tooltip.lines, tooltip.owner, tooltip.shown).
+-- that records what it was given (lines, owner, shown, hyperlinks; badLinks[link] makes SetHyperlink raise).
 local function stubBlizzardUi()
   Wow.stub("UISpecialFrames", {})
-  local tooltip = { lines = {}, shown = false }
+  local tooltip = { lines = {}, shown = false, hyperlinks = {} }
   function tooltip:SetOwner(owner, anchor)
     self.owner, self.anchor, self.lines = owner, anchor, {}
   end
@@ -122,6 +126,15 @@ local function stubBlizzardUi()
   end
   function tooltip:Hide()
     self.shown = false
+  end
+  function tooltip:SetHyperlink(link)
+    if self.badLinks and self.badLinks[link] then
+      error("bad link: " .. link)
+    end
+    table.insert(self.hyperlinks, link)
+  end
+  function tooltip:IsOwned(frame)
+    return self.owner == frame and self.shown
   end
   Wow.stub("GameTooltip", tooltip)
 end

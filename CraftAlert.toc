@@ -61,10 +61,14 @@ UI/Theme.lua
 UI/FrameKit.lua
 UI/LeadText.lua
 UI/ClickRouter.lua
-UI/AlertToast.lua
+UI/LinkHover.lua
+UI/Dock.lua
 UI/LeadRow.lua
 UI/LeadsWindow.lua
+UI/LauncherArt.lua
 UI/Launcher.lua
+UI/ToastLayout.lua
+UI/AlertToast.lua
 UI/Settings/Controls.lua
 UI/Settings/PageGeneral.lua
 UI/Settings/PageAlerts.lua

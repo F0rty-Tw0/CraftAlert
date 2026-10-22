@@ -67,6 +67,38 @@ function FrameKit.Text(parent, font, color)
   return text
 end
 
+-- True when the client knows the atlas. C_Texture is read through _G (luacheck's read_globals
+-- lacks it); a raising GetAtlasInfo counts as unknown.
+local function atlasExists(atlas)
+  local api = _G["C_Texture"]
+  if type(api) ~= "table" or type(api.GetAtlasInfo) ~= "function" then
+    return false
+  end
+  local ok, info = pcall(api.GetAtlasInfo, atlas)
+
+  return ok and type(info) == "table"
+end
+
+-- Draws `atlas` on the texture; when the client lacks it, `fallbackFile`; with neither, hides the
+-- texture. `blend` (when given) is set on a texture that stays visible. True only for the atlas.
+function FrameKit.Art(texture, atlas, fallbackFile, blend)
+  local hasAtlas = atlasExists(atlas)
+  if hasAtlas then
+    texture:SetAtlas(atlas)
+  elseif fallbackFile then
+    texture:SetTexture(fallbackFile)
+  else
+    texture:Hide()
+
+    return false
+  end
+  if blend then
+    texture:SetBlendMode(blend)
+  end
+
+  return hasAtlas
+end
+
 -- RAID_CLASS_COLORS entry of the player with this chat GUID, or nil. A secret GUID or class is
 -- never passed on or compared: FlavorCompat.ClassOf owns that guard. The colour table is checked
 -- first, so a client without it makes no API call.

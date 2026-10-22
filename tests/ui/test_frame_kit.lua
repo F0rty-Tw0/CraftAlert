@@ -51,8 +51,48 @@ local function testMalformedFallsBack()
   Assert.same(placed(FrameKit), { "TOP", "TOP", 0, -160 })
 end
 
+-- Art takes the atlas when the client knows it, else the fallback file, else hides the texture.
+local function testArt()
+  local FrameKit = load({})
+  local frame = rawget(_G, "CreateFrame")("Frame")
+  local known = { Known = true }
+  Wow.stub("C_Texture", {
+    GetAtlasInfo = function(name)
+      return known[name] and { width = 1 } or nil
+    end,
+  })
+  local t = frame:CreateTexture()
+  Assert.equal(FrameKit.Art(t, "Known", "InterfaceX", "ADD"), true)
+  Assert.equal(t.atlas, "Known")
+  Assert.equal(t.texture, nil)
+  Assert.equal(t.blendMode, "ADD")
+  t = frame:CreateTexture()
+  Assert.equal(FrameKit.Art(t, "Missing", "InterfaceX", "ADD"), false)
+  Assert.equal(t.atlas, nil)
+  Assert.equal(t.texture, "InterfaceX")
+  Assert.equal(t.blendMode, "ADD")
+  Assert.equal(t.shown, true)
+  t = frame:CreateTexture()
+  Assert.equal(FrameKit.Art(t, "Missing"), false)
+  Assert.equal(t.shown, false)
+  -- A raising GetAtlasInfo and a missing C_Texture both count as "atlas missing".
+  Wow.stub("C_Texture", {
+    GetAtlasInfo = function()
+      error("boom")
+    end,
+  })
+  t = frame:CreateTexture()
+  Assert.equal(FrameKit.Art(t, "Known", "InterfaceX"), false)
+  Assert.equal(t.texture, "InterfaceX")
+  Wow.stub("C_Texture", nil)
+  t = frame:CreateTexture()
+  Assert.equal(FrameKit.Art(t, "Known"), false)
+  Assert.equal(t.shown, false)
+end
+
 return function()
   testSavedPosition()
   testMalformedFallsBack()
+  testArt()
   Wow.reset()
 end
