@@ -16,6 +16,7 @@ local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local WhisperTracker = ns.WhisperTracker or require("CraftAlert.Model.WhisperTracker")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local ModernReader = ns.ModernReader or require("CraftAlert.Professions.ModernReader")
+local QualityReach = ns.QualityReach or require("CraftAlert.Professions.QualityReach")
 local LearnWatcher = ns.LearnWatcher or require("CraftAlert.Professions.LearnWatcher")
 local Status = ns.Status or require("CraftAlert.Core.Status")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
@@ -69,6 +70,13 @@ local function installReaders()
   end
   ModernReader.Install(db)
   LearnWatcher.Install()
+end
+
+local function installQualityReach()
+  if FlavorCompat.isClassic then
+    return
+  end
+  QualityReach.Install(db)
 end
 
 -- AlertToast and WhisperTracker subscribe themselves to "change", TestReport to "new" and "change".
@@ -135,6 +143,7 @@ local LOGIN_STEPS = {
   wireIndex,
   wireLeads,
   installReaders,
+  installQualityReach,
   installScanGate,
   createLauncher,
   registerCategory,
