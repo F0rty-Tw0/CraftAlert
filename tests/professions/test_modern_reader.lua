@@ -281,10 +281,12 @@ return function()
   state.recipes = {
     belt(1, 100, { profession = { professionID = 2872 } }),
     belt(2, 200, { profession = ownCooking }),
+    belt(3, 300, { profession = { professionID = 2872, parentProfessionID = 0 } }),
   }
   Wow.fireEvent("TRADE_SKILL_SHOW")
   Assert.equal(recipesOf(db)[1].prof, BS, "a bare skill line proves no other profession")
   Assert.equal(recipesOf(db)[2], nil)
+  Assert.equal(recipesOf(db)[3].prof, BS, "a 0 parent is not loaded yet")
 
   -- Opening the window reads even while the data source is still rebuilding.
   state, _, db = setup()

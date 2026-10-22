@@ -148,7 +148,8 @@ local function professionInfo(recipeID)
   return type(info) == "table" and info or nil
 end
 
--- The base profession of a recipe: the parent skill line when there is one, else nil.
+-- The base profession of a recipe: the parent skill line when there is one, else the skill
+-- line itself; nil when the lookup gives nothing.
 function ModernReader.ProfessionOf(recipeID)
   local info = professionInfo(recipeID)
   return info and (info.parentProfessionID or info.professionID) or nil
@@ -162,7 +163,8 @@ end
 -- → the key to store under (nil: skip), and whether the recipe's own lookup named the window.
 local function storeKey(charKey, recipeID, key)
   local info = professionInfo(recipeID)
-  local own = info and (info.parentProfessionID or info.professionID)
+  local parent = info and info.parentProfessionID
+  local own = parent or (info and info.professionID)
   if own == key then
     return key, true
   end
@@ -172,7 +174,7 @@ local function storeKey(charKey, recipeID, key)
   if ProfessionList.IsStored(db, charKey, own) then
     return own, false
   end
-  return info.parentProfessionID == nil and key or nil, false
+  return parent == nil and key or nil, false
 end
 
 -- Drops the saved recipes tagged with the window's profession whose own lookup names a
