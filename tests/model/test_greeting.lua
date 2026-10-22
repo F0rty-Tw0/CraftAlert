@@ -52,6 +52,9 @@ return function()
   -- An alt on another realm keeps its realm; the player's own realm is dropped.
   Assert.equal(Greeting.Build(professionLead("Alt-Draenor"), settings), "Hi! My alt Alt-Draenor has Blacksmithing, what do you need?")
 
+  Assert.equal(Greeting.CrafterName("Alt-Realm"), "Alt")
+  Assert.equal(Greeting.CrafterName("Alt-Other"), "Alt-Other")
+
   -- Classic and Forever have no crafting orders: the alt item default says to whisper the alt.
   for _, flavor in ipairs({ "forever", "tbc", "era" }) do
     local greeting, flavorSettings = load(flavor)
