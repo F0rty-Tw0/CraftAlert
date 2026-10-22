@@ -276,8 +276,16 @@ return function()
   rank, byConc = select(3, ranked({ "Alt-Realm", 10 }))
   Assert.same({ rank, byConc }, { 1, false }, "no snapshot counts as 0")
   data.characters["Alt-Realm"].recipes[10].reachRank = 2
+  data.characters["Alt-Realm"].concentration = snapshot(900)
   rank, byConc = select(3, ranked({ "Alt-Realm", 10 }))
-  Assert.same({ rank, byConc }, { 2, false }, "top rank reached: concentration is not asked")
+  Assert.same({ rank, byConc }, { 2, false }, "top rank reached: concentration is not asked, even when it covers the cost")
+
+  -- A snapshot taken after now (clock skew) projects no negative cycles: the amount stays.
+  data.characters["Alt-Realm"].recipes[10].reachRank = 1
+  data.characters["Alt-Realm"].concentration = { [3168] = { amount = 376, at = 1000000, cycleMs = CYCLE_MS, perCycle = 1, max = 1000 } }
+  Wow.clock.time = 0
+  rank, byConc = select(3, ranked({ "Alt-Realm", 10 }))
+  Assert.same({ rank, byConc }, { 2, true }, "a snapshot from the future still has its own amount")
   Wow.clock.time = 0
 
   -- The current character reads its live currency.
