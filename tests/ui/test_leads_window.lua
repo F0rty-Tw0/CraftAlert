@@ -28,20 +28,6 @@ local function rowText(row)
   return table.concat(Widgets.texts(row, Wow.frames), " / ")
 end
 
--- The window's direct child button whose label is `label`.
-local function buttonLabelled(parent, label)
-  for _, frame in ipairs(Wow.frames) do
-    if frame.parent == parent then
-      for _, region in ipairs(frame.regions) do
-        if region.text == label then
-          return frame
-        end
-      end
-    end
-  end
-  error("no button " .. label)
-end
-
 -- A fixture whose leads come from `customers` (oldest first), the window subscribed to
 -- lead changes as Bootstrap will do it.
 local function load(customers, edit)
@@ -67,6 +53,9 @@ local function testLazyAndEscape()
   Assert.equal(ns.LeadsWindow.VisibleLatest(), nil)
   ns.LeadsWindow.Toggle()
   Assert.truthy(window(), "window created on first open")
+  Assert.equal(window().template, "ButtonFrameTemplate")
+  Assert.equal(window().portraitHidden, true)
+  Assert.equal(window():GetTitleText():GetText(), "Craft Alert — Leads")
   Assert.equal(window():IsShown(), true)
   -- ESC closes it: our own frame name in UISpecialFrames, once, however often it opens.
   ns.LeadsWindow.Toggle()
@@ -77,7 +66,7 @@ local function testLazyAndEscape()
   Assert.equal(window().resizable, true)
   Assert.equal(window().clamped, true)
   -- The close button hides it.
-  Widgets.click(buttonLabelled(window(), "X"), "LeftButton")
+  Widgets.click(window().CloseButton, "LeftButton")
   Assert.equal(window():IsShown(), false)
 end
 
@@ -157,6 +146,69 @@ local function testRowClicks()
   Assert.equal(#rows(), 0)
 end
 
+-- Rows sit in the inset and fit its height (320 high: inset 320 - 28 - 26 = 266; floor((266 - 16 + 2) / 38) = 6).
+local function testRowsFitTheInset()
+  local customers = {}
+  for i = 1, 12 do
+    customers[i] = "Customer" .. i .. "-Draenor"
+  end
+  local ns = load(customers)
+  ns.LeadsWindow.Toggle()
+  local frame = window()
+  Assert.equal(#rows(), 6)
+  Assert.equal(rows()[1].parent, frame.Inset)
+  Assert.same({ rows()[1]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -8 })
+  Assert.same({ rows()[2]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -46 })
+  Assert.truthy(string.find(table.concat(Widgets.texts(frame, Wow.frames), " / "), "Click: greet", 1, true), "footer hint")
+  ns = load({})
+  ns.LeadsWindow.Toggle()
+  Assert.truthy(string.find(table.concat(Widgets.texts(window().Inset, Wow.frames), " / "), "No leads", 1, true), "empty text is in the inset")
+end
+
+-- Review Focus 5: resize wrapping, minimum, save, close-and-reopen, reload.
+local function testResizeButton()
+  local customers = {}
+  for i = 1, 12 do
+    customers[i] = "Customer" .. i .. "-Draenor"
+  end
+  local ns, db = load(customers)
+  ns.LeadsWindow.Toggle()
+  local frame, screen = window(), rawget(_G, "UIParent")
+  local button = frame.resizeButton
+  Assert.equal(button.template, "PanelResizeButtonTemplate")
+  Assert.same(
+    { button.target == frame, button.minWidth, button.minHeight, button.maxWidth, button.maxHeight },
+    { true, 360, 160, screen:GetWidth(), screen:GetHeight() }
+  )
+  Assert.equal(#rows(), 6)
+  -- Dragging: the client resizes and fires OnSizeChanged. Init wrapped our refresh, so rows refit.
+  button.scripts.OnMouseDown(button, "LeftButton")
+  Assert.equal(frame.sizing, "BOTTOMRIGHT")
+  frame:SetSize(500, 400)
+  frame.scripts.OnSizeChanged(frame, 500, 400)
+  Assert.equal(#rows(), 8) -- 400 - 54 = 346; floor((346 - 16 + 2) / 38) = 8
+  -- Below the minimum, the button's wrapper pulls the size back (it only works if our script was set before Init).
+  frame:SetSize(100, 100)
+  frame.scripts.OnSizeChanged(frame, 100, 100)
+  Assert.same({ frame:GetWidth(), frame:GetHeight() }, { 360, 160 })
+  frame:SetSize(500, 400)
+  frame.scripts.OnSizeChanged(frame, 500, 400)
+  button.scripts.OnMouseUp(button, "LeftButton")
+  Assert.equal(frame.sizing, nil)
+  Assert.same({ db.ui.window.width, db.ui.window.height }, { 500, 400 })
+  -- Closed and reopened: same size, rows refit.
+  ns.LeadsWindow.Toggle()
+  ns.LeadsWindow.Toggle()
+  Assert.same({ frame:GetWidth(), frame:GetHeight(), #rows() }, { 500, 400, 8 })
+  -- After a /reload it opens at the saved size with the rows refit.
+  local saved = db.ui.window
+  ns = load(customers, function(accountDb)
+    accountDb.ui.window = saved
+  end)
+  ns.LeadsWindow.Toggle()
+  Assert.same({ window():GetWidth(), window():GetHeight(), #rows() }, { 500, 400, 8 })
+end
+
 local function testVisibleLatestAndScroll()
   local customers = {}
   for i = 1, 12 do
@@ -199,16 +251,16 @@ local function testSavedFrameAndOpacity()
   ns.LeadsWindow.Toggle()
   local frame = window()
   Assert.equal(frame:GetAlpha(), 0.7)
-  -- Dragging saves the position; the resize grip saves the size.
+  -- Dragging saves the position; the resize button saves the size.
   frame.scripts.OnDragStart(frame)
   frame:ClearAllPoints()
   frame:SetPoint("LEFT", rawget(_G, "UIParent"), "LEFT", 30, 40)
   frame.scripts.OnDragStop(frame)
-  local grip = frame.resizeGrip
-  grip.scripts.OnMouseDown(grip, "LeftButton")
+  local button = frame.resizeButton
+  button.scripts.OnMouseDown(button, "LeftButton")
   Assert.equal(frame.sizing, "BOTTOMRIGHT")
   frame:SetSize(500, 400)
-  grip.scripts.OnMouseUp(grip, "LeftButton")
+  button.scripts.OnMouseUp(button, "LeftButton")
   Assert.same(db.ui.window, { point = "LEFT", relativePoint = "LEFT", x = 30, y = 40, width = 500, height = 400 })
 
   -- The saved shapes are flat scalars, which the load-time Schema check keeps as they are.
@@ -251,6 +303,7 @@ local function testHugeSavedSize()
   local parent = rawget(_G, "UIParent")
   Assert.equal(window():GetWidth(), parent:GetWidth(), "no wider than the screen")
   Assert.equal(window():GetHeight(), parent:GetHeight(), "no taller than the screen")
+  Assert.equal(window().resizeButton.maxWidth, parent:GetWidth())
   Assert.equal(#rows(), 2)
   -- Even a frame taller than the screen (the client does not guarantee the clamp) rows only
   -- the leads there are.
@@ -294,6 +347,8 @@ return function()
   testRowFields()
   testRowRank()
   testRowClicks()
+  testRowsFitTheInset()
+  testResizeButton()
   testVisibleLatestAndScroll()
   testSavedFrameAndOpacity()
   testCorruptedSavedLeads()

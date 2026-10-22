@@ -54,8 +54,8 @@ Theme.LAYOUT = {
   WINDOW_HEIGHT = 320,
   WINDOW_MIN_WIDTH = 360,
   WINDOW_MIN_HEIGHT = 160,
-  RESIZE_GRIP_SIZE = 16,
-  FOOTER_HEIGHT = 20,
+  INSET_TOP = 28,
+  INSET_BOTTOM = 26,
   ROW_ICON_SIZE = 14,
   ROW_HEIGHT = 36,
   ROW_GAP = 2,
@@ -87,7 +87,6 @@ Theme.ICON = "Interface\\Icons\\INV_Misc_Bell_01"
 -- Textures every flavor's UI source references (ui_live, ui_forever, ui_classic, ui_classic_era).
 Theme.BADGE_TEXTURE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
 Theme.GREETED_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
-Theme.RESIZE_GRIP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
 Theme.DIM_ALPHA = 0.5
 
 ns.Theme = Theme

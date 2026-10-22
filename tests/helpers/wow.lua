@@ -198,6 +198,10 @@ local function installDefaults()
       return { width = 1, height = 1 }
     end,
   })
+  -- Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.lua:111-117: swaps the border; recorded only.
+  Wow.stub("ButtonFrameTemplate_HidePortrait", function(frame)
+    frame.portraitHidden = true
+  end)
   Wow.stub("SetItemRef", function(link, text, button, frame)
     table.insert(Wow.itemRefs, { link, text, button, frame })
   end)

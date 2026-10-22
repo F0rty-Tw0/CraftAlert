@@ -59,6 +59,103 @@ function Templates.fakes.TooltipBackdropTemplate(frame)
   end
 end
 
+-- The client lays the inset out between its anchors: the frame's height, less the gap above its
+-- last TOPLEFT anchor and the gap below its last BOTTOMRIGHT anchor.
+local function insetHeight(inset)
+  local topY, bottomY
+  for _, point in ipairs(inset.points) do
+    if point[1] == "TOPLEFT" then
+      topY = point[5]
+    elseif point[1] == "BOTTOMRIGHT" then
+      bottomY = point[5]
+    end
+  end
+  if topY == nil or bottomY == nil then
+    return inset.height
+  end
+
+  return inset.parent:GetHeight() + topY - bottomY
+end
+
+-- Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml:680 (CloseButton), :684-693 (Inset at
+-- TOPLEFT (4, -60) / BOTTOMRIGHT (-6, 26)) and :576-585 (TitleContainer.TitleText);
+-- SharedUIPanelTemplates.lua:144 (the close button hides its parent) and
+-- Blizzard_SharedXML/PortraitFrame.lua:4-14 (TitledPanelMixin GetTitleText and SetTitle).
+-- Children come from the stubbed CreateFrame: they are complete frames, unlike `frame` here.
+function Templates.fakes.ButtonFrameTemplate(frame)
+  local createFrame = _G["CreateFrame"]
+  local inset = createFrame("Frame", nil, frame)
+  inset:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -60)
+  inset:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 26)
+  inset.GetHeight = insetHeight
+  frame.Inset = inset
+
+  local close = createFrame("Button", nil, frame)
+  close:SetScript("OnClick", function(self)
+    self.parent:Hide()
+  end)
+  frame.CloseButton = close
+
+  local titleContainer = createFrame("Frame", nil, frame)
+  titleContainer.TitleText = titleContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  frame.TitleContainer = titleContainer
+
+  function frame:GetTitleText()
+    return self.TitleContainer.TitleText
+  end
+
+  function frame:SetTitle(title)
+    self:GetTitleText():SetText(title)
+  end
+end
+
+-- Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml:1561-1562 (16x16) and
+-- SharedUIPanelTemplates.lua:1505-1543 (Init wraps the target's OnSizeChanged as it is then and
+-- clamps only while the button is held), :1561 (OnMouseDown), :1584-1604 (OnMouseUp), :1640.
+function Templates.fakes.PanelResizeButtonTemplate(button)
+  button:SetSize(16, 16)
+
+  function button:Init(target, minWidth, minHeight, maxWidth, maxHeight)
+    self.target, self.minWidth, self.minHeight, self.maxWidth, self.maxHeight = target, minWidth, minHeight, maxWidth, maxHeight
+    local original = target:GetScript("OnSizeChanged")
+    target:SetScript("OnSizeChanged", function(sized, width, height)
+      if original then
+        original(sized, width, height)
+      end
+      if not self.isActive then
+        return
+      end
+      if width < self.minWidth then
+        sized:SetWidth(self.minWidth)
+      elseif self.maxWidth and width > self.maxWidth then
+        sized:SetWidth(self.maxWidth)
+      end
+      if height < self.minHeight then
+        sized:SetHeight(self.minHeight)
+      elseif self.maxHeight and height > self.maxHeight then
+        sized:SetHeight(self.maxHeight)
+      end
+    end)
+  end
+
+  function button:SetOnResizeStoppedCallback(callback)
+    self.resizeStoppedCallback = callback
+  end
+
+  button.scripts.OnMouseDown = function(self)
+    self.isActive = true
+    self.target:StartSizing("BOTTOMRIGHT", true)
+  end
+
+  button.scripts.OnMouseUp = function(self)
+    self.isActive = false
+    self.target:StopMovingOrSizing()
+    if self.resizeStoppedCallback then
+      self.resizeStoppedCallback(self.target)
+    end
+  end
+end
+
 function Templates.Apply(frame, templateName)
   local fake = Templates.fakes[templateName]
   if fake == nil then
