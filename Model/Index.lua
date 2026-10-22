@@ -164,7 +164,7 @@ local function copySet(map)
   return copy
 end
 
-local function newIndex(db, settings, opts)
+local function newIndex(settings, opts)
   local intentList, intentSet = wordList(settings.intentWords)
   local _, blockerSet = wordList(settings.blockerWords)
   return {
@@ -173,7 +173,6 @@ local function newIndex(db, settings, opts)
     wordIndex = {},
     professionWords = {},
     mutedProfessions = {}, -- characterKey -> { professionKey -> true }: every stored recipe muted
-    blockSet = copySet(db.ignored),
     channelEnabled = copySet(settings.channels),
     intentList = intentList,
     intentSet = intentSet,
@@ -200,7 +199,7 @@ end
 -- ownKey = "Name-Realm", pending = { lowerName, ... } }.
 function Index.Build(db, settings, opts)
   opts = opts or {}
-  local index = newIndex(db, settings, opts)
+  local index = newIndex(settings, opts)
   local ctx = { settings = settings, names = {}, words = {}, professions = {} }
   local characters = db.characters or {}
   local crafters = {}

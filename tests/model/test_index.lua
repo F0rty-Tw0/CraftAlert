@@ -84,7 +84,6 @@ local function fixtureDb(Defaults)
     professions = { [TAILOR] = profession("Tailoring") },
     recipes = { [3001] = { item = 601, name = "Cloth Robe", prof = TAILOR, bind = 1 } },
   }
-  db.ignored["Spammer-Realm"] = true
   return db
 end
 
@@ -215,10 +214,8 @@ local function testSettingsCopies()
   Assert.same(index.intentList, { "lf", "wtb" })
   Assert.same(index.intentSet, { lf = true, wtb = true })
   Assert.same(index.blockerSet, { wts = true })
-  Assert.same(index.blockSet, { ["Spammer-Realm"] = true })
   Assert.same(index.channelEnabled, db.settings.channels)
   Assert.falsy(rawequal(index.channelEnabled, db.settings.channels), "channels copied")
-  Assert.falsy(rawequal(index.blockSet, db.ignored), "block set copied")
   Assert.same(index.professionOrder, { ENCH, BS })
   Assert.equal(index.professionWordAlerts, false)
   Assert.equal(index.ownName, "Smith-Realm")
