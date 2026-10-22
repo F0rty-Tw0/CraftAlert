@@ -116,20 +116,24 @@ local function anchorInset(frame)
   inset:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, layout.INSET_BOTTOM)
 end
 
--- Init wraps the frame's OnSizeChanged as it is now, so the refresh must already be set.
+local function onResizeStopped(target)
+  saveFrame(target)
+  LeadsWindow.Refresh()
+end
+
 local function createResizeButton(frame)
   local layout, screen = Theme.LAYOUT, _G["UIParent"]
   local button = _G["CreateFrame"]("Button", nil, frame, "PanelResizeButtonTemplate")
   button:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 4)
+  -- Init wraps the frame's OnSizeChanged as it is now, so the refresh must already be set.
+  frame:SetScript("OnSizeChanged", LeadsWindow.Refresh)
   button:Init(frame, layout.WINDOW_MIN_WIDTH, layout.WINDOW_MIN_HEIGHT, screen:GetWidth(), screen:GetHeight())
-  button:SetOnResizeStoppedCallback(function(target)
-    saveFrame(target)
-    LeadsWindow.Refresh()
-  end)
+  button:SetOnResizeStoppedCallback(onResizeStopped)
   frame.resizeButton = button
+  return button
 end
 
-local function createTexts(frame)
+local function createTexts(frame, resizeButton)
   local layout, inset = Theme.LAYOUT, frame.Inset
   local empty = FrameKit.Text(inset, Theme.FONTS.body, Theme.COLORS.textSecondary)
   empty:SetPoint("CENTER", inset, "CENTER", 0, 0)
@@ -137,7 +141,7 @@ local function createTexts(frame)
   empty:SetText(Localization.Text("No leads right now. Requests you can craft show up here."))
   local hint = FrameKit.Text(frame, Theme.FONTS.detail, Theme.COLORS.textTimestamp)
   hint:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", layout.PADDING, layout.PADDING)
-  hint:SetPoint("RIGHT", frame.resizeButton, "LEFT", -layout.PADDING, 0)
+  hint:SetPoint("RIGHT", resizeButton, "LEFT", -layout.PADDING, 0)
   hint:SetText(Localization.Text("Click: greet · Shift: edit first · Ctrl: empty whisper · Right: dismiss"))
   return empty
 end
@@ -164,9 +168,8 @@ local function create()
   FrameKit.Place(frame, UI_KEY, FALLBACK_POSITION)
   frame:EnableMouseWheel(true)
   frame:SetScript("OnMouseWheel", onMouseWheel)
-  frame:SetScript("OnSizeChanged", LeadsWindow.Refresh)
-  createResizeButton(frame)
-  local empty = createTexts(frame)
+  local resizeButton = createResizeButton(frame)
+  local empty = createTexts(frame, resizeButton)
   frame:Hide()
   table.insert(_G["UISpecialFrames"], FRAME_NAME)
   return { frame = frame, rows = {}, empty = empty }

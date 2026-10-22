@@ -239,6 +239,20 @@ local function testRowsFitTheInset()
   Assert.same({ rows()[1]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -8 })
   Assert.same({ rows()[2]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -46 })
   Assert.truthy(string.find(table.concat(Widgets.texts(frame, Wow.frames), " / "), "Click: greet", 1, true), "footer hint")
+  -- The hint's right edge stops at the resize button, so the button exists before the texts.
+  local hintRight
+  for _, region in ipairs(frame.regions) do
+    if region.GetText and string.find(region:GetText() or "", "Click: greet", 1, true) then
+      for _, point in ipairs(region.points) do
+        if point[1] == "RIGHT" then
+          hintRight = point
+        end
+      end
+    end
+  end
+  hintRight = assert(hintRight, "the hint has a RIGHT anchor")
+  Assert.equal(hintRight[2], frame.resizeButton, "the hint anchors to the resize button")
+  Assert.same({ hintRight[3], hintRight[4], hintRight[5] }, { "LEFT", -8, 0 })
   -- The client sizes the inset from its anchors only, which may be unresolved (0 high) on the
   -- first open; the fit still comes out of the frame's own height.
   ns.LeadsWindow.Toggle()
