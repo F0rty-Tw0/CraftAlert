@@ -295,7 +295,12 @@ end
 -- the order is seeded from storage, and SKILL_LINES_CHANGED refreshes once the data is there.
 local function testPartialProfessionsAtLogin(db)
   local session, state = startClient(db, { false, false, { name = "Cooking", skillLine = COOKING } })
+  rawset(_G["C_TradeSkillUI"], "GetTradeSkillTexture", function(key)
+    return "tex" .. key
+  end)
   local ns = login(session)
+  local launcher = rawget(_G, "CraftAlertLauncher")
+  Assert.equal(launcher.icon.texture, "tex164", "idle icon: the first profession")
   local character = rawget(_G, "CraftAlertDB").characters[OWN_KEY]
   Assert.truthy(character.professions[BS], "the stored profession is kept")
   Assert.equal(ns.Index.Current().size, 3, "its recipes are still listened for")
@@ -311,6 +316,7 @@ local function testPartialProfessionsAtLogin(db)
   Assert.same(ns.ProfessionList.Order(), { ENCH, BS })
   Assert.truthy(character.professions[ENCH])
   Assert.equal(Wow.pendingTimers(0), 1, "a new order requests one rebuild")
+  Assert.equal(launcher.icon.texture, "tex333", "the launcher's idle icon follows the new order")
   runFrame()
   Assert.same(ns.Index.Current().professionOrder, { ENCH, BS })
 end
