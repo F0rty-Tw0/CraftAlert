@@ -129,6 +129,31 @@ local function jobCases()
   Assert.equal(db.characters[CHAR].professions[BS].read, true)
   Assert.same(calls, { 1, 2, 3 }, "recipe 1 is not read again")
 
+  -- A guard or a profession switch mid-read stops the job like a close does, and the recipes
+  -- stored so far reach the index.
+  local trips = {
+    linked = function(tripped)
+      tripped.guards.IsTradeSkillLinked = true
+    end,
+    switched = function(tripped)
+      tripped.base = ENCH
+    end,
+  }
+  for name, trip in pairs(trips) do
+    local tripped, _, tripDb, tripRun, tripSlicer = setup()
+    tripped.recipes = threeBelts()
+    logRecipeReads()
+    Wow.fireEvent("TRADE_SKILL_SHOW")
+    runOneTick()
+    trip(tripped)
+    Wow.runTimers()
+    Assert.truthy(recipesOf(tripDb)[1], name)
+    Assert.equal(recipesOf(tripDb)[2], nil, name)
+    Assert.equal(tripDb.characters[CHAR].professions[BS].read, false, name)
+    Assert.equal(tripSlicer.IsRunning("read"), false, name)
+    Assert.same(tripRun.reasons, { "read" }, name)
+  end
+
   -- An interrupted read stores what an uninterrupted one does.
   local plain, _, plainDb, _, plainSlicer = setup()
   plain.recipes = threeBelts()

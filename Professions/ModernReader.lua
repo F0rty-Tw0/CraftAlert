@@ -214,12 +214,16 @@ local function finishRead(job)
 end
 
 -- One Slicer step. A window that closed, got blocked or switched profession keeps the job for
--- a resume and cancels it. → whether the job is done.
+-- a resume and cancels it; what it stored so far goes to the index. → whether the job is done.
 local function runStep(job)
   local api = windowApiFor(job)
   if api == nil then
     keptJob = job
     Slicer.Cancel(JOB_NAME)
+    if job.anyChanged then
+      job.anyChanged = false
+      Index.RequestRebuild("read")
+    end
     return false
   end
   local done = ReadJob.Step(job, api)
