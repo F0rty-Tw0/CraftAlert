@@ -21,6 +21,17 @@ function LeadText.Crafter(lead)
   return Localization.Text("by %s", tostring(lead.crafter))
 end
 
+-- §4.5: "R2 (conc)" when the rank counts on concentration, "R2" when it needs none, else nil.
+function LeadText.Rank(lead)
+  if not lead.rank then
+    return nil
+  end
+  if lead.rankConc then
+    return Localization.Text("R%d (conc)", lead.rank)
+  end
+  return Localization.Text("R%d", lead.rank)
+end
+
 -- §7.2: "can't order (realm)" when the customer cannot send the crafter an order, else nil.
 function LeadText.RealmTag(lead)
   if lead.cannotOrder then

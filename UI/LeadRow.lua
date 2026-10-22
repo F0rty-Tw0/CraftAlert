@@ -81,9 +81,10 @@ function LeadRow.Create(parent, index)
   return row
 end
 
--- What matched, the crafter and the realm tag on one line.
+-- What matched, the crafter, the rank and the realm tag on one line.
 local function detailText(lead)
   local parts = { LeadText.What(lead), LeadText.Crafter(lead) }
+  parts[#parts + 1] = LeadText.Rank(lead)
   parts[#parts + 1] = LeadText.RealmTag(lead)
   return concat(parts, " · ")
 end
