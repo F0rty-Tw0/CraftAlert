@@ -14,11 +14,9 @@ local CrafterRank = {}
 local pairs = pairs
 local type = type
 
--- Lower is better: current character, the profession's primary crafter, other characters of
--- this account, imported characters. A crafter the customer cannot send an order to (Retail,
--- realm list known) ranks below all of those. Ties are broken by character name.
+-- Tier, lower is better: current character, the profession's primary crafter, other
+-- characters of this account, imported characters.
 local CURRENT, PRIMARY, SAME_ACCOUNT, IMPORTED = 0, 1, 2, 3
-local CANNOT_ORDER = 10
 
 function CrafterRank.IsIgnored(name)
   local api = _G["C_FriendList"]
@@ -51,15 +49,57 @@ local function listensFor(key, prof)
   return not (muted and muted[prof])
 end
 
--- → characterKey, cannotOrder; nil when the customer is on Blizzard's ignore list (unless
--- opts.skipIgnore, which only the Settings Test page passes) or no character qualifies. `result` is the
--- Matcher's reused result: only read here. A match without entries (a profession word) is
--- answered by every enabled character with that profession that still listens for it.
+-- Concentration `key` can spend on currency `id` now. The current character reads the live
+-- currency; another one projects its saved snapshot by the recharge cycles since `at`. No
+-- snapshot, no API: 0, so concentration does not count.
+local function available(db, key, id)
+  if key == PlayerName.Own() then
+    local api = _G["C_CurrencyInfo"]
+    local info = type(api) == "table" and type(api.GetCurrencyInfo) == "function" and api.GetCurrencyInfo(id)
+    return type(info) == "table" and type(info.quantity) == "number" and info.quantity or 0
+  end
+  local character = db.characters[key]
+  local saved = character and character.concentration and character.concentration[id]
+  if not saved then
+    return 0
+  end
+  local cycles = math.max(0, math.floor((_G["time"]() - saved.at) * 1000 / saved.cycleMs))
+
+  return math.min(saved.max, saved.amount + cycles * saved.perCycle)
+end
+
+-- The quality rank `key` can reach for one recipe → rank, top, byConc; nil without reach data or
+-- `ranks`. One rank more when concentration pays for it. Reads the db, not the index, so a
+-- finished reach is seen at once.
+local function effectiveRank(db, key, recipeKey)
+  local character = db.characters[key]
+  local recipe = character and character.recipes and character.recipes[recipeKey]
+  local reached = recipe and recipe.reachRank
+  local top = recipe and recipe.ranks and #recipe.ranks
+  if not (reached and top and top > 0) then
+    return nil
+  end
+  local cost = recipe.reachCost or 0
+  local canGoHigher = cost > 0 and reached < top
+  local byConc = canGoHigher and available(db, key, recipe.reachConc) >= cost
+
+  return byConc and reached + 1 or reached, top, byConc
+end
+
+-- → characterKey, cannotOrder, rank, byConc, recipeKey; nil when the customer is on Blizzard's
+-- ignore list (unless opts.skipIgnore, which only the Settings Test page passes) or no character
+-- qualifies. Best first: can order, higher rank / #ranks (no rank last), the rank reached without
+-- concentration, tier, name. A character
+-- is judged by its best entry; rank, byConc and recipeKey come from the winning entry (nil for a
+-- profession word). `result` is the Matcher's reused result: only read here. A match without
+-- entries (a profession word) is answered by every enabled character with that profession that
+-- still listens for it.
 function CrafterRank.Pick(result, customerKey, db, opts)
   if not (opts and opts.skipIgnore) and CrafterRank.IsIgnored(customerKey) then
     return nil
   end
-  local bestKey, bestScore = nil, nil
+  local bestKey, bestCannot, bestFraction, bestConc, bestTier = nil, nil, nil, nil, nil
+  local bestRank, bestByConc, bestRecipeKey
   -- Asked once per character: an entry per recipe names the same few characters again and again.
   local cannotOrderBy, asked = {}, {}
   local function cannotOrder(key)
@@ -69,32 +109,42 @@ function CrafterRank.Pick(result, customerKey, db, opts)
     end
     return cannotOrderBy[key]
   end
-  local function consider(key, prof)
-    local score = tierOf(db.characters[key], key, prof)
-    if cannotOrder(key) == true then
-      score = score + CANNOT_ORDER
-    end
-    if bestKey == nil or score < bestScore or (score == bestScore and key < bestKey) then
-      bestKey, bestScore = key, score
+  local function consider(key, prof, recipeKey)
+    local cannot = cannotOrder(key) == true and 1 or 0
+    local rank, top, byConc = effectiveRank(db, key, recipeKey)
+    local fraction = rank and rank / top or -1
+    local conc = byConc and 1 or 0
+    local tier = tierOf(db.characters[key], key, prof)
+    local sameRank = bestKey ~= nil and cannot == bestCannot and fraction == bestFraction
+    local sameConc = sameRank and conc == bestConc
+    local better = bestKey == nil
+      or cannot < bestCannot
+      or (cannot == bestCannot and fraction > bestFraction)
+      or (sameRank and conc < bestConc)
+      or (sameConc and (tier < bestTier or (tier == bestTier and key < bestKey)))
+    if better then
+      bestKey, bestCannot, bestFraction, bestConc, bestTier = key, cannot, fraction, conc, tier
+      bestRank, bestByConc, bestRecipeKey = rank, byConc, recipeKey
     end
   end
   if result.entryCount > 0 then
     for i = 1, result.entryCount do
       local entry = result.entries[i]
-      consider(entry.character, entry.prof or result.prof)
+      consider(entry.character, entry.prof or result.prof, entry.recipeKey)
     end
   else
     for key, character in pairs(db.characters) do
       local candidate = character.enabled ~= false and character.professions[result.prof] ~= nil
       if candidate and listensFor(key, result.prof) then
-        consider(key, result.prof)
+        consider(key, result.prof, nil)
       end
     end
   end
   if bestKey == nil then
     return nil
   end
-  return bestKey, cannotOrder(bestKey)
+
+  return bestKey, cannotOrder(bestKey), bestRank, bestByConc, bestRecipeKey
 end
 
 ns.CrafterRank = CrafterRank

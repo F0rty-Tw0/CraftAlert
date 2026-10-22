@@ -19,8 +19,15 @@ local STATUS_NOT_STARTED = "Paused — Craft Alert did not start; /reload to try
 local NO_DB = "Craft Alert's saved data did not load; /reload to try again"
 local UNREAD_LINE = "Open Blacksmithing once to start listening."
 local FIRST_RUN_HINT = "After opening a profession, try /ca test LF <profession> crafter"
-local INSTALLED_EVENTS =
-  { "TRADE_SKILL_SHOW", "TRADE_SKILL_CLOSE", "TRADE_SKILL_LIST_UPDATE", "NEW_RECIPE_LEARNED", "PLAYER_UPDATE_RESTING", "IGNORELIST_UPDATE" }
+local INSTALLED_EVENTS = {
+  "TRADE_SKILL_SHOW",
+  "TRADE_SKILL_CLOSE",
+  "TRADE_SKILL_LIST_UPDATE",
+  "NEW_RECIPE_LEARNED",
+  "PLAYER_UPDATE_RESTING",
+  "IGNORELIST_UPDATE",
+  "PLAYER_LOGOUT",
+}
 local WHISPER_EVENTS = { "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM" }
 -- The customer's realm is connected, so the lead carries no "can't order" tag.
 local CONNECTED_REALMS = { "OwnRealm", "Other Realm" }
@@ -85,6 +92,10 @@ local function startClient(db, slots)
   })
   Wow.stub("CraftAlertDB", db)
   local state = ProfessionsRetail.install({ slots = slots or SLOTS, base = BS, recipes = RECIPES, items = ITEMS, bind = BIND, autoCache = true })
+  -- The three APIs QualityReach needs; none answers for the stub recipes.
+  rawset(_G["C_TradeSkillUI"], "GetCraftingOperationInfo", function() end)
+  Wow.stub("Enum", { TradeskillSlotDataType = { ModifiedReagent = 1 }, CraftingReagentType = { Finishing = 3 } })
+  Wow.stub("C_CurrencyInfo", { GetCurrencyInfo = function() end })
   return session, state
 end
 

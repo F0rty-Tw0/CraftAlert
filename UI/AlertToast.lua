@@ -47,9 +47,10 @@ local function trim(text)
   return match(text or "", "^%s*(.-)%s*$")
 end
 
--- Crafter, why, and the realm tag (§7.2) on one line.
+-- Crafter, rank, why, and the realm tag (§7.2) on one line.
 local function detailText(lead)
   local parts = { LeadText.Crafter(lead) }
+  parts[#parts + 1] = LeadText.Rank(lead)
   if lead.why and lead.why ~= "" then
     parts[#parts + 1] = lead.why
   end

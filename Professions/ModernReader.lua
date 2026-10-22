@@ -10,6 +10,7 @@ local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.Prof
 local BindLookup = ns.BindLookup or require("CraftAlert.Professions.BindLookup")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 local ReadJob = ns.ReadJob or require("CraftAlert.Professions.ReadJob")
+local QualityReach = ns.QualityReach or require("CraftAlert.Professions.QualityReach")
 
 -- Spec §5.2 row 1 (Retail, Forever): reads the learned recipes of the open profession
 -- window into the current character's storage, as Slicer job "read" (spec 2026-10-22
@@ -211,6 +212,7 @@ local function finishRead(job)
   if job.anyChanged then
     Index.RequestRebuild("read")
   end
+  QualityReach.Queue(job.storedIDs)
 end
 
 -- One Slicer step. A window that closed, got blocked or switched profession keeps the job for
@@ -314,6 +316,7 @@ function ModernReader.ReadOne(recipeID, professionKey)
   if changed then
     Index.RequestRebuild("learn")
   end
+  QualityReach.Queue({ recipeID })
   return true
 end
 

@@ -95,6 +95,18 @@ local function testLazyFrameAndContent()
   shown = texts()
   Assert.truthy(string.find(shown, "[Sim Plate Belt]", 1, true), shown)
   Assert.truthy(string.find(shown, "can't order (realm)", 1, true), shown)
+  Assert.falsy(string.find(shown, "R2", 1, true), "no rank, no R part: " .. shown)
+
+  -- §4.5: the rank follows the crafter.
+  ns = UiFixture.load({
+    leads = 1,
+    db = function(accountDb)
+      accountDb.leads[1].rank, accountDb.leads[1].rankConc = 2, true
+    end,
+  })
+  ns.AlertToast.Show(ns.Leads.Latest())
+  shown = texts()
+  Assert.truthy(string.find(shown, "by Me-Realm · R2 (conc) · lf + blacksmith", 1, true), shown)
 end
 
 local function testNewerLeadAndAutoHide()

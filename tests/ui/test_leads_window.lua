@@ -101,6 +101,7 @@ local function testRowFields()
   for _, part in ipairs({ "Ann-Draenor", "2m", "Blacksmithing", "Me-Realm" }) do
     Assert.truthy(string.find(second, part, 1, true), part .. " missing from: " .. second)
   end
+  Assert.falsy(string.find(first, "R2", 1, true), "no rank, no R part: " .. first)
   Assert.equal(shown[1].greetedIcon:IsShown(), false)
   Assert.equal(shown[1].repliedTag:IsShown(), false)
   Assert.equal(shown[2].greetedIcon:IsShown(), true)
@@ -116,6 +117,20 @@ local function testRowFields()
   ns.LeadsWindow.Toggle()
   Assert.equal(#rows(), 0)
   Assert.truthy(string.find(table.concat(Widgets.texts(window(), Wow.frames), " / "), "No leads", 1, true))
+end
+
+-- §4.5: the rank sits between the crafter and the realm tag.
+local function testRowRank()
+  local ns = load({ "Ann-Draenor", "Bob-Draenor" }, function(accountDb)
+    accountDb.leads[1].rank, accountDb.leads[1].rankConc = 2, false
+    accountDb.leads[2].rank, accountDb.leads[2].rankConc, accountDb.leads[2].cannotOrder = 2, true, true
+  end)
+  ns.LeadsWindow.Toggle()
+  local shown = rows()
+  local conc, plain = rowText(shown[1]), rowText(shown[2])
+  Assert.truthy(string.find(conc, "by Me-Realm · R2 (conc) · can't order (realm)", 1, true), conc)
+  Assert.truthy(string.find(plain, "by Me-Realm · R2", 1, true), plain)
+  Assert.falsy(string.find(plain, "(conc)", 1, true), plain)
 end
 
 local function testRowClicks()
@@ -277,6 +292,7 @@ end
 return function()
   testLazyAndEscape()
   testRowFields()
+  testRowRank()
   testRowClicks()
   testVisibleLatestAndScroll()
   testSavedFrameAndOpacity()

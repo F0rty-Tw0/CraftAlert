@@ -7,6 +7,9 @@ local ProfessionsRetail = require("tests.helpers.professions_retail")
 local BS, ENCH, COOKING = 164, 333, 185
 local CHAR = "Me-Realm"
 
+-- What the reader handed QualityReach.Queue since the last setup.
+local queued = {}
+
 local function belt(id, item, extra)
   local recipe = { id = id, name = "Belt " .. id, item = item, learned = true }
   for key, value in pairs(extra or {}) do
@@ -32,6 +35,10 @@ local function setup(flavor)
   local ProfessionList = Fresh.require("Professions.ProfessionList")
   Fresh.require("Professions.BindLookup")
   Fresh.require("Professions.ReadJob")
+  queued = {}
+  Fresh.require("Professions.QualityReach").Queue = function(recipeIDs)
+    queued[#queued + 1] = recipeIDs
+  end
   local Slicer = Fresh.require("Core.Slicer")
   local ModernReader = Fresh.require("Professions.ModernReader")
   local db = ns.Defaults.Db()
@@ -80,6 +87,7 @@ local function readFlow(flavor)
   Wow.runTimers()
   Assert.same(run.reasons, { "read" })
   Assert.equal(run.builds, 1)
+  Assert.same(queued, { { 1, 2, 3 } }, "a finished read queues the stored IDs in read order")
 end
 
 -- Records the recipe IDs each GetRecipeInfo call gets and advances the profile clock past the
@@ -119,6 +127,7 @@ end
 local function jobCases()
   -- Close mid-read keeps what was stored and marks nothing read; reopening resumes at the cursor.
   local _, db, Slicer, calls = closeMidRead()
+  Assert.same(queued, {}, "a cut-off read queues no reach")
   Assert.truthy(recipesOf(db)[1])
   Assert.equal(recipesOf(db)[2], nil)
   Assert.equal(db.characters[CHAR].professions[BS].read, false, "a cut-off read marks nothing read")
@@ -128,6 +137,7 @@ local function jobCases()
   Assert.truthy(recipesOf(db)[3])
   Assert.equal(db.characters[CHAR].professions[BS].read, true)
   Assert.same(calls, { 1, 2, 3 }, "recipe 1 is not read again")
+  Assert.same(queued, { { 1, 2, 3 } }, "reach waits for the resumed read to finish")
 
   -- A guard or a profession switch mid-read stops the job like a close does, and the recipes
   -- stored so far reach the index.
@@ -345,9 +355,11 @@ return function()
   state.recipes = { belt(1, 100, { learned = false }), belt(2, 200, { isRecraft = true }), belt(3, 300) }
   Assert.equal(ModernReader.ReadOne(1, BS), true)
   Assert.same(recipesOf(db)[1], { item = 100, name = "Belt 1", prof = BS })
+  Assert.same(queued, { { 1 } }, "a stored recipe queues reach")
   Assert.equal(ModernReader.ReadOne(2, BS), false, "a recraft recipe is dropped")
   Assert.equal(ModernReader.ReadOne(99, BS), false, "an unknown recipe")
   Assert.equal(ModernReader.ReadOne(3, COOKING), false, "a profession the character does not have")
+  Assert.same(queued, { { 1 } }, "a recipe that is not stored queues nothing")
   Assert.equal(recipesOf(db)[3], nil)
   Assert.same(state.requests, { 100 })
   Wow.runTimers()
