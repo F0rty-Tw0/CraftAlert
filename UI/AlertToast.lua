@@ -137,7 +137,7 @@ end
 
 -- What matched (lead.why, never drawn on the face) and the clicks, in Blizzard's tooltip hierarchy
 -- (Blizzard_SharedXML/SharedTooltipTemplates.lua, every flavour): gold title, white description,
--- a blank line, one green instruction line per click.
+-- a blank line, one green instruction line per click, then the drag (it moves the launcher).
 local function showTooltip(frame)
   local tooltip = _G["GameTooltip"]
   local why = current.lead and current.lead.why
@@ -150,6 +150,7 @@ local function showTooltip(frame)
   for _, line in ipairs(LeadText.ClickLines()) do
     _G["GameTooltip_AddInstructionLine"](tooltip, line)
   end
+  _G["GameTooltip_AddInstructionLine"](tooltip, Localization.Text("Drag: move"))
   tooltip:Show()
 end
 
