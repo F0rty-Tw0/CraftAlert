@@ -141,6 +141,127 @@ local function testListPages()
   Assert.equal(shown(), "x", "a shorter list scrolls back")
 end
 
+local function frame(frameType, template)
+  return _G["CreateFrame"](frameType, nil, _G["UIParent"], template)
+end
+
+local function testFakeCheckButton()
+  Wow.reset()
+  local c = frame("CheckButton", "UICheckButtonTemplate")
+  c:SetChecked(true)
+  Assert.equal(c:GetChecked(), true)
+  Assert.truthy(c.Text, "the template's label")
+  local seen = {}
+  c:SetScript("OnClick", function(self)
+    seen[#seen + 1] = self:GetChecked()
+  end)
+  Widgets.click(c)
+  Assert.same(seen, { false }, "the client flips the box before the script runs")
+  Assert.equal(c:GetChecked(), false)
+end
+
+local function testFakeSlider()
+  Wow.reset()
+  local s = frame("Frame", "MinimalSliderWithSteppersTemplate")
+  Assert.equal(rawget(_G, "MinimalSliderWithSteppersMixin").Label.Right, 2)
+  local seen = {}
+  local mouseDown = {}
+  s:RegisterCallback(s.Event.OnValueChanged, function(_, value)
+    seen[#seen + 1] = value
+    mouseDown[#mouseDown + 1] = _G["IsMouseButtonDown"]("LeftButton")
+  end, s)
+  s:Init(5, 1, 10, 9, {
+    [2] = function(v)
+      return v .. "!"
+    end,
+  })
+  Assert.equal(s.Labels[2]:GetText(), "5!")
+  Assert.truthy(s.Labels[2]:IsShown())
+  Assert.falsy(s.Labels[1]:IsShown(), "labels without a formatter stay hidden")
+  Assert.same(seen, {}, "Init sets the value before it installs the script")
+  Assert.same(s.initArgs, { 5, 1, 10, 9 })
+  Assert.equal(s.Slider:GetValueStep(), 1)
+  s.Slider:SetValue(7)
+  Assert.same(seen, { 7 })
+  Assert.equal(s.Labels[2]:GetText(), "7!")
+  Widgets.step(s, true)
+  Assert.same(seen, { 7, 8 })
+  Widgets.step(s, false)
+  Assert.same(seen, { 7, 8, 7 })
+  mouseDown = {}
+  Widgets.slide(s, 3)
+  Assert.equal(seen[#seen], 3)
+  Assert.same(mouseDown, { true }, "the button is held while the thumb moves")
+  Assert.equal(_G["IsMouseButtonDown"]("LeftButton"), false, "and up afterwards")
+  Assert.equal(s.mouseUps, 1)
+  local hooked = 0
+  s.Slider:HookScript("OnMouseUp", function()
+    hooked = hooked + 1
+  end)
+  Widgets.fire(s.Slider, "OnMouseUp")
+  Assert.same({ s.mouseUps, hooked }, { 2, 1 }, "the mixin's script runs, then the hook")
+  local bare = frame("Slider")
+  bare:SetMinMaxValues(0, 10)
+  local ups = 0
+  bare:SetScript("OnMouseUp", function()
+    ups = ups + 1
+  end)
+  Widgets.slide(bare, 4)
+  Assert.same({ bare:GetValue(), ups }, { 4, 1 }, "a bare Slider is still driven")
+end
+
+local function testFakeDropdown()
+  Wow.reset()
+  local d = frame("DropdownButton", "WowStyle1DropdownTemplate")
+  local current = 2
+  local picked = {}
+  local function isSel(value)
+    return current == value
+  end
+  local function onSel(value)
+    picked[#picked + 1] = value
+  end
+  d:SetupMenu(function(_, root)
+    root:CreateRadio("A", isSel, onSel, 1)
+    root:CreateRadio("B", isSel, onSel, 2)
+  end)
+  d:GenerateMenu()
+  Assert.equal(d.Text:GetText(), "B")
+  Assert.equal(#d.menuEntries, 2, "generating again replaces the entries")
+  Widgets.pick(d, 1)
+  Assert.same(picked, { 1 })
+  current = 1
+  d:GenerateMenu()
+  Assert.equal(d.Text:GetText(), "A")
+  Assert.raises(function()
+    Widgets.pick(d, 9)
+  end, "no radio")
+end
+
+local function testFakeButton()
+  Wow.reset()
+  local b = frame("Button", "UIPanelButtonTemplate")
+  b:SetText("Go")
+  Assert.equal(b:GetText(), "Go")
+  Assert.equal(b:GetFontString():GetText(), "Go")
+  b:LockHighlight()
+  Assert.equal(b.highlightLocked, true)
+  b:UnlockHighlight()
+  Assert.equal(b.highlightLocked, false)
+end
+
+local function testFakeResizeMins()
+  Wow.reset()
+  local target = frame("Frame")
+  local button = frame("Button", "PanelResizeButtonTemplate")
+  button:Init(target, 360, 160, 1000, 800)
+  button:SetMinWidth(600)
+  button:SetMinHeight(480)
+  button.isActive = true
+  target:GetScript("OnSizeChanged")(target, 500, 400)
+  Assert.same({ target:GetWidth(), target:GetHeight() }, { 600, 480 }, "the wrapper reads the new mins")
+end
+
 return function()
   testColumnStacksRows()
   testToggle()
@@ -148,4 +269,9 @@ return function()
   testInput()
   testChoice()
   testListPages()
+  testFakeCheckButton()
+  testFakeSlider()
+  testFakeDropdown()
+  testFakeButton()
+  testFakeResizeMins()
 end

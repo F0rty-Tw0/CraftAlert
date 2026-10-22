@@ -150,6 +150,15 @@ function Templates.fakes.PanelResizeButtonTemplate(button)
     self.resizeStoppedCallback = callback
   end
 
+  -- :1610-1617: the mins are stored only; the wrapper Init installed reads them at each resize.
+  function button:SetMinWidth(minWidth)
+    self.minWidth = minWidth
+  end
+
+  function button:SetMinHeight(minHeight)
+    self.minHeight = minHeight
+  end
+
   button.scripts.OnMouseDown = function(self)
     self.isActive = true
     self.target:StartSizing("BOTTOMRIGHT", true)
@@ -161,6 +170,184 @@ function Templates.fakes.PanelResizeButtonTemplate(button)
     if self.resizeStoppedCallback then
       self.resizeStoppedCallback(self.target)
     end
+  end
+end
+
+-- Blizzard_SharedXML/Shared/Button/CheckButtonTemplates.xml:50-64 (32x32, the label FontString
+-- `Text`, anchored LEFT of the box's RIGHT edge). The client flips a CheckButton before its OnClick
+-- script runs; Widgets.click does that for a frame with `toggleOnClick`.
+function Templates.fakes.UICheckButtonTemplate(button)
+  button:SetSize(32, 32)
+  button.Text = button:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+  button.toggleOnClick = true
+  button.checked = false
+
+  function button:SetChecked(checked)
+    self.checked = checked and true or false
+  end
+
+  function button:GetChecked()
+    return self.checked
+  end
+end
+
+local MINIMAL_SLIDER_EVENTS = { "OnValueChanged", "OnInteractStart", "OnInteractEnd" }
+
+-- Blizzard_SharedXML/Shared/Slider/MinimalSlider.xml:34-90 (250x40 Frame; inner Slider inset 19;
+-- Back and Forward Buttons; five hidden Labels in Left, Right, Top, Min, Max order) and
+-- MinimalSlider.lua: :35-43 the callback events and Label enum, :50-58 and :94-104 a stepper
+-- click is Slider:SetValue(value +- step), :126-142 Init (range, step (max-min)/steps and value first,
+-- then the formatters, then the OnValueChanged script), :160-171 FormatValue writes and shows Labels[labelID],
+-- :202-204 SetValue, :70-75 the inner slider's own OnMouseUp (counted in `mouseUps`).
+-- CallbackRegistry.lua:112-141 and :184-210: RegisterCallback(event, func, owner) calls func(owner, ...).
+-- Not modelled: stepper enabling at the ends (UpdateStepperStates), interact events and narration.
+function Templates.fakes.MinimalSliderWithSteppersTemplate(control)
+  local createFrame = _G["CreateFrame"]
+  control:SetSize(250, 40)
+  control.mouseUps = 0
+  control.Event = {}
+  for _, event in ipairs(MINIMAL_SLIDER_EVENTS) do
+    control.Event[event] = event
+  end
+
+  local slider = createFrame("Slider", nil, control)
+  slider:SetScript("OnMouseUp", function()
+    control.mouseUps = control.mouseUps + 1
+  end)
+  control.Slider = slider
+
+  -- Back is the closure with forward = false, Forward the one with forward = true (:50-58).
+  local function newStepper(direction)
+    local stepper = createFrame("Button", nil, control)
+    stepper:SetScript("OnClick", function()
+      slider:SetValue(slider:GetValue() + direction * slider:GetValueStep())
+    end)
+
+    return stepper
+  end
+  control.Back, control.Forward = newStepper(-1), newStepper(1)
+
+  control.Labels = {}
+  for index = 1, 5 do
+    local label = control:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    label:Hide()
+    control.Labels[index] = label
+  end
+
+  local callbacks = {}
+
+  function control:RegisterCallback(event, func, owner)
+    callbacks[event] = callbacks[event] or {}
+    table.insert(callbacks[event], { func = func, owner = owner })
+  end
+
+  function control:TriggerEvent(event, ...)
+    for _, callback in ipairs(callbacks[event] or {}) do
+      callback.func(callback.owner, ...)
+    end
+  end
+
+  function control:FormatValue(value)
+    for labelID, formatter in pairs(self.formatters or {}) do
+      local label = self.Labels[labelID]
+      if label then
+        label:SetText(formatter(value))
+        label:Show()
+      end
+    end
+  end
+
+  function control:Init(value, minValue, maxValue, steps, formatters)
+    self.initArgs = { value, minValue, maxValue, steps }
+    self.Slider:SetMinMaxValues(minValue, maxValue)
+    self.Slider:SetValueStep((maxValue - minValue) / steps)
+    self.Slider:SetValue(value)
+    self.formatters = formatters
+    self:FormatValue(value)
+    self.Slider:SetScript("OnValueChanged", function(_, changed)
+      self:FormatValue(changed)
+      self:TriggerEvent(self.Event.OnValueChanged, changed)
+    end)
+  end
+
+  function control:SetValue(value)
+    self.Slider:SetValue(value)
+  end
+
+  function control:GetValue()
+    return self.Slider:GetValue()
+  end
+end
+
+-- Blizzard_Menu/Mainline/MenuTemplates.xml:3-33 (120x25 DropdownButton with the FontString `Text`);
+-- Blizzard_Menu/DropdownButton.lua: :237-249 SetupMenu (generates at once only when the dropdown is
+-- shown), :255-262 GenerateMenu (generator(dropdown, root)), :341-351 Pick (the radio's responder
+-- runs, then the dropdown shows its selection); Blizzard_Menu/MenuTemplates.lua:345-354
+-- CreateRadio(text, isSelected, onSelect, data) with isSelected(data) and onSelect(data).
+-- The text shown is the first radio selected, "" when none is.
+function Templates.fakes.WowStyle1DropdownTemplate(dropdown)
+  dropdown:SetSize(120, 25)
+  dropdown.Text = dropdown:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  dropdown.menuEntries = {}
+
+  local root = {}
+
+  function root.CreateRadio(_, text, isSelected, onSelect, data)
+    local entry = { text = text, isSelected = isSelected, onSelect = onSelect, data = data }
+    table.insert(dropdown.menuEntries, entry)
+
+    return entry
+  end
+
+  local function showSelection()
+    dropdown.Text:SetText("")
+    for _, entry in ipairs(dropdown.menuEntries) do
+      if entry.isSelected(entry.data) then
+        dropdown.Text:SetText(entry.text)
+        return
+      end
+    end
+  end
+
+  function dropdown:GenerateMenu()
+    if not self.menuGenerator then
+      return
+    end
+    self.menuEntries = {}
+    self.menuGenerator(self, root)
+    showSelection()
+  end
+
+  function dropdown:SetupMenu(generator)
+    self.menuGenerator = generator
+    if self:IsShown() then
+      self:GenerateMenu()
+    end
+  end
+
+  function dropdown:Pick(entry)
+    entry.onSelect(entry.data)
+    showSelection()
+  end
+end
+
+-- Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml:303 (ButtonText parentKey="Text") and
+-- :315-320 (UIPanelButtonTemplate inherits UIPanelButtonNoTooltipTemplate). The button's one
+-- FontString is what SetText and GetText act on.
+function Templates.fakes.UIPanelButtonTemplate(button)
+  local fontString = button:CreateFontString(nil, "ARTWORK", "GameFontNormalOutline")
+  button.Text = fontString
+
+  function button:SetText(text)
+    fontString:SetText(text)
+  end
+
+  function button:GetText()
+    return fontString:GetText()
+  end
+
+  function button:GetFontString()
+    return fontString
   end
 end
 

@@ -253,6 +253,12 @@ local function installDefaults()
   Wow.stub("HideUIPanel", function(frame)
     frame:Hide()
   end)
+  -- Reads Widgets.mouse; Wow.reset empties it.
+  Wow.stub("IsMouseButtonDown", function(button)
+    return Widgets.mouse[button] == true
+  end)
+  -- Blizzard_SharedXML/Shared/Slider/MinimalSlider.lua:43: the enum the code reads Labels with.
+  Wow.stub("MinimalSliderWithSteppersMixin", { Label = { Left = 1, Right = 2, Top = 3, Min = 4, Max = 5 } })
   Wow.stub("SetItemRef", function(link, text, button, frame)
     table.insert(Wow.itemRefs, { link, text, button, frame })
   end)
@@ -330,6 +336,9 @@ function Wow.reset()
   Wow.itemRefs = {}
   Wow.clock = { gettime = 0, time = 0, profile = 0 }
   Wow.combat = false
+  for button in pairs(Widgets.mouse) do
+    Widgets.mouse[button] = nil
+  end
   installDefaults()
 end
 
