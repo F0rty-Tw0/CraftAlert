@@ -167,6 +167,27 @@ local function testRecipeNotStoredIsSkipped()
   Assert.same(idsOf(state.calls), { 10 })
 end
 
+local function testRecipeWithoutRanksIsNotAsked()
+  local state, QualityReach, Slicer = setup({ [10] = { ranks = { 1, 2 } }, [11] = {} })
+  state.answers[10] = qualityAnswer(1, 376, 3168)
+  state.answers[11] = qualityAnswer(1, 376, 3168)
+  QualityReach.Queue({ 11, 10 })
+  Slicer.Drain()
+
+  Assert.same(idsOf(state.calls), { 10 })
+end
+
+local function testConcentrationIsSavedAfterTheLastStep()
+  local state, QualityReach, Slicer, db = setup({ [10] = { ranks = { 1, 2 } } })
+  state.answers[10] = qualityAnswer(1, 376, 3168)
+  db.characters[CHAR].concentration = nil
+  Wow.clock.time = 7000
+  QualityReach.Queue({ 10 })
+  Slicer.Drain()
+
+  Assert.same(db.characters[CHAR].concentration, { [3168] = { amount = 100, at = 7000, cycleMs = 345600, perCycle = 1, max = 1000 } })
+end
+
 local function testQueueKeepsFifoWithoutDuplicates()
   local recipes = {}
   for id = 1, 3 do
@@ -258,6 +279,8 @@ return function()
   testQualityAnswerIsStored()
   testAnyOtherAnswerClearsAllThreeFields()
   testRecipeNotStoredIsSkipped()
+  testRecipeWithoutRanksIsNotAsked()
+  testConcentrationIsSavedAfterTheLastStep()
   testQueueKeepsFifoWithoutDuplicates()
   testCombatHoldsTheJobUntilRegenEnabled()
   testSaveConcentrationWritesOneEntryPerCurrency()
