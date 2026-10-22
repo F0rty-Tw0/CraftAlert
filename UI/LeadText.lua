@@ -56,6 +56,16 @@ function LeadText.RealmTag(lead)
   return nil
 end
 
+-- What each click on a lead does (UI/ClickRouter.lua), one tooltip instruction line each.
+function LeadText.ClickLines()
+  return {
+    Localization.Text("Click: greet"),
+    Localization.Text("Shift-click: edit first"),
+    Localization.Text("Ctrl-click: empty whisper"),
+    Localization.Text("Right-click: dismiss"),
+  }
+end
+
 -- "35s" under a minute, else whole minutes ("2m"); leads expire within the hour.
 function LeadText.Age(seconds)
   if seconds < 60 then

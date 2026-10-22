@@ -135,17 +135,21 @@ local function startHideTimer()
   armHide()
 end
 
--- What matched (lead.why, never drawn on the face) and the click legend.
+-- What matched (lead.why, never drawn on the face) and the clicks, in Blizzard's tooltip hierarchy
+-- (Blizzard_SharedXML/SharedTooltipTemplates.lua, every flavour): gold title, white description,
+-- a blank line, one green instruction line per click.
 local function showTooltip(frame)
-  local tooltip, secondary = _G["GameTooltip"], Theme.COLORS.textSecondary
+  local tooltip = _G["GameTooltip"]
   local why = current.lead and current.lead.why
   tooltip:SetOwner(frame, "ANCHOR_TOP")
-  tooltip:SetText(Localization.Text("Craft Alert"))
+  _G["GameTooltip_SetTitle"](tooltip, Localization.Text("Craft Alert"), _G["NORMAL_FONT_COLOR"])
   if type(why) == "string" and why ~= "" then
-    tooltip:AddLine(Localization.Text("Matched: %s", why), 1, 1, 1, true)
+    _G["GameTooltip_AddHighlightLine"](tooltip, Localization.Text("Matched: %s", why))
   end
-  local legend = Localization.Text("Click: greet · Shift: edit first · Ctrl: empty whisper · Right: dismiss")
-  tooltip:AddLine(legend, secondary[1], secondary[2], secondary[3], true)
+  _G["GameTooltip_AddBlankLineToTooltip"](tooltip)
+  for _, line in ipairs(LeadText.ClickLines()) do
+    _G["GameTooltip_AddInstructionLine"](tooltip, line)
+  end
   tooltip:Show()
 end
 
