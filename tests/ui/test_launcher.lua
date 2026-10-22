@@ -115,10 +115,118 @@ local function testSavedPosition()
   Assert.same({ point, relativePoint, x, y }, { "BOTTOMRIGHT", "BOTTOMRIGHT", -20, 80 })
 end
 
+local ART_RING, ART_GLOW = "Soulbinds_Tree_Ring", "Soulbinds_Tree_Ring_Glow"
+
+local function stubAtlases(present) -- present: set of atlas names, or nil for "none"
+  Wow.stub("C_Texture", {
+    GetAtlasInfo = function(name)
+      return present and present[name] and { width = 1 } or nil
+    end,
+  })
+end
+
+local function testArt()
+  local ns = UiFixture.load()
+  setScan(ns, true)
+  stubAtlases({ Soulbinds_Tree_Ring_Disabled = true, [ART_RING] = true, [ART_GLOW] = true, ["GarrLanding-CircleGlow"] = true })
+  local frame = ns.Launcher.Create()
+  Assert.same({ frame:GetWidth(), frame:GetHeight() }, { 53, 53 })
+  Assert.equal(frame:GetNormalTexture().atlas, "Soulbinds_Tree_Ring_Disabled")
+  Assert.equal(frame:GetPushedTexture().atlas, ART_RING)
+  Assert.same({ frame:GetHighlightTexture().atlas, frame:GetHighlightTexture().blendMode }, { ART_RING, "ADD" })
+  Assert.equal(frame.icon.masks[1].texture, "Interface\\CharacterFrame\\TempPortraitAlphaMask")
+  Assert.same({ frame.icon:GetWidth(), frame.icon:GetHeight() }, { 44, 44 })
+  -- Hover glow follows the cursor.
+  Assert.equal(frame.glow:IsShown(), false)
+  frame.scripts.OnEnter(frame)
+  Assert.equal(frame.glow:IsShown(), true)
+  frame.scripts.OnLeave(frame)
+  Assert.equal(frame.glow:IsShown(), false)
+
+  -- No CraftScan atlas (Classic): file fallbacks, no pushed art, no glow, no pulse.
+  ns = UiFixture.load()
+  setScan(ns, true)
+  stubAtlases(nil)
+  frame = ns.Launcher.Create()
+  Assert.equal(frame:GetNormalTexture().texture, "Interface\\Minimap\\MiniMap-TrackingBorder")
+  Assert.same({ frame:GetHighlightTexture().texture, frame:GetHighlightTexture().blendMode }, { "Interface\\Buttons\\UI-Common-MouseHilight", "ADD" })
+  Assert.equal(frame:GetPushedTexture():IsShown(), false)
+  Assert.same({ frame.glow, frame.pulse, frame.pulseOnce, frame.pulseLoop }, {})
+  ns.Launcher.ShowLead(ns.Leads.Latest() or UiFixture.lead(1)) -- plays nothing, raises nothing
+  frame.scripts.OnEnter(frame)
+end
+
+local function testIconAndPulse()
+  local ns = UiFixture.load()
+  setScan(ns, true)
+  ns.Launcher.ShowLead(UiFixture.lead(1)) -- before Create: a no-op
+  Assert.equal(ns.Launcher.Frame(), nil)
+  local asked = {}
+  Wow.stub("C_TradeSkillUI", {
+    GetTradeSkillTexture = function(key)
+      asked[#asked + 1] = key
+      return key ~= 999 and ("tex" .. key) or nil
+    end,
+  })
+  ns.ProfessionList.Order = function()
+    return { 164, 171 }
+  end
+  local frame = ns.Launcher.Create()
+  Assert.equal(frame.icon.texture, "tex164", "idle: the first profession")
+  local lead = UiFixture.lead(1)
+  lead.prof = 171
+  ns.Launcher.ShowLead(lead)
+  Assert.equal(frame.icon.texture, "tex171")
+  Assert.same({ frame.pulseOnce:IsPlaying(), frame.pulseLoop:IsPlaying() }, { true, true })
+  ns.Launcher.Refresh()
+  Assert.equal(frame.icon.texture, "tex171", "Refresh keeps the lead icon while one is shown")
+  ns.Launcher.ShowLead(nil)
+  Assert.equal(frame.pulseLoop:IsPlaying(), false)
+  Assert.equal(frame.icon.texture, "tex164")
+  -- Bell: key not a number, API returns nil, API missing.
+  lead.prof = "Blacksmithing"
+  ns.Launcher.ShowLead(lead)
+  Assert.equal(frame.icon.texture, "Interface\\Icons\\INV_Misc_Bell_01")
+  lead.prof = 999
+  ns.Launcher.ShowLead(lead)
+  Assert.equal(frame.icon.texture, "Interface\\Icons\\INV_Misc_Bell_01")
+  Wow.stub("C_TradeSkillUI", nil)
+  lead.prof = 171
+  ns.Launcher.ShowLead(lead)
+  Assert.equal(frame.icon.texture, "Interface\\Icons\\INV_Misc_Bell_01")
+end
+
+local function testDragApi()
+  local ns, db = UiFixture.load()
+  setScan(ns, true)
+  ns.Launcher.StartDrag() -- before Create: no-ops
+  ns.Launcher.StopDrag()
+  local order = {}
+  ns.Launcher.OnMoved(function()
+    order[#order + 1] = "first"
+  end)
+  ns.Launcher.OnMoved(function()
+    order[#order + 1] = "second"
+  end)
+  local frame = ns.Launcher.Create()
+  Assert.equal(ns.Launcher.Frame(), frame)
+  frame.scripts.OnDragStart(frame)
+  Assert.equal(frame.moving, true)
+  frame:ClearAllPoints()
+  frame:SetPoint("BOTTOMRIGHT", rawget(_G, "UIParent"), "BOTTOMRIGHT", -20, 80)
+  frame.scripts.OnDragStop(frame)
+  Assert.equal(frame.moving, false)
+  Assert.same(db.ui.launcher, { point = "BOTTOMRIGHT", relativePoint = "BOTTOMRIGHT", x = -20, y = 80 })
+  Assert.same(order, { "first", "second" }, "saved first, then each OnMoved in registration order")
+end
+
 return function()
   testLitDimAndTooltip()
   testLeadExpiryWhilePaused()
   testHideWhenNoLeads()
   testSavedPosition()
+  testArt()
+  testIconAndPulse()
+  testDragApi()
   Wow.reset()
 end

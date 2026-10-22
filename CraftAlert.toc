@@ -66,6 +66,7 @@ UI/Dock.lua
 UI/AlertToast.lua
 UI/LeadRow.lua
 UI/LeadsWindow.lua
+UI/LauncherArt.lua
 UI/Launcher.lua
 UI/Settings/Controls.lua
 UI/Settings/PageGeneral.lua

@@ -10,24 +10,43 @@ local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
+local LauncherArt = ns.LauncherArt or require("CraftAlert.UI.LauncherArt")
+local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 
 -- Spec §7.3 and §7.6: the launcher button, frame CraftAlertLauncher, the one Craft Alert frame
 -- made at login (§4.4 rule 5). Lit while scanning, dim while paused; a badge counts the leads;
 -- the tooltip is the status line; a click toggles the leads window; "Hide when no leads"
 -- hides it while the list is empty. Draggable, position saved in CraftAlertDB.ui.launcher.
+-- Spec §5.1–5.2: CraftScan-style ring and portrait (UI/LauncherArt.lua); the portrait shows the
+-- shown lead's profession, else the first profession; a new lead pulses the ring.
 local Launcher = {}
 
 local tostring = tostring
+local ipairs = ipairs
 
 local FRAME_NAME = "CraftAlertLauncher"
 local UI_KEY = "launcher"
 local FALLBACK_POSITION = { "RIGHT", -60, 120 }
-local ICON_INSET = 2
-local ICON_CROP = { 0.08, 0.92, 0.08, 0.92 }
 local BADGE_OFFSET = 6
 
 ---@type table
 local launcher = nil -- the button, nil until Create
+local leadShown = false
+local movedHandlers = {}
+
+-- The profession's icon from the client, else the bell. C_TradeSkillUI is read through _G
+-- (luacheck's read_globals lacks it).
+local function iconFor(lead)
+  local key = ProfessionList.Order()[1]
+  if lead then
+    key = lead.prof
+  end
+  local api = _G["C_TradeSkillUI"]
+  local canAsk = type(key) == "number" and type(api) == "table" and type(api.GetTradeSkillTexture) == "function"
+  local texture = canAsk and api.GetTradeSkillTexture(key) or nil
+
+  return texture or Theme.ICON
+end
 
 local function showTooltip(frame)
   local tooltip, secondary = _G["GameTooltip"], Theme.COLORS.textSecondary
@@ -38,7 +57,17 @@ local function showTooltip(frame)
   tooltip:Show()
 end
 
-local function hideTooltip()
+local function onEnter(frame)
+  if frame.glow then
+    frame.glow:Show()
+  end
+  showTooltip(frame)
+end
+
+local function onLeave(frame)
+  if frame.glow then
+    frame.glow:Hide()
+  end
   _G["GameTooltip"]:Hide()
 end
 
@@ -61,20 +90,18 @@ end
 local function create()
   local frame = _G["CreateFrame"]("Button", FRAME_NAME, _G["UIParent"])
   frame:SetSize(Theme.LAYOUT.ICON_SIZE, Theme.LAYOUT.ICON_SIZE)
-  FrameKit.Panel(frame)
-  local icon = frame:CreateTexture(nil, "ARTWORK")
-  icon:SetPoint("TOPLEFT", frame, "TOPLEFT", ICON_INSET, -ICON_INSET)
-  icon:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -ICON_INSET, ICON_INSET)
-  icon:SetTexture(Theme.ICON)
-  icon:SetTexCoord(ICON_CROP[1], ICON_CROP[2], ICON_CROP[3], ICON_CROP[4])
-  frame.icon = icon
+  local art = LauncherArt.Build(frame)
+  frame.icon, frame.glow, frame.pulse = art.icon, art.glow, art.pulse
+  frame.pulseOnce, frame.pulseLoop = art.pulseOnce, art.pulseLoop
   frame.badge, frame.badgeText = createBadge(frame)
   FrameKit.Draggable(frame, UI_KEY)
+  frame:SetScript("OnDragStart", Launcher.StartDrag)
+  frame:SetScript("OnDragStop", Launcher.StopDrag)
   FrameKit.Place(frame, UI_KEY, FALLBACK_POSITION)
   frame:RegisterForClicks("LeftButtonUp")
   frame:SetScript("OnClick", LeadsWindow.Toggle)
-  frame:SetScript("OnEnter", showTooltip)
-  frame:SetScript("OnLeave", hideTooltip)
+  frame:SetScript("OnEnter", onEnter)
+  frame:SetScript("OnLeave", onLeave)
   return frame
 end
 
@@ -85,11 +112,61 @@ function Launcher.Create()
   return launcher
 end
 
+-- The button, or nil before Create.
+function Launcher.Frame()
+  return launcher
+end
+
+-- A lead: its profession's icon, and the ring pulses once then keeps pulsing. nil: the idle
+-- icon, and the looping pulse stops.
+function Launcher.ShowLead(lead)
+  if launcher == nil then
+    return
+  end
+  leadShown = lead ~= nil
+  launcher.icon:SetTexture(iconFor(lead))
+  if launcher.pulseLoop == nil then
+    return
+  end
+  if leadShown then
+    launcher.pulseOnce:Play()
+    launcher.pulseLoop:Play()
+  else
+    launcher.pulseLoop:Stop()
+  end
+end
+
+-- `fn()` runs after every drag stop, once the position is saved; may be called before Create.
+function Launcher.OnMoved(fn)
+  movedHandlers[#movedHandlers + 1] = fn
+end
+
+function Launcher.StartDrag()
+  if launcher == nil then
+    return
+  end
+  launcher:StartMoving()
+end
+
+function Launcher.StopDrag()
+  if launcher == nil then
+    return
+  end
+  launcher:StopMovingOrSizing()
+  FrameKit.SavePosition(launcher, UI_KEY)
+  for _, fn in ipairs(movedHandlers) do
+    fn()
+  end
+end
+
 -- Lit or dim from ScanGate.IsActive(), badge and visibility from the leads. Arguments are
 -- ignored (Bootstrap subscribes it to ScanGate.OnChange and Leads.On("change")).
 function Launcher.Refresh()
   if launcher == nil then
     return
+  end
+  if not leadShown then
+    launcher.icon:SetTexture(iconFor(nil))
   end
   local lit = ScanGate.IsActive()
   launcher.icon:SetDesaturated(not lit)

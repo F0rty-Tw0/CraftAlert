@@ -34,6 +34,7 @@ local UI = {
   "UI.AlertToast",
   "UI.LeadRow",
   "UI.LeadsWindow",
+  "UI.LauncherArt",
   "UI.Launcher",
   "UI.Settings.Controls",
   "UI.Settings.PageGeneral",
