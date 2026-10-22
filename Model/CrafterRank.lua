@@ -88,7 +88,8 @@ end
 
 -- → characterKey, cannotOrder, rank, byConc, recipeKey; nil when the customer is on Blizzard's
 -- ignore list (unless opts.skipIgnore, which only the Settings Test page passes) or no character
--- qualifies. Best first: can order, higher rank / #ranks (no rank last), tier, name. A character
+-- qualifies. Best first: can order, higher rank / #ranks (no rank last), the rank reached without
+-- concentration, tier, name. A character
 -- is judged by its best entry; rank, byConc and recipeKey come from the winning entry (nil for a
 -- profession word). `result` is the Matcher's reused result: only read here. A match without
 -- entries (a profession word) is answered by every enabled character with that profession that
@@ -97,7 +98,7 @@ function CrafterRank.Pick(result, customerKey, db, opts)
   if not (opts and opts.skipIgnore) and CrafterRank.IsIgnored(customerKey) then
     return nil
   end
-  local bestKey, bestCannot, bestFraction, bestTier = nil, nil, nil, nil
+  local bestKey, bestCannot, bestFraction, bestConc, bestTier = nil, nil, nil, nil, nil
   local bestRank, bestByConc, bestRecipeKey
   -- Asked once per character: an entry per recipe names the same few characters again and again.
   local cannotOrderBy, asked = {}, {}
@@ -112,14 +113,17 @@ function CrafterRank.Pick(result, customerKey, db, opts)
     local cannot = cannotOrder(key) == true and 1 or 0
     local rank, top, byConc = effectiveRank(db, key, recipeKey)
     local fraction = rank and rank / top or -1
+    local conc = byConc and 1 or 0
     local tier = tierOf(db.characters[key], key, prof)
-    local sameFirstKeys = bestKey ~= nil and cannot == bestCannot and fraction == bestFraction
+    local sameRank = bestKey ~= nil and cannot == bestCannot and fraction == bestFraction
+    local sameConc = sameRank and conc == bestConc
     local better = bestKey == nil
       or cannot < bestCannot
       or (cannot == bestCannot and fraction > bestFraction)
-      or (sameFirstKeys and (tier < bestTier or (tier == bestTier and key < bestKey)))
+      or (sameRank and conc < bestConc)
+      or (sameConc and (tier < bestTier or (tier == bestTier and key < bestKey)))
     if better then
-      bestKey, bestCannot, bestFraction, bestTier = key, cannot, fraction, tier
+      bestKey, bestCannot, bestFraction, bestConc, bestTier = key, cannot, fraction, conc, tier
       bestRank, bestByConc, bestRecipeKey = rank, byConc, recipeKey
     end
   end

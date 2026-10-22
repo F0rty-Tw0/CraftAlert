@@ -355,6 +355,18 @@ return function()
   picked, _, rank, _, recipeKey = ranked({ "Alt-Realm", 11 }, { "Alt-Realm", 10 })
   Assert.same({ picked, rank, recipeKey }, { "Alt-Realm", 2, 11 })
 
+  -- The highest rank wins even when it costs concentration; at the same rank, the crafter who
+  -- reaches it without concentration wins (user ruling 2026-10-22).
+  data = db()
+  data.characters["Alt-Realm"].concentration = snapshot(900)
+  learn("Alt-Realm", 10, { ranks = { 1, 2, 3 }, reachRank = 2, reachCost = 376, reachConc = 3168 })
+  learn("Zed-Realm", 10, { ranks = { 1, 2, 3 }, reachRank = 2, reachCost = 0, reachConc = 3168 })
+  picked, _, rank, byConc = ranked({ "Zed-Realm", 10 }, { "Alt-Realm", 10 })
+  Assert.same({ picked, rank, byConc }, { "Alt-Realm", 3, true }, "R3 with concentration beats R2 without")
+  data.characters["Alt-Realm"].recipes[10].reachRank = 1
+  picked, _, rank, byConc = ranked({ "Alt-Realm", 10 }, { "Zed-Realm", 10 })
+  Assert.same({ picked, rank, byConc }, { "Zed-Realm", 2, false }, "R2 without concentration beats R2 with it")
+
   -- A profession-word match has no recipe: no rank, no recipeKey.
   _, _, rank, byConc, recipeKey = CrafterRank.Pick({ kind = "profession", entries = {}, entryCount = 0, prof = BS }, CUSTOMER, data)
   Assert.same({ rank, byConc, recipeKey }, {})
