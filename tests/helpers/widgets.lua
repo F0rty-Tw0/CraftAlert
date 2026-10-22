@@ -3,7 +3,7 @@
 -- (fonts, textures, layout) is only recorded.
 --   Widgets.extend(frame)           adds region, frame and child-creation methods
 --   Widgets.click(frame, button)    runs the OnClick script as a mouse click would (a check button flips first)
---   Widgets.slide(control, value)   drags a Slider, or a template frame's inner Slider, to value and lets go
+--   Widgets.slide(control, value)   drags a slider template frame's inner Slider to value and lets go
 --   Widgets.step(control, forward)  clicks a slider template's Forward or Back stepper
 --   Widgets.pick(dropdown, value)   picks the dropdown's radio whose data is value
 --   Widgets.mouse                   buttons held right now (`LeftButton = true`), read by IsMouseButtonDown
@@ -554,10 +554,10 @@ function Widgets.click(frame, button)
 end
 
 -- A drag that ends at `value`: the button goes down, the client moves the thumb (OnValueChanged),
--- then the button comes up (OnMouseUp, then its hooks). `control` is a Slider or a slider
--- template frame, whose inner Slider is dragged.
+-- then the button comes up (OnMouseUp, then its hooks). `control` is a slider template frame,
+-- whose inner Slider is dragged.
 function Widgets.slide(control, value)
-  local slider = control.Slider or control
+  local slider = control.Slider
   Widgets.mouse.LeftButton = true
   slider:SetValue(value)
   Widgets.mouse.LeftButton = false

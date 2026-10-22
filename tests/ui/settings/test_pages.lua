@@ -93,7 +93,7 @@ local function testGeneralPage()
   settings.channels.guild = true
   ns.SettingsWindow.Toggle()
   ns.SettingsWindow.Toggle()
-  Assert.equal(row("Guild").input.knob.points[1][1], "RIGHT")
+  Assert.equal(row("Guild").input:GetChecked(), true)
 end
 
 local function testChannelsPerFlavor()
@@ -119,14 +119,13 @@ local function testAlertsPage()
   local settings = db.settings
   open(ns, "Alerts")
   take(refreshes)
-  -- Sound: steps through None and the flavor's kits; "Play" plays the chosen one.
+  -- Sound: None or one of the flavor's kits; "Play" plays the chosen one.
   local sound = row("Alert sound").input
-  Widgets.click(sound, "RightButton")
-  Assert.equal(settings.sound, 0, "before the first kit: None")
+  Widgets.pick(sound, 0)
+  Assert.equal(settings.sound, 0, "None")
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Play"))
   Assert.equal(#UiFixture.callsTo(calls, "sound"), 0, "None plays nothing")
-  Widgets.click(sound, "LeftButton")
-  Widgets.click(sound, "LeftButton")
+  Widgets.pick(sound, 3081)
   Assert.equal(settings.sound, 3081)
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Play"))
   Assert.same(UiFixture.callsTo(calls, "sound"), { { "sound", 3081, "Master" } })
@@ -134,6 +133,10 @@ local function testAlertsPage()
   Assert.equal(settings.flash, false)
   Assert.same(take(refreshes), {}, "sound and flash are read when an alert fires")
 
+  -- Each slider counts its steps as (max - min) / step, rounded (§7.3).
+  Assert.equal(row("Toast duration").input.initArgs[4], 23)
+  Assert.equal(row("Lead timeout").input.initArgs[4], 59)
+  Assert.equal(row("Opacity").input.initArgs[4], 14)
   Widgets.slide(row("Toast duration").input, 45)
   Assert.equal(settings.toastDuration, 45)
   Assert.same(take(refreshes), {})
@@ -189,15 +192,15 @@ local function testGreetingsPage()
   Assert.equal(row("Note").input.maxLetters, 255)
 
   -- Professions by name; the note goes to the one shown and joins its preview lines.
-  Assert.equal(row("Note for").input.label:GetText(), "Blacksmithing")
+  Assert.equal(row("Note for").input.Text:GetText(), "Blacksmithing")
   Widgets.type(row("Note").input, "Bring mats.")
   Assert.same(settings.notes, { [164] = "Bring mats." })
   Assert.truthy(SettingsFixture.texts():find("what do you need? Bring mats.", 1, true))
-  Widgets.click(row("Note for").input)
-  Assert.equal(row("Note for").input.label:GetText(), "Enchanting")
+  Widgets.pick(row("Note for").input, 333)
+  Assert.equal(row("Note for").input.Text:GetText(), "Enchanting")
   Assert.equal(row("Note").input:GetText(), "", "the shown note follows the profession")
   Assert.truthy(SettingsFixture.texts():find("Profession: Hi! I have Enchanting, what do you need?", 1, true))
-  Widgets.click(row("Note for").input)
+  Widgets.pick(row("Note for").input, 164)
   Widgets.type(row("Note").input, "")
   Assert.same(settings.notes, {}, "an emptied note is removed")
   Assert.same(take(refreshes), {})

@@ -6,12 +6,10 @@ end
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 
--- The settings pages' controls in WhisperMessenger's look (trimmed from its
--- UI/Shared/SettingsControls.lua and UI/Helpers/Controls.lua: section label, toggle switch,
--- slider, option button, input; no presets, no native-HUD variants). A Column stacks rows top
--- to bottom. Each control returns { row, input, Set(value) }: Set shows a value without
--- reporting it; only the player's action calls onChange. `row.settingsLabel` names the row and
--- `row.input` is its control frame.
+-- The settings pages' controls on Blizzard templates: check button, slider with steppers,
+-- input box, dropdown and panel button. A Column stacks rows top to bottom. Each control returns
+-- { row, input, Set(value) }: Set shows a value without reporting it; only the player's action
+-- calls onChange. `row.settingsLabel` names the row and `row.input` is its control frame.
 local Controls = {}
 
 local floor = math.floor
@@ -19,8 +17,8 @@ local max = math.max
 local min = math.min
 local tostring = tostring
 
-local function create(frameType, parent)
-  return _G["CreateFrame"](frameType, nil, parent)
+local function create(frameType, parent, template)
+  return _G["CreateFrame"](frameType, nil, parent, template)
 end
 
 function Controls.Column(parent)
@@ -38,7 +36,7 @@ function Controls.Place(column, region, gap)
 end
 
 function Controls.Section(column, text)
-  local label = FrameKit.Text(column.parent, Theme.FONTS.name, Theme.COLORS.textSecondary)
+  local label = FrameKit.Text(column.parent, Theme.FONTS.name)
   label:SetText(text)
   Controls.Place(column, label, column.last and Theme.LAYOUT.SECTION_GAP or 0)
   return label
@@ -46,30 +44,20 @@ end
 
 -- A wrapping text block as wide as the controls (previews, results).
 function Controls.Note(column, font)
-  local text = FrameKit.Text(column.parent, font or Theme.FONTS.body, Theme.COLORS.textPrimary)
+  local text = FrameKit.Text(column.parent, font or Theme.FONTS.body)
   text:SetWidth(Theme.LAYOUT.CONTROL_WIDTH)
   text:SetWordWrap(true)
   Controls.Place(column, text)
   return text
 end
 
--- A flat option button; `button.label` holds its text. Hover lights it up.
+-- A panel button; `button.label` is its FontString.
 function Controls.Button(parent, label, width, onClick)
-  local button = create("Button", parent)
+  local button = create("Button", parent, "UIPanelButtonTemplate")
   button:SetSize(width, Theme.LAYOUT.BUTTON_HEIGHT)
-  local background = FrameKit.Panel(button, Theme.COLORS.option)
-  button.label = FrameKit.Text(button, Theme.FONTS.body, Theme.COLORS.textPrimary)
-  button.label:SetPoint("CENTER", button, "CENTER", 0, 0)
-  button.label:SetJustifyH("CENTER")
-  button.label:SetText(label)
-  button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  button:SetText(label)
+  button.label = button:GetFontString()
   button:SetScript("OnClick", onClick)
-  button:SetScript("OnEnter", function()
-    FrameKit.Fill(background, Theme.COLORS.optionHover)
-  end)
-  button:SetScript("OnLeave", function()
-    FrameKit.Fill(background, Theme.COLORS.option)
-  end)
   return button
 end
 
@@ -78,7 +66,7 @@ local function newRow(column, label)
   local row = create("Frame", column.parent)
   row:SetSize(layout.CONTROL_WIDTH, layout.CONTROL_HEIGHT)
   row.settingsLabel = label
-  local text = FrameKit.Text(row, Theme.FONTS.body, Theme.COLORS.textPrimary)
+  local text = FrameKit.Text(row, Theme.FONTS.body)
   text:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -4)
   text:SetText(label)
   Controls.Place(column, row)
@@ -99,42 +87,22 @@ function Controls.Refresher()
   return add, refresh
 end
 
-local function paintSwitch(switch, on)
-  local layout = Theme.LAYOUT
-  FrameKit.Fill(switch.track, on and Theme.COLORS.toggleOn or Theme.COLORS.toggleOff)
-  switch.knob:ClearAllPoints()
-  if on then
-    switch.knob:SetPoint("RIGHT", switch, "RIGHT", -layout.KNOB_INSET, 0)
-  else
-    switch.knob:SetPoint("LEFT", switch, "LEFT", layout.KNOB_INSET, 0)
-  end
-end
-
--- Label on the left, switch on the right; onChange(isOn).
+-- Label on the left, check button on the right; onChange(isOn). The client flips the box
+-- before OnClick runs, so the box holds the value.
 function Controls.Toggle(column, label, onChange)
-  local layout = Theme.LAYOUT
+  local size = Theme.LAYOUT.CONTROL_HEIGHT
   local row = newRow(column, label)
-  local switch = create("Button", row)
-  switch:SetSize(layout.SWITCH_WIDTH, layout.SWITCH_HEIGHT)
-  switch:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-  switch.track = switch:CreateTexture(nil, "BACKGROUND")
-  switch.track:SetAllPoints(switch)
-  switch.knob = switch:CreateTexture(nil, "ARTWORK")
-  switch.knob:SetSize(layout.KNOB_SIZE, layout.KNOB_SIZE)
-  FrameKit.Fill(switch.knob, Theme.COLORS.knob)
-  local value = false
-  switch:SetScript("OnClick", function()
-    value = not value
-    paintSwitch(switch, value)
-    onChange(value)
+  local check = create("CheckButton", row, "UICheckButtonTemplate")
+  check:SetSize(size, size)
+  check:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+  check:SetScript("OnClick", function()
+    onChange(check:GetChecked() and true or false)
   end)
-  paintSwitch(switch, value)
-  local function set(newValue)
-    value = newValue == true
-    paintSwitch(switch, value)
+  local function set(value)
+    check:SetChecked(value == true)
   end
-  row.input = switch
-  return { row = row, input = switch, Set = set }
+  row.input = check
+  return { row = row, input = check, Set = set }
 end
 
 -- A toggle that writes owner()[key] and then runs after(). → the fn that shows the db value
@@ -148,56 +116,51 @@ function Controls.BoundToggle(column, label, owner, key, after)
   end
 end
 
-local function createTrack(slider)
-  local layout = Theme.LAYOUT
-  local track = slider:CreateTexture(nil, "BACKGROUND")
-  track:SetPoint("LEFT", slider, "LEFT", 0, 0)
-  track:SetPoint("RIGHT", slider, "RIGHT", 0, 0)
-  track:SetHeight(4)
-  FrameKit.Fill(track, Theme.COLORS.toggleOff)
-  local thumb = slider:CreateTexture(nil, "OVERLAY")
-  thumb:SetSize(layout.SLIDER_THUMB_WIDTH, layout.SLIDER_HEIGHT)
-  FrameKit.Fill(thumb, Theme.COLORS.toggleOn)
-  slider:SetThumbTexture(thumb)
-end
-
 -- spec = { label, min, max, step, format = fn(value) → text (optional), onChange(value) }.
--- Dragging updates the value text; letting go commits a changed value once, so one drag is
--- one write (WhisperMessenger's commitOnRelease).
+-- The template draws the value text right of the bar. A change made with the left button up
+-- (a stepper click) commits at once; a drag commits when the button comes up. A commit writes
+-- the stepped value only when it differs from the last one, so one drag is one write.
 function Controls.Slider(column, spec)
   local layout = Theme.LAYOUT
   local row = newRow(column, spec.label)
-  local valueText = FrameKit.Text(row, Theme.FONTS.detail, Theme.COLORS.textSecondary)
-  valueText:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, -4)
-  local slider = create("Slider", row)
-  slider:SetSize(layout.CONTROL_WIDTH - layout.LABEL_WIDTH - 48, layout.SLIDER_HEIGHT)
+  local slider = create("Frame", row, "MinimalSliderWithSteppersTemplate")
+  slider:SetSize(layout.CONTROL_WIDTH - layout.LABEL_WIDTH - layout.SLIDER_VALUE_WIDTH, layout.CONTROL_HEIGHT)
   slider:SetPoint("LEFT", row, "LEFT", layout.LABEL_WIDTH, 0)
-  slider:SetOrientation("HORIZONTAL")
-  slider:SetMinMaxValues(spec.min, spec.max)
-  slider:SetValueStep(spec.step)
-  slider:SetObeyStepOnDrag(true)
-  slider:EnableMouse(true)
-  createTrack(slider)
   local format = spec.format or tostring
-  local committed = nil
-  local function stepped()
-    local value = spec.min + floor((slider:GetValue() - spec.min) / spec.step + 0.5) * spec.step
-    return floor(value * 1000 + 0.5) / 1000
+  local function stepped(value)
+    local onStep = spec.min + floor((value - spec.min) / spec.step + 0.5) * spec.step
+    return floor(onStep * 1000 + 0.5) / 1000
   end
-  slider:SetScript("OnValueChanged", function()
-    valueText:SetText(format(stepped()))
-  end)
-  slider:SetScript("OnMouseUp", function()
-    local value = stepped()
+  -- Rounded: (1 - 0.3) / 0.05 is 13.999999999999998 in floating point.
+  local steps = floor((spec.max - spec.min) / spec.step + 0.5)
+  slider:Init(spec.min, spec.min, spec.max, steps, {
+    [_G["MinimalSliderWithSteppersMixin"].Label.Right] = function(value)
+      return format(stepped(value))
+    end,
+  })
+  local committed = nil
+  local quiet = false
+  local function commit()
+    local value = stepped(slider.Slider:GetValue())
     if value ~= committed then
       committed = value
       spec.onChange(value)
     end
-  end)
+  end
+  slider:RegisterCallback(slider.Event.OnValueChanged, function()
+    if quiet then
+      return
+    end
+    if not _G["IsMouseButtonDown"]("LeftButton") then
+      commit()
+    end
+  end, row)
+  slider.Slider:HookScript("OnMouseUp", commit)
   local function set(value)
     committed = value
+    quiet = true
     slider:SetValue(value)
-    valueText:SetText(format(value))
+    quiet = false
   end
   row.input = slider
   return { row = row, input = slider, Set = set }
@@ -206,19 +169,17 @@ end
 -- Label on the left, box on the right. Enter or leaving the box commits a changed text
 -- (onCommit(text)); Escape restores the last committed text. maxLetters (optional) caps the
 -- box; without it a long word list is kept whole (a cut text would be committed on focus loss).
+-- The template's art reaches 5 px left of the box, so the box is 8 px short of the column.
 function Controls.Input(column, label, onCommit, maxLetters)
   local layout = Theme.LAYOUT
   local row = newRow(column, label)
-  local box = create("EditBox", row)
-  box:SetSize(layout.CONTROL_WIDTH - layout.LABEL_WIDTH, layout.INPUT_HEIGHT)
+  local box = create("EditBox", row, "InputBoxTemplate")
+  box:SetSize(layout.CONTROL_WIDTH - layout.LABEL_WIDTH - 8, layout.INPUT_HEIGHT)
   box:SetPoint("RIGHT", row, "RIGHT", 0, 0)
   box:SetAutoFocus(false)
-  box:SetFontObject(Theme.FONTS.body)
-  box:SetTextInsets(6, 6, 0, 0)
   if maxLetters then
     box:SetMaxLetters(maxLetters)
   end
-  FrameKit.Panel(box, Theme.COLORS.input)
   local committed = ""
   local function commit()
     local text = box:GetText()
@@ -231,6 +192,7 @@ function Controls.Input(column, label, onCommit, maxLetters)
     commit()
     box:ClearFocus()
   end)
+  -- These replace the template's own Escape and focus-lost scripts.
   box:SetScript("OnEditFocusLost", commit)
   box:SetScript("OnEscapePressed", function()
     box:SetText(committed)
@@ -253,32 +215,33 @@ local function indexOf(options, value)
   return nil
 end
 
--- A button that steps through `options` ({ { value, text }, ... }): left-click the next,
--- right-click the previous, both wrapping; onChange(value).
+-- A dropdown of `options` ({ { value, text }, ... }), one radio each; picking one calls
+-- onChange(value). The dropdown shows the selected option's text in `input.Text`.
 function Controls.Choice(column, label, options, onChange)
   local layout = Theme.LAYOUT
   local row = newRow(column, label)
   local current = 1
-  local button
-  local function show()
+  local dropdown = create("DropdownButton", row, "WowStyle1DropdownTemplate")
+  dropdown:SetSize(layout.CONTROL_WIDTH - layout.LABEL_WIDTH, layout.CONTROL_HEIGHT)
+  dropdown:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+  local function isSelected(value)
     local option = options[current]
-    button.label:SetText(option and option.text or "")
+    return option ~= nil and option.value == value
   end
-  button = Controls.Button(row, "", layout.CONTROL_WIDTH - layout.LABEL_WIDTH, function(_, mouseButton)
-    if #options == 0 then
-      return
+  local function onSelect(value)
+    current = indexOf(options, value) or current
+    onChange(value)
+  end
+  dropdown:SetupMenu(function(_, root)
+    for _, option in ipairs(options) do
+      root:CreateRadio(option.text, isSelected, onSelect, option.value)
     end
-    local step = mouseButton == "RightButton" and -1 or 1
-    current = (current - 1 + step) % #options + 1
-    show()
-    onChange(options[current].value)
   end)
-  button:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-  row.input = button
-  local control = { row = row, input = button }
+  row.input = dropdown
+  local control = { row = row, input = dropdown }
   function control.Set(value)
     current = indexOf(options, value) or 1
-    show()
+    dropdown:GenerateMenu()
   end
   function control.SetOptions(newOptions, value)
     options = newOptions
@@ -292,6 +255,7 @@ function Controls.Choice(column, label, options, onChange)
 end
 
 -- `count` rows of LIST_ROW_HEIGHT, made by createRow(row, index); the mouse wheel scrolls.
+-- Rows are Buttons, as only a button draws its HIGHLIGHT layer on hover.
 -- Render(items, show) fills them from the current offset with show(row, item).
 function Controls.List(column, count, createRow)
   local layout = Theme.LAYOUT
@@ -300,9 +264,10 @@ function Controls.List(column, count, createRow)
   Controls.Place(column, frame)
   local list = { frame = frame, rows = {}, offset = 0, items = {}, show = nil }
   for index = 1, count do
-    local row = create("Frame", frame)
+    local row = create("Button", frame)
     row:SetSize(layout.CONTROL_WIDTH, layout.LIST_ROW_HEIGHT)
     row:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -(index - 1) * layout.LIST_ROW_HEIGHT)
+    FrameKit.ListHighlight(row)
     createRow(row, index)
     list.rows[index] = row
   end

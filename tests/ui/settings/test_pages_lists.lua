@@ -97,19 +97,19 @@ local function testCraftersPage()
   open(ns, "Crafters")
   take(refreshes)
   local character = row("Character").input
-  Assert.equal(character.label:GetText(), "Me-Realm (this character)", "opens on the current character")
-  Widgets.click(character, "LeftButton")
-  Assert.equal(character.label:GetText(), "Alt-Realm (same account)", "then by name, wrapping")
-  Widgets.click(character, "LeftButton")
-  Assert.equal(character.label:GetText(), "Far-Away (imported)")
-  Widgets.click(character, "LeftButton")
+  Assert.equal(character.Text:GetText(), "Me-Realm (this character)", "opens on the current character")
+  Widgets.pick(character, "Alt-Realm")
+  Assert.equal(character.Text:GetText(), "Alt-Realm (same account)")
+  Widgets.pick(character, "Far-Away")
+  Assert.equal(character.Text:GetText(), "Far-Away (imported)")
+  Widgets.pick(character, "Me-Realm")
 
   Widgets.click(row("Listen for this character").input)
   Assert.equal(me.enabled, false)
   Assert.same(take(refreshes), { "rebuild:crafter" })
 
   -- Primary: one crafter per profession; it is the shown character's for the shown profession.
-  Assert.equal(row("Profession").input.label:GetText(), "Blacksmithing")
+  Assert.equal(row("Profession").input.Text:GetText(), "Blacksmithing")
   Widgets.click(row("Primary crafter for this profession").input)
   Assert.equal(me.professions[BS].primary, true)
   Assert.equal(db.characters["Alt-Realm"].professions[BS].primary, false, "the other primary is cleared")
@@ -134,7 +134,7 @@ local function testCraftersPage()
   Assert.equal(me.recipes[9001].muted, nil)
   Assert.equal(bellOf(9001).desaturated, false)
   Assert.same(take(refreshes), { "rebuild:mute" })
-  Widgets.click(row("Profession").input)
+  Widgets.pick(row("Profession").input, ENCH)
   Assert.truthy(texts():find("Enchant Bracer - Health", 1, true), "the search clears with the profession")
 
   -- Remove asks for a second click, then drops the character and shows the next one.
@@ -145,7 +145,7 @@ local function testCraftersPage()
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Click again to remove"))
   Assert.equal(db.characters["Me-Realm"], nil)
   Assert.same(take(refreshes), { "rebuild:crafter" })
-  Assert.equal(character.label:GetText(), "Alt-Realm (same account)")
+  Assert.equal(character.Text:GetText(), "Alt-Realm (same account)")
 end
 
 -- The recipe keys of the visible recipe rows, top to bottom.
@@ -214,8 +214,8 @@ local function testRemoveOwnCharacter()
 
   -- Another character is not the client's: it stays removed.
   local character = row("Character").input
-  Widgets.click(character, "LeftButton")
-  Assert.equal(character.label:GetText(), "Alt-Realm (same account)")
+  Widgets.pick(character, "Alt-Realm")
+  Assert.equal(character.Text:GetText(), "Alt-Realm (same account)")
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Remove character"))
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Click again to remove"))
   Assert.equal(db.characters["Alt-Realm"], nil, "an alt is not stored again")

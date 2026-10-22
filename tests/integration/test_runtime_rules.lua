@@ -8,6 +8,7 @@ local Toc = require("tests.helpers.toc")
 local RuntimeTraps = require("tests.helpers.runtime_traps")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
 local SettingsFixture = require("tests.helpers.settings_fixture")
+local Widgets = require("tests.helpers.widgets")
 
 local CHANNEL, PLAYER_RESTING = "CHAT_MSG_CHANNEL", "PLAYER_UPDATE_RESTING"
 -- Timer delays the plan allows (§4.3 rule 1): index coalescing 0, bind tick 1, toast auto-hide
@@ -393,19 +394,17 @@ local function testAddonObeysTheRules()
     end
     SettingsFixture.open(ns, "General")
     local onlyResting = SettingsFixture.row("Only while resting (city or inn)").input
-    onlyResting:GetScript("OnClick")(onlyResting, "LeftButton")
-    onlyResting:GetScript("OnClick")(onlyResting, "LeftButton")
+    Widgets.click(onlyResting)
+    Widgets.click(onlyResting)
     local guild = SettingsFixture.row("Guild").input
-    guild:GetScript("OnClick")(guild, "LeftButton")
+    Widgets.click(guild)
     Assert.same(publicChatEvents(), { CHANNEL, "CHAT_MSG_GUILD" }, "the gate registers a new channel at once")
-    guild:GetScript("OnClick")(guild, "LeftButton")
+    Widgets.click(guild)
     SettingsFixture.open(ns, "Alerts")
-    local timeout = SettingsFixture.row("Lead timeout").input
-    timeout:SetValue(5)
-    timeout:GetScript("OnMouseUp")(timeout, "LeftButton")
+    Widgets.slide(SettingsFixture.row("Lead timeout").input, 5)
     local hide = SettingsFixture.row("Hide the launcher when there are no leads").input
-    hide:GetScript("OnClick")(hide, "LeftButton")
-    hide:GetScript("OnClick")(hide, "LeftButton")
+    Widgets.click(hide)
+    Widgets.click(hide)
     SettingsFixture.open(ns, "Test")
     local line = SettingsFixture.row("Test a line").input
     line:SetText("LF plate belt")

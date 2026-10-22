@@ -76,6 +76,8 @@ Theme.LAYOUT = {
   KNOB_INSET = 2,
   SLIDER_HEIGHT = 16,
   SLIDER_THUMB_WIDTH = 10,
+  -- Room right of the slider bar for the template's value text (drawn 25 px right of the bar).
+  SLIDER_VALUE_WIDTH = 56,
   INPUT_HEIGHT = 22,
   BUTTON_HEIGHT = 20,
   LIST_ROW_HEIGHT = 20,
