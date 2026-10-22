@@ -98,7 +98,7 @@ local function createRecipeRow(row)
   row.bell:SetSize(size, size)
   row.bell:SetPoint("LEFT", row, "LEFT", 0, 0)
   row.bell:SetTexture(Theme.ICON)
-  row.name = FrameKit.Text(row, Theme.FONTS.body, Theme.COLORS.textPrimary)
+  row.name = FrameKit.Text(row, Theme.FONTS.body)
   row.name:SetPoint("LEFT", row.bell, "RIGHT", Theme.LAYOUT.PADDING, 0)
   row.mute = Controls.Button(row, "", MUTE_WIDTH, function()
     row.item.recipe.muted = not row.item.recipe.muted or nil
