@@ -169,11 +169,17 @@ local function onShow()
   end
 end
 
--- Hides the toast once its lead is dismissed, ignored or expired.
+-- Hides the toast once its lead is dismissed, ignored or expired; else re-docks a shown toast.
+-- Bootstrap subscribes Launcher.Refresh to "change" before the first alert subscribes this, so a
+-- launcher that "Hide when no leads" kept hidden (no centre when the toast docked) is shown by now.
 local function onLeadsChange()
   local lead = current.lead
   if lead and not Leads.IsActive(lead.id) then
     hide()
+    return
+  end
+  if toast.frame:IsShown() then
+    AlertToast.Dock()
   end
 end
 

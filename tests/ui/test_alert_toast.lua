@@ -464,12 +464,19 @@ local function testHiddenLauncherAndPulse()
     return active
   end
   local launcher = ns.Launcher.Create()
+  -- Bootstrap subscribes Launcher.Refresh to "change" at login, before the toast subscribes on
+  -- its first alert. Once shown, the launcher has a centre: the right half, like its default spot.
+  ns.Leads.On("change", function()
+    ns.Launcher.Refresh()
+    launcher.center = { 1800, 900 }
+  end)
   Assert.equal(launcher:IsShown(), false)
   ns.AlertToast.Show(ns.Leads.Latest()) -- GetCenter() is nil: no error, left/upper row
   dockedAt(toastFrame(), launcher, ROWS[1])
   active = true
-  ns.Launcher.Refresh() -- the following "change"
+  ns.Leads.MarkGreeted(ns.Leads.Latest().id) -- a "change", as the one fired after "new"
   Assert.equal(launcher:IsShown(), true)
+  dockedAt(toastFrame(), launcher, ROWS[3])
 
   -- Pulse and glow: a new lead starts them, the hide (timer, click or dismissal) stops the glow.
   Assert.same({ launcher.pulseOnce:IsPlaying(), launcher.pulseLoop:IsPlaying() }, { true, true })
