@@ -50,6 +50,7 @@ Model/GreetAction.lua
 Model/WhisperTracker.lua
 Professions/ProfessionList.lua
 Professions/BindLookup.lua
+Professions/ReadJob.lua
 Professions/ModernReader.lua
 Professions/LearnWatcher.lua
 Core/Status.lua

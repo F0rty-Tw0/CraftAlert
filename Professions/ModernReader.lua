@@ -8,32 +8,41 @@ local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local BindLookup = ns.BindLookup or require("CraftAlert.Professions.BindLookup")
+local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
+local ReadJob = ns.ReadJob or require("CraftAlert.Professions.ReadJob")
 
 -- Spec §5.2 row 1 (Retail, Forever): reads the learned recipes of the open profession
--- window into the current character's storage. Guards skip other players' lists and special
--- modes, a window of a profession the character does not store (Cooking, Smelting) stores
--- nothing, and reads only add. ReadOne serves the learn path (§5.3) with the window closed.
+-- window into the current character's storage, as Slicer job "read" (spec 2026-10-22
+-- §4.2). Guards skip other players' lists and special modes, a window of a profession the
+-- character does not store (Cooking, Smelting) stores nothing, and reads only add. A job cut
+-- off by a closed or switched window is kept and resumes when the same window reopens.
+-- ReadOne serves the learn path (§5.3) with the window closed.
 local ModernReader = {}
 
-local pairs = pairs
 local ipairs = ipairs
 local type = type
 
 local SHOW_EVENT = "TRADE_SKILL_SHOW"
+local CLOSE_EVENT = "TRADE_SKILL_CLOSE"
 local UPDATE_EVENT = "TRADE_SKILL_LIST_UPDATE"
+local JOB_NAME = "read"
 local GUARDS = { "IsNPCCrafting", "IsTradeSkillGuild", "IsTradeSkillGuildMember", "IsTradeSkillLinked", "IsRuneforging" }
 
 local db = nil
 local readKey = nil -- profession and recipe count of the window as last read
 local readCount = nil
+local windowOpen = false
+local activeJob = nil -- the job last started; running only while Slicer.IsRunning(JOB_NAME)
+local keptJob = nil -- a job its window cut off; the same key and recipe count resume it
 
--- The last window read, for the sim: { prof, stored, pendingBind }.
+-- The last window read, for the sim and /ca perf: { prof, stored, pendingBind, ms, steps }.
 ModernReader.lastRead = nil
 
 function ModernReader.Install(accountDb)
   db = accountDb
   BindLookup.Configure(accountDb)
   EventRouter.On(SHOW_EVENT, ModernReader.OnShow)
+  EventRouter.On(CLOSE_EVENT, ModernReader.OnClose)
   EventRouter.On(UPDATE_EVENT, ModernReader.OnListUpdate)
 end
 
@@ -158,7 +167,7 @@ end
 -- Mid-switch the list may still hold another profession's recipes: each is stored under its
 -- own profession when the character stores that one, and skipped (nil) otherwise. A recipe
 -- with no profession info (nil, or 0 before the data loads) belongs to the window, and so
--- does one answered with a bare skill line the character does not store: like dropForeign,
+-- does one answered with a bare skill line the character does not store: like the foreign-drop phase,
 -- only a parented answer proves another profession.
 -- → the key to store under (nil: skip), and whether the recipe's own lookup named the window.
 local function storeKey(charKey, recipeID, key)
@@ -177,57 +186,59 @@ local function storeKey(charKey, recipeID, key)
   return parent == nil and key or nil, false
 end
 
--- Drops the saved recipes tagged with the window's profession whose own lookup names a
--- profession the character does not store (an older read tagged a mid-switch list with the
--- window's). Only a parented answer counts: a recipe the lookup does not resolve, or answers
--- with a bare skill line, is kept. → whether any was dropped.
-local function dropForeign(character, charKey, key)
-  local dropped = false
-  for recipeID, recipe in pairs(character.recipes) do
-    if recipe.prof == key then
-      local info = professionInfo(recipeID)
-      local own = info and info.parentProfessionID
-      if own ~= nil and own ~= 0 and own ~= key and not ProfessionList.IsStored(db, charKey, own) then
-        character.recipes[recipeID] = nil
-        dropped = true
-      end
-    end
+local OPS = {
+  usableInfo = usableInfo,
+  storeKey = storeKey,
+  readFields = readFields,
+  store = store,
+  professionInfo = professionInfo,
+}
+
+-- → the trade skill api while the job's window is still open, unblocked and on its profession.
+local function windowApiFor(job)
+  local api = tradeSkillApi()
+  if not windowOpen or api == nil or isBlocked(api) then
+    return nil
   end
-  return dropped
+  return windowProfession(api) == job.key and api or nil
 end
 
--- Marks read only the professions that got a recipe. → whether the window's profession did.
--- Saved recipes of other professions are dropped only when some recipe's own lookup named
--- the window's profession: a lookup that resolves nothing (not loaded, or a shape this code
--- does not read) must never empty the saved data.
-local function readWindow(api, character, charKey, key, recipeIDs)
-  local stored, pendingBind, anyChanged, readKeys, named = 0, 0, false, {}, false
-  for _, recipeID in ipairs(recipeIDs) do
-    local info = usableInfo(api, recipeID, true)
-    local professionKey, ownNamed
-    if info then
-      professionKey, ownNamed = storeKey(charKey, recipeID, key)
-      named = named or ownNamed
-    end
-    if professionKey then
-      local changed, unknownBind = store(character.recipes, recipeID, readFields(api, recipeID, info), professionKey)
-      stored = stored + 1
-      anyChanged = anyChanged or changed
-      pendingBind = pendingBind + (unknownBind and 1 or 0)
-      readKeys[professionKey] = true
-    end
+local function finishRead(job)
+  ModernReader.lastRead = ReadJob.Finish(job)
+  if job.readKeys[job.key] then
+    readKey, readCount = job.key, #job.recipeIDs
   end
-  if named and dropForeign(character, charKey, key) then
-    anyChanged = true
-  end
-  for professionKey in pairs(readKeys) do
-    character.professions[professionKey].read = true
-  end
-  ModernReader.lastRead = { prof = key, stored = stored, pendingBind = pendingBind }
-  if anyChanged then
+  if job.anyChanged then
     Index.RequestRebuild("read")
   end
-  return readKeys[key] == true
+end
+
+-- One Slicer step. A window that closed, got blocked or switched profession keeps the job for
+-- a resume and cancels it. → whether the job is done.
+local function runStep(job)
+  local api = windowApiFor(job)
+  if api == nil then
+    keptJob = job
+    Slicer.Cancel(JOB_NAME)
+    return false
+  end
+  local done = ReadJob.Step(job, api)
+  if done then
+    finishRead(job)
+  end
+  return done
+end
+
+local function newJob(key, recipeIDs)
+  local job = ReadJob.New({ db = db, charKey = PlayerName.Own(), key = key, recipeIDs = recipeIDs, ops = OPS })
+  job.step = function()
+    return runStep(job)
+  end
+  return job
+end
+
+local function matches(job, key, count)
+  return job ~= nil and job.key == key and #job.recipeIDs == count
 end
 
 -- A list update while the data source is rebuilding is yielded; a later update brings the
@@ -237,8 +248,9 @@ local function isDataSourceChanging(api)
   return type(changing) == "function" and changing() == true
 end
 
--- force: the window was just opened. An update re-reads only when the profession or the
--- recipe count differs from the last read that stored a recipe for the window.
+-- force: the window was just opened. An update starts a read only when the profession or the
+-- recipe count differs from the running job, or from the last read that stored a recipe for
+-- the window. A kept job with the same profession and count resumes instead of starting over.
 local function onWindowEvent(force)
   local api = tradeSkillApi()
   if api == nil or db == nil or isBlocked(api) then
@@ -252,17 +264,28 @@ local function onWindowEvent(force)
     return
   end
   local recipeIDs = api.GetAllRecipeIDs() or {}
-  if not force and key == readKey and #recipeIDs == readCount then
+  local count = #recipeIDs
+  local running = Slicer.IsRunning(JOB_NAME) and activeJob or nil
+  if matches(running, key, count) then
     return
   end
-  local charKey = PlayerName.Own()
-  if readWindow(api, db.characters[charKey], charKey, key, recipeIDs) then
-    readKey, readCount = key, #recipeIDs
+  local resumable = matches(keptJob, key, count)
+  local lastReadAgain = key == readKey and count == readCount
+  if running == nil and not force and not resumable and lastReadAgain then
+    return
   end
+  local job = resumable and keptJob or newJob(key, recipeIDs)
+  keptJob, activeJob = nil, job
+  Slicer.Start(JOB_NAME, job)
 end
 
 function ModernReader.OnShow()
+  windowOpen = true
   onWindowEvent(true)
+end
+
+function ModernReader.OnClose()
+  windowOpen = false
 end
 
 function ModernReader.OnListUpdate()
