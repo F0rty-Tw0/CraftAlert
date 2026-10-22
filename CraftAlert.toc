@@ -23,6 +23,7 @@ Core/Constants.lua
 Core/Localization.lua
 Core/ChatPrint.lua
 Core/EventRouter.lua
+Core/Slicer.lua
 Core/PlayerName.lua
 Persistence/Defaults.lua
 Persistence/Schema.lua

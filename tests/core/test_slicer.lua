@@ -1,0 +1,218 @@
+local Assert = require("tests.helpers.assert")
+local Wow = require("tests.helpers.wow")
+local Fresh = require("tests.helpers.fresh")
+
+local function newSlicer()
+  Wow.reset()
+  Fresh.require("Core.EventRouter")
+  return Fresh.require("Core.Slicer")
+end
+
+-- A job whose step i costs costs[i] ms of the stubbed profile clock and logs its name.
+local function costJob(log, name, costs)
+  local index = 0
+  local job = { cancels = 0 }
+  function job.step()
+    index = index + 1
+    log[#log + 1] = name
+    Wow.clock.profile = Wow.clock.profile + costs[index]
+    return index == #costs
+  end
+  function job.onCancel()
+    job.cancels = job.cancels + 1
+  end
+  return job
+end
+
+local function runOneTick()
+  table.remove(Wow.timers, 1).fn()
+end
+
+local function captureErrors()
+  local reported = {}
+  Wow.stub("geterrorhandler", function()
+    return function(err)
+      reported[#reported + 1] = err
+    end
+  end)
+  return reported
+end
+
+local function testBudgetStopsAfterTwoOneMsSteps()
+  local Slicer = newSlicer()
+  local log = {}
+  Slicer.Start("read", costJob(log, "A", { 1, 1, 1 }))
+
+  runOneTick()
+  Assert.equal(Slicer.stats.steps, 2, "two 1 ms steps fill the 2 ms budget")
+  Assert.equal(Wow.pendingTimers(0), 1)
+  Wow.runTimers()
+  Assert.equal(#log, 3)
+  Assert.falsy(Slicer.IsRunning("read"))
+  Assert.equal(Wow.pendingTimers(0), 0, "a finished job schedules nothing")
+end
+
+local function testSlowStepIsPaidBackByIdleTicks()
+  local Slicer = newSlicer()
+  Slicer.Start("read", costJob({}, "A", { 9, 1 }))
+
+  local perTick = {}
+  local before = 0
+  for tick = 1, 6 do
+    runOneTick()
+    perTick[tick] = Slicer.stats.steps - before
+    before = Slicer.stats.steps
+  end
+
+  Assert.same(perTick, { 1, 0, 0, 0, 0, 1 }, "debt 7 -> 5 -> 3 -> 1 -> 0, then a step")
+  Assert.equal(Slicer.stats.ticks, 6)
+  Assert.equal(Slicer.stats.longestTickMs, 9)
+  Assert.equal(Wow.pendingTimers(0), 0)
+end
+
+local function testJobsAlternate()
+  local Slicer = newSlicer()
+  local log = {}
+  Slicer.Start("a", costJob(log, "A", { 1, 1 }))
+  Slicer.Start("b", costJob(log, "B", { 1, 1 }))
+
+  Wow.runTimers()
+  Assert.same(log, { "A", "B", "A", "B" })
+end
+
+local function testCursorResumesAfterLastJobThatRan()
+  local Slicer = newSlicer()
+  local log = {}
+  Slicer.Start("a", costJob(log, "A", { 3, 3, 3 }))
+  Slicer.Start("b", costJob(log, "B", { 1, 1, 1 }))
+
+  Wow.runTimers()
+  Assert.same(log, { "A", "B", "A", "B", "A", "B" }, "a cursor reset to the first job would run A three times first")
+end
+
+local function testStartingARunningNameCancelsTheOldJob()
+  local Slicer = newSlicer()
+  local log = {}
+  local job1 = costJob(log, "one", { 1, 1, 1 })
+  local job2 = costJob(log, "two", { 1 })
+  Slicer.Start("x", job1)
+  Slicer.Start("x", job2)
+
+  Assert.equal(job1.cancels, 1)
+  Wow.runTimers()
+  Assert.same(log, { "two" })
+  Assert.equal(job2.cancels, 0, "a finished job is not cancelled")
+end
+
+local function testIdleStartsShareOneTimer()
+  local Slicer = newSlicer()
+  Slicer.Start("a", costJob({}, "A", { 1 }))
+  Slicer.Start("b", costJob({}, "B", { 1 }))
+
+  Assert.equal(Wow.pendingTimers(0), 1)
+end
+
+local function testRaisingStepIsReportedAndOthersGoOn()
+  local Slicer = newSlicer()
+  local reported = captureErrors()
+  local log = {}
+  local bad = { cancels = 0 }
+  function bad.step()
+    error("boom", 0)
+  end
+  function bad.onCancel()
+    bad.cancels = bad.cancels + 1
+  end
+  Slicer.Start("A", bad)
+  Slicer.Start("B", costJob(log, "B", { 1, 1 }))
+
+  Wow.runTimers()
+  Assert.same(reported, { "boom" })
+  Assert.falsy(Slicer.IsRunning("A"))
+  Assert.equal(bad.cancels, 1)
+  Assert.same(log, { "B", "B" }, "B still finishes")
+  Assert.falsy(Slicer.IsRunning("B"))
+end
+
+local function testStepMayCancelItsOwnJob()
+  local Slicer = newSlicer()
+  local reported = captureErrors()
+  local job = { cancels = 0 }
+  function job.step()
+    Slicer.Cancel("A")
+    return false
+  end
+  function job.onCancel()
+    job.cancels = job.cancels + 1
+  end
+  Slicer.Start("A", job)
+
+  Wow.runTimers()
+  Assert.falsy(Slicer.IsRunning("A"))
+  Assert.equal(job.cancels, 1)
+  Assert.same(reported, {})
+  Assert.equal(Wow.pendingTimers(0), 0)
+end
+
+local function testCombatPausesUntilRegenEnabled()
+  local Slicer = newSlicer()
+  local log = {}
+  Slicer.Start("A", costJob(log, "A", { 1, 1 }))
+  Wow.combat = true
+
+  runOneTick()
+  Assert.equal(#log, 0, "no step in combat")
+  Assert.equal(Wow.pendingTimers(0), 0, "no timer in combat")
+  Assert.truthy(Slicer.IsRunning("A"))
+
+  Wow.combat = false
+  Wow.fireEvent("PLAYER_REGEN_ENABLED")
+  Assert.equal(Wow.pendingTimers(0), 1)
+  Wow.runTimers()
+  Assert.equal(#log, 2)
+  Assert.falsy(Slicer.IsRunning("A"))
+  Wow.fireEvent("PLAYER_REGEN_ENABLED")
+  Assert.equal(Wow.pendingTimers(0), 0, "the combat listener is gone")
+end
+
+local function testDrainFinishesEveryJob()
+  local Slicer = newSlicer()
+  local log = {}
+  Slicer.Start("a", costJob(log, "A", { 3, 3, 3 }))
+  Slicer.Start("b", costJob(log, "B", { 3, 3, 3 }))
+  runOneTick()
+
+  Slicer.Drain()
+  Assert.falsy(Slicer.IsRunning("a"))
+  Assert.falsy(Slicer.IsRunning("b"))
+  Assert.equal(#log, 6)
+  Assert.equal(Wow.pendingTimers(0), 1, "the scheduled tick stays")
+  Wow.runTimers()
+  Assert.equal(Wow.pendingTimers(0), 0, "and finds nothing to do")
+  Assert.equal(#log, 6)
+end
+
+local function testResetStatsZeroesCounters()
+  local Slicer = newSlicer()
+  Slicer.Start("A", costJob({}, "A", { 5, 1 }))
+  runOneTick()
+  Assert.truthy(Slicer.stats.steps > 0)
+
+  Slicer.ResetStats()
+  Assert.same(Slicer.stats, { ticks = 0, steps = 0, longestTickMs = 0 })
+end
+
+return function()
+  testBudgetStopsAfterTwoOneMsSteps()
+  testSlowStepIsPaidBackByIdleTicks()
+  testJobsAlternate()
+  testCursorResumesAfterLastJobThatRan()
+  testStartingARunningNameCancelsTheOldJob()
+  testIdleStartsShareOneTimer()
+  testRaisingStepIsReportedAndOthersGoOn()
+  testStepMayCancelItsOwnJob()
+  testCombatPausesUntilRegenEnabled()
+  testDrainFinishesEveryJob()
+  testResetStatsZeroesCounters()
+  Wow.reset()
+end
