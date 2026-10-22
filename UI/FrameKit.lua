@@ -99,6 +99,17 @@ function FrameKit.Art(texture, atlas, fallbackFile, blend)
   return hasAtlas
 end
 
+-- The quest-log hover highlight over the whole of `button`, shown by the client while hovered.
+function FrameKit.ListHighlight(button)
+  local texture = button:CreateTexture(nil, "HIGHLIGHT")
+  texture:SetAllPoints(button)
+  texture:SetTexture(Theme.ART.LIST_HOVER)
+  texture:SetBlendMode("ADD")
+  texture:SetAlpha(Theme.ART.LIST_HOVER_ALPHA)
+
+  return texture
+end
+
 -- RAID_CLASS_COLORS entry of the player with this chat GUID, or nil. A secret GUID or class is
 -- never passed on or compared: FlavorCompat.ClassOf owns that guard. The colour table is checked
 -- first, so a client without it makes no API call.

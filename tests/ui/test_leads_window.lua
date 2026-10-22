@@ -5,6 +5,8 @@ local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 
 local WINDOW_NAME = "CraftAlertLeadsWindow"
+local LINK = "item:190001"
+local LINK_TEXT = "|cff1eff00|Hitem:190001|h[Sim Plate Belt]|h|r"
 
 local function window()
   return rawget(_G, WINDOW_NAME)
@@ -144,6 +146,77 @@ local function testRowClicks()
   Widgets.click(rows()[1], "RightButton")
   Assert.equal(ns.Leads.HasActive(), false)
   Assert.equal(#rows(), 0)
+end
+
+-- Spec §6: no fill on a row; the quest-log hover texture lights it.
+local function testRowHighlight()
+  local ns = load({ "Ann-Draenor" })
+  ns.LeadsWindow.Toggle()
+  local hover, fills = nil, 0
+  for _, region in ipairs(rows()[1].regions) do
+    if region.layer == "HIGHLIGHT" then
+      hover = region
+    end
+    if region.color then
+      fills = fills + 1
+    end
+  end
+  Assert.truthy(hover, "a HIGHLIGHT-layer texture")
+  Assert.equal(hover.texture, ns.Theme.ART.LIST_HOVER)
+  Assert.equal(hover.blendMode, "ADD")
+  Assert.equal(hover:GetAlpha(), 0.18)
+  Assert.equal(fills, 0, "no colour fill on the row")
+end
+
+-- Spec §6, §4.5, §4.6: the item link in the detail line hovers, clicks through SetItemRef, and guards the row's clicks.
+local function testRowLinkHover()
+  local ns, _, calls = load({ "Ann-Draenor", "Bob-Draenor" }, function(accountDb)
+    accountDb.leads[2].kind, accountDb.leads[2].itemLink = "item", LINK_TEXT
+  end)
+  local tip = rawget(_G, "GameTooltip")
+  function tip:SetHyperlink(link)
+    self.hyperlink = link
+  end
+  local clicked = {}
+  Wow.stub("SetItemRef", function(...)
+    clicked[#clicked + 1] = { ... }
+  end)
+  ns.LeadsWindow.Toggle()
+  local row = rows()[1] -- Bob, the newest lead, holds the item link
+  Assert.truthy(row.scripts.OnHyperlinkEnter and row.scripts.OnHyperlinkLeave and row.scripts.OnHyperlinkClick)
+
+  row.scripts.OnHyperlinkEnter(row, LINK, LINK_TEXT)
+  Assert.equal(row.hoveredLink, LINK)
+  Assert.same({ tip.hyperlink, tip.owner, tip.shown }, { LINK, row, true })
+
+  -- While a link is hovered no click greets or dismisses.
+  Wow.clock.gettime = 51
+  Widgets.click(row, "LeftButton")
+  Widgets.click(row, "RightButton")
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 0, "a click on a link never greets")
+  Assert.equal(ns.Leads.HasActive(), true)
+
+  row.scripts.OnHyperlinkClick(row, LINK, LINK_TEXT, "LeftButton")
+  Assert.same(clicked, { { LINK, LINK_TEXT, "LeftButton", row } })
+
+  -- After the link is left, a plain click greets.
+  row.scripts.OnHyperlinkLeave(row, LINK)
+  Assert.same({ row.hoveredLink, tip.shown }, { nil, false })
+  Widgets.click(row, "LeftButton")
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 1)
+
+  -- A refresh that puts another lead in the row clears the hovered link and its tooltip.
+  row.scripts.OnHyperlinkEnter(row, LINK, LINK_TEXT)
+  ns.Leads.Dismiss(ns.Leads.Latest().id)
+  Assert.equal(rows()[1], row)
+  Assert.equal(row.lead.customer, "Ann-Draenor")
+  Assert.same({ row.hoveredLink, tip.shown }, { nil, false })
+
+  -- Closing and reopening the window clears it too.
+  row.scripts.OnHyperlinkEnter(row, LINK, LINK_TEXT)
+  ns.LeadsWindow.Toggle()
+  ns.LeadsWindow.Toggle()
+  Assert.equal(row.hoveredLink, nil)
 end
 
 -- Rows sit in the inset and fit its height (320 high: inset 320 - 28 - 26 = 266; floor((266 - 16 + 2) / 38) = 6).
@@ -347,6 +420,8 @@ return function()
   testRowFields()
   testRowRank()
   testRowClicks()
+  testRowHighlight()
+  testRowLinkHover()
   testRowsFitTheInset()
   testResizeButton()
   testVisibleLatestAndScroll()
