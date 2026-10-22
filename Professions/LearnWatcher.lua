@@ -17,19 +17,12 @@ local EVENT = "NEW_RECIPE_LEARNED"
 -- Whether the last event stored a recipe, for the sim.
 LearnWatcher.lastStored = nil
 
--- The base profession of a recipe: the parent skill line when there is one.
-local function professionOf(recipeID)
-  local api = _G["C_TradeSkillUI"]
-  local info = type(api) == "table" and api.GetProfessionInfoByRecipeID(recipeID) or nil
-  return type(info) == "table" and (info.parentProfessionID or info.professionID) or nil
-end
-
 local function onLearned(recipeID)
   LearnWatcher.lastStored = false
   if FlavorCompat.issecretvalue(recipeID) then
     return
   end
-  local professionKey = professionOf(recipeID)
+  local professionKey = ModernReader.ProfessionOf(recipeID)
   if professionKey ~= nil then
     LearnWatcher.lastStored = ModernReader.ReadOne(recipeID, professionKey)
   end
