@@ -174,6 +174,16 @@ return function()
   Assert.equal(#asked, 2, "skipIgnore does not ask")
   Wow.stub("C_FriendList", nil)
 
+  -- IsIgnored is the one ignore check: Leads asks it too.
+  Wow.stub("C_FriendList", {
+    IsIgnored = function()
+      return true
+    end,
+  })
+  Assert.equal(CrafterRank.IsIgnored("Bob-Draenor"), true)
+  Wow.stub("C_FriendList", nil)
+  Assert.equal(CrafterRank.IsIgnored("Bob-Draenor"), false, "no API, no legacy global: not ignored")
+
   -- Retail: crafters who can receive the customer's order rank above those who cannot.
   data = db()
   data.characters["Me-Realm"].realms = { "Realm" }

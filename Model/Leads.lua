@@ -5,7 +5,6 @@ end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
-local Index = ns.Index or require("CraftAlert.Model.Index")
 local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
 
 -- Spec §7.2: the leads (matched requests) the player can answer. Steps 5-7 of §6.3 run here
@@ -328,6 +327,10 @@ function Leads.OnMatch(result, customerKey, text, channelKey, guid)
   if db == nil or customerKey == nil then
     return nil
   end
+  -- grug: ignore list asked twice on a new lead (here and in Pick); matched lines only
+  if CrafterRank.IsIgnored(customerKey) then
+    return nil
+  end
   local lead, position = findDuplicate(customerKey, result)
   if lead then
     lead.message, lead.channel, lead.time = text, channelKey, now()
@@ -419,10 +422,11 @@ function Leads.Dismiss(id)
   end
 end
 
-function Leads.DismissCustomer(key)
+-- Blizzard's ignore list changed (IGNORELIST_UPDATE): drop the open leads of every ignored customer.
+function Leads.DismissIgnored()
   local removed = false
   for i = #leads, 1, -1 do
-    if leads[i].customer == key then
+    if CrafterRank.IsIgnored(leads[i].customer) then
       remove(leads, i)
       removed = true
     end
@@ -430,17 +434,6 @@ function Leads.DismissCustomer(key)
   if removed then
     fire("change")
   end
-end
-
--- The row "Block" button (§7.3): hot-path block set rebuilt, customer's leads dismissed.
-function Leads.Block(key)
-  key = PlayerName.Normalize(key)
-  if key == nil then
-    return
-  end
-  db.ignored[key] = true
-  Leads.DismissCustomer(key)
-  Index.RequestRebuild("block")
 end
 
 function Leads.Latest()

@@ -5,26 +5,16 @@ end
 
 local Constants = ns.Constants or require("CraftAlert.Core.Constants")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
-local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Index = ns.Index or require("CraftAlert.Model.Index")
-local Leads = ns.Leads or require("CraftAlert.Model.Leads")
-local Theme = ns.Theme or require("CraftAlert.UI.Theme")
-local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
--- Spec §9 Keywords: intent words, blocker words, extra slang (word → slot/type) and the
--- blocked players (`ignored`; the player-facing word is "Block"). Every change rebuilds the
--- index, which holds the word sets and the hot-path block set (§6.2). Blocking goes through
--- Leads.Block, as the leads-window button does, so that customer's leads go too.
+-- Spec §9 Keywords: intent words, blocker words and extra slang (word → slot/type). Every
+-- change rebuilds the index, which holds the word sets (§6.2).
 local PageKeywords = { id = "keywords", title = Localization.Text("Keywords") }
 
-local find = string.find
 local gmatch = string.gmatch
 local lower = string.lower
 local match = string.match
-
-local BLOCKED_ROWS = 8
-local UNBLOCK_WIDTH = 64
 
 local function db()
   return _G["CraftAlertDB"]
@@ -108,55 +98,6 @@ local function slangInput(column, add)
   end)
 end
 
-local function createBlockedRow(row)
-  row.name = FrameKit.Text(row, Theme.FONTS.body, Theme.COLORS.textPrimary)
-  row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
-  row.unblock = Controls.Button(row, Localization.Text("Unblock"), UNBLOCK_WIDTH, function()
-    db().ignored[row.key] = nil
-    Index.RequestRebuild("block")
-    row.list.Refresh()
-  end)
-  row.unblock:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-end
-
-local function showBlocked(row, key)
-  row.key = key
-  row.name:SetText(key)
-end
-
--- Every realm the db knows: those of the characters' keys and their connected realms.
-local function knownRealms()
-  local realms = {}
-  for key, character in pairs(db().characters) do
-    realms[#realms + 1] = PlayerName.RealmOf(key)
-    for _, realm in ipairs(character.realms or {}) do
-      realms[#realms + 1] = realm
-    end
-  end
-  return realms
-end
-
-local function blockedList(column, add)
-  Controls.Section(column, Localization.Text("Blocked players"))
-  local list
-  local input = Controls.Input(column, Localization.Text("Block a player"), function(text)
-    if find(text, "%S") then
-      local key = PlayerName.FromTyped(match(text, "^%s*(.-)%s*$"), knownRealms())
-      Leads.Block(key)
-    end
-    list.Refresh()
-  end)
-  list = Controls.List(column, BLOCKED_ROWS, createBlockedRow)
-  function list.Refresh()
-    input.Set("")
-    list.Render(sortedKeys(db().ignored), showBlocked)
-  end
-  for _, row in ipairs(list.rows) do
-    row.list = list
-  end
-  add(list.Refresh)
-end
-
 function PageKeywords.Create(parent)
   local column = Controls.Column(parent)
   local add, refresh = Controls.Refresher()
@@ -164,7 +105,6 @@ function PageKeywords.Create(parent)
   wordsInput(column, add, "Intent words", "intentWords", Constants.intentWords)
   wordsInput(column, add, "Blocker words", "blockerWords", nil)
   slangInput(column, add)
-  blockedList(column, add)
   return { Refresh = refresh }
 end
 

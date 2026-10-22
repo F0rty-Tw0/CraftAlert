@@ -30,6 +30,5 @@ return {
   leads = {},
   ledger = {},
   recentGreeted = {},
-  ignored = {},
   ui = {},
 }

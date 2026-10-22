@@ -230,9 +230,6 @@ function Matcher.Match(channelKey, text, sender, guid)
   if key ~= nil and key == index.ownName then
     return stop("self")
   end
-  if key ~= nil and index.blockSet[key] then
-    return stop("blocked")
-  end
   lineGuid = guid
   return matchText(text)
 end

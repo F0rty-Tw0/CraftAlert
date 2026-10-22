@@ -3,7 +3,7 @@ local Localization = require("CraftAlert.Core.Localization")
 
 return function()
   -- English strings are the keys: no catalog, the text passes through.
-  Assert.equal(Localization.Text("Block"), "Block")
+  Assert.equal(Localization.Text("Greet"), "Greet")
   -- A literal percent sign survives when there is nothing to format.
   Assert.equal(Localization.Text("100% sure"), "100% sure")
   Assert.equal(Localization.Text("Hi %s, you have %d leads", "Bob", 3), "Hi Bob, you have 3 leads")

@@ -57,7 +57,6 @@ local function testTestCommand()
       return true
     end,
   })
-  db.ignored["Test-Realm"] = true
   local ledger = {}
   for key, value in pairs(db.ledger) do
     ledger[key] = value

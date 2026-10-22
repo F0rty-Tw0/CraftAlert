@@ -49,10 +49,7 @@ local function testGate()
   Assert.equal(Matcher.Match("trade", "lf fiery weapon", "Me-Realm"), nil)
   Assert.equal(Matcher.lastStop, "self")
   local db = Fixture.db(ns)
-  db.ignored["Spammer-Realm"] = true
   fixture(ns, Fixture.index(ns, db))
-  Assert.equal(Matcher.Match("trade", "lf fiery weapon", "Spammer-Realm"), nil)
-  Assert.equal(Matcher.lastStop, "blocked")
   -- MatchUngated runs steps 2-4 only (/ca test).
   Assert.truthy(Matcher.MatchUngated("lf fiery weapon"))
   Assert.equal(Matcher.lastStop, "match")

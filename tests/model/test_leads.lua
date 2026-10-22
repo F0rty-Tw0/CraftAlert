@@ -133,8 +133,40 @@ local function testPreview()
   Assert.equal(Leads.Preview(match(ns, profession), profession), nil, "no enabled crafter, no lead")
 end
 
+-- Blizzard's ignore list: an ignored customer makes and refreshes no lead, and IGNORELIST_UPDATE
+-- (Leads.DismissIgnored) drops the open leads of everyone ignored, with one "change".
+local function testIgnoreList()
+  local ns = setup()
+  local Leads = ns.Leads
+  local text = "LF plate belt"
+  local first = newLead(ns, text)
+  local time, message = first.time, first.message
+  -- A second open lead of the same customer, next to the first: the pass must drop both.
+  Assert.truthy(newLead(ns, "LF plate greaves"), "a second lead for the customer")
+  Wow.clock.time = Wow.clock.time + 30
+  Wow.stub("C_FriendList", {
+    IsIgnored = function(name)
+      return name == CUSTOMER
+    end,
+  })
+  Assert.equal(newLead(ns, "LF plate belt now"), nil, "an ignored customer's repeat line refreshes nothing")
+  Assert.same({ first.time, first.message }, { time, message }, "the open lead is untouched")
+
+  Assert.truthy(newLead(ns, text, "Other-Draenor"), "Other is not ignored")
+  local seen = listen(Leads)
+  Leads.DismissIgnored()
+  Assert.equal(seen.change, 1, "one change for the whole pass")
+  Assert.equal(#Leads.List(), 1, "both of the customer's leads went")
+  Assert.equal(Leads.List()[1].customer, "Other-Draenor")
+
+  Wow.stub("C_FriendList", nil)
+  Leads.DismissIgnored()
+  Assert.equal(seen.change, 1, "nobody ignored: no change")
+end
+
 return function()
   testPreview()
+  testIgnoreList()
   -- A new lead copies what it keeps out of the Matcher's result (§6.3 step 7).
   local ns, db = setup()
   local Leads = ns.Leads
@@ -274,39 +306,21 @@ return function()
   Assert.equal(Leads.IsActive(newer.id), false)
   Assert.equal(Leads.FindActiveByCustomer(CUSTOMER), lead)
 
-  -- Dismiss, DismissCustomer: one change each, no event for unknown ids.
+  -- Dismiss: one change, no event for unknown ids.
   changes = seen.change
   Leads.Dismiss(9999)
   Assert.equal(seen.change, changes)
-  newLead(ns, "LF plate greaves")
-  newLead(ns, "LF plate belt", "Carl-Draenor")
+  local carl = newLead(ns, "LF plate belt", "Carl-Draenor")
   changes = seen.change
-  Leads.DismissCustomer(CUSTOMER)
+  Leads.Dismiss(carl.id)
   Assert.equal(seen.change, changes + 1)
+  Assert.equal(Leads.IsActive(carl.id), false)
   Assert.equal(#db.leads, 1)
-  Assert.equal(db.leads[1].customer, "Carl-Draenor")
-  Leads.DismissCustomer("Nobody-Draenor")
-  Assert.equal(seen.change, changes + 1)
-  Leads.Dismiss(db.leads[1].id)
+  Assert.equal(db.leads[1], lead)
+  Leads.Dismiss(lead.id)
   Assert.equal(Leads.HasActive(), false)
   Assert.equal(Leads.Latest(), nil)
   Assert.same(Leads.List(), {})
-
-  -- Block: ignored, every lead of the customer dismissed, one rebuild asked for.
-  ns, db = setup()
-  Leads = ns.Leads
-  newLead(ns, "LF plate belt")
-  newLead(ns, "LF plate greaves")
-  local keep = newLead(ns, "LF plate belt", "Carl-Draenor")
-  Assert.equal(Wow.pendingTimers(0), 0)
-  Leads.Block("Bob-Dra enor")
-  Assert.equal(db.ignored["Bob-Draenor"], true)
-  Assert.same(db.leads, { keep })
-  Assert.equal(ns.Index.lastReason, "block")
-  Assert.equal(Wow.pendingTimers(0), 1)
-  Leads.Block("Dan")
-  Assert.equal(db.ignored["Dan-Realm"], true, "keys are normalized")
-  Leads.Block(nil)
 
   -- Review Focus 3: eight alts know the recipe → one lead, the best crafter.
   ns, db = setup(nil, function(data)

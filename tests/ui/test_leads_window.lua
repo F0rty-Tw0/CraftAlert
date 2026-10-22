@@ -118,18 +118,19 @@ local function testRowFields()
   Assert.truthy(string.find(table.concat(Widgets.texts(window(), Wow.frames), " / "), "No leads", 1, true))
 end
 
-local function testBlockAndClicks()
-  -- The row "Block" button blocks the customer: every row of theirs goes, others stay.
-  local ns, db, calls = load({ "Ann-Draenor", "Bob-Draenor", "Ann-Draenor" })
+local function testRowClicks()
+  local ns, _, calls = load({ "Bob-Draenor" })
   ns.LeadsWindow.Toggle()
-  Assert.equal(#rows(), 3)
-  local blockButton = rows()[1].blockButton
-  Widgets.click(blockButton, "LeftButton")
-  Assert.equal(db.ignored["Ann-Draenor"], true)
   local left = rows()
   Assert.equal(#left, 1)
   Assert.truthy(string.find(rowText(left[1]), "Bob-Draenor", 1, true))
-  Assert.equal(ns.Index.lastReason, "block", "the hot-path block set is rebuilt")
+  -- With no button on the right, the replied tag sits at the row's right edge, inset by PADDING.
+  local point, relativeTo, relativePoint, x, y = left[1].repliedTag:GetPoint()
+  Assert.equal(point, "RIGHT")
+  Assert.equal(relativeTo, left[1], "anchored to the row")
+  Assert.equal(relativePoint, "RIGHT")
+  Assert.equal(x, -ns.Theme.LAYOUT.PADDING)
+  Assert.equal(y, 0)
 
   -- Rows take the toast's clicks: left greets once the row has been up 0.5 s, right dismisses.
   Wow.clock.gettime = 51
@@ -276,7 +277,7 @@ end
 return function()
   testLazyAndEscape()
   testRowFields()
-  testBlockAndClicks()
+  testRowClicks()
   testVisibleLatestAndScroll()
   testSavedFrameAndOpacity()
   testCorruptedSavedLeads()

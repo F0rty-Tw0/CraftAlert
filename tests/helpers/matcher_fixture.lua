@@ -165,7 +165,6 @@ function Fixture.itemIndex(ns, extra, order)
   local smith = { [1] = { item = 501, name = "Thick Plate Belt", prof = BS }, [2] = { item = 502, name = "Plate Greaves", prof = BS } }
   db.characters["Smith-Realm"] = Fixture.character({ BS, 755 }, smith)
   db.characters["Alt-Realm"] = Fixture.character({ BS }, { [1] = { item = 501, name = "Thick Plate Belt", prof = BS } })
-  db.ignored["Spammer-Realm"] = true
   if extra then
     extra(db)
   end

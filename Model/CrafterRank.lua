@@ -20,7 +20,7 @@ local type = type
 local CURRENT, PRIMARY, SAME_ACCOUNT, IMPORTED = 0, 1, 2, 3
 local CANNOT_ORDER = 10
 
-local function isIgnored(name)
+function CrafterRank.IsIgnored(name)
   local api = _G["C_FriendList"]
   if type(api) == "table" and type(api.IsIgnored) == "function" then
     return api.IsIgnored(name) == true
@@ -56,7 +56,7 @@ end
 -- Matcher's reused result: only read here. A match without entries (a profession word) is
 -- answered by every enabled character with that profession that still listens for it.
 function CrafterRank.Pick(result, customerKey, db, opts)
-  if not (opts and opts.skipIgnore) and isIgnored(customerKey) then
+  if not (opts and opts.skipIgnore) and CrafterRank.IsIgnored(customerKey) then
     return nil
   end
   local bestKey, bestScore = nil, nil
