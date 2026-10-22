@@ -23,6 +23,7 @@ Core/Constants.lua
 Core/Localization.lua
 Core/ChatPrint.lua
 Core/EventRouter.lua
+Core/Slicer.lua
 Core/PlayerName.lua
 Persistence/Defaults.lua
 Persistence/Schema.lua
@@ -49,6 +50,7 @@ Model/GreetAction.lua
 Model/WhisperTracker.lua
 Professions/ProfessionList.lua
 Professions/BindLookup.lua
+Professions/ReadJob.lua
 Professions/ModernReader.lua
 Professions/LearnWatcher.lua
 Core/Status.lua

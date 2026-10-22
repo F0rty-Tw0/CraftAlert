@@ -454,6 +454,7 @@ function STEPS.event(ctx, step)
   ctx.ns.LearnWatcher.lastStored = nil
   ctx.ns.BindLookup.lastStored = nil
   Wow.fireEvent(step.name, unpack(args, 1, #step.args))
+  ctx.ns.Slicer.Drain()
   reportRead(ctx)
   reportLearn(ctx)
   runFrameTimers(step.name == "GET_ITEM_INFO_RECEIVED" and BIND_DEBOUNCE_SECONDS or 0)

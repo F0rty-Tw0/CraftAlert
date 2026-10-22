@@ -40,6 +40,8 @@ end
 return function()
   local ns = SlashFixture.load()
   local Perf = ns.Perf
+  local ModernReader = require("CraftAlert.Professions.ModernReader")
+  local Slicer = require("CraftAlert.Core.Slicer")
   ns.Index.lastBuildMs = 12.5
   Perf.loginMs = 42
   Assert.equal(Perf.IsRunning(), false)
@@ -63,7 +65,10 @@ return function()
   -- The first line after 60 s carries the report: an unmatched line and a channel the gate
   -- drops count as hot path lines (a stale "match" must not make it a matched one).
   fireCustomChannel()
-  Assert.equal(lastChat(), "Perf: Lines 2, mean 20.0 us, max 30.0 us. Matched 1, mean 500.0 us, max 500.0 us. Login 42.0 ms, index build 12.5 ms.")
+  Assert.equal(
+    lastChat(),
+    "Perf: Lines 2, mean 20.0 us, max 30.0 us. Matched 1, mean 500.0 us, max 500.0 us. Login 42.0 ms, index build 12.5 ms, last read n/a in 0 steps, background 0 steps in 0 ticks, longest 0.0 ms."
+  )
   Assert.equal(#Wow.chat, 2)
   fireCustomChannel()
   Assert.equal(#Wow.chat, 2, "the next report waits another 60 s")
@@ -73,7 +78,7 @@ return function()
   Assert.equal(Perf.IsRunning(), false)
   Assert.equal(
     lastChat(),
-    "Perf off: Lines 3, mean 16.7 us, max 30.0 us. Matched 1, mean 500.0 us, max 500.0 us. Login 42.0 ms, index build 12.5 ms. Memory 100.0 KB to 130.5 KB."
+    "Perf off: Lines 3, mean 16.7 us, max 30.0 us. Matched 1, mean 500.0 us, max 500.0 us. Login 42.0 ms, index build 12.5 ms, last read n/a in 0 steps, background 0 steps in 0 ticks, longest 0.0 ms. Memory 100.0 KB to 130.5 KB."
   )
   local reads = calls()
   SlashFixture.fireTrade("LF mongoose", "Di-Draenor")
@@ -105,7 +110,7 @@ return function()
   Perf.Stop()
   Assert.same(SlashFixture.chat(), {
     "Perf on: timing each chat line, a report every 60 s. /ca perf again stops it.",
-    "Perf off: Lines 0. Matched 0. Login n/a, index build n/a.",
+    "Perf off: Lines 0. Matched 0. Login n/a, index build n/a, last read n/a in 0 steps, background 0 steps in 0 ticks, longest 0.0 ms.",
   })
 
   -- ScanGate.Deliver goes through the timed handler: one call is one counted line.
@@ -114,5 +119,21 @@ return function()
   Perf.Start()
   ns.ScanGate.Deliver("CHAT_MSG_CHANNEL", "hello", "Bob-Draenor", "", "5. Custom", "Bob-Draenor", "", 0, 5, "Custom", 0, 1, nil)
   Perf.Stop()
-  Assert.equal(lastChat(), "Perf off: Lines 1, mean 10.0 us, max 10.0 us. Matched 0. Login n/a, index build n/a.")
+  Assert.equal(
+    lastChat(),
+    "Perf off: Lines 1, mean 10.0 us, max 10.0 us. Matched 0. Login n/a, index build n/a, last read n/a in 0 steps, background 0 steps in 0 ticks, longest 0.0 ms."
+  )
+
+  -- Read and slicer stats: the last read's ms and steps, the Slicer's totals, and Start zeroes them.
+  ns.Index.lastBuildMs = 12.5
+  ModernReader.lastRead = { prof = 164, stored = 3, pendingBind = 0, ms = 12.5, steps = 4 }
+  Slicer.stats.ticks, Slicer.stats.steps, Slicer.stats.longestTickMs = 10, 7, 9.26
+  scriptClock({ 0, 100, 100.010 })
+  Wow.chat = {}
+  Perf.Start()
+  Assert.equal(Slicer.stats.ticks + Slicer.stats.steps + Slicer.stats.longestTickMs, 0, "Start zeroes the Slicer stats")
+  Slicer.stats.ticks, Slicer.stats.steps, Slicer.stats.longestTickMs = 10, 7, 9.26
+  Perf.Stop()
+  Assert.truthy(lastChat():find("last read 12.5 ms in 4 steps, background 7 steps in 10 ticks, longest 9.3 ms.", 1, true), lastChat())
+  ModernReader.lastRead = nil
 end
