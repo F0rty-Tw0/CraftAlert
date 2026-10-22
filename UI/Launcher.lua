@@ -52,12 +52,16 @@ local function iconFor(lead)
   return texture or Theme.ICON
 end
 
+-- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua, every flavour): gold
+-- title, the status in white, a blank line, one green instruction line per action.
 local function showTooltip(frame)
-  local tooltip, secondary = _G["GameTooltip"], Theme.COLORS.textSecondary
+  local tooltip = _G["GameTooltip"]
   tooltip:SetOwner(frame, "ANCHOR_LEFT")
-  tooltip:SetText(Localization.Text("Craft Alert"))
-  tooltip:AddLine(Status.Text(ScanGate.State()), 1, 1, 1, true)
-  tooltip:AddLine(Localization.Text("Click: leads window · Drag: move"), secondary[1], secondary[2], secondary[3], true)
+  _G["GameTooltip_SetTitle"](tooltip, Localization.Text("Craft Alert"), _G["NORMAL_FONT_COLOR"])
+  _G["GameTooltip_AddHighlightLine"](tooltip, Status.Text(ScanGate.State()))
+  _G["GameTooltip_AddBlankLineToTooltip"](tooltip)
+  _G["GameTooltip_AddInstructionLine"](tooltip, Localization.Text("Click: open the leads window"))
+  _G["GameTooltip_AddInstructionLine"](tooltip, Localization.Text("Drag: move"))
   tooltip:Show()
 end
 

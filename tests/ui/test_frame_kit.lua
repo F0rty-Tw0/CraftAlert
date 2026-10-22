@@ -90,9 +90,22 @@ local function testArt()
   Assert.equal(t.shown, false)
 end
 
+local function testListHighlight()
+  local FrameKit = load({})
+  local Theme = require("CraftAlert.UI.Theme")
+  local button = rawget(_G, "CreateFrame")("Button")
+  local texture = FrameKit.ListHighlight(button)
+  Assert.equal(texture.layer, "HIGHLIGHT")
+  Assert.equal(texture.texture, Theme.ART.LIST_HOVER)
+  Assert.equal(texture.blendMode, "ADD")
+  Assert.equal(texture:GetAlpha(), Theme.ART.LIST_HOVER_ALPHA)
+  Assert.same(texture.points, { { "ALL", button } })
+end
+
 return function()
   testSavedPosition()
   testMalformedFallsBack()
   testArt()
+  testListHighlight()
   Wow.reset()
 end

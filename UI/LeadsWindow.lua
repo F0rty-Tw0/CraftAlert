@@ -28,9 +28,12 @@ local FALLBACK_POSITION = { "CENTER", 0, 0 }
 local window = nil -- { frame, rows = { row, ... }, empty }, nil until the first open
 local offset = 0 -- leads scrolled past the top row
 
+-- The inset's height from the frame's own size and the offsets anchorInset gives it: the client
+-- sizes the inset from its anchors only, which may still read 0 on the first open.
 local function rowsThatFit(frame)
   local layout = Theme.LAYOUT
-  local height = frame:GetHeight() - layout.TITLE_BAR_HEIGHT - layout.FOOTER_HEIGHT - 2 * layout.PADDING
+  local insetHeight = frame:GetHeight() - layout.INSET_TOP - layout.INSET_BOTTOM
+  local height = insetHeight - 2 * layout.PADDING
   return max(0, floor((height + layout.ROW_GAP) / (layout.ROW_HEIGHT + layout.ROW_GAP)))
 end
 
@@ -39,11 +42,11 @@ local function rowAt(index)
   if row then
     return row
   end
-  local layout, frame = Theme.LAYOUT, window.frame
-  row = LeadRow.Create(frame, index)
-  local top = layout.TITLE_BAR_HEIGHT + layout.PADDING + (index - 1) * (layout.ROW_HEIGHT + layout.ROW_GAP)
-  row:SetPoint("TOPLEFT", frame, "TOPLEFT", layout.PADDING, -top)
-  row:SetPoint("RIGHT", frame, "RIGHT", -layout.PADDING, 0)
+  local layout, inset = Theme.LAYOUT, window.frame.Inset
+  row = LeadRow.Create(inset, index)
+  local top = layout.PADDING + (index - 1) * (layout.ROW_HEIGHT + layout.ROW_GAP)
+  row:SetPoint("TOPLEFT", inset, "TOPLEFT", layout.PADDING, -top)
+  row:SetPoint("RIGHT", inset, "RIGHT", -layout.PADDING, 0)
   window.rows[index] = row
   return row
 end
@@ -104,52 +107,65 @@ local function applySavedSize(frame)
   frame:SetResizeBounds(layout.WINDOW_MIN_WIDTH, layout.WINDOW_MIN_HEIGHT)
 end
 
-local function createResizeGrip(frame)
-  local size = Theme.LAYOUT.RESIZE_GRIP_SIZE
-  local grip = _G["CreateFrame"]("Button", nil, frame)
-  grip:SetSize(size, size)
-  grip:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -2, 2)
-  grip:EnableMouse(true)
-  local texture = grip:CreateTexture(nil, "OVERLAY")
-  texture:SetAllPoints(grip)
-  texture:SetTexture(Theme.RESIZE_GRIP)
-  grip:SetScript("OnMouseDown", function()
-    frame:StartSizing("BOTTOMRIGHT")
-  end)
-  grip:SetScript("OnMouseUp", function()
-    frame:StopMovingOrSizing()
-    saveFrame(frame)
-    LeadsWindow.Refresh()
-  end)
-  frame.resizeGrip = grip
+-- The template's inset starts 60 below the top, room for a portrait; without one that wastes a row
+-- (Blizzard re-anchors it the same way in FriendsFrame.lua).
+local function anchorInset(frame)
+  local layout, inset = Theme.LAYOUT, frame.Inset
+  inset:ClearAllPoints()
+  inset:SetPoint("TOPLEFT", frame, "TOPLEFT", 11, -layout.INSET_TOP)
+  inset:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, layout.INSET_BOTTOM)
 end
 
-local function createTexts(frame)
-  local layout = Theme.LAYOUT
-  local empty = FrameKit.Text(frame, Theme.FONTS.body, Theme.COLORS.textSecondary)
-  empty:SetPoint("CENTER", frame, "CENTER", 0, 0)
+local function onResizeStopped(target)
+  saveFrame(target)
+  LeadsWindow.Refresh()
+end
+
+local function createResizeButton(frame)
+  local layout, screen = Theme.LAYOUT, _G["UIParent"]
+  local button = _G["CreateFrame"]("Button", nil, frame, "PanelResizeButtonTemplate")
+  button:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 4)
+  -- Init wraps the frame's OnSizeChanged as it is now, so the refresh must already be set.
+  frame:SetScript("OnSizeChanged", LeadsWindow.Refresh)
+  button:Init(frame, layout.WINDOW_MIN_WIDTH, layout.WINDOW_MIN_HEIGHT, screen:GetWidth(), screen:GetHeight())
+  button:SetOnResizeStoppedCallback(onResizeStopped)
+  frame.resizeButton = button
+end
+
+local function createEmptyText(frame)
+  local inset = frame.Inset
+  local empty = FrameKit.Text(inset, Theme.FONTS.body, Theme.COLORS.textSecondary)
+  empty:SetPoint("CENTER", inset, "CENTER", 0, 0)
   empty:SetJustifyH("CENTER")
   empty:SetText(Localization.Text("No leads right now. Requests you can craft show up here."))
-  local hint = FrameKit.Text(frame, Theme.FONTS.detail, Theme.COLORS.textTimestamp)
-  hint:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", layout.PADDING, layout.PADDING / 2)
-  hint:SetPoint("RIGHT", frame, "RIGHT", -layout.RESIZE_GRIP_SIZE - layout.PADDING, 0)
-  hint:SetText(Localization.Text("Click: greet · Shift: edit first · Ctrl: empty whisper · Right: dismiss"))
+
   return empty
 end
 
+-- The template's close button runs UIPanelCloseButton_OnClick
+-- (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.lua:144-155): this callback first, and
+-- HideUIPanel only when it returns truthy. HideUIPanel
+-- (Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:886-897) returns without hiding
+-- in combat when called from addon code, so the callback hides the frame itself.
+local function onClose(closeButton)
+  closeButton:GetParent():Hide()
+  return false
+end
+
 local function create()
-  local frame = _G["CreateFrame"]("Frame", FRAME_NAME, _G["UIParent"])
+  local frame = _G["CreateFrame"]("Frame", FRAME_NAME, _G["UIParent"], "ButtonFrameTemplate")
+  frame.onCloseCallback = onClose
   frame:SetFrameStrata("HIGH")
+  _G["ButtonFrameTemplate_HidePortrait"](frame)
+  frame:SetTitle(Localization.Text("Craft Alert — Leads"))
+  anchorInset(frame)
   applySavedSize(frame)
-  FrameKit.Panel(frame)
   FrameKit.Draggable(frame, UI_KEY)
   FrameKit.Place(frame, UI_KEY, FALLBACK_POSITION)
-  FrameKit.TitleBar(frame, Localization.Text("Craft Alert — Leads"))
-  createResizeGrip(frame)
-  local empty = createTexts(frame)
   frame:EnableMouseWheel(true)
   frame:SetScript("OnMouseWheel", onMouseWheel)
-  frame:SetScript("OnSizeChanged", LeadsWindow.Refresh)
+  createResizeButton(frame)
+  local empty = createEmptyText(frame)
   frame:Hide()
   table.insert(_G["UISpecialFrames"], FRAME_NAME)
   return { frame = frame, rows = {}, empty = empty }

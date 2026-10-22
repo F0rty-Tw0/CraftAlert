@@ -12,11 +12,9 @@ local Theme = {}
 -- { r, g, b, a }
 Theme.COLORS = {
   surface = { 0.07, 0.07, 0.10, 0.97 },
-  surfaceRaised = { 0.10, 0.10, 0.14, 0.60 },
   chrome = { 0.09, 0.09, 0.13, 0.60 },
   border = { 1.0, 1.0, 1.0, 0.10 },
   divider = { 1.0, 1.0, 1.0, 0.08 },
-  rowHover = { 1.0, 1.0, 1.0, 0.05 },
   textPrimary = { 0.92, 0.92, 0.95, 1.0 },
   textSecondary = { 1.0, 1.0, 1.0, 0.55 },
   textTimestamp = { 1.0, 1.0, 1.0, 0.40 },
@@ -54,8 +52,8 @@ Theme.LAYOUT = {
   WINDOW_HEIGHT = 320,
   WINDOW_MIN_WIDTH = 360,
   WINDOW_MIN_HEIGHT = 160,
-  RESIZE_GRIP_SIZE = 16,
-  FOOTER_HEIGHT = 20,
+  INSET_TOP = 28,
+  INSET_BOTTOM = 26,
   ROW_ICON_SIZE = 14,
   ROW_HEIGHT = 36,
   ROW_GAP = 2,
@@ -87,7 +85,13 @@ Theme.ICON = "Interface\\Icons\\INV_Misc_Bell_01"
 -- Textures every flavor's UI source references (ui_live, ui_forever, ui_classic, ui_classic_era).
 Theme.BADGE_TEXTURE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
 Theme.GREETED_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
-Theme.RESIZE_GRIP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
+-- Quest-log list art (plain files, not atlases): selected and hover row highlights, drawn ADD.
+Theme.ART = {
+  LIST_SELECTED = "Interface\\QuestFrame\\UI-QuestLogTitleHighlight",
+  LIST_HOVER = "Interface\\QuestFrame\\UI-QuestTitleHighlight",
+  LIST_SELECTED_ALPHA = 0.45,
+  LIST_HOVER_ALPHA = 0.18,
+}
 Theme.DIM_ALPHA = 0.5
 
 ns.Theme = Theme

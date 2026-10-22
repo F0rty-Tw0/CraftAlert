@@ -47,7 +47,10 @@ local function testLitDimAndTooltip()
   frame.scripts.OnEnter(frame)
   Assert.equal(tooltip.owner, frame)
   Assert.equal(tooltip.shown, true)
-  Assert.truthy(string.find(table.concat(tooltip.lines, " / "), "Listening in Trade — 4 recipes, 2 crafters", 1, true))
+  -- Blizzard's tooltip hierarchy: a gold title, the status in white, a blank line, then one green
+  -- instruction line per action.
+  Assert.same(tooltip.lines, { "Craft Alert", "Listening in Trade — 4 recipes, 2 crafters", " ", "Click: open the leads window", "Drag: move" })
+  Assert.same(tooltip.colors, { { 1, 0.82, 0 }, { 1, 1, 1 }, {}, { 0.1, 1, 0.1 }, { 0.1, 1, 0.1 } })
   frame.scripts.OnLeave(frame)
   Assert.equal(tooltip.shown, false)
   setScan(ns, false)

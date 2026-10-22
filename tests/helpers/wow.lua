@@ -97,6 +97,10 @@ local function newFrame(frameType, name, parent, template)
     return self.shown
   end
 
+  function frame:GetParent()
+    return self.parent
+  end
+
   -- As the client: shown, and so is every parent (UIParent:Hide() is Alt+Z).
   function frame:IsVisible()
     return self.shown and (self.parent == nil or self.parent:IsVisible())
@@ -168,6 +172,8 @@ local function newTooltip()
 
   function tooltip:AddLine() end
 
+  function tooltip:ClearLines() end
+
   function tooltip:SetHyperlink() end
 
   function tooltip:Show()
@@ -185,9 +191,48 @@ local function newTooltip()
   return tooltip
 end
 
+-- The font colours the client defines before FrameXML loads (not in the FrameXML sources).
+local function newColor(r, g, b)
+  return {
+    GetRGB = function()
+      return r, g, b
+    end,
+  }
+end
+
+-- Blizzard_SharedXML/SharedTooltipTemplates.lua:116-171, loaded on every flavour: the tooltip
+-- line helpers, each ending in tooltip:AddLine as there.
+local function installTooltipHelpers()
+  Wow.stub("NORMAL_FONT_COLOR", newColor(1, 0.82, 0))
+  Wow.stub("HIGHLIGHT_FONT_COLOR", newColor(1, 1, 1))
+  Wow.stub("GREEN_FONT_COLOR", newColor(0.1, 1, 0.1))
+  local function addColoredLine(tooltip, text, color, wrap, leftOffset)
+    local r, g, b = color:GetRGB()
+    if wrap == nil then
+      wrap = true
+    end
+    tooltip:AddLine(text, r, g, b, wrap, leftOffset)
+  end
+  Wow.stub("GameTooltip_AddColoredLine", addColoredLine)
+  Wow.stub("GameTooltip_AddBlankLineToTooltip", function(tooltip)
+    tooltip:AddLine(" ")
+  end)
+  Wow.stub("GameTooltip_SetTitle", function(tooltip, text, overrideColor, wrap)
+    tooltip:ClearLines()
+    addColoredLine(tooltip, text, overrideColor or _G["HIGHLIGHT_FONT_COLOR"], wrap)
+  end)
+  Wow.stub("GameTooltip_AddHighlightLine", function(tooltip, text, wrap, leftOffset)
+    addColoredLine(tooltip, text, _G["HIGHLIGHT_FONT_COLOR"], wrap, leftOffset)
+  end)
+  Wow.stub("GameTooltip_AddInstructionLine", function(tooltip, text, wrap, leftOffset)
+    addColoredLine(tooltip, text, _G["GREEN_FONT_COLOR"], wrap, leftOffset)
+  end)
+end
+
 local timerSeq = 0
 local function installDefaults()
   Wow.stub("GameTooltip", newTooltip())
+  installTooltipHelpers()
   Wow.stub("CreateFrame", newFrame)
   Wow.stub("UIParent", newFrame("Frame", nil))
   table.remove(Wow.frames) -- UIParent never registers events; keep Wow.frames to the addon's frames
@@ -198,6 +243,16 @@ local function installDefaults()
       return { width = 1, height = 1 }
     end,
   })
+  -- Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.lua:111-117: swaps the border; recorded only.
+  Wow.stub("ButtonFrameTemplate_HidePortrait", function(frame)
+    frame.portraitHidden = true
+  end)
+  -- Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua:886-901: out of combat a frame
+  -- with no panel attribute just hides; in combat (CheckProtectedFunctionsAllowed, :844-850) it
+  -- returns first, which a test models by re-stubbing this.
+  Wow.stub("HideUIPanel", function(frame)
+    frame:Hide()
+  end)
   Wow.stub("SetItemRef", function(link, text, button, frame)
     table.insert(Wow.itemRefs, { link, text, button, frame })
   end)

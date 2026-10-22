@@ -180,13 +180,20 @@ local function testTooltip()
   local frame, tip = toastFrame(), rawget(_G, "GameTooltip")
   frame.scripts.OnEnter(frame)
   Assert.same({ tip.owner, tip.anchor, tip.shown }, { frame, "ANCHOR_TOP", true })
-  Assert.same(tip.lines, { "Craft Alert", "Matched: lf + blacksmith", "Click: greet · Shift: edit first · Ctrl: empty whisper · Right: dismiss" })
+  -- Blizzard's tooltip hierarchy: a gold title, what matched in white, a blank line, then one
+  -- green instruction line per action: the clicks, then the drag (it moves the launcher).
+  local clicks = { "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper", "Right-click: dismiss" }
+  local drag = "Drag: move"
+  local gold, white, green = { 1, 0.82, 0 }, { 1, 1, 1 }, { 0.1, 1, 0.1 }
+  Assert.same(tip.lines, { "Craft Alert", "Matched: lf + blacksmith", " ", clicks[1], clicks[2], clicks[3], clicks[4], drag })
+  Assert.same(tip.colors, { gold, white, {}, green, green, green, green, green })
   frame.scripts.OnLeave(frame)
   Assert.equal(tip.shown, false)
   ns.Leads.Latest().why = ""
   ns.AlertToast.Show(ns.Leads.Latest())
   frame.scripts.OnEnter(frame)
-  Assert.same(tip.lines, { "Craft Alert", "Click: greet · Shift: edit first · Ctrl: empty whisper · Right: dismiss" })
+  Assert.same(tip.lines, { "Craft Alert", " ", clicks[1], clicks[2], clicks[3], clicks[4], drag })
+  Assert.same(tip.colors, { gold, {}, green, green, green, green, green })
 end
 
 local function testLinks()

@@ -5,6 +5,8 @@ local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 
 local WINDOW_NAME = "CraftAlertLeadsWindow"
+local LINK = "item:190001"
+local LINK_TEXT = "|cff1eff00|Hitem:190001|h[Sim Plate Belt]|h|r"
 
 local function window()
   return rawget(_G, WINDOW_NAME)
@@ -24,22 +26,18 @@ local function rows()
   return shown
 end
 
-local function rowText(row)
-  return table.concat(Widgets.texts(row, Wow.frames), " / ")
+-- Every text shown in `frame` and its descendants, joined.
+local function textOf(frame)
+  return table.concat(Widgets.texts(frame, Wow.frames), " / ")
 end
 
--- The window's direct child button whose label is `label`.
-local function buttonLabelled(parent, label)
-  for _, frame in ipairs(Wow.frames) do
-    if frame.parent == parent then
-      for _, region in ipairs(frame.regions) do
-        if region.text == label then
-          return frame
-        end
-      end
-    end
+-- `n` customer names, Customer1-Draenor (oldest) to Customer<n>-Draenor.
+local function customerNames(n)
+  local names = {}
+  for i = 1, n do
+    names[i] = "Customer" .. i .. "-Draenor"
   end
-  error("no button " .. label)
+  return names
 end
 
 -- A fixture whose leads come from `customers` (oldest first), the window subscribed to
@@ -67,6 +65,9 @@ local function testLazyAndEscape()
   Assert.equal(ns.LeadsWindow.VisibleLatest(), nil)
   ns.LeadsWindow.Toggle()
   Assert.truthy(window(), "window created on first open")
+  Assert.equal(window().template, "ButtonFrameTemplate")
+  Assert.equal(window().portraitHidden, true)
+  Assert.equal(window():GetTitleText():GetText(), "Craft Alert — Leads")
   Assert.equal(window():IsShown(), true)
   -- ESC closes it: our own frame name in UISpecialFrames, once, however often it opens.
   ns.LeadsWindow.Toggle()
@@ -77,8 +78,14 @@ local function testLazyAndEscape()
   Assert.equal(window().resizable, true)
   Assert.equal(window().clamped, true)
   -- The close button hides it.
-  Widgets.click(buttonLabelled(window(), "X"), "LeftButton")
+  Widgets.click(window().CloseButton, "LeftButton")
   Assert.equal(window():IsShown(), false)
+  -- In combat HideUIPanel returns without hiding (addon code may not call protected functions),
+  -- yet the close button still closes the window.
+  ns.LeadsWindow.Toggle()
+  Wow.stub("HideUIPanel", function() end)
+  Widgets.click(window().CloseButton, "LeftButton")
+  Assert.equal(window():IsShown(), false, "the close button hides the window in combat")
 end
 
 local function testRowFields()
@@ -94,7 +101,7 @@ local function testRowFields()
   local shown = rows()
   Assert.equal(#shown, 2)
   -- §7.3: newest first, with age, customer, item/profession, crafter, greeted and replied.
-  local first, second = rowText(shown[1]), rowText(shown[2])
+  local first, second = textOf(shown[1]), textOf(shown[2])
   for _, part in ipairs({ "Bob-Draenor", "30s", "[Sim Plate Belt]", "Me-Realm", "can't order (realm)" }) do
     Assert.truthy(string.find(first, part, 1, true), part .. " missing from: " .. first)
   end
@@ -109,14 +116,14 @@ local function testRowFields()
   -- Ages are refreshed on each refresh (window open or lead event), never by a ticker.
   Wow.clock.time = UiFixture.T0 + 60
   ns.LeadsWindow.Refresh()
-  Assert.truthy(string.find(rowText(rows()[1]), "1m", 1, true), rowText(rows()[1]))
+  Assert.truthy(string.find(textOf(rows()[1]), "1m", 1, true), textOf(rows()[1]))
   Assert.equal(#db.leads, 2)
 
   -- No leads: an empty-state line, no rows.
   ns = load({})
   ns.LeadsWindow.Toggle()
   Assert.equal(#rows(), 0)
-  Assert.truthy(string.find(table.concat(Widgets.texts(window(), Wow.frames), " / "), "No leads", 1, true))
+  Assert.truthy(string.find(textOf(window()), "No leads", 1, true))
 end
 
 -- §4.5: the rank sits between the crafter and the realm tag.
@@ -127,7 +134,7 @@ local function testRowRank()
   end)
   ns.LeadsWindow.Toggle()
   local shown = rows()
-  local conc, plain = rowText(shown[1]), rowText(shown[2])
+  local conc, plain = textOf(shown[1]), textOf(shown[2])
   Assert.truthy(string.find(conc, "by Me-Realm · R2 (conc) · can't order (realm)", 1, true), conc)
   Assert.truthy(string.find(plain, "by Me-Realm · R2", 1, true), plain)
   Assert.falsy(string.find(plain, "(conc)", 1, true), plain)
@@ -138,7 +145,7 @@ local function testRowClicks()
   ns.LeadsWindow.Toggle()
   local left = rows()
   Assert.equal(#left, 1)
-  Assert.truthy(string.find(rowText(left[1]), "Bob-Draenor", 1, true))
+  Assert.truthy(string.find(textOf(left[1]), "Bob-Draenor", 1, true))
   -- With no button on the right, the replied tag sits at the row's right edge, inset by PADDING.
   local point, relativeTo, relativePoint, x, y = left[1].repliedTag:GetPoint()
   Assert.equal(point, "RIGHT")
@@ -157,12 +164,138 @@ local function testRowClicks()
   Assert.equal(#rows(), 0)
 end
 
-local function testVisibleLatestAndScroll()
-  local customers = {}
-  for i = 1, 12 do
-    customers[i] = "Customer" .. i .. "-Draenor"
+-- native-HUD spec §6: no fill on a row; the quest-log hover texture lights it.
+local function testRowHighlight()
+  local ns = load({ "Ann-Draenor" })
+  ns.LeadsWindow.Toggle()
+  local row = rows()[1]
+  local fills = 0
+  for _, region in ipairs(row.regions) do
+    if region.color then
+      fills = fills + 1
+    end
   end
-  local ns = load(customers)
+  local hover = assert(row.hover, "the row's hover texture")
+  Assert.equal(hover.layer, "HIGHLIGHT")
+  Assert.equal(hover.texture, ns.Theme.ART.LIST_HOVER)
+  Assert.equal(hover.blendMode, "ADD")
+  Assert.equal(hover:GetAlpha(), ns.Theme.ART.LIST_HOVER_ALPHA)
+  Assert.equal(fills, 0, "no colour fill on the row")
+end
+
+-- native-HUD spec §6, §4.5, §4.6: the item link in the detail line hovers, clicks through SetItemRef, and guards the row's clicks.
+local function testRowLinkHover()
+  local ns, _, calls = load({ "Ann-Draenor", "Bob-Draenor" }, function(accountDb)
+    accountDb.leads[2].kind, accountDb.leads[2].itemLink = "item", LINK_TEXT
+  end)
+  local tip = rawget(_G, "GameTooltip")
+  ns.LeadsWindow.Toggle()
+  local row = rows()[1] -- Bob, the newest lead, holds the item link
+  Assert.truthy(row.scripts.OnHyperlinkEnter and row.scripts.OnHyperlinkLeave and row.scripts.OnHyperlinkClick)
+
+  row.scripts.OnHyperlinkEnter(row, LINK, LINK_TEXT)
+  Assert.equal(row.hoveredLink, LINK)
+  Assert.same({ tip.hyperlinks, tip.owner, tip.shown }, { { LINK }, row, true })
+
+  -- While a link is hovered no click greets or dismisses.
+  local bobId = row.lead.id
+  Wow.clock.gettime = 51
+  Widgets.click(row, "LeftButton")
+  Widgets.click(row, "RightButton")
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 0, "a click on a link never greets")
+  Assert.equal(ns.Leads.IsActive(bobId), true, "a right-click on a link never dismisses")
+  Assert.equal(row.lead.customer, "Bob-Draenor")
+
+  row.scripts.OnHyperlinkClick(row, LINK, LINK_TEXT, "LeftButton")
+  Assert.same(Wow.itemRefs, { { LINK, LINK_TEXT, "LeftButton", row } })
+
+  -- After the link is left, a plain click greets.
+  row.scripts.OnHyperlinkLeave(row, LINK)
+  Assert.same({ row.hoveredLink, tip.shown }, { nil, false })
+  Widgets.click(row, "LeftButton")
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 1)
+
+  -- A refresh that puts another lead in the row clears the hovered link and its tooltip.
+  row.scripts.OnHyperlinkEnter(row, LINK, LINK_TEXT)
+  ns.Leads.Dismiss(ns.Leads.Latest().id)
+  Assert.equal(rows()[1], row)
+  Assert.equal(row.lead.customer, "Ann-Draenor")
+  Assert.same({ row.hoveredLink, tip.shown }, { nil, false })
+
+  -- Closing and reopening the window clears it too.
+  row.scripts.OnHyperlinkEnter(row, LINK, LINK_TEXT)
+  ns.LeadsWindow.Toggle()
+  ns.LeadsWindow.Toggle()
+  Assert.equal(row.hoveredLink, nil)
+end
+
+-- Rows sit in the inset and fit its height (320 high: inset 320 - 28 - 26 = 266; floor((266 - 16 + 2) / 38) = 6).
+local function testRowsFitTheInset()
+  local ns = load(customerNames(12))
+  ns.LeadsWindow.Toggle()
+  local frame = window()
+  Assert.equal(#rows(), 6)
+  Assert.equal(rows()[1].parent, frame.Inset)
+  Assert.same({ rows()[1]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -8 })
+  Assert.same({ rows()[2]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -46 })
+  -- No footer hint under the list: the clicks are the toast's, and its tooltip lists them.
+  Assert.falsy(string.find(textOf(frame), "Click: greet", 1, true), "no footer hint: " .. textOf(frame))
+  -- The client sizes the inset from its anchors only, which may be unresolved (0 high) on the
+  -- first open; the fit still comes out of the frame's own height.
+  ns.LeadsWindow.Toggle()
+  frame.Inset.GetHeight = function()
+    return 0
+  end
+  ns.LeadsWindow.Toggle()
+  Assert.equal(#rows(), 6, "rows fit before the inset is laid out")
+  ns = load({})
+  ns.LeadsWindow.Toggle()
+  Assert.truthy(string.find(textOf(window().Inset), "No leads", 1, true), "empty text is in the inset")
+end
+
+-- Review Focus 5: resize wrapping, minimum, save, close-and-reopen, reload.
+local function testResizeButton()
+  local customers = customerNames(12)
+  local ns, db = load(customers)
+  ns.LeadsWindow.Toggle()
+  local frame, screen = window(), rawget(_G, "UIParent")
+  local button = frame.resizeButton
+  Assert.equal(button.template, "PanelResizeButtonTemplate")
+  Assert.same(
+    { button.target == frame, button.minWidth, button.minHeight, button.maxWidth, button.maxHeight },
+    { true, 360, 160, screen:GetWidth(), screen:GetHeight() }
+  )
+  Assert.equal(#rows(), 6)
+  -- Dragging: the client resizes and fires OnSizeChanged. Init wrapped our refresh, so rows refit.
+  button.scripts.OnMouseDown(button, "LeftButton")
+  Assert.equal(frame.sizing, "BOTTOMRIGHT")
+  frame:SetSize(500, 400)
+  frame.scripts.OnSizeChanged(frame, 500, 400)
+  Assert.equal(#rows(), 8) -- 400 - 54 = 346; floor((346 - 16 + 2) / 38) = 8
+  -- Below the minimum, the button's wrapper pulls the size back (it only works if our script was set before Init).
+  frame:SetSize(100, 100)
+  frame.scripts.OnSizeChanged(frame, 100, 100)
+  Assert.same({ frame:GetWidth(), frame:GetHeight() }, { 360, 160 })
+  frame:SetSize(500, 400)
+  frame.scripts.OnSizeChanged(frame, 500, 400)
+  button.scripts.OnMouseUp(button, "LeftButton")
+  Assert.equal(frame.sizing, nil)
+  Assert.same({ db.ui.window.width, db.ui.window.height }, { 500, 400 })
+  -- Closed and reopened: same size, rows refit.
+  ns.LeadsWindow.Toggle()
+  ns.LeadsWindow.Toggle()
+  Assert.same({ frame:GetWidth(), frame:GetHeight(), #rows() }, { 500, 400, 8 })
+  -- After a /reload it opens at the saved size with the rows refit.
+  local saved = db.ui.window
+  ns = load(customers, function(accountDb)
+    accountDb.ui.window = saved
+  end)
+  ns.LeadsWindow.Toggle()
+  Assert.same({ window():GetWidth(), window():GetHeight(), #rows() }, { 500, 400, 8 })
+end
+
+local function testVisibleLatestAndScroll()
+  local ns = load(customerNames(12))
   ns.LeadsWindow.Toggle()
   -- The newest lead is in the top row, shown since the window opened (GetTime() 50).
   local lead, shownAt = ns.LeadsWindow.VisibleLatest()
@@ -174,17 +307,17 @@ local function testVisibleLatestAndScroll()
   Assert.equal(select(2, ns.LeadsWindow.VisibleLatest()), 50)
   ns.Leads.Dismiss(ns.Leads.Latest().id)
   Assert.same({ ns.LeadsWindow.VisibleLatest() }, { ns.Leads.Latest(), 55 })
-  Assert.truthy(string.find(rowText(rows()[1]), "Customer11-Draenor", 1, true), rowText(rows()[1]))
+  Assert.truthy(string.find(textOf(rows()[1]), "Customer11-Draenor", 1, true), textOf(rows()[1]))
   local visibleRows = #rows()
   Assert.truthy(visibleRows > 0 and visibleRows < 11, "only the rows that fit are shown")
   -- The mouse wheel scrolls; the latest lead is then off screen.
   window().scripts.OnMouseWheel(window(), -1)
-  Assert.truthy(string.find(rowText(rows()[1]), "Customer10-Draenor", 1, true), rowText(rows()[1]))
+  Assert.truthy(string.find(textOf(rows()[1]), "Customer10-Draenor", 1, true), textOf(rows()[1]))
   Assert.equal(ns.LeadsWindow.VisibleLatest(), nil)
   for _ = 1, 20 do
     window().scripts.OnMouseWheel(window(), -1)
   end
-  Assert.truthy(string.find(rowText(rows()[#rows()]), "Customer1-Draenor", 1, true), "stops at the oldest lead")
+  Assert.truthy(string.find(textOf(rows()[#rows()]), "Customer1-Draenor", 1, true), "stops at the oldest lead")
   -- Closing and reopening starts at the top again, shown from the new open time.
   ns.LeadsWindow.Toggle()
   Assert.equal(ns.LeadsWindow.VisibleLatest(), nil)
@@ -199,16 +332,16 @@ local function testSavedFrameAndOpacity()
   ns.LeadsWindow.Toggle()
   local frame = window()
   Assert.equal(frame:GetAlpha(), 0.7)
-  -- Dragging saves the position; the resize grip saves the size.
+  -- Dragging saves the position; the resize button saves the size.
   frame.scripts.OnDragStart(frame)
   frame:ClearAllPoints()
   frame:SetPoint("LEFT", rawget(_G, "UIParent"), "LEFT", 30, 40)
   frame.scripts.OnDragStop(frame)
-  local grip = frame.resizeGrip
-  grip.scripts.OnMouseDown(grip, "LeftButton")
+  local button = frame.resizeButton
+  button.scripts.OnMouseDown(button, "LeftButton")
   Assert.equal(frame.sizing, "BOTTOMRIGHT")
   frame:SetSize(500, 400)
-  grip.scripts.OnMouseUp(grip, "LeftButton")
+  button.scripts.OnMouseUp(button, "LeftButton")
   Assert.same(db.ui.window, { point = "LEFT", relativePoint = "LEFT", x = 30, y = 40, width = 500, height = 400 })
 
   -- The saved shapes are flat scalars, which the load-time Schema check keeps as they are.
@@ -251,6 +384,7 @@ local function testHugeSavedSize()
   local parent = rawget(_G, "UIParent")
   Assert.equal(window():GetWidth(), parent:GetWidth(), "no wider than the screen")
   Assert.equal(window():GetHeight(), parent:GetHeight(), "no taller than the screen")
+  Assert.equal(window().resizeButton.maxWidth, parent:GetWidth())
   Assert.equal(#rows(), 2)
   -- Even a frame taller than the screen (the client does not guarantee the clamp) rows only
   -- the leads there are.
@@ -294,6 +428,10 @@ return function()
   testRowFields()
   testRowRank()
   testRowClicks()
+  testRowHighlight()
+  testRowLinkHover()
+  testRowsFitTheInset()
+  testResizeButton()
   testVisibleLatestAndScroll()
   testSavedFrameAndOpacity()
   testCorruptedSavedLeads()
