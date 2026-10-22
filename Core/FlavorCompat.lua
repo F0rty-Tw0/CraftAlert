@@ -128,13 +128,25 @@ end
 local issecretvalue = _G["issecretvalue"]
 FlavorCompat.issecretvalue = type(issecretvalue) == "function" and issecretvalue or neverSecret
 
+-- Session-only class tokens for synthetic test leads, keyed by test guid. Never saved.
+local TEST_GUID_PREFIX = "Player-0-CRAFTALERTTEST" -- same value as Leads.TEST_GUID_PREFIX; Leads loads later
+local testClasses = {}
+
+-- Set the class token shown for a test guid; a nil token clears it.
+function FlavorCompat.SetTestClass(guid, token)
+  testClasses[guid] = token
+end
+
 -- Class token of the player with this chat GUID, or nil. The one owner of the chat-GUID class
 -- guard. A secret GUID or class is never passed on or compared (the secret test comes first: a
--- secret value cannot be inspected). The API and issecretvalue are read on each call, so tests
--- that stub them after load still reach this code.
+-- secret value cannot be inspected). A test GUID reads the test map and never the API. The API and
+-- issecretvalue are read on each call, so tests that stub them after load still reach this code.
 function FlavorCompat.ClassOf(guid)
   if FlavorCompat.issecretvalue(guid) or type(guid) ~= "string" then
     return nil
+  end
+  if string.sub(guid, 1, #TEST_GUID_PREFIX) == TEST_GUID_PREFIX then
+    return testClasses[guid]
   end
   local getInfo = _G["GetPlayerInfoByGUID"]
   if type(getInfo) ~= "function" then
