@@ -9,11 +9,16 @@ local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
+local LinkHover = ns.LinkHover or require("CraftAlert.UI.LinkHover")
+local Dock = ns.Dock or require("CraftAlert.UI.Dock")
+local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
+local ToastLayout = ns.ToastLayout or require("CraftAlert.UI.ToastLayout")
 
--- Spec §7.1: the one alert toast. Created on the first alert (§4.4 rule 5) as frame
--- CraftAlertToast; draggable, clamped, position saved in CraftAlertDB.ui.toast. A newer lead
--- replaces the shown one and the "+N more" badge counts the leads it replaced; the toast hides
--- after the toast duration (one pending timer, §4.3 rule 1) or when its lead leaves the list.
+-- Spec §7.1 and §4: the one alert toast. Created on the first alert (§4.4 rule 5) as frame
+-- CraftAlertToast, a native tooltip-backdrop panel docked beside the launcher (UI/Dock.lua);
+-- dragging it moves the launcher, so it keeps no position of its own. A newer lead replaces the
+-- shown one and the "+N more" badge counts the leads it replaced; the toast hides after the
+-- toast duration (one pending timer, §4.3 rule 1) or when its lead leaves the list.
 local AlertToast = {}
 
 -- The "+N more" count on the shown toast: leads it replaced since it appeared (0 when hidden).
@@ -21,16 +26,15 @@ AlertToast.more = 0
 
 local concat = table.concat
 local match = string.match
+local tostring = tostring
 local type = type
 
 local FRAME_NAME = "CraftAlertToast"
-local UI_KEY = "toast"
-local FALLBACK_POSITION = { "TOP", 0, -160 }
+local NO_LAUNCHER_POSITION = { "TOP", 0, -160 }
 local SOUND_CHANNEL = "Master"
-local LINE_GAP = 3
 
 ---@type table
-local toast = nil -- { frame, name, badge, message, what, detail }, nil until the first alert
+local toast = nil -- { frame, parts = ToastLayout.Build(frame) }, nil until the first alert
 local current = { lead = nil, shownAt = nil }
 local hideAt = 0
 local timerPending = false
@@ -47,14 +51,12 @@ local function trim(text)
   return match(text or "", "^%s*(.-)%s*$")
 end
 
--- Crafter, rank, why, and the realm tag (§7.2) on one line.
+-- The rank and the realm tag (§4.5, §7.2), whichever the lead has, or "".
 local function detailText(lead)
-  local parts = { LeadText.Crafter(lead) }
+  local parts = {}
   parts[#parts + 1] = LeadText.Rank(lead)
-  if lead.why and lead.why ~= "" then
-    parts[#parts + 1] = lead.why
-  end
   parts[#parts + 1] = LeadText.RealmTag(lead)
+
   return concat(parts, " · ")
 end
 
@@ -71,21 +73,36 @@ local function badgeText()
   return ""
 end
 
+local function showDetail(detail, text)
+  detail:SetText(text)
+  if text == "" then
+    detail:Hide()
+  else
+    detail:Show()
+  end
+end
+
 local function render(lead)
-  toast.name:SetText(tostring(lead.customer))
-  FrameKit.PaintName(toast.name, lead.guid)
-  toast.badge:SetText(badgeText())
-  toast.message:SetText(trim(lead.message))
-  toast.what:SetText(LeadText.What(lead))
-  toast.detail:SetText(detailText(lead))
-  toast.frame:SetAlpha(settings().opacity or 1)
-  toast.frame:Show()
+  local frame, parts = toast.frame, toast.parts
+  parts.name:SetText(tostring(lead.customer))
+  FrameKit.PaintName(parts.name, lead.guid)
+  parts.badge:SetText(badgeText())
+  parts.headline:SetText(LeadText.Headline(lead))
+  local detail = detailText(lead)
+  showDetail(parts.detail, detail)
+  parts.message:SetText(trim(lead.message))
+  LinkHover.Clear(frame)
+  ToastLayout.Fit(frame, parts, detail ~= "")
+  frame:SetAlpha(settings().opacity or 1)
+  frame:Show()
+  AlertToast.Dock()
 end
 
 local function hide()
   current.lead, current.shownAt = nil, nil
   AlertToast.more = 0
   toast.frame:Hide()
+  Launcher.ShowLead(nil)
 end
 
 local armHide
@@ -116,7 +133,29 @@ local function startHideTimer()
   armHide()
 end
 
-local function onClick(_, button)
+-- What matched (lead.why, never drawn on the face) and the click legend.
+local function showTooltip(frame)
+  local tooltip, secondary = _G["GameTooltip"], Theme.COLORS.textSecondary
+  local why = current.lead and current.lead.why
+  tooltip:SetOwner(frame, "ANCHOR_TOP")
+  tooltip:SetText(Localization.Text("Craft Alert"))
+  if type(why) == "string" and why ~= "" then
+    tooltip:AddLine(Localization.Text("Matched: %s", why), 1, 1, 1, true)
+  end
+  local legend = Localization.Text("Click: greet · Shift: edit first · Ctrl: empty whisper · Right: dismiss")
+  tooltip:AddLine(legend, secondary[1], secondary[2], secondary[3], true)
+  tooltip:Show()
+end
+
+local function hideTooltip()
+  _G["GameTooltip"]:Hide()
+end
+
+-- A click on a link inside the message belongs to the link (LinkHover), never to the lead.
+local function onClick(frame, button)
+  if LinkHover.IsOverLink(frame) then
+    return
+  end
   if ClickRouter.Handle(button, current.lead, current.shownAt) then
     hide()
   end
@@ -138,36 +177,27 @@ local function onLeadsChange()
   end
 end
 
-local function line(frame, font, color, anchor)
-  local text = FrameKit.Text(frame, font, color)
-  text:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -LINE_GAP)
-  text:SetPoint("RIGHT", frame, "RIGHT", -Theme.LAYOUT.PADDING, 0)
-  return text
-end
-
+-- The scripts go on before LinkHover.Attach, which hooks OnLeave and OnHide.
 local function create()
-  local layout, colors, fonts = Theme.LAYOUT, Theme.COLORS, Theme.FONTS
-  local frame = _G["CreateFrame"]("Button", FRAME_NAME, _G["UIParent"])
-  frame:SetSize(layout.TOAST_WIDTH, layout.TOAST_HEIGHT)
+  local frame = _G["CreateFrame"]("Button", FRAME_NAME, _G["UIParent"], "TooltipBackdropTemplate")
+  frame:SetWidth(Theme.LAYOUT.TOAST_WIDTH)
   frame:SetFrameStrata("DIALOG")
-  FrameKit.Panel(frame)
-  FrameKit.Draggable(frame, UI_KEY)
-  FrameKit.Place(frame, UI_KEY, FALLBACK_POSITION)
+  frame:SetClampedToScreen(true)
+  frame:EnableMouse(true)
+  frame:RegisterForDrag("LeftButton")
   frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  frame:SetScript("OnEnter", showTooltip)
+  frame:SetScript("OnLeave", hideTooltip)
   frame:SetScript("OnClick", onClick)
   frame:SetScript("OnShow", onShow)
-  local name = FrameKit.Text(frame, fonts.name)
-  name:SetPoint("TOPLEFT", frame, "TOPLEFT", layout.PADDING, -layout.PADDING)
-  local badge = FrameKit.Text(frame, fonts.badge, colors.accent)
-  badge:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -layout.PADDING, -layout.PADDING)
-  badge:SetJustifyH("RIGHT")
-  name:SetPoint("RIGHT", badge, "LEFT", -layout.PADDING, 0)
-  local message = line(frame, fonts.body, colors.textPrimary, name)
-  local what = line(frame, fonts.body, colors.textPrimary, message)
-  local detail = line(frame, fonts.detail, colors.textSecondary, what)
+  frame:SetScript("OnDragStart", Launcher.StartDrag)
+  frame:SetScript("OnDragStop", Launcher.StopDrag)
+  LinkHover.Attach(frame, showTooltip)
+  local parts = ToastLayout.Build(frame)
   frame:Hide()
   Leads.On("change", onLeadsChange)
-  return { frame = frame, name = name, badge = badge, message = message, what = what, detail = detail }
+
+  return { frame = frame, parts = parts }
 end
 
 local function alert()
@@ -182,15 +212,35 @@ local function alert()
   end
 end
 
--- A new lead (Leads.On("new"), wired by Bootstrap): show it, sound, flash.
+-- A new lead (Leads.On("new"), wired by Bootstrap): show it, light the launcher, sound, flash.
 function AlertToast.Show(lead)
   toast = toast or create()
   local replacing = toast.frame:IsShown() and current.lead ~= nil and current.lead ~= lead
   AlertToast.more = replacing and AlertToast.more + 1 or 0
   current.lead, current.shownAt = lead, now()
   render(lead)
+  Launcher.ShowLead(lead)
   alert()
   startHideTimer()
+end
+
+-- Docks the toast beside the launcher (Dock.Anchor), or at a fixed spot on UIParent before the
+-- launcher exists. Bootstrap runs it after every launcher drag (Launcher.OnMoved).
+function AlertToast.Dock()
+  if toast == nil then
+    return
+  end
+  local frame, launcher, screen = toast.frame, Launcher.Frame(), _G["UIParent"]
+  frame:ClearAllPoints()
+  if launcher == nil then
+    local point, x, y = NO_LAUNCHER_POSITION[1], NO_LAUNCHER_POSITION[2], NO_LAUNCHER_POSITION[3]
+    frame:SetPoint(point, screen, point, x, y)
+    return
+  end
+  local lx, ly = launcher:GetCenter()
+  local sx, sy = screen:GetCenter()
+  local point, relativePoint, x, y = Dock.Anchor(lx, ly, sx, sy)
+  frame:SetPoint(point, launcher, relativePoint, x, y)
 end
 
 -- The lead on the toast and GetTime() when it appeared, or nil (hidden, also by Alt+Z, or

@@ -155,8 +155,39 @@ function Wow.pendingTimers(delay)
   return count
 end
 
+-- FrameXML's GameTooltip, present in every client before any addon loads: it keeps its owner and
+-- whether it is shown; text calls are dropped. tests/helpers/ui_fixture.lua stubs a recording one.
+local function newTooltip()
+  local tooltip = { shown = false }
+
+  function tooltip:SetOwner(owner)
+    self.owner = owner
+  end
+
+  function tooltip:SetText() end
+
+  function tooltip:AddLine() end
+
+  function tooltip:SetHyperlink() end
+
+  function tooltip:Show()
+    self.shown = true
+  end
+
+  function tooltip:Hide()
+    self.shown = false
+  end
+
+  function tooltip:IsOwned(frame)
+    return self.owner == frame and self.shown
+  end
+
+  return tooltip
+end
+
 local timerSeq = 0
 local function installDefaults()
+  Wow.stub("GameTooltip", newTooltip())
   Wow.stub("CreateFrame", newFrame)
   Wow.stub("UIParent", newFrame("Frame", nil))
   table.remove(Wow.frames) -- UIParent never registers events; keep Wow.frames to the addon's frames

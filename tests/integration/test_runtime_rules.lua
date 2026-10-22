@@ -52,6 +52,9 @@ local function installBlizzard(sent)
     Hide = function(self)
       self.shown = false
     end,
+    IsOwned = function()
+      return false
+    end,
   })
   Wow.stub("ProfessionsFrame", { CraftingPage = { RecipeList = { ScrollBox = {} } } })
   Wow.stub("SlashCmdList", {})
