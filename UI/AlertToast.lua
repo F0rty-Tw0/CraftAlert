@@ -236,7 +236,8 @@ function AlertToast.Show(lead)
 end
 
 -- Docks the toast beside the launcher (Dock.Anchor), or at a fixed spot on UIParent before the
--- launcher exists. Bootstrap runs it after every launcher drag (Launcher.OnMoved).
+-- launcher exists. Bootstrap runs it after every launcher drag (Launcher.OnMoved); render and
+-- every leads "change" while the toast is shown run it too.
 function AlertToast.Dock()
   if toast == nil then
     return
