@@ -4,6 +4,8 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
+local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 
 -- The words the toast and the leads-window rows show for a lead.
 local LeadText = {}
@@ -19,6 +21,18 @@ end
 
 function LeadText.Crafter(lead)
   return Localization.Text("by %s", tostring(lead.crafter))
+end
+
+-- Spec §4.2: "Wants <what> — you can craft it" / "— your alt <name> can craft it"; a lead without
+-- an item or recipe says "you have it" / "your alt <name> has it".
+function LeadText.Headline(lead)
+  local what = LeadText.What(lead)
+  local craftable = lead.itemLink or lead.recipeName
+  if lead.crafter == PlayerName.Own() then
+    return Localization.Text(craftable and "Wants %s — you can craft it" or "Wants %s — you have it", what)
+  end
+  local alt = Greeting.CrafterName(lead.crafter)
+  return Localization.Text(craftable and "Wants %s — your alt %s can craft it" or "Wants %s — your alt %s has it", what, alt)
 end
 
 -- §4.5: "R2 (conc)" when the rank counts on concentration, "R2" when it needs none, else nil.
