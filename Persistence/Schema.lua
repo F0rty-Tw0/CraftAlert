@@ -43,6 +43,7 @@ local LEAD_FIELDS = {
   greeted = "boolean",
   replied = "boolean",
   arrivedWhileAfk = "boolean",
+  test = "boolean",
   profName = "string",
   recipeName = "string",
   itemID = "number",
