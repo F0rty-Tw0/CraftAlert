@@ -164,7 +164,7 @@ local function jobCases()
   resumed.recipes = threeBelts()
   recipesOf(resumedDb)[2] = { item = 200, name = "Belt 2", prof = BS }
   recipesOf(resumedDb)[3] = { item = 300, name = "Belt 3", prof = BS }
-  logRecipeReads()
+  local resumedCalls = logRecipeReads()
   Wow.fireEvent("TRADE_SKILL_SHOW")
   runOneTick()
   Wow.fireEvent("TRADE_SKILL_CLOSE")
@@ -173,6 +173,7 @@ local function jobCases()
   Wow.runTimers()
   Assert.equal(resumedDb.characters[CHAR].professions[BS].read, true)
   Assert.same(resumedRun.reasons, { "read" })
+  Assert.same(resumedCalls, { 1, 2, 3 }, "the job resumed at the cursor")
 
   -- An interrupted read stores what an uninterrupted one does.
   local plain, _, plainDb, _, plainSlicer = setup()
