@@ -133,8 +133,38 @@ local function testPreview()
   Assert.equal(Leads.Preview(match(ns, profession), profession), nil, "no enabled crafter, no lead")
 end
 
+-- Blizzard's ignore list: an ignored customer makes and refreshes no lead, and IGNORELIST_UPDATE
+-- (Leads.DismissIgnored) drops the open leads of everyone ignored, with one "change".
+local function testIgnoreList()
+  local ns = setup()
+  local Leads = ns.Leads
+  local text = "LF plate belt"
+  local first = newLead(ns, text)
+  local time, message = first.time, first.message
+  Wow.clock.time = Wow.clock.time + 30
+  Wow.stub("C_FriendList", {
+    IsIgnored = function(name)
+      return name == CUSTOMER
+    end,
+  })
+  Assert.equal(newLead(ns, "LF plate belt now"), nil, "an ignored customer's repeat line refreshes nothing")
+  Assert.same({ first.time, first.message }, { time, message }, "the open lead is untouched")
+
+  Assert.truthy(newLead(ns, text, "Other-Draenor"), "Other is not ignored")
+  local seen = listen(Leads)
+  Leads.DismissIgnored()
+  Assert.equal(seen.change, 1, "one change for the whole pass")
+  Assert.equal(#Leads.List(), 1)
+  Assert.equal(Leads.List()[1].customer, "Other-Draenor")
+
+  Wow.stub("C_FriendList", nil)
+  Leads.DismissIgnored()
+  Assert.equal(seen.change, 1, "nobody ignored: no change")
+end
+
 return function()
   testPreview()
+  testIgnoreList()
   -- A new lead copies what it keeps out of the Matcher's result (§6.3 step 7).
   local ns, db = setup()
   local Leads = ns.Leads

@@ -328,6 +328,10 @@ function Leads.OnMatch(result, customerKey, text, channelKey, guid)
   if db == nil or customerKey == nil then
     return nil
   end
+  -- grug: ignore list asked twice on a new lead (here and in Pick); matched lines only
+  if CrafterRank.IsIgnored(customerKey) then
+    return nil
+  end
   local lead, position = findDuplicate(customerKey, result)
   if lead then
     lead.message, lead.channel, lead.time = text, channelKey, now()
@@ -415,6 +419,20 @@ function Leads.Dismiss(id)
   local lead, position = find(id)
   if lead then
     remove(leads, position)
+    fire("change")
+  end
+end
+
+-- Blizzard's ignore list changed (IGNORELIST_UPDATE): drop the open leads of every ignored customer.
+function Leads.DismissIgnored()
+  local removed = false
+  for i = #leads, 1, -1 do
+    if CrafterRank.IsIgnored(leads[i].customer) then
+      remove(leads, i)
+      removed = true
+    end
+  end
+  if removed then
     fire("change")
   end
 end
