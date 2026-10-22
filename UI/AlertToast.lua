@@ -133,7 +133,7 @@ local function onShow()
   end
 end
 
--- Hides the toast once its lead is dismissed, blocked or expired.
+-- Hides the toast once its lead is dismissed, ignored or expired.
 local function onLeadsChange()
   local lead = current.lead
   if lead and not current.isTest and not Leads.IsActive(lead.id) then

@@ -4,14 +4,13 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
-local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
 
 -- Spec §7.3: one row of the leads window. Customer and age on top; item or profession, crafter
--- and realm tag below; greeted check, replied tag and the "Block" button on the right. Clicks
+-- and realm tag below; greeted check and replied tag on the right. Clicks
 -- follow the toast's table (§7.1). The row frame carries its lead and the GetTime() at which
 -- that lead appeared in it (§7.5 rule 3).
 local LeadRow = {}
@@ -35,13 +34,6 @@ local function onShow(row)
   end
 end
 
-local function onBlock(button)
-  local lead = button.row.lead
-  if lead then
-    Leads.Block(lead.customer)
-  end
-end
-
 local function setShown(region, shown)
   if shown then
     region:Show()
@@ -50,26 +42,10 @@ local function setShown(region, shown)
   end
 end
 
-local function createBlockButton(row)
-  local layout = Theme.LAYOUT
-  local button = _G["CreateFrame"]("Button", nil, row)
-  button:SetSize(layout.BLOCK_BUTTON_WIDTH, layout.BLOCK_BUTTON_HEIGHT)
-  button:SetPoint("RIGHT", row, "RIGHT", -layout.PADDING, 0)
-  FrameKit.Panel(button, Theme.COLORS.danger)
-  local label = FrameKit.Text(button, Theme.FONTS.detail, Theme.COLORS.textPrimary)
-  label:SetPoint("CENTER", button, "CENTER", 0, 0)
-  label:SetJustifyH("CENTER")
-  label:SetText(Localization.Text("Block"))
-  button.row = row
-  button:RegisterForClicks("LeftButtonUp")
-  button:SetScript("OnClick", onBlock)
-  return button
-end
-
-local function createMarks(row, blockButton)
+local function createMarks(row)
   local size = Theme.LAYOUT.ROW_ICON_SIZE
   local replied = FrameKit.Text(row, Theme.FONTS.detail, Theme.COLORS.accent)
-  replied:SetPoint("RIGHT", blockButton, "LEFT", -Theme.LAYOUT.PADDING, 0)
+  replied:SetPoint("RIGHT", row, "RIGHT", -Theme.LAYOUT.PADDING, 0)
   replied:SetText(Localization.Text("replied"))
   local greeted = row:CreateTexture(nil, "ARTWORK")
   greeted:SetSize(size, size)
@@ -90,8 +66,7 @@ function LeadRow.Create(parent, index)
   local hover = row:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints(row)
   FrameKit.Fill(hover, colors.rowHover)
-  row.blockButton = createBlockButton(row)
-  row.greetedIcon, row.repliedTag = createMarks(row, row.blockButton)
+  row.greetedIcon, row.repliedTag = createMarks(row)
   row.name = FrameKit.Text(row, fonts.name)
   row.name:SetPoint("TOPLEFT", row, "TOPLEFT", layout.PADDING, -4)
   row.age = FrameKit.Text(row, fonts.detail, colors.textTimestamp)
