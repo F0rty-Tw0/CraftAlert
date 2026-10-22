@@ -240,6 +240,9 @@ local function testFreshInstall()
   Assert.equal(lead.crafter, OWN_KEY)
   Assert.equal(session.toasts, 1, "one toast per new lead")
   local toast = rawget(_G, "CraftAlertToast")
+  launcher.center = { 1800, 100 }
+  launcher.scripts.OnDragStop(launcher) -- Bootstrap wired Launcher.OnMoved(AlertToast.Dock)
+  Assert.equal(toast:GetPoint(), "BOTTOMRIGHT")
   Assert.equal(toast:IsShown(), true)
   for _, event in ipairs(WHISPER_EVENTS) do
     Assert.truthy(isRegistered(event), event .. " registered with a lead")

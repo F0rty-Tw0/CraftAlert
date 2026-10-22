@@ -122,6 +122,7 @@ end
 
 local function createLauncher()
   Launcher.Create()
+  Launcher.OnMoved(AlertToast.Dock)
   ScanGate.OnChange(Launcher.Refresh)
 end
 
