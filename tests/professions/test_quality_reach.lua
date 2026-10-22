@@ -179,7 +179,7 @@ end
 
 local function testConcentrationIsSavedAfterTheLastStep()
   local state, QualityReach, Slicer, db = setup({ [10] = { ranks = { 1, 2 } }, [11] = { ranks = { 1, 2 } } })
-  state.answers[10] = qualityAnswer(1, 376, 3168)
+  state.answers[10] = qualityAnswer(1, 376, 3167)
   state.answers[11] = qualityAnswer(1, 376, 3168)
   db.characters[CHAR].concentration = nil
   Wow.clock.time = 7000
@@ -189,7 +189,10 @@ local function testConcentrationIsSavedAfterTheLastStep()
   Wow.clock.time = 8000
   Slicer.Drain()
 
-  Assert.same(db.characters[CHAR].concentration, { [3168] = { amount = 100, at = 8000, cycleMs = 345600, perCycle = 1, max = 1000 } })
+  Assert.same(db.characters[CHAR].concentration, {
+    [3167] = { amount = 698, at = 8000, cycleMs = 345600, perCycle = 1, max = 1000 },
+    [3168] = { amount = 100, at = 8000, cycleMs = 345600, perCycle = 1, max = 1000 },
+  }, "a currency the last recipe brings in is saved too")
 end
 
 local function testQueueKeepsFifoWithoutDuplicates()
