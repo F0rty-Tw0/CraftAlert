@@ -150,7 +150,7 @@ local function testArt()
   frame = ns.Launcher.Create()
   Assert.equal(frame:GetNormalTexture().texture, "Interface\\Minimap\\MiniMap-TrackingBorder")
   Assert.same({ frame:GetHighlightTexture().texture, frame:GetHighlightTexture().blendMode }, { "Interface\\Buttons\\UI-Common-MouseHilight", "ADD" })
-  Assert.equal(frame:GetPushedTexture():IsShown(), false)
+  Assert.equal(frame:GetPushedTexture(), nil, "no pushed texture: a press keeps the normal ring")
   Assert.same({ frame.glow, frame.pulse, frame.pulseOnce, frame.pulseLoop }, {})
   ns.Launcher.ShowLead(ns.Leads.Latest() or UiFixture.lead(1)) -- plays nothing, raises nothing
   frame.scripts.OnEnter(frame)

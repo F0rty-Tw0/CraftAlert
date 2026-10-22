@@ -9,8 +9,8 @@ local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 -- Spec §5.1–5.2: the launcher's CraftScan look (../CraftScan/Customer/AlertIcon.xml). A
 -- Soulbinds ring as the button's normal, pushed and highlight art; a round-masked portrait
 -- inside it; a ring glow while the cursor is over it; a circle glow that pulses for a new lead.
--- Without the atlases (Classic) the ring falls back to the minimap tracking border, and the
--- glow and pulse do not exist.
+-- Without the atlases (Classic) the ring falls back to the minimap tracking border, the button
+-- has no pushed art, and the glow and pulse do not exist.
 local LauncherArt = {}
 
 local RING_NORMAL_ATLAS = "Soulbinds_Tree_Ring_Disabled"
@@ -45,8 +45,11 @@ local function buildRings(frame)
   FrameKit.Art(normal, RING_NORMAL_ATLAS, RING_NORMAL_FILE)
   frame:SetNormalTexture(normal)
   local pushed = frame:CreateTexture(nil, "ARTWORK")
-  FrameKit.Art(pushed, RING_LIT_ATLAS)
-  frame:SetPushedTexture(pushed)
+  local hasPushed = FrameKit.Art(pushed, RING_LIT_ATLAS)
+  -- A pushed state swaps out the normal ring, so a missing atlas gets no pushed texture at all.
+  if hasPushed then
+    frame:SetPushedTexture(pushed)
+  end
   local highlight = frame:CreateTexture(nil, "HIGHLIGHT")
   FrameKit.Art(highlight, RING_LIT_ATLAS, RING_HIGHLIGHT_FILE, ADD)
   frame:SetHighlightTexture(highlight, ADD)
