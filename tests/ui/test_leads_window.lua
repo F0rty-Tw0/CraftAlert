@@ -198,12 +198,13 @@ local function testRowLinkHover()
   Assert.same({ tip.hyperlinks, tip.owner, tip.shown }, { { LINK }, row, true })
 
   -- While a link is hovered no click greets or dismisses.
+  local bobId = row.lead.id
   Wow.clock.gettime = 51
   Widgets.click(row, "LeftButton")
   Widgets.click(row, "RightButton")
   Assert.equal(#UiFixture.callsTo(calls, "chat"), 0, "a click on a link never greets")
+  Assert.equal(ns.Leads.IsActive(bobId), true, "a right-click on a link never dismisses")
   Assert.equal(row.lead.customer, "Bob-Draenor")
-  Assert.equal(ns.Leads.IsActive(row.lead.id), true, "a right-click on a link never dismisses")
 
   row.scripts.OnHyperlinkClick(row, LINK, LINK_TEXT, "LeftButton")
   Assert.same(Wow.itemRefs, { { LINK, LINK_TEXT, "LeftButton", row } })
