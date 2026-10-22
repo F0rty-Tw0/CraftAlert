@@ -5,6 +5,7 @@
 --   Wow.runTimers()         run queued C_Timer.After callbacks (lowest delay first)
 --   Wow.pendingTimers(d)    how many queued C_Timer.After callbacks have delay d
 --   Wow.secret(v)           wrap v so issecretvalue(wrapper) is true
+--   Wow.itemRefs            the calls to the stubbed SetItemRef: { link, text, button, frame }
 local Widgets = require("tests.helpers.widgets")
 
 local Wow = {}
@@ -17,6 +18,7 @@ local secrets = setmetatable({}, { __mode = "k" })
 Wow.frames = {}
 Wow.timers = {}
 Wow.chat = {}
+Wow.itemRefs = {}
 Wow.clock = { gettime = 0, time = 0, profile = 0 }
 Wow.combat = false -- what InCombatLockdown() returns
 
@@ -36,13 +38,7 @@ end
 -- As the client: OnShow (then its hooks) runs on a frame that becomes visible, and on each of
 -- its shown descendants, so showing UIParent again after Alt+Z reaches the addon's frames.
 local function fireOnShow(frame)
-  local onShow = frame.scripts.OnShow
-  if onShow then
-    onShow(frame)
-  end
-  for _, hook in ipairs(frame.hooks.OnShow or {}) do
-    hook(frame)
-  end
+  Widgets.fire(frame, "OnShow")
   for _, child in ipairs(Wow.frames) do
     if child.parent == frame and child.shown then
       fireOnShow(child)
@@ -88,8 +84,13 @@ local function newFrame(frameType, name, parent, template)
     end
   end
 
+  -- As the client: OnHide (then its hooks) runs when a shown frame hides.
   function frame:Hide()
+    local wasShown = self.shown
     self.shown = false
+    if wasShown then
+      Widgets.fire(self, "OnHide")
+    end
   end
 
   function frame:IsShown()
@@ -160,6 +161,15 @@ local function installDefaults()
   Wow.stub("UIParent", newFrame("Frame", nil))
   table.remove(Wow.frames) -- UIParent never registers events; keep Wow.frames to the addon's frames
   _G["UIParent"]:SetSize(1920, 1080)
+  _G["UIParent"].center = { 960, 540 }
+  Wow.stub("C_Texture", {
+    GetAtlasInfo = function()
+      return { width = 1, height = 1 }
+    end,
+  })
+  Wow.stub("SetItemRef", function(link, text, button, frame)
+    table.insert(Wow.itemRefs, { link, text, button, frame })
+  end)
   Wow.stub("C_Timer", {
     After = function(delay, fn)
       timerSeq = timerSeq + 1
@@ -231,6 +241,7 @@ function Wow.reset()
   Wow.frames = {}
   Wow.timers = {}
   Wow.chat = {}
+  Wow.itemRefs = {}
   Wow.clock = { gettime = 0, time = 0, profile = 0 }
   Wow.combat = false
   installDefaults()
