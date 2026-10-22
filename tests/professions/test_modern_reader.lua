@@ -244,7 +244,13 @@ return function()
   recipesOf(db)[9] = { item = 900, name = "Belt 9", prof = BS }
   recipesOf(db)[10] = { item = 1000, name = "Belt 10", prof = BS, muted = true }
   recipesOf(db)[11] = { item = 1100, name = "Belt 11", prof = BS, muted = true }
-  state.lookups = { [7] = ownCooking, [10] = ownEnch, [11] = { professionID = 2872 } }
+  recipesOf(db)[12] = { item = 1200, name = "Belt 12", prof = BS, muted = true }
+  state.lookups = {
+    [7] = ownCooking,
+    [10] = ownEnch,
+    [11] = { professionID = 2872 },
+    [12] = { professionID = 0, parentProfessionID = 0 },
+  }
   state.recipes = { belt(3, 300, { profession = ownCooking }), belt(5, 500, { profession = ownEnch }) }
   Wow.fireEvent("TRADE_SKILL_SHOW")
   Assert.truthy(recipesOf(db)[3], "no recipe named Blacksmithing: the lookup proves nothing")
@@ -259,6 +265,7 @@ return function()
   Assert.truthy(recipesOf(db)[9], "no lookup answer: kept")
   Assert.same(recipesOf(db)[10], { item = 1000, name = "Belt 10", prof = BS, muted = true }, "a stored profession: kept")
   Assert.truthy(recipesOf(db)[11], "a bare skill line without a parent: kept")
+  Assert.same(recipesOf(db)[12], { item = 1200, name = "Belt 12", prof = BS, muted = true }, "a 0 parent: kept")
   Assert.equal(recipesOf(db)[1].prof, BS)
   Wow.runTimers()
   local builds = run.builds
@@ -267,6 +274,17 @@ return function()
   Assert.equal(recipesOf(db)[7], nil)
   Wow.runTimers()
   Assert.equal(run.builds, builds + 1, "a read that only drops a recipe still rebuilds the index")
+
+  -- A recipe whose lookup answers a bare skill line the character does not store (no parent)
+  -- belongs to the window, as when nothing loaded; a parented unstored answer is skipped.
+  state, _, db = setup()
+  state.recipes = {
+    belt(1, 100, { profession = { professionID = 2872 } }),
+    belt(2, 200, { profession = ownCooking }),
+  }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(recipesOf(db)[1].prof, BS, "a bare skill line proves no other profession")
+  Assert.equal(recipesOf(db)[2], nil)
 
   -- Opening the window reads even while the data source is still rebuilding.
   state, _, db = setup()
