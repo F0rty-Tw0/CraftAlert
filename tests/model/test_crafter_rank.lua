@@ -230,6 +230,127 @@ return function()
   Assert.equal(picked, "Prim-Realm")
   Assert.equal(cannotOrder, nil)
 
+  -- Quality rank (spec §4.4): after can-order, before the tier. An entry is { crafter, recipeKey }.
+  local function rankedResult(...)
+    local entries = {}
+    for i, pair in ipairs({ ... }) do
+      entries[i] = { character = pair[1], recipeKey = pair[2], group = 501, prof = BS }
+    end
+    return { kind = "item", entries = entries, entryCount = #entries, group = 501, prof = BS, why = { "lf" }, whyCount = 1 }
+  end
+  local function learn(key, recipeKey, fields)
+    fields.name, fields.prof = "recipe " .. recipeKey, BS
+    data.characters[key].recipes[recipeKey] = fields
+  end
+  local function ranked(...)
+    return CrafterRank.Pick(rankedResult(...), CUSTOMER, data)
+  end
+  local CYCLE_MS = 345600
+  local rank, byConc, recipeKey, _
+  local function snapshot(amount, max)
+    return { [3168] = { amount = amount, at = 0, cycleMs = CYCLE_MS, perCycle = 1, max = max or 1000 } }
+  end
+
+  CrafterRank = load("retail")
+  data = db()
+  learn("Me-Realm", 10, { ranks = { 1, 2 }, reachRank = 1, reachCost = 0, reachConc = 3168 })
+  learn("Alt-Realm", 10, { ranks = { 1, 2 }, reachRank = 2, reachCost = 0, reachConc = 3168 })
+  picked, _, rank, byConc, recipeKey = ranked({ "Me-Realm", 10 }, { "Alt-Realm", 10 })
+  Assert.same({ picked, rank, byConc, recipeKey }, { "Alt-Realm", 2, false, 10 }, "the higher rank beats the current character")
+
+  -- Alt concentration is projected from its snapshot: amount + whole recharge cycles, up to max.
+  data = db()
+  learn("Alt-Realm", 10, { ranks = { 1, 2 }, reachRank = 1, reachCost = 376, reachConc = 3168 })
+  data.characters["Alt-Realm"].concentration = snapshot(300)
+  Wow.clock.time = 27648
+  picked, _, rank, byConc = ranked({ "Alt-Realm", 10 })
+  Assert.same({ picked, rank, byConc }, { "Alt-Realm", 2, true }, "380 projected covers the 376 cost")
+  Wow.clock.time = 24192
+  picked, _, rank, byConc = ranked({ "Alt-Realm", 10 })
+  Assert.same({ picked, rank, byConc }, { "Alt-Realm", 1, false }, "370 projected does not")
+  Wow.clock.time = 1728000
+  data.characters["Alt-Realm"].concentration = snapshot(300, 350)
+  rank, byConc = select(3, ranked({ "Alt-Realm", 10 }))
+  Assert.same({ rank, byConc }, { 1, false }, "the projection stops at max")
+  data.characters["Alt-Realm"].concentration = nil
+  rank, byConc = select(3, ranked({ "Alt-Realm", 10 }))
+  Assert.same({ rank, byConc }, { 1, false }, "no snapshot counts as 0")
+  data.characters["Alt-Realm"].recipes[10].reachRank = 2
+  rank, byConc = select(3, ranked({ "Alt-Realm", 10 }))
+  Assert.same({ rank, byConc }, { 2, false }, "top rank reached: concentration is not asked")
+  Wow.clock.time = 0
+
+  -- The current character reads its live currency.
+  data = db()
+  learn("Me-Realm", 10, { ranks = { 1, 2 }, reachRank = 1, reachCost = 376, reachConc = 3168 })
+  local quantity = 400
+  Wow.stub("C_CurrencyInfo", {
+    GetCurrencyInfo = function(id)
+      Assert.equal(id, 3168)
+      return { quantity = quantity }
+    end,
+  })
+  rank, byConc = select(3, ranked({ "Me-Realm", 10 }))
+  Assert.same({ rank, byConc }, { 2, true }, "400 live covers 376")
+  quantity = 10
+  rank, byConc = select(3, ranked({ "Me-Realm", 10 }))
+  Assert.same({ rank, byConc }, { 1, false }, "10 live does not")
+  Wow.stub("C_CurrencyInfo", {
+    GetCurrencyInfo = function()
+      return nil
+    end,
+  })
+  rank, byConc = select(3, ranked({ "Me-Realm", 10 }))
+  Assert.same({ rank, byConc }, { 1, false }, "no currency answer counts as 0")
+  Wow.stub("C_CurrencyInfo", nil)
+  rank, byConc = select(3, ranked({ "Me-Realm", 10 }))
+  Assert.same({ rank, byConc }, { 1, false }, "no currency API (Classic) counts as 0")
+
+  -- Can-order stays the first key.
+  data = db()
+  data.characters["Me-Realm"].realms = { "Realm", "Draenor" }
+  data.characters["Alt-Realm"].realms = { "Realm" }
+  learn("Me-Realm", 10, { ranks = { 1, 2 }, reachRank = 1, reachCost = 0, reachConc = 3168 })
+  learn("Alt-Realm", 10, { ranks = { 1, 2 }, reachRank = 2, reachCost = 0, reachConc = 3168 })
+  picked, cannotOrder, rank = ranked({ "Me-Realm", 10 }, { "Alt-Realm", 10 })
+  Assert.same({ picked, cannotOrder, rank }, { "Me-Realm", false, 1 }, "a crafter who cannot be ordered loses despite a higher rank")
+
+  -- The key is rank / #ranks; nil ranks below any number.
+  data = db()
+  learn("Alt-Realm", 10, { ranks = { 1, 2, 3, 4, 5 }, reachRank = 1, reachCost = 0, reachConc = 3168 })
+  learn("Me-Realm", 10, { ranks = { 1, 2 }, reachCost = 0 })
+  Assert.equal((ranked({ "Me-Realm", 10 }, { "Alt-Realm", 10 })), "Alt-Realm", "1 of 5 beats no rank")
+  learn("Zed-Realm", 10, { ranks = { 1, 2 }, reachRank = 2, reachCost = 0, reachConc = 3168 })
+  data.characters["Alt-Realm"].recipes[10].reachRank = 4
+  Assert.equal((ranked({ "Alt-Realm", 10 }, { "Zed-Realm", 10 })), "Zed-Realm", "2 of 2 beats 4 of 5")
+
+  -- An imported character has no rank, so a ranked alt beats it; unranked ties fall to the tier.
+  data = db()
+  learn("Alt-Realm", 10, { ranks = { 1, 2 }, reachRank = 1, reachCost = 0, reachConc = 3168 })
+  Assert.equal((ranked({ "Imp-Realm", 10 }, { "Alt-Realm", 10 })), "Alt-Realm")
+  Assert.equal((ranked({ "Imp-Realm", 10 }, { "Zed-Realm", 10 })), "Zed-Realm", "nobody ranked: the tier decides")
+
+  -- Review Focus 2: reach fields on a recipe without `ranks` mean no rank, and no error.
+  data = db()
+  learn("Alt-Realm", 10, { reachRank = 1, reachCost = 376, reachConc = 3168 })
+  picked, _, rank, byConc, recipeKey = ranked({ "Alt-Realm", 10 })
+  Assert.same({ picked, rank, byConc, recipeKey }, { "Alt-Realm", nil, nil, 10 })
+  picked, _, rank, byConc, recipeKey = ranked({ "Alt-Realm", 99 })
+  Assert.same({ picked, rank, byConc, recipeKey }, { "Alt-Realm", nil, nil, 99 }, "an entry the db does not hold has no rank")
+
+  -- A character with several entries is judged by its best one, in either entry order.
+  data = db()
+  learn("Alt-Realm", 10, { ranks = { 1, 2 }, reachRank = 1, reachCost = 0, reachConc = 3168 })
+  learn("Alt-Realm", 11, { ranks = { 1, 2 }, reachRank = 2, reachCost = 0, reachConc = 3168 })
+  picked, _, rank, _, recipeKey = ranked({ "Alt-Realm", 10 }, { "Alt-Realm", 11 })
+  Assert.same({ picked, rank, recipeKey }, { "Alt-Realm", 2, 11 })
+  picked, _, rank, _, recipeKey = ranked({ "Alt-Realm", 11 }, { "Alt-Realm", 10 })
+  Assert.same({ picked, rank, recipeKey }, { "Alt-Realm", 2, 11 })
+
+  -- A profession-word match has no recipe: no rank, no recipeKey.
+  _, _, rank, byConc, recipeKey = CrafterRank.Pick({ kind = "profession", entries = {}, entryCount = 0, prof = BS }, CUSTOMER, data)
+  Assert.same({ rank, byConc, recipeKey }, {})
+
   -- Forever has no crafting orders, so realms never reorder anything.
   CrafterRank = load("forever")
   picked, cannotOrder = CrafterRank.Pick(result({ "Me-Realm", "Alt-Realm" }), CUSTOMER, data)
