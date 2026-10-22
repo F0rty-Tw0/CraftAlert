@@ -13,6 +13,7 @@ local function setup(withBody)
     body[#body + 1] = f
   end
   ns.LinkHover.Attach(frame, withBody and record or nil)
+
   return ns, frame, rawget(_G, "GameTooltip"), body
 end
 

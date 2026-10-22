@@ -37,13 +37,17 @@ local movedHandlers = {}
 -- The profession's icon from the client, else the bell. C_TradeSkillUI is read through _G
 -- (luacheck's read_globals lacks it).
 local function iconFor(lead)
-  local key = ProfessionList.Order()[1]
-  if lead then
-    key = lead.prof
+  local key = lead and lead.prof
+  if lead == nil then
+    local order = ProfessionList.Order()
+    key = order[1]
   end
   local api = _G["C_TradeSkillUI"]
   local canAsk = type(key) == "number" and type(api) == "table" and type(api.GetTradeSkillTexture) == "function"
-  local texture = canAsk and api.GetTradeSkillTexture(key) or nil
+  if not canAsk then
+    return Theme.ICON
+  end
+  local texture = api.GetTradeSkillTexture(key)
 
   return texture or Theme.ICON
 end

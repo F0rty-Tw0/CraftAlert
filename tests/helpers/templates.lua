@@ -53,6 +53,7 @@ function Templates.fakes.TooltipBackdropTemplate(frame)
     local frameMethod, nineSliceMethod = forward[1], forward[2]
     frame[frameMethod] = function(self, ...)
       local nineSlice = self.NineSlice
+
       return nineSlice[nineSliceMethod](nineSlice, ...)
     end
   end

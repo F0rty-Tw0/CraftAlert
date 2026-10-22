@@ -28,10 +28,12 @@ end
 function LeadText.Headline(lead)
   local what = LeadText.What(lead)
   local craftable = lead.itemLink or lead.recipeName
-  if lead.crafter == PlayerName.Own() then
+  local isOwn = lead.crafter == PlayerName.Own()
+  if isOwn then
     return Localization.Text(craftable and "Wants %s — you can craft it" or "Wants %s — you have it", what)
   end
   local alt = Greeting.CrafterName(lead.crafter)
+
   return Localization.Text(craftable and "Wants %s — your alt %s can craft it" or "Wants %s — your alt %s has it", what, alt)
 end
 

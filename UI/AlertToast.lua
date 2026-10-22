@@ -155,7 +155,8 @@ end
 
 -- A click on a link inside the message belongs to the link (LinkHover), never to the lead.
 local function onClick(frame, button)
-  if LinkHover.IsOverLink(frame) then
+  local overLink = LinkHover.IsOverLink(frame)
+  if overLink then
     return
   end
   if ClickRouter.Handle(button, current.lead, current.shownAt) then
@@ -180,7 +181,8 @@ local function onLeadsChange()
     hide()
     return
   end
-  if toast.frame:IsShown() then
+  local shown = toast.frame:IsShown()
+  if shown then
     AlertToast.Dock()
   end
 end
@@ -204,8 +206,9 @@ local function create()
   local parts = ToastLayout.Build(frame)
   frame:Hide()
   Leads.On("change", onLeadsChange)
+  local created = { frame = frame, parts = parts }
 
-  return { frame = frame, parts = parts }
+  return created
 end
 
 local function alert()
@@ -243,6 +246,7 @@ function AlertToast.Dock()
   if launcher == nil then
     local point, x, y = NO_LAUNCHER_POSITION[1], NO_LAUNCHER_POSITION[2], NO_LAUNCHER_POSITION[3]
     frame:SetPoint(point, screen, point, x, y)
+
     return
   end
   local lx, ly = launcher:GetCenter()

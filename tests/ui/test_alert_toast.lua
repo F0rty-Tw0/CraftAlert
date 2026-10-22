@@ -23,6 +23,7 @@ local function part(font)
       found[#found + 1] = region
     end
   end
+
   return found
 end
 
@@ -478,7 +479,8 @@ local function testHiddenLauncherAndPulse()
   Assert.equal(launcher:IsShown(), true)
   dockedAt(toastFrame(), launcher, ROWS[3])
 
-  -- Pulse and glow: a new lead starts them, the hide (timer, click or dismissal) stops the glow.
+  -- Pulse: a new lead plays the one-shot and the looping pulse; the hide (timer, click or
+  -- dismissal) stops the looping pulse.
   Assert.same({ launcher.pulseOnce:IsPlaying(), launcher.pulseLoop:IsPlaying() }, { true, true })
   Wow.clock.gettime = 50 + TOAST_SECONDS
   runTimersUpTo(TOAST_SECONDS)

@@ -116,8 +116,9 @@ local function buildPulse(frame)
   end
   local pulseLoop = pulseGroup(pulse, PULSE_LOOP)
   pulseLoop:SetLooping("REPEAT")
+  local pulseOnce = pulseGroup(pulse, PULSE_ONCE)
 
-  return pulse, pulseGroup(pulse, PULSE_ONCE), pulseLoop
+  return pulse, pulseOnce, pulseLoop
 end
 
 -- Draws the launcher's art on `frame`. glow, pulse, pulseOnce and pulseLoop are nil without

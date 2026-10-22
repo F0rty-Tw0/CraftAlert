@@ -32,7 +32,8 @@ end
 
 local function onEnter(frame, link)
   frame.hoveredLink = link
-  if linkType(link) == "trade" then
+  local isTrade = linkType(link) == "trade"
+  if isTrade then
     return
   end
   showTooltip(frame, link)
@@ -42,7 +43,8 @@ local function makeOnLeave(onBodyEnter)
   return function(frame)
     frame.hoveredLink = nil
     tooltip():Hide()
-    if onBodyEnter and frame:IsMouseOver() then
+    local backOnBody = onBodyEnter ~= nil and frame:IsMouseOver()
+    if backOnBody then
       onBodyEnter(frame)
     end
   end
@@ -64,7 +66,8 @@ end
 function LinkHover.Clear(frame)
   frame.hoveredLink = nil
   local tip = tooltip()
-  if tip:IsOwned(frame) then
+  local owned = tip:IsOwned(frame)
+  if owned then
     tip:Hide()
   end
 end

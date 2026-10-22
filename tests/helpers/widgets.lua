@@ -48,6 +48,7 @@ local function newAnimationGroup()
   function group:CreateAnimation(kind)
     local animation = newAnimation(kind)
     table.insert(self.animations, animation)
+
     return animation
   end
 
@@ -504,6 +505,7 @@ function Widgets.extend(frame)
     local mask = newTexture(self, "ARTWORK")
     mask.isMask = true
     table.insert(self.regions, mask)
+
     return mask
   end
 
