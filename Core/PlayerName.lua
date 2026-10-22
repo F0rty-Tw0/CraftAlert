@@ -91,7 +91,7 @@ function PlayerName.RealmOf(key)
   return match(key, "^[^-]*%-(.+)$") or ownRealm
 end
 
--- The customer /ca test and the Test page pretend to be: "Test" on the player's own realm.
+-- The customer the Test page pretends to be: "Test" on the player's own realm.
 function PlayerName.TestCustomer()
   return "Test-" .. (PlayerName.RealmOf(ownKey or "") or "")
 end

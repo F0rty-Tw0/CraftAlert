@@ -71,7 +71,7 @@ local function installReaders()
   LearnWatcher.Install()
 end
 
--- AlertToast, WhisperTracker and TestLine subscribe themselves to "change".
+-- AlertToast and WhisperTracker subscribe themselves to "change", TestReport to "new" and "change".
 local function wireLeads()
   Leads.Restore(db)
   EventRouter.On("IGNORELIST_UPDATE", Leads.DismissIgnored)
