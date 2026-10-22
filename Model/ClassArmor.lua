@@ -31,6 +31,31 @@ for token, armor in pairs(ARMOR) do
   WHY[token] = armor .. " (" .. string.lower(token) .. ")"
 end
 
+local TOKENS = {
+  "WARRIOR",
+  "PALADIN",
+  "DEATHKNIGHT",
+  "HUNTER",
+  "SHAMAN",
+  "EVOKER",
+  "ROGUE",
+  "DRUID",
+  "MONK",
+  "DEMONHUNTER",
+  "MAGE",
+  "PRIEST",
+  "WARLOCK",
+}
+
+-- A new array of every class token, in class-list order. The caller may mutate it.
+function ClassArmor.Tokens()
+  local copy = {}
+  for i, token in ipairs(TOKENS) do
+    copy[i] = token
+  end
+  return copy
+end
+
 -- Armor word and why label for a class token, or nil, nil for any other value.
 function ClassArmor.For(classToken)
   return ARMOR[classToken], WHY[classToken]
