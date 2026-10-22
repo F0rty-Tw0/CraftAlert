@@ -26,6 +26,16 @@ local function toastTexts()
   return table.concat(Widgets.texts(rawget(_G, TOAST), Wow.frames), " / ")
 end
 
+-- Whether the toast has a font string showing exactly `text` (the badge, not the customer name).
+local function toastShows(text)
+  for _, shown in ipairs(Widgets.texts(rawget(_G, TOAST), Wow.frames)) do
+    if shown == text then
+      return true
+    end
+  end
+  return false
+end
+
 local function testRegister()
   local _, _, _, handler = setup()
   Assert.equal(rawget(_G, "SLASH_CRAFTALERT1"), "/craftalert")
@@ -69,7 +79,7 @@ local function testTestCommand()
   local lead = ns.Leads.Latest()
   Assert.same({ lead.test, lead.customer, #ns.Leads.List() }, { true, "Test0-Realm", 1 })
   Assert.equal(ns.AlertToast.VisibleLead(), lead)
-  Assert.truthy(string.find(toastTexts(), "Test", 1, true), toastTexts())
+  Assert.truthy(toastShows("Test"), toastTexts())
   Assert.truthy(string.find(toastTexts(), "LF mongoose", 1, true), toastTexts())
   Assert.same(db.ledger, ledger, "no ledger count")
   for _, api in ipairs({ "addon", "chat", "prefill", "empty" }) do

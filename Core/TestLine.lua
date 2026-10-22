@@ -6,6 +6,7 @@ end
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local ClassArmor = ns.ClassArmor or require("CraftAlert.Model.ClassArmor")
+local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Status = ns.Status or require("CraftAlert.Core.Status")
@@ -60,6 +61,9 @@ local function parse(args)
   if lower(word) == "as" then
     local name
     name, rest = nextWord(after)
+    if name == "" then
+      return usage()
+    end
     class = classToken(name)
     if class == nil then
       say("Unknown class %s. Classes: %s", name, concat(ClassArmor.Tokens(), ", "))
@@ -100,8 +104,9 @@ end
 
 -- An update keeps its lead's first guid, but the Matcher reads the class of this line's guid.
 -- The lead this line would update takes the line's class, so what is painted is what matched.
+-- No class given → the lead keeps the one it has.
 local function syncDuplicate(customer, sender, line, guid, class)
-  if Leads.FindActiveByCustomer(customer) == nil then
+  if class == nil or Leads.FindActiveByCustomer(customer) == nil then
     return
   end
   local result = Matcher.Match("trade", line, sender, guid)
@@ -109,6 +114,19 @@ local function syncDuplicate(customer, sender, line, guid, class)
   if duplicate and duplicate.guid then
     FlavorCompat.SetTestClass(duplicate.guid, class)
   end
+end
+
+-- `/ca test reply`: the newest test lead's customer whispers back, through the real handler.
+local function reply()
+  for _, lead in ipairs(Leads.List()) do
+    if lead.test then
+      if not lead.greeted then
+        return say("Greet the test lead first (a reply counts only after a greeting)")
+      end
+      return EventRouter.Dispatch("CHAT_MSG_WHISPER", "test reply", lead.customer)
+    end
+  end
+  say("No test lead to reply from")
 end
 
 local function deliver(line, sender, class)
@@ -127,7 +145,7 @@ end
 -- `/ca test` (§7.3), the command's arguments already trimmed.
 function TestLine.Run(args)
   if args == "reply" then
-    return TestReport.Reply()
+    return reply()
   end
   local class, count, line = parse(args)
   if line == nil or gateStops() then

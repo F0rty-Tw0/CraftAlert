@@ -39,6 +39,16 @@ local function toastTexts()
   return table.concat(Widgets.texts(rawget(_G, TOAST), Wow.frames), " / ")
 end
 
+-- Whether the toast has a font string showing exactly `text` (the badge, not the customer name).
+local function toastShows(text)
+  for _, shown in ipairs(Widgets.texts(rawget(_G, TOAST), Wow.frames)) do
+    if shown == text then
+      return true
+    end
+  end
+  return false
+end
+
 local function classOf(ns, lead)
   return ns.FlavorCompat.ClassOf(lead.guid)
 end
@@ -55,7 +65,7 @@ local function testNewAndRepeat()
   Assert.equal(string.sub(lines[1], 1, 6), "Item: ")
   Assert.same({ lines[2], lines[3] }, { "Why: lf + plate + belt", "Crafter: Armor-Realm" })
   Assert.equal(string.sub(lines[4], 1, 10), "Greeting: ")
-  Assert.truthy(string.find(toastTexts(), "Test", 1, true), toastTexts())
+  Assert.truthy(toastShows("Test"), toastTexts())
   Assert.equal(ns.AlertToast.VisibleLead(), lead)
   Assert.equal(#UiFixture.callsTo(calls, "sound"), 1)
 
@@ -113,7 +123,7 @@ local function testBurst()
   Assert.same(customers, { "Test1-Realm", "Test2-Realm", "Test3-Realm" })
   Assert.equal(#lines, 12, "three reports of four lines")
   Assert.equal(ns.AlertToast.more, 2)
-  Assert.truthy(string.find(toastTexts(), "Test · +2 more", 1, true), toastTexts())
+  Assert.truthy(toastShows("Test · +2 more"), toastTexts())
   -- The burst letter is case-insensitive; Test1 and Test2 ask for another belt, so new leads, and
   -- the guid counter runs on across commands.
   run(handler, "as druid X2 LF belt")
@@ -122,9 +132,20 @@ local function testBurst()
   Assert.equal(#ns.Leads.List(), 5)
 end
 
+-- A test toast already up, then a burst of new leads: the badge counts all three it replaced.
+local function testBurstOverShownToast()
+  local ns, _, _, handler = load()
+  run(handler, "LF plate belt")
+  Assert.truthy(toastShows("Test"), toastTexts())
+  run(handler, "x3 LF plate belt")
+  Assert.equal(#ns.Leads.List(), 4)
+  Assert.equal(ns.AlertToast.more, 3)
+  Assert.truthy(toastShows("Test · +3 more"), toastTexts())
+end
+
 local function testUsage()
   local ns, _, _, handler = load()
-  for _, args in ipairs({ "", "   ", "x1 LF belt", "x0 LF belt", "x7 LF belt", "x3", "x3   ", "as warrior", "as warrior x3" }) do
+  for _, args in ipairs({ "", "   ", "as", "as   ", "x1 LF belt", "x0 LF belt", "x7 LF belt", "x3", "x3   ", "as warrior", "as warrior x3" }) do
     Assert.same(run(handler, args), { USAGE }, "args: " .. args)
   end
   Assert.equal(#ns.Leads.List(), 0, "usage makes no lead")
@@ -149,7 +170,6 @@ local function testClass()
   local lines = run(handler, "as wizard LF belt")
   Assert.same(lines, { "Unknown class wizard. Classes: " .. table.concat(ns.ClassArmor.Tokens(), ", ") })
   Assert.truthy(string.find(lines[1], "Classes: WARRIOR, PALADIN, DEATHKNIGHT, ", 1, true), lines[1])
-  Assert.same(run(handler, "as"), { "Unknown class . Classes: " .. table.concat(ns.ClassArmor.Tokens(), ", ") })
   Assert.equal(#ns.Leads.List(), count)
 
   -- The order is fixed: the burst comes after `as`, so before it the words are line text.
@@ -169,6 +189,10 @@ local function testRepeatKeepsClassInSync()
   local lines = run(handler, "as priest LF plate belt")
   Assert.equal(lines[#lines], UPDATED)
   Assert.same({ #ns.Leads.List(), ns.Leads.Latest() == lead, classOf(ns, lead) }, { 1, true, "PRIEST" })
+
+  -- A repeat without `as` has no class to sync: the lead keeps the one it has.
+  run(handler, "LF plate belt")
+  Assert.same({ #ns.Leads.List(), classOf(ns, lead) }, { 1, "PRIEST" })
 end
 
 -- /ca perf counts the test line like any chat line.
@@ -219,9 +243,15 @@ local function testNothingIsSent()
   keys.shift = true
   Widgets.click(rawget(_G, TOAST), "LeftButton")
   bursts("shift")
+  -- Ctrl needs a fresh toast on a NEW lead (another item, so no update), past the click guard.
   keys.shift, keys.ctrl = false, true
-  run(handler, "LF plate greaves")
+  run(handler, "LF leather belt")
+  Assert.equal(ns.Leads.Latest().itemID, 701, "a new lead, so a fresh toast")
+  Wow.clock.gettime = 70
+  Wow.chat = {}
   Widgets.click(rawget(_G, TOAST), "LeftButton")
+  local ctrlLines = table.concat(SlashFixture.chat(), "\n")
+  Assert.truthy(string.find(ctrlLines, "Test, would open an empty whisper to ", 1, true), ctrlLines)
   bursts("ctrl")
   keys.ctrl = false
   Wow.clock.gettime = 90
@@ -265,6 +295,7 @@ return function()
   testGate()
   testStops()
   testBurst()
+  testBurstOverShownToast()
   testUsage()
   testClass()
   testRepeatKeepsClassInSync()
