@@ -16,7 +16,6 @@ local Leads = {}
 local concat = table.concat
 local remove = table.remove
 local sort = table.sort
-local sub = string.sub
 local max = math.max
 local pcall = pcall
 local tostring = tostring
@@ -24,8 +23,7 @@ local type = type
 
 local MAX_LEADS = 100
 -- A lead whose guid starts with this is a synthetic `/ca test` lead: flagged `test`, never saved.
-local TEST_GUID_PREFIX = "Player-0-CRAFTALERTTEST"
-Leads.TEST_GUID_PREFIX = TEST_GUID_PREFIX
+Leads.TEST_GUID_PREFIX = FlavorCompat.TEST_GUID_PREFIX
 local EVENTS = { new = true, change = true, greeted = true, replied = true }
 
 ---@type table
@@ -204,7 +202,7 @@ local function clampTimes(list)
   end
 end
 
--- The leads that are not synthetic, in place (the list is db.leads).
+-- Removes synthetic (`/ca test`) leads from the list, in place (the list is db.leads).
 local function dropTest(list)
   local kept = 0
   for i = 1, #list do
@@ -219,8 +217,8 @@ local function dropTest(list)
 end
 
 -- Binds db.leads (Bootstrap, at PLAYER_LOGIN): repairs a hand-edited list (ids, times, order,
--- size), drops expired leads and starts the timer. The db is bound last: while a repair raises,
--- Leads stays unbound and makes no lead.
+-- size), drops test leads and expired leads and starts the timer. The db is bound last: while a
+-- repair raises, Leads stays unbound and makes no lead.
 function Leads.Restore(accountDb)
   local list = accountDb.leads
   dropTest(list)
@@ -366,7 +364,7 @@ function Leads.OnMatch(result, customerKey, text, channelKey, guid)
   lead = buildLead(result, customerKey, text, channelKey, crafter, cannotOrder)
   lead.id = nextId
   lead.guid = type(guid) == "string" and not FlavorCompat.issecretvalue(guid) and guid or nil
-  if lead.guid and sub(lead.guid, 1, #TEST_GUID_PREFIX) == TEST_GUID_PREFIX then
+  if FlavorCompat.IsTestGuid(lead.guid) then
     lead.test = true
   end
   lead.arrivedWhileAfk = afkNow()

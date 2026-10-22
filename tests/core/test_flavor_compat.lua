@@ -247,7 +247,20 @@ local function testTestClasses()
   Assert.equal(FlavorCompat.ClassOf(Wow.secret("Player-0-CRAFTALERTTEST3")), nil, "secret GUID first")
 end
 
+-- Only a string GUID that starts with the test prefix is a test GUID.
+local function testIsTestGuid()
+  local FlavorCompat = load("retail")
+  Assert.equal(FlavorCompat.TEST_GUID_PREFIX, "Player-0-CRAFTALERTTEST")
+  Assert.equal(FlavorCompat.IsTestGuid("Player-0-CRAFTALERTTEST1"), true, "prefix GUID")
+  Assert.equal(FlavorCompat.IsTestGuid(FlavorCompat.TEST_GUID_PREFIX), true, "the bare prefix")
+  Assert.equal(FlavorCompat.IsTestGuid("Player-1-0A"), false, "real GUID")
+  Assert.equal(FlavorCompat.IsTestGuid("xPlayer-0-CRAFTALERTTEST1"), false, "prefix not at the start")
+  Assert.equal(FlavorCompat.IsTestGuid(nil), false, "no GUID")
+  Assert.equal(FlavorCompat.IsTestGuid(42), false, "not a string")
+end
+
 return function()
+  testIsTestGuid()
   testTestClasses()
   testFlavorKeys()
   testForeverSignals()

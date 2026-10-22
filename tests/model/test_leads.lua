@@ -170,6 +170,7 @@ local function testTestFlag()
   local Leads = ns.Leads
   local prefix = Leads.TEST_GUID_PREFIX
   Assert.equal(prefix, "Player-0-CRAFTALERTTEST")
+  Assert.equal(prefix, ns.FlavorCompat.TEST_GUID_PREFIX, "one source for the prefix")
   local flagSeen
   Leads.On("new", function(lead)
     flagSeen = lead.test
