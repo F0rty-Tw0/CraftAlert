@@ -73,6 +73,7 @@ end
 -- AlertToast and WhisperTracker subscribe themselves to "change".
 local function wireLeads()
   Leads.Restore(db)
+  EventRouter.On("IGNORELIST_UPDATE", Leads.DismissIgnored)
   Leads.On("new", AlertToast.Show)
   Leads.On("change", Launcher.Refresh)
   Leads.On("change", LeadsWindow.Refresh)

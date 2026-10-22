@@ -19,7 +19,7 @@ local STATUS_NOT_STARTED = "Paused — Craft Alert did not start; /reload to try
 local NO_DB = "Craft Alert's saved data did not load; /reload to try again"
 local UNREAD_LINE = "Open Blacksmithing once to start listening."
 local FIRST_RUN_HINT = "After opening a profession, try /ca test LF <profession> crafter"
-local INSTALLED_EVENTS = { "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "NEW_RECIPE_LEARNED", "PLAYER_UPDATE_RESTING" }
+local INSTALLED_EVENTS = { "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "NEW_RECIPE_LEARNED", "PLAYER_UPDATE_RESTING", "IGNORELIST_UPDATE" }
 local WHISPER_EVENTS = { "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM" }
 -- The customer's realm is connected, so the lead carries no "can't order" tag.
 local CONNECTED_REALMS = { "OwnRealm", "Other Realm" }
@@ -482,6 +482,29 @@ local function testLoginTime(db)
   Assert.equal(ns.Perf.loginMs, 10)
 end
 
+-- /ignore through the real wiring: IGNORELIST_UPDATE drops the ignored customer's leads, and
+-- the toast showing one goes with it.
+local function testIgnoreDropsLead(db)
+  local buyer = "Buyer-OtherRealm"
+  local session = startClient(db)
+  local ns = login(session)
+  trade("LF " .. BELT_LINK .. " crafter", buyer)
+  Assert.equal(rawget(_G, "CraftAlertToast"):IsShown(), true, "the toast shows Buyer's lead")
+  local before = #ns.Leads.List()
+  Wow.stub("C_FriendList", {
+    IsIgnored = function(name)
+      return name == buyer
+    end,
+  })
+  Wow.fireEvent("IGNORELIST_UPDATE")
+  Assert.equal(#ns.Leads.List(), before - 1, "only Buyer's lead went")
+  for _, lead in ipairs(ns.Leads.List()) do
+    Assert.equal(lead.customer ~= buyer, true, "no lead of the ignored customer is left")
+  end
+  Assert.equal(rawget(_G, "CraftAlertToast"):IsShown(), false, "the toast hides with its lead")
+  Wow.stub("C_FriendList", nil)
+end
+
 local function deepCopy(value)
   if type(value) ~= "table" then
     return value
@@ -508,5 +531,6 @@ return function()
   testRaisingPlayerName(deepCopy(saved), "Init")
   testRaisingPlayerName(deepCopy(saved), "Own")
   testLoginTime(deepCopy(saved))
+  testIgnoreDropsLead(deepCopy(saved))
   Wow.reset()
 end
