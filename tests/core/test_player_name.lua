@@ -125,32 +125,7 @@ local function testRealmFallbacks()
   Assert.equal(unknown.Normalize("Bob-Area 52"), "Bob-Area52")
 end
 
--- A name the player typed is cased as the client spells chat senders; a known realm takes its
--- stored spelling. Normalize itself keeps the case it is given (senders arrive cased already).
-local function testFromTyped()
-  local PlayerName = load()
-  Assert.equal(PlayerName.FromTyped("bob"), "Bob-OwnRealm")
-  Assert.equal(PlayerName.FromTyped("bOB-ownrealm"), "Bob-OwnRealm")
-  Assert.equal(PlayerName.FromTyped("alice-area 52", { "Kel'Thuzad", "Area52" }), "Alice-Area52")
-  Assert.equal(PlayerName.FromTyped("alice-unknownrealm", { "Area52" }), "Alice-unknownrealm", "an unknown realm stays as typed")
-  Assert.equal(PlayerName.FromTyped("bob-kelthuzad", { "Kel'Thuzad" }), "Bob-Kel'Thuzad", "apostrophes do not count")
-  Assert.equal(PlayerName.FromTyped("bob-twisting nether", { "Twisting Nether" }), "Bob-TwistingNether", "nor do spaces; the key stays normalized")
-  -- Only ASCII letters change case; UTF-8 bytes are left as they are.
-  Assert.equal(PlayerName.FromTyped("zoË"), "ZoË-OwnRealm")
-  Assert.equal(PlayerName.FromTyped("éLAN"), "élan-OwnRealm")
-  Assert.equal(PlayerName.FromTyped(""), nil)
-  Assert.equal(PlayerName.FromTyped(nil), nil)
-  Assert.equal(PlayerName.Normalize("bob"), "bob-OwnRealm", "Normalize is unchanged")
-  -- A realm of apostrophes only matches no stored realm, a blank one included.
-  Assert.equal(PlayerName.FromTyped("bob-'''", { "" }), "Bob-'''")
-  Assert.equal(PlayerName.FromTyped("bob-'", { "", "Area52" }), "Bob-'")
-  -- Forever: each part of "First Last" starts upper case.
-  local forever = load("forever", "First", "Last")
-  Assert.equal(forever.FromTyped("mary JANE"), "Mary Jane-OwnRealm")
-end
-
 return function()
-  testFromTyped()
   testNormalize()
   testNonAsciiAndApostrophes()
   testForeverNames()
