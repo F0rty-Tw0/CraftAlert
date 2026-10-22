@@ -224,7 +224,9 @@ local function testSetKeptOverClass()
 end
 
 -- User ruling 2026-10-20 (supersedes Review Focus 1): a line with an Enchanting word infers
--- no armor word and looks up no class, since an enchant does not depend on the asker's armor.
+-- no armor word and looks up no class, since an enchant does not depend on the asker's armor,
+-- unless Enchanting has no candidate and a profession named after it falls through (user
+-- ruling 2026-10-22).
 local function testEnchantingLines()
   local ns = Fixture.load()
   Fixture.itemIndex(ns, function(db)
@@ -248,6 +250,22 @@ local function testEnchantingLines()
   check(ns, "enchanting", "LF bs belt", W, "item:501", 1)
   check(ns, "enchanting", "LF ench or bs belt", W, "item:501", 1)
   check(ns, "enchanting", "LF bs or ench belt", W, "item:501", 1)
+  -- The same on a step 4.2 set ("green iron"): Enchanting is tried on the set first, without
+  -- the armor word and the class lookup; the professions named after it get the armor word.
+  local function greenIron(enchanting)
+    ns = Fixture.load()
+    Fixture.itemIndex(ns, function(db)
+      db.characters["Smith-Realm"].recipes[3] = { item = 505, name = "Green Iron Girdle", prof = BS }
+      db.characters["Tai-Realm"] = Fixture.character({ TAILOR }, { [5] = { item = 605, name = "Green Iron Cord", prof = TAILOR } })
+      db.characters["Ench-Realm"] = Fixture.character({ ENCH }, { [44] = enchanting })
+    end)
+  end
+  greenIron({ name = "Green Iron Sigil", prof = ENCH })
+  check(ns, "enchanting set", "LF ench or bs green iron belt", W, "item:505", 1)
+  check(ns, "enchanting set", "LF ench or tailor green iron belt", W, "item:605", 1)
+  check(ns, "enchanting set", "LF ench green iron belt", W, "profession:" .. ENCH, 0)
+  greenIron({ item = 602, name = "Green Iron Sash", prof = ENCH })
+  check(ns, "enchanting set", "LF ench or bs green iron belt", W, "item:602", 0)
 end
 
 -- Review Focus 2: inference never removes a word that counts today (§4 rule 5).

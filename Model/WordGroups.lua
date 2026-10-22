@@ -310,8 +310,8 @@ end
 -- are skipped), Candidates.wordWhy, named and the inferArmor line state. → why count, or nil
 -- when a known slang word nobody can craft empties the intersection.
 -- inferable (§4 rule 2) is decided on every scanned word, counted or not: a slot without an
--- armor type (an ambiguous slot needs a cue next to it) and no Enchanting word (user ruling
--- 2026-10-20: an enchant ignores the asker's armor). A repeat of a word already decided
+-- armor type (an ambiguous slot needs a cue next to it); an Enchanting word is tried first
+-- without it (Match; user rulings 2026-10-20 and 2026-10-22). A repeat of a word already decided
 -- (wordStamp: stamp counted, -stamp an ambiguous word left uncounted) takes the same decision
 -- at once, since nothing it depends on changed; only a cue next to the repeat (cuedAt) can
 -- count an uncounted one. The first two wordIndex words are found only when an ambiguous word
