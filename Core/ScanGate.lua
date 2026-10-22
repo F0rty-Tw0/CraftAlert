@@ -104,6 +104,11 @@ function ScanGate.SetHandler(fn)
   handler = fn or ScanGate.HandleChat
 end
 
+-- Hands one event to the current handler, as the chat event frame does.
+function ScanGate.Deliver(event, ...)
+  return handler(event, ...)
+end
+
 local function shimFor(event)
   local shim = shims[event]
   if shim == nil then
