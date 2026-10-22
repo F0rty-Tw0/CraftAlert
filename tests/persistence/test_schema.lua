@@ -41,7 +41,6 @@ local function testValidDbIsUntouched()
   }
   db.ledger["2026-10-17"] = { seen = 3, greeted = 2, replied = 1, filled = 0 }
   db.recentGreeted["Cus-Realm"] = 100
-  db.ignored["Bad-Realm"] = true
   db.leads[1] = { id = 1, customer = "Cus-Realm", crafter = "Me-Realm", time = 100, message = "LF belt" }
   db.ui.toast = { point = "TOP", x = 10, y = -20 }
   db.ui.settings = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 40 }
@@ -61,7 +60,6 @@ local function testBadTopLevelTypes()
     leads = true,
     ledger = 1,
     recentGreeted = false,
-    ignored = "no",
     ui = 7,
   })
   Assert.same(db, Defaults.Db())
@@ -208,7 +206,7 @@ local function testLedgerRecentIgnoredLeadsUi()
   })
   Assert.same(db.ledger, { ["2026-10-17"] = { seen = 3, greeted = 0, replied = 0, filled = 2 } })
   Assert.same(db.recentGreeted, { ["A-Realm"] = 100 })
-  Assert.same(db.ignored, { ["A-Realm"] = true })
+  Assert.equal(db.ignored, nil, "the saved block list of an old save is dropped")
   Assert.equal(#db.leads, 2)
   Assert.equal(db.leads[2].customer, "C-Realm")
   Assert.same(db.ui, { toast = { point = "TOP", x = 1 }, launcher = {} })
@@ -260,6 +258,15 @@ local function testNewerSchema()
   Assert.truthy(string.find(printedLines()[1], "2", 1, true))
   -- Known fields were repaired (toastDuration clamped), so the warning must not claim "as is".
   Assert.falsy(string.find(printedLines()[1], "as is", 1, true))
+end
+
+-- Review Focus 3: a save from a newer schema keeps `ignored`, as it keeps every unknown key.
+local function testNewerSchemaKeepsIgnored()
+  local Schema = load()
+  local newer = deepCopy(require("tests.fixtures.db_schema2"))
+  newer.ignored = { ["A-Realm"] = true }
+  local db = Schema.Validate(newer)
+  Assert.equal(db.ignored["A-Realm"], true)
 end
 
 local function testOlderSchemaIsRaisedAndNoWarning()
@@ -427,6 +434,7 @@ return function()
   testListWithHoles()
   testNewerSchemaKeepsNestedUiValues()
   testNewerSchema()
+  testNewerSchemaKeepsIgnored()
   testOlderSchemaIsRaisedAndNoWarning()
   testLeadFieldTypes()
   testLeadsFromOnMatchSurvive()

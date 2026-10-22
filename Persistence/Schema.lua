@@ -71,10 +71,6 @@ local function isString(value)
   return type(value) == "string"
 end
 
-local function isTrue(value)
-  return value == true
-end
-
 local function isDay(value)
   return type(value) == "string" and string.find(value, DAY_PATTERN) ~= nil
 end
@@ -316,7 +312,9 @@ function Schema.Validate(db)
   db.leads = fixLeads(db.leads)
   db.ledger = fixRecords(db.ledger, isDay, fixDay)
   db.recentGreeted = fixMap(db.recentGreeted, isName, isNumber)
-  db.ignored = fixMap(db.ignored, isName, isTrue)
+  if not keepUnknown then
+    db.ignored = nil
+  end
   db.ui = fixUi(db.ui)
   keepUnknown = false
   return db

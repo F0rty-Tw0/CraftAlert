@@ -61,7 +61,6 @@ function Defaults.Db()
     leads = {},
     ledger = {},
     recentGreeted = {},
-    ignored = {},
     ui = {},
   }
 end

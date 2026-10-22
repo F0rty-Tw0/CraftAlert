@@ -69,7 +69,7 @@ local function testDb()
   Assert.same(db.leads, {})
   Assert.same(db.ledger, {})
   Assert.same(db.recentGreeted, {})
-  Assert.same(db.ignored, {})
+  Assert.equal(db.ignored, nil, "Blizzard's ignore list replaced the saved block list")
   Assert.same(db.ui, {})
   Assert.same(db.settings, Defaults.Settings())
 end
