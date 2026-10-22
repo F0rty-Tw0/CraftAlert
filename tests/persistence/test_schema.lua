@@ -413,6 +413,19 @@ local function testLeadsFromOnMatchSurvive()
   Assert.same(Schema.Validate(db).leads, expected, "leads written by Leads.lua are unchanged")
 end
 
+-- `test` marks a synthetic lead (Leads.TEST_GUID_PREFIX): a boolean like the other flags.
+local function testLeadTestFlag()
+  local Schema = load()
+  local db = Schema.Validate({
+    leads = {
+      { id = 1, customer = "A-Realm", crafter = "Me-Realm", time = 10, test = true },
+      { id = 2, customer = "B-Realm", crafter = "Me-Realm", time = 10, test = "yes" },
+    },
+  })
+  Assert.equal(db.leads[1].test, true)
+  Assert.equal(db.leads[2].test, nil, "a wrong-typed test flag is dropped")
+end
+
 local function testIdempotent()
   local Schema = load()
   local db = Schema.Validate({
@@ -438,5 +451,6 @@ return function()
   testOlderSchemaIsRaisedAndNoWarning()
   testLeadFieldTypes()
   testLeadsFromOnMatchSurvive()
+  testLeadTestFlag()
   testIdempotent()
 end

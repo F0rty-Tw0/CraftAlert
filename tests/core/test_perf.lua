@@ -107,4 +107,12 @@ return function()
     "Perf on: timing each chat line, a report every 60 s. /ca perf again stops it.",
     "Perf off: Lines 0. Matched 0. Login n/a, index build n/a.",
   })
+
+  -- ScanGate.Deliver goes through the timed handler: one call is one counted line.
+  scriptClock({ 0, 100, 100.010 })
+  Wow.chat = {}
+  Perf.Start()
+  ns.ScanGate.Deliver("CHAT_MSG_CHANNEL", "hello", "Bob-Draenor", "", "5. Custom", "Bob-Draenor", "", 0, 5, "Custom", 0, 1, nil)
+  Perf.Stop()
+  Assert.equal(lastChat(), "Perf off: Lines 1, mean 10.0 us, max 10.0 us. Matched 0. Login n/a, index build n/a.")
 end

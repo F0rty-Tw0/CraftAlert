@@ -38,7 +38,38 @@ local function testTable()
   Assert.equal(ClassArmor.For(5), nil)
 end
 
+-- Tokens() is the fixed class order, as a fresh array each call.
+local function testTokens()
+  local ClassArmor = load()
+  local expected = {
+    "WARRIOR",
+    "PALADIN",
+    "DEATHKNIGHT",
+    "HUNTER",
+    "SHAMAN",
+    "EVOKER",
+    "ROGUE",
+    "DRUID",
+    "MONK",
+    "DEMONHUNTER",
+    "MAGE",
+    "PRIEST",
+    "WARLOCK",
+  }
+  local tokens = ClassArmor.Tokens()
+  Assert.equal(#tokens, #expected, "length")
+  for i, token in ipairs(expected) do
+    Assert.equal(tokens[i], token, "token " .. i)
+  end
+  tokens[1] = "CHANGED"
+  tokens[#tokens + 1] = "EXTRA"
+  local again = ClassArmor.Tokens()
+  Assert.equal(again[1], "WARRIOR", "mutation does not leak")
+  Assert.equal(#again, #expected, "mutation does not leak")
+end
+
 return function()
   testTable()
+  testTokens()
   Wow.reset()
 end

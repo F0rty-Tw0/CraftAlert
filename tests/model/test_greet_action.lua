@@ -70,6 +70,35 @@ end
 
 local GREETING = "Hi! I have Blacksmithing, what do you need?"
 
+-- Test-lead helpers: a lead flagged `test` (as Leads.OnMatch does) never reaches a send API.
+local PREFIX = "|cffffd100Craft Alert:|r "
+local TARGET = "Test0-Realm"
+local function setupTestLead(flavor, edit)
+  local tns, tdb, tcalls = setup(edit, flavor)
+  -- Restore drops test leads, so the record joins the live list after it.
+  local record = leadRecord(1, TARGET)
+  record.test = true
+  tdb.leads[1] = record
+  return tns, tdb, tcalls, record
+end
+
+local function chatLines(...)
+  local lines = {}
+  for i, text in ipairs({ ... }) do
+    lines[i] = PREFIX .. text
+  end
+  return lines
+end
+
+-- true when five more sends put the rate cap in force (Check says "rate", not "greeted").
+local function capped(tns, tlead)
+  for _ = 1, 5 do
+    tns.SendGuard.RecordSend()
+  end
+  local ok, why = tns.SendGuard.Check(tlead, 49)
+  return ok == false and why == "rate"
+end
+
 return function()
   -- Greet sends the disclosure notice, then the greeting whisper, records the send and
   -- marks the lead greeted.
@@ -247,4 +276,64 @@ return function()
   ns.GreetAction.Greet(ns.Leads.Latest(), 49)
   Assert.same(globalNotices, { { "robots.txt", "Q:CraftAlert", "WHISPER", "Customer1-Draenor" } })
   Assert.equal(calls[1][2], GREETING .. " Tips welcome.")
+
+  -- A test lead (flag set by Leads.OnMatch for the reserved guid) never reaches a send API: each
+  -- would-be send prints one chat line. Only the would-whisper line counts against the cap and
+  -- marks the lead greeted.
+  ns, db, calls, lead = setupTestLead()
+  ns.GreetAction.Greet(lead, 49)
+  Assert.same(
+    Wow.chat,
+    chatLines('Test, would send addon message robots.txt "Q:CraftAlert" to ' .. TARGET, "Test, would whisper " .. TARGET .. ": " .. GREETING)
+  )
+  Assert.same(calls, {})
+  Assert.equal(lead.greeted, true)
+  Assert.equal(db.recentGreeted[TARGET], nil)
+  Assert.equal(capped(ns, lead), true, "the would-whisper line counted one send")
+
+  -- A guard that blocks (shown just now) opens-a-whisper line only: not greeted, not counted.
+  ns, _, calls, lead = setupTestLead()
+  ns.GreetAction.Greet(lead, 50)
+  Assert.same(Wow.chat, chatLines("Test, would open a whisper to " .. TARGET .. " with: " .. GREETING))
+  Assert.same(calls, {})
+  Assert.equal(lead.greeted, false)
+  Assert.equal(capped(ns, lead), false, "a blocked dry run was not counted")
+
+  -- Prefill and Empty print their lines, mark nothing, count nothing.
+  ns, _, calls, lead = setupTestLead()
+  ns.GreetAction.Prefill(lead)
+  ns.GreetAction.Empty(lead)
+  Assert.same(
+    Wow.chat,
+    chatLines("Test, would open a whisper to " .. TARGET .. " with: " .. GREETING, "Test, would open an empty whisper to " .. TARGET)
+  )
+  Assert.same(calls, {})
+  Assert.equal(lead.greeted, false)
+  Assert.equal(capped(ns, lead), false, "Prefill and Empty were not counted")
+
+  -- An empty greeting through Greet prints the empty-whisper line, nothing greeted.
+  ns, _, calls, lead = setupTestLead(nil, function(data)
+    data.settings.templates.profession = ""
+  end)
+  ns.GreetAction.Greet(lead, 49)
+  Assert.same(Wow.chat, chatLines("Test, would open an empty whisper to " .. TARGET))
+  Assert.same(calls, {})
+  Assert.equal(lead.greeted, false)
+
+  -- Forever: the printed target drops the realm, as the real whisper does.
+  ns, _, calls, lead = setupTestLead("forever")
+  ns.GreetAction.Greet(lead, 49)
+  ns.GreetAction.Prefill(lead)
+  ns.GreetAction.Empty(lead)
+  Assert.same(
+    Wow.chat,
+    chatLines(
+      'Test, would send addon message robots.txt "Q:CraftAlert" to Test0',
+      "Test, would whisper Test0: " .. GREETING,
+      "Test, would open a whisper to Test0 with: " .. GREETING,
+      "Test, would open an empty whisper to Test0"
+    )
+  )
+  Assert.same(calls, {})
+  Assert.equal(lead.customer, TARGET)
 end

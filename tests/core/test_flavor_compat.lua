@@ -225,7 +225,43 @@ local function testClassOf()
   Assert.equal(FlavorCompat.ClassOf("Player-1-0F"), nil, "API missing")
 end
 
+-- A test GUID takes its class from the session-only map and never reaches the API.
+local function testTestClasses()
+  local FlavorCompat = load("retail")
+  local calls = 0
+  Wow.stub("GetPlayerInfoByGUID", function()
+    calls = calls + 1
+    error("must not be called for a test GUID")
+  end)
+  FlavorCompat.SetTestClass("Player-0-CRAFTALERTTEST1", "DRUID")
+  Assert.equal(FlavorCompat.ClassOf("Player-0-CRAFTALERTTEST1"), "DRUID", "mapped test GUID")
+  Assert.equal(FlavorCompat.ClassOf("Player-0-CRAFTALERTTEST2"), nil, "test GUID with no class")
+  FlavorCompat.SetTestClass("Player-0-CRAFTALERTTEST1", nil)
+  Assert.equal(FlavorCompat.ClassOf("Player-0-CRAFTALERTTEST1"), nil, "nil token clears the entry")
+  Assert.equal(calls, 0, "API never reached for a test GUID")
+  Wow.stub("GetPlayerInfoByGUID", function()
+    return "Warrior", "WARRIOR"
+  end)
+  Assert.equal(FlavorCompat.ClassOf("Player-1-0A"), "WARRIOR", "real GUID still uses the API")
+  FlavorCompat.SetTestClass("Player-0-CRAFTALERTTEST3", "MAGE")
+  Assert.equal(FlavorCompat.ClassOf(Wow.secret("Player-0-CRAFTALERTTEST3")), nil, "secret GUID first")
+end
+
+-- Only a string GUID that starts with the test prefix is a test GUID.
+local function testIsTestGuid()
+  local FlavorCompat = load("retail")
+  Assert.equal(FlavorCompat.TEST_GUID_PREFIX, "Player-0-CRAFTALERTTEST")
+  Assert.equal(FlavorCompat.IsTestGuid("Player-0-CRAFTALERTTEST1"), true, "prefix GUID")
+  Assert.equal(FlavorCompat.IsTestGuid(FlavorCompat.TEST_GUID_PREFIX), true, "the bare prefix")
+  Assert.equal(FlavorCompat.IsTestGuid("Player-1-0A"), false, "real GUID")
+  Assert.equal(FlavorCompat.IsTestGuid("xPlayer-0-CRAFTALERTTEST1"), false, "prefix not at the start")
+  Assert.equal(FlavorCompat.IsTestGuid(nil), false, "no GUID")
+  Assert.equal(FlavorCompat.IsTestGuid(42), false, "not a string")
+end
+
 return function()
+  testIsTestGuid()
+  testTestClasses()
   testFlavorKeys()
   testForeverSignals()
   testNoBuildInfoDefaultsToRetail()

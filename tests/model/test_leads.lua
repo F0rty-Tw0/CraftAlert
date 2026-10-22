@@ -164,9 +164,55 @@ local function testIgnoreList()
   Assert.equal(seen.change, 1, "nobody ignored: no change")
 end
 
+-- A guid under Leads.TEST_GUID_PREFIX marks a synthetic lead; nothing else does, whatever the name.
+local function testTestFlag()
+  local ns = setup()
+  local Leads = ns.Leads
+  local prefix = Leads.TEST_GUID_PREFIX
+  Assert.equal(prefix, "Player-0-CRAFTALERTTEST")
+  Assert.equal(prefix, ns.FlavorCompat.TEST_GUID_PREFIX, "one source for the prefix")
+  local flagSeen
+  Leads.On("new", function(lead)
+    flagSeen = lead.test
+  end)
+  local text = "LF plate belt"
+  local lead = newLead(ns, text, "Test0-Realm", prefix .. "1")
+  Assert.equal(flagSeen, true, "the flag is set before the new event")
+  Assert.equal(lead.test, true)
+
+  local again, isNew = newLead(ns, text, "Test0-Realm", prefix .. "2")
+  Assert.same({ again, isNew }, { lead, false }, "the repeat updates the same lead")
+  Assert.equal(lead.guid, prefix .. "1", "the first guid stays")
+
+  local real = newLead(ns, text, "Test-Realm", "Player-1-ABC")
+  Assert.equal(real.test, nil, "a real player named Test is a normal lead")
+  Assert.equal(newLead(ns, "LF plate greaves", "Other-Realm").test, nil, "no guid, no flag")
+end
+
+-- Nothing a test lead triggers reaches saved state.
+local function testTestGuards()
+  local ns, db = setup()
+  local Leads = ns.Leads
+  local text = "LF plate belt"
+  local testLead = newLead(ns, text, "Test0-Realm", Leads.TEST_GUID_PREFIX .. "1")
+  local realLead = newLead(ns, text, CUSTOMER, "Player-1-ABC")
+  Assert.equal(Leads.MarkGreeted(testLead.id), true)
+  Assert.equal(db.recentGreeted["Test0-Realm"], nil, "a test greeting is not remembered")
+  Assert.equal(Leads.MarkGreeted(realLead.id), true)
+  Assert.equal(db.recentGreeted[CUSTOMER], T0, "a real one is")
+
+  -- Restore drops test leads left in the list.
+  db.leads = { testLead, realLead }
+  Leads.Restore(db)
+  Assert.same(db.leads, { realLead }, "only the real lead is left")
+  Assert.same(Leads.List(), { realLead })
+end
+
 return function()
   testPreview()
   testIgnoreList()
+  testTestFlag()
+  testTestGuards()
   -- A new lead copies what it keeps out of the Matcher's result (§6.3 step 7).
   local ns, db = setup()
   local Leads = ns.Leads

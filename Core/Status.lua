@@ -15,7 +15,7 @@ local function counted(count, noun)
   return count .. " " .. noun .. (count == 1 and "" or "s")
 end
 
-local function pausedText(state)
+function Status.PausedText(state)
   local reason = state.reason
   if reason == "notResting" then
     return Localization.Text("Paused — not in a city or inn")
@@ -31,6 +31,8 @@ local function pausedText(state)
   end
   return Localization.Text("Paused — no recipes to listen for")
 end
+
+local pausedText = Status.PausedText
 
 -- state: ScanGate.State() = { active, reason, channels, recipeCount, crafterCount, unreadProfession }.
 function Status.Text(state)

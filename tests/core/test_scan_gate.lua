@@ -293,6 +293,17 @@ return function()
   Assert.equal(#seen, 1)
   Assert.equal(ns.Leads.Latest().customer, "Gus-Draenor")
 
+  -- Deliver calls the current handler with the event and payload; nil handler reaches HandleChat.
+  local delivered
+  ns.ScanGate.SetHandler(function(...)
+    delivered = { ... }
+  end)
+  ns.ScanGate.Deliver(CHANNEL, "a", "b")
+  Assert.same(delivered, { CHANNEL, "a", "b" })
+  ns.ScanGate.SetHandler(nil)
+  ns.ScanGate.Deliver(CHANNEL, "LF plate belt", "Hal-Draenor", "", "2. Trade", "Hal-Draenor", "", 2, 2, "Trade", 0, 1, nil)
+  Assert.equal(ns.Leads.Latest().customer, "Hal-Draenor", "Deliver reaches HandleChat")
+
   -- Whisper events are not the scan's business.
   Assert.falsy(Wow.frames[1]:IsEventRegistered(WHISPER))
 end

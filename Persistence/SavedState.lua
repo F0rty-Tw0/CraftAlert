@@ -47,7 +47,7 @@ local function pruneLeads(db, now)
   local limit = db.settings.leadTimeoutMin * 60
   local alive = {}
   for _, lead in ipairs(db.leads) do
-    if now - lead.time <= limit then
+    if not lead.test and now - lead.time <= limit then
       alive[#alive + 1] = lead
     end
   end

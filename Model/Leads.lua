@@ -22,6 +22,8 @@ local tostring = tostring
 local type = type
 
 local MAX_LEADS = 100
+-- A lead whose guid starts with this is a synthetic `/ca test` lead: flagged `test`, never saved.
+Leads.TEST_GUID_PREFIX = FlavorCompat.TEST_GUID_PREFIX
 local EVENTS = { new = true, change = true, greeted = true, replied = true }
 
 ---@type table
@@ -200,11 +202,26 @@ local function clampTimes(list)
   end
 end
 
+-- Removes synthetic (`/ca test`) leads from the list, in place (the list is db.leads).
+local function dropTest(list)
+  local kept = 0
+  for i = 1, #list do
+    if not list[i].test then
+      kept = kept + 1
+      list[kept] = list[i]
+    end
+  end
+  for i = #list, kept + 1, -1 do
+    list[i] = nil
+  end
+end
+
 -- Binds db.leads (Bootstrap, at PLAYER_LOGIN): repairs a hand-edited list (ids, times, order,
--- size), drops expired leads and starts the timer. The db is bound last: while a repair raises,
--- Leads stays unbound and makes no lead.
+-- size), drops test leads and expired leads and starts the timer. The db is bound last: while a
+-- repair raises, Leads stays unbound and makes no lead.
 function Leads.Restore(accountDb)
   local list = accountDb.leads
+  dropTest(list)
   local limit = timeoutSeconds(accountDb)
   fixIds(list)
   clampTimes(list)
@@ -347,6 +364,9 @@ function Leads.OnMatch(result, customerKey, text, channelKey, guid)
   lead = buildLead(result, customerKey, text, channelKey, crafter, cannotOrder)
   lead.id = nextId
   lead.guid = type(guid) == "string" and not FlavorCompat.issecretvalue(guid) and guid or nil
+  if FlavorCompat.IsTestGuid(lead.guid) then
+    lead.test = true
+  end
   lead.arrivedWhileAfk = afkNow()
   nextId = nextId + 1
   leads[#leads + 1] = lead
@@ -381,7 +401,9 @@ function Leads.MarkGreeted(id)
     return false
   end
   lead.greeted = true
-  db.recentGreeted[lead.customer] = now()
+  if not lead.test then
+    db.recentGreeted[lead.customer] = now()
+  end
   fire("greeted", lead)
   fire("change")
   return true
