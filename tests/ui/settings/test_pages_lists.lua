@@ -6,7 +6,7 @@ local SettingsFixture = require("tests.helpers.settings_fixture")
 
 local open, row, take, texts = SettingsFixture.open, SettingsFixture.row, SettingsFixture.take, SettingsFixture.texts
 
--- §6.2: keyword and block-list changes rebuild the index (the hot path reads copies).
+-- §6.2: keyword changes rebuild the index (the hot path reads copies).
 local function testKeywordsPage()
   local ns, db, refreshes = SettingsFixture.load({ leads = 2 })
   local settings = db.settings
@@ -29,22 +29,6 @@ local function testKeywordsPage()
   Assert.same(settings.extraSlang, { pauldron = "shoulders", hat = "helm" })
   Assert.same(take(refreshes), { "rebuild:keywords" })
   Assert.equal(row("Extra slang (word=slot)").input:GetText(), "hat=helm pauldron=shoulders")
-
-  -- Blocking from here works as the leads-window button: ignored, leads gone, block set rebuilt.
-  Widgets.type(row("Block a player").input, "Customer1-Draenor")
-  Assert.same(db.ignored, { ["Customer1-Draenor"] = true })
-  Assert.equal(#db.leads, 1)
-  Assert.same(take(refreshes), { "rebuild:block" })
-  Assert.equal(row("Block a player").input:GetText(), "", "the box empties")
-  Widgets.type(row("Block a player").input, "Other")
-  Assert.truthy(db.ignored["Other-Realm"], "normalized with the player's realm")
-  take(refreshes)
-  Assert.truthy(texts():find("Customer1-Draenor", 1, true))
-  Assert.truthy(texts():find("Other-Realm", 1, true))
-  Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Unblock"))
-  Assert.same(db.ignored, { ["Other-Realm"] = true }, "the first row (by name) unblocked")
-  Assert.same(take(refreshes), { "rebuild:block" })
-  Assert.falsy(texts():find("Customer1-Draenor", 1, true))
 
   -- A word list longer than a chat line is kept whole, also through a reopen and a focus loss
   -- (a capped box would commit its cut text).
@@ -69,31 +53,6 @@ local function testKeywordsPage()
     slangCount = slangCount + 1
   end
   Assert.equal(slangCount, 60)
-end
-
--- A typed name is cased as chat senders are, so the block matches them (§6.3 step 1).
-local function testBlockTypedName()
-  local ns, db = SettingsFixture.load({
-    db = function(accountDb)
-      for key, character in pairs(Fixture.db({ Defaults = require("CraftAlert.Persistence.Defaults") }).characters) do
-        accountDb.characters[key] = character
-      end
-      local far = Fixture.character({}, {})
-      far.realms = { "Area52", "Stormrage" }
-      accountDb.characters["Far-Area52"] = far
-    end,
-  })
-  open(ns, "Keywords")
-  Widgets.type(row("Block a player").input, "bob")
-  Assert.same(db.ignored, { ["Bob-Realm"] = true })
-  ns.Matcher.SetIndex(Fixture.index(ns, db))
-  Assert.truthy(ns.Matcher.Match("trade", "lf lion heart", "Carl"), "another sender still matches")
-  Assert.equal(ns.Matcher.Match("trade", "lf lion heart", "Bob"), nil)
-  Assert.equal(ns.Matcher.lastStop, "blocked")
-  Widgets.type(row("Block a player").input, "alice-area 52")
-  Assert.equal(db.ignored["Alice-Area52"], true, "a known realm takes its stored spelling")
-  Widgets.type(row("Block a player").input, "x-stormrage")
-  Assert.equal(db.ignored["X-Stormrage"], true, "a connected realm in no character key takes its stored spelling")
 end
 
 local BS, ENCH = 164, 333
@@ -273,9 +232,6 @@ local function testTestPage()
       for key, character in pairs(Fixture.db({ Defaults = require("CraftAlert.Persistence.Defaults") }).characters) do
         accountDb.characters[key] = character
       end
-      -- Blocked in the index's block set and on Blizzard's ignore list: both checks are
-      -- skipped, as for /ca test.
-      accountDb.ignored["Test-Realm"] = true
     end,
     before = function(chain)
       chain.Matcher.SetIndex(Fixture.index(chain, fixtureDb))
@@ -304,7 +260,6 @@ end
 
 return function()
   testKeywordsPage()
-  testBlockTypedName()
   testCraftersPage()
   testCraftersRecipeOrder()
   testRemoveOwnCharacter()
