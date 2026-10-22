@@ -45,7 +45,6 @@ local UI = {
   "UI.Settings.PageCrafters",
   "UI.Settings.PageTest",
   "UI.Settings.SettingsWindow",
-  "UI.Settings.BlizzardCategory",
   "Core.Bindings",
   "Core.Perf",
   "Core.TestReport",

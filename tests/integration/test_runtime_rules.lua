@@ -380,15 +380,8 @@ local function testAddonObeysTheRules()
     Assert.equal(ns.Leads.HasActive(), false)
     Assert.same(publicChatEvents(), { CHANNEL })
 
-    -- The settings window under the traps: its Blizzard category and button, every page, and
-    -- settings that rebuild, re-evaluate, re-arm and repaint (its UISpecialFrames insert).
-    local category = ns.BlizzardCategory.Register()
-    Assert.truthy(category, "registered through the Settings API")
-    for _, frame in ipairs(Wow.frames) do
-      if frame.parent == category.frame and frame.frameType == "Button" then
-        frame:GetScript("OnClick")(frame, "LeftButton")
-      end
-    end
+    -- The settings pages under the traps: every page, and settings that rebuild, re-evaluate,
+    -- re-arm and repaint (its UISpecialFrames insert).
     for _, title in ipairs({ "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" }) do
       SettingsFixture.open(ns, title)
     end
