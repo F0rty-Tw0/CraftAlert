@@ -25,8 +25,19 @@ local ipairs = ipairs
 local RANGES = { toastDuration = { 5, 120 }, leadTimeoutMin = { 1, 60 }, opacity = { 0.3, 1.0 } }
 local SETTING_OPTIONAL = { craftScanImported = "number", craftScanPrompted = "boolean" }
 local PROFESSION_SHAPE = { name = "", primary = false, read = false }
-local RECIPE_FIELDS = { name = "string", prof = "key", item = "number", ranks = "table", bind = "number", muted = "boolean" }
-local CHARACTER_FIELDS = { source = "string", importedAt = "number", realms = "table", professions = "table", recipes = "table" }
+local RECIPE_FIELDS = {
+  name = "string",
+  prof = "key",
+  item = "number",
+  ranks = "table",
+  bind = "number",
+  muted = "boolean",
+  reachRank = "number",
+  reachCost = "number",
+  reachConc = "number",
+}
+local CHARACTER_FIELDS =
+  { source = "string", importedAt = "number", realms = "table", professions = "table", recipes = "table", concentration = "table" }
 local LEAD_FIELDS = {
   id = "number",
   customer = "string",
@@ -48,6 +59,8 @@ local LEAD_FIELDS = {
   recipeName = "string",
   itemID = "number",
   itemLink = "string",
+  rank = "number",
+  rankConc = "boolean",
 }
 local COUNTERS = { seen = 0, greeted = 0, replied = 0, filled = 0 }
 local UI_FRAMES = { toast = true, window = true, launcher = true, settings = true }
@@ -211,6 +224,10 @@ local function fixRecipe(record)
     local ranks = fixList(record.ranks, isNumber)
     record.ranks = #ranks > 0 and ranks or nil
   end
+  -- Rank, cost and concentration are one measurement: all three or none.
+  if not (isNumber(record.reachRank) and isNumber(record.reachCost) and isNumber(record.reachConc)) then
+    record.reachRank, record.reachCost, record.reachConc = nil, nil, nil
+  end
   return record
 end
 
@@ -228,6 +245,29 @@ local function fixRealms(list)
   return realms
 end
 
+local SNAPSHOT_NUMBERS = { "amount", "at", "cycleMs", "perCycle", "max" }
+
+local function isSnapshot(value)
+  if type(value) ~= "table" then
+    return false
+  end
+  for _, field in ipairs(SNAPSHOT_NUMBERS) do
+    if not isNumber(value[field]) then
+      return false
+    end
+  end
+  return value.cycleMs > 0
+end
+
+-- Per-currency concentration snapshots; nil when none is valid.
+local function fixConcentration(map)
+  if type(map) ~= "table" then
+    return nil
+  end
+  fixMap(map, isNumber, isSnapshot)
+  return next(map) ~= nil and map or nil
+end
+
 local function fixCharacter(record)
   if record.source ~= "local" and record.source ~= "import" then
     record.source = "local"
@@ -236,6 +276,7 @@ local function fixCharacter(record)
   record.realms = fixRealms(record.realms)
   record.professions = fixRecords(record.professions, isKey, fixProfession)
   record.recipes = fixRecords(record.recipes, isKey, fixRecipe)
+  record.concentration = fixConcentration(record.concentration)
   return record
 end
 
