@@ -239,6 +239,14 @@ local function testRowsFitTheInset()
   Assert.same({ rows()[1]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -8 })
   Assert.same({ rows()[2]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -46 })
   Assert.truthy(string.find(table.concat(Widgets.texts(frame, Wow.frames), " / "), "Click: greet", 1, true), "footer hint")
+  -- The client sizes the inset from its anchors only, which may be unresolved (0 high) on the
+  -- first open; the fit still comes out of the frame's own height.
+  ns.LeadsWindow.Toggle()
+  frame.Inset.GetHeight = function()
+    return 0
+  end
+  ns.LeadsWindow.Toggle()
+  Assert.equal(#rows(), 6, "rows fit before the inset is laid out")
   ns = load({})
   ns.LeadsWindow.Toggle()
   Assert.truthy(string.find(table.concat(Widgets.texts(window().Inset, Wow.frames), " / "), "No leads", 1, true), "empty text is in the inset")

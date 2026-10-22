@@ -28,9 +28,12 @@ local FALLBACK_POSITION = { "CENTER", 0, 0 }
 local window = nil -- { frame, rows = { row, ... }, empty }, nil until the first open
 local offset = 0 -- leads scrolled past the top row
 
-local function rowsThatFit(inset)
+-- The inset's height from the frame's own size and the offsets anchorInset gives it: the client
+-- sizes the inset from its anchors only, which may still read 0 on the first open.
+local function rowsThatFit(frame)
   local layout = Theme.LAYOUT
-  local height = inset:GetHeight() - 2 * layout.PADDING
+  local insetHeight = frame:GetHeight() - layout.INSET_TOP - layout.INSET_BOTTOM
+  local height = insetHeight - 2 * layout.PADDING
   return max(0, floor((height + layout.ROW_GAP) / (layout.ROW_HEIGHT + layout.ROW_GAP)))
 end
 
@@ -59,7 +62,7 @@ function LeadsWindow.Refresh()
     return
   end
   local leads = Leads.List()
-  local fit = rowsThatFit(window.frame.Inset)
+  local fit = rowsThatFit(window.frame)
   offset = max(0, min(offset, #leads - fit))
   -- Bounded by the leads, not the frame height: a huge saved height must not loop for ever.
   local shown = max(0, min(fit, #leads - offset))
