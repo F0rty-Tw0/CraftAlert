@@ -30,4 +30,7 @@ return function()
   Assert.equal(Status.Text(paused("empty")), "Paused — no recipes to listen for")
   Assert.equal(Status.Text(paused("disabled")), "Paused — Craft Alert is turned off")
   Assert.equal(Status.Text(paused("notStarted")), "Paused — Craft Alert did not start; /reload to try again")
+
+  -- PausedText is the paused line on its own, for callers that already know the gate is paused.
+  Assert.equal(Status.PausedText({ reason = "notResting" }), "Paused — not in a city or inn")
 end
