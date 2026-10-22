@@ -178,14 +178,18 @@ local function testRecipeWithoutRanksIsNotAsked()
 end
 
 local function testConcentrationIsSavedAfterTheLastStep()
-  local state, QualityReach, Slicer, db = setup({ [10] = { ranks = { 1, 2 } } })
+  local state, QualityReach, Slicer, db = setup({ [10] = { ranks = { 1, 2 } }, [11] = { ranks = { 1, 2 } } })
   state.answers[10] = qualityAnswer(1, 376, 3168)
+  state.answers[11] = qualityAnswer(1, 376, 3168)
   db.characters[CHAR].concentration = nil
   Wow.clock.time = 7000
-  QualityReach.Queue({ 10 })
+  QualityReach.Queue({ 10, 11 })
+  table.remove(Wow.timers, 1).fn()
+  Assert.same(idsOf(state.calls), { 10 }, "one step per tick")
+  Wow.clock.time = 8000
   Slicer.Drain()
 
-  Assert.same(db.characters[CHAR].concentration, { [3168] = { amount = 100, at = 7000, cycleMs = 345600, perCycle = 1, max = 1000 } })
+  Assert.same(db.characters[CHAR].concentration, { [3168] = { amount = 100, at = 8000, cycleMs = 345600, perCycle = 1, max = 1000 } })
 end
 
 local function testQueueKeepsFifoWithoutDuplicates()
