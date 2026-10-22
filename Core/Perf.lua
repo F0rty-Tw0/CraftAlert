@@ -9,6 +9,8 @@ local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
+local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
+local ModernReader = ns.ModernReader or require("CraftAlert.Professions.ModernReader")
 
 -- Spec §4.4 `/ca perf`: times each chat line through a handler that replaces ScanGate's
 -- (ScanGate.SetHandler), so with perf off the hot path holds no timing call at all. The
@@ -49,9 +51,21 @@ local function millis(value)
   return value and Localization.Text("%.1f ms", value) or Localization.Text("n/a")
 end
 
--- "Login 42.0 ms, index build 12.5 ms." — shown in every report.
+-- "Login 42.0 ms, index build 12.5 ms, last read 12.5 ms in 4 steps, background 7 steps in 10
+-- ticks, longest 9.3 ms." — shown in every report. No read yet (or Classic): "last read n/a in 0 steps".
 local function setupText()
-  return Localization.Text("Login %s, index build %s.", millis(Perf.loginMs), millis(Index.lastBuildMs))
+  local read = ModernReader.lastRead
+  local stats = Slicer.stats
+  return Localization.Text(
+    "Login %s, index build %s, last read %s in %d steps, background %d steps in %d ticks, longest %s.",
+    millis(Perf.loginMs),
+    millis(Index.lastBuildMs),
+    millis(read and read.ms),
+    read and read.steps or 0,
+    stats.steps,
+    stats.ticks,
+    millis(stats.longestTickMs)
+  )
 end
 
 local function linesText()
@@ -99,6 +113,7 @@ function Perf.Start()
   lastReportAt = clock()
   lines, linesTotal, linesMax = 0, 0, 0
   matched, matchedTotal, matchedMax = 0, 0, 0
+  Slicer.ResetStats()
   running = true
   ScanGate.SetHandler(timedHandler)
   local notice = Localization.Text("Perf on: timing each chat line, a report every 60 s. /ca perf again stops it.")
