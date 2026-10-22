@@ -34,7 +34,7 @@ local guidCount = 0 -- one per test line this session, so every line has its own
 local say = TestReport.Say
 
 local function usage()
-  say("Usage: /ca test [as <class>] [x<N>] <a trade chat line>")
+  say("Usage: /ca test [as <class>] [x<N>] <a trade chat line> | /ca test reply")
 end
 
 local function nextWord(text)
@@ -126,6 +126,9 @@ end
 
 -- `/ca test` (§7.3), the command's arguments already trimmed.
 function TestLine.Run(args)
+  if args == "reply" then
+    return TestReport.Reply()
+  end
   local class, count, line = parse(args)
   if line == nil or gateStops() then
     return

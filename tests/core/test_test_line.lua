@@ -6,7 +6,7 @@ local UiFixture = require("tests.helpers.ui_fixture")
 local SlashFixture = require("tests.helpers.slash_fixture")
 
 local TOAST = "CraftAlertToast"
-local USAGE = "Usage: /ca test [as <class>] [x<N>] <a trade chat line>"
+local USAGE = "Usage: /ca test [as <class>] [x<N>] <a trade chat line> | /ca test reply"
 local PAUSED_RESTING = "Test: Paused — not in a city or inn, a real Trade line would be ignored too"
 local MATCHED_NO_ONE = "Matched, but none of your enabled characters can answer it, or the customer is on your ignore list"
 local UPDATED = "Updated the existing test lead (same customer asked again)"
@@ -235,6 +235,31 @@ local function testNothingIsSent()
   bursts("dismiss keybind")
 end
 
+-- `/ca test reply` fakes the customer's whisper through WhisperTracker's real handler, but only
+-- once a greeting went out, and for the newest test lead even when a real lead is newer.
+local function testReply()
+  local ns, _, _, handler = load()
+  Assert.same(run(handler, "reply"), { "No test lead to reply from" })
+  run(handler, "LF plate belt")
+  local lead = ns.Leads.Latest()
+  local replies = 0
+  ns.Leads.On("replied", function()
+    replies = replies + 1
+  end)
+  Assert.same(run(handler, "reply"), { "Greet the test lead first (a reply counts only after a greeting)" })
+  Assert.same({ lead.replied, replies }, { false, 0 })
+
+  Wow.clock.gettime = 51
+  Widgets.click(rawget(_G, TOAST), "LeftButton")
+  Assert.truthy(lead.greeted)
+  SlashFixture.fireTrade("LF mongoose", "Bob-Draenor")
+  Assert.equal(ns.Leads.Latest().test, nil, "a real lead is newest")
+  Assert.same(run(handler, "reply"), {})
+  Assert.same({ lead.replied, replies }, { true, 1 })
+  run(handler, "reply")
+  Assert.equal(replies, 1, "replied fires once")
+end
+
 return function()
   testNewAndRepeat()
   testGate()
@@ -245,5 +270,6 @@ return function()
   testRepeatKeepsClassInSync()
   testPerf()
   testNothingIsSent()
+  testReply()
   Wow.reset()
 end

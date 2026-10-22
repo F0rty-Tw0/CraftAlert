@@ -5,6 +5,7 @@ end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
+local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
@@ -14,6 +15,7 @@ local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 -- in flight (Begin..End), then says what the line did.
 local TestReport = {}
 
+local ipairs = ipairs
 local tostring = tostring
 
 local MATCH = "match"
@@ -61,6 +63,19 @@ function TestReport.Print()
   else
     say("Matched, but none of your enabled characters can answer it, or the customer is on your ignore list")
   end
+end
+
+-- `/ca test reply`: the newest test lead's customer whispers back, through the real handler.
+function TestReport.Reply()
+  for _, lead in ipairs(Leads.List()) do
+    if lead.test then
+      if not lead.greeted then
+        return say("Greet the test lead first (a reply counts only after a greeting)")
+      end
+      return EventRouter.Dispatch("CHAT_MSG_WHISPER", "test reply", lead.customer)
+    end
+  end
+  say("No test lead to reply from")
 end
 
 -- Bootstrap, with the other lead listeners. Once.

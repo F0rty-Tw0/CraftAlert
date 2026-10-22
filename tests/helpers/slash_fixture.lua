@@ -9,6 +9,7 @@
 local Wow = require("tests.helpers.wow")
 local Fixture = require("tests.helpers.matcher_fixture")
 local UiFixture = require("tests.helpers.ui_fixture")
+local Fresh = require("tests.helpers.fresh")
 
 local SlashFixture = {}
 
@@ -42,6 +43,8 @@ function SlashFixture.load(opts)
   ns.Index.Rebuild()
   ns.Leads.On("new", ns.AlertToast.Show)
   ns.TestLine.Install()
+  ns.WhisperTracker = Fresh.require("Model.WhisperTracker")
+  ns.WhisperTracker.Install()
   Wow.chat = {}
   return ns, db, calls
 end

@@ -111,7 +111,7 @@ local function testTestCommandStops()
   Assert.equal(rawget(_G, TOAST), nil, "no toast for a line that stopped")
   Wow.chat = {}
   handler("test")
-  Assert.same(SlashFixture.chat(), { "Usage: /ca test [as <class>] [x<N>] <a trade chat line>" })
+  Assert.same(SlashFixture.chat(), { "Usage: /ca test [as <class>] [x<N>] <a trade chat line> | /ca test reply" })
 
   -- Matched, but every crafter is switched off since the index was built.
   for _, character in pairs(db.characters) do
