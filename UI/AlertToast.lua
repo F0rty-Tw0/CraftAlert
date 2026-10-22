@@ -14,11 +14,12 @@ local Dock = ns.Dock or require("CraftAlert.UI.Dock")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
 local ToastLayout = ns.ToastLayout or require("CraftAlert.UI.ToastLayout")
 
--- Spec §7.1 and §4: the one alert toast. Created on the first alert (§4.4 rule 5) as frame
--- CraftAlertToast, a native tooltip-backdrop panel docked beside the launcher (UI/Dock.lua);
--- dragging it moves the launcher, so it keeps no position of its own. A newer lead replaces the
--- shown one and the "+N more" badge counts the leads it replaced; the toast hides after the
--- toast duration (one pending timer, §4.3 rule 1) or when its lead leaves the list.
+-- Design spec §7.1 and native-HUD spec §4: the one alert toast. Created on the first alert
+-- (design spec §4.4 rule 5) as frame CraftAlertToast, a native tooltip-backdrop panel docked
+-- beside the launcher (UI/Dock.lua); dragging it moves the launcher, so it keeps no position of
+-- its own. A newer lead replaces the shown one and the "+N more" badge counts the leads it
+-- replaced; the toast hides after the toast duration (one pending timer, design spec §4.3
+-- rule 1) or when its lead leaves the list.
 local AlertToast = {}
 
 -- The "+N more" count on the shown toast: leads it replaced since it appeared (0 when hidden).
@@ -51,7 +52,8 @@ local function trim(text)
   return match(text or "", "^%s*(.-)%s*$")
 end
 
--- The rank and the realm tag (§4.5, §7.2), whichever the lead has, or "".
+-- The rank and the realm tag (quality-rank spec §4.5, design spec §7.2), whichever the lead
+-- has, or "".
 local function detailText(lead)
   local parts = {}
   parts[#parts + 1] = LeadText.Rank(lead)

@@ -6,7 +6,7 @@ end
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 
--- Spec §4.3: the toast's lines and its measured height. The name and the badge share the top
+-- Native-HUD spec §4.3: the toast's lines and its measured height. The name and the badge share the top
 -- row; the headline, the detail line (shown only with a rank or realm tag) and the message stack
 -- under it, each wrapping across the toast's inner width.
 local ToastLayout = {}

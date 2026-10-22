@@ -6,7 +6,7 @@ end
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 
--- Spec §5.1–5.2: the launcher's CraftScan look (../CraftScan/Customer/AlertIcon.xml). A
+-- Native-HUD spec §5.1–5.2: the launcher's CraftScan look (../CraftScan/Customer/AlertIcon.xml). A
 -- Soulbinds ring as the button's normal, pushed and highlight art; a round-masked portrait
 -- inside it; a ring glow while the cursor is over it; a circle glow that pulses for a new lead.
 -- Without the atlases (Classic) the ring falls back to the minimap tracking border, the button

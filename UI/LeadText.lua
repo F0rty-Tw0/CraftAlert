@@ -23,7 +23,7 @@ function LeadText.Crafter(lead)
   return Localization.Text("by %s", tostring(lead.crafter))
 end
 
--- Spec §4.2: "Wants <what> — you can craft it" / "— your alt <name> can craft it"; a lead without
+-- Native-HUD spec §4.2: "Wants <what> — you can craft it" / "— your alt <name> can craft it"; a lead without
 -- an item or recipe says "you have it" / "your alt <name> has it".
 function LeadText.Headline(lead)
   local what = LeadText.What(lead)

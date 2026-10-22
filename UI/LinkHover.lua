@@ -3,7 +3,7 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
--- Spec §4.5: hover tooltips and clicks for hyperlinks inside a frame's own text. A frame
+-- Native-HUD spec §4.5: hover tooltips and clicks for hyperlinks inside a frame's own text. A frame
 -- reads its hovered link through IsOverLink so a click on a link never greets the lead.
 local LinkHover = {}
 

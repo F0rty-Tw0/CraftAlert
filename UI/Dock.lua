@@ -5,7 +5,7 @@ end
 
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 
--- Spec §4.4: which side of the launcher the toast docks to. The toast opens toward the screen
+-- Native-HUD spec §5.3: which side of the launcher the toast docks to. The toast opens toward the screen
 -- centre, on the launcher's own vertical half. A nil centre counts as left / upper.
 local Dock = {}
 

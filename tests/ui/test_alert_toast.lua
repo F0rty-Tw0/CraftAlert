@@ -118,7 +118,7 @@ local function testLazyFrameAndContent()
   Assert.truthy(string.find(shown, "can't order (realm)", 1, true), shown)
   Assert.falsy(string.find(shown, "R2", 1, true), "no rank, no R part: " .. shown)
 
-  -- §4.5: the rank sits on the detail line; the crafter is not drawn.
+  -- Native-HUD spec §4.1: the rank sits on the detail line; the crafter is not drawn.
   ns = UiFixture.load({
     leads = 1,
     db = function(accountDb)
@@ -167,7 +167,7 @@ local function testHeight()
   Assert.equal(message.text, CORPUS)
   Assert.truthy(message:GetStringHeight() >= 5 * Widgets.LINE_HEIGHT, "254 visible characters wrap past one line")
   Assert.truthy(frame:GetHeight() > shortHeight, "the toast grows")
-  -- Spec §4.3: PADDING + name + gap + headline + gap + message + PADDING (no detail line).
+  -- Native-HUD spec §4.3: PADDING + name + gap + headline + gap + message + PADDING (no detail line).
   local name, headline = part("GameFontNormal")[1], part("GameFontNormal")[2]
   Assert.equal(frame:GetHeight(), 8 + name:GetStringHeight() + 3 + headline:GetStringHeight() + 3 + message:GetStringHeight() + 8)
   Assert.equal(message:GetWidth(), 320 - 2 * 8)
