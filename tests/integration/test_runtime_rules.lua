@@ -413,19 +413,19 @@ local function testAddonObeysTheRules()
     )
     Assert.same(publicChatEvents(), { CHANNEL }, "and drops it at once")
 
-    -- Slash commands under the traps: the windows, a test line (a toast, no lead) and /ca perf
+    -- Slash commands under the traps: the windows, a test line (a toast and a test lead) and /ca perf
     -- around one chat line (swapping the handler registers no event and arms no timer).
     local slash = G("SlashCmdList").CRAFTALERT
     local leadsBefore = #ns.Leads.List()
     slash("")
     slash("config")
     slash("test LF plate belt")
-    Assert.equal(#ns.Leads.List(), leadsBefore, "/ca test makes no lead")
+    Assert.equal(#ns.Leads.List(), leadsBefore + 1, "/ca test makes a test lead")
     slash("perf")
     fireRequest("LF plate belt", "Dee-OtherRealm")
     slash("perf")
     slash("help")
-    Assert.equal(#ns.Leads.List(), leadsBefore + 1, "the timed handler still makes the lead")
+    Assert.equal(#ns.Leads.List(), leadsBefore + 2, "the timed handler still makes the lead")
     Assert.same(publicChatEvents(), { CHANNEL, "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM" }, "only that lead's whisper events")
     for _, timer in ipairs(Wow.timers) do
       Assert.truthy(ALLOWED_DELAYS[timer.delay], "timer with delay " .. tostring(timer.delay))

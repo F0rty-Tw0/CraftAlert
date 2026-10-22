@@ -44,6 +44,8 @@ local UI = {
   "UI.Settings.BlizzardCategory",
   "Core.Bindings",
   "Core.Perf",
+  "Core.TestReport",
+  "Core.TestLine",
   "Core.SlashCommands",
 }
 -- Globals Core/Bindings.lua defines at load: stubbed first, so Wow.reset removes them again.

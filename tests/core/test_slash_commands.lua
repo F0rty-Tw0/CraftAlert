@@ -1,6 +1,7 @@
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
+local UiFixture = require("tests.helpers.ui_fixture")
 local SlashFixture = require("tests.helpers.slash_fixture")
 
 local LEADS_WINDOW, SETTINGS_WINDOW, TOAST = "CraftAlertLeadsWindow", "CraftAlertSettingsWindow", "CraftAlertToast"
@@ -48,15 +49,11 @@ local function testWindows()
   Assert.equal(shown(SETTINGS_WINDOW), false, "case and spaces do not matter")
 end
 
--- §7.3: steps 2-5 on the text as "Test" on the own realm; it prints the result, why, crafter and
--- greeting, shows a test toast and creates no lead, no ledger count, no send, no sound.
+-- §7.3: the text goes through the real path as customer Test0 on the own realm. It makes a test
+-- lead (toast badged "Test"), prints what matched, why, the crafter and the greeting, and
+-- sends nothing.
 local function testTestCommand()
   local ns, db, calls, handler = setup()
-  Wow.stub("C_FriendList", {
-    IsIgnored = function()
-      return true
-    end,
-  })
   local ledger = {}
   for key, value in pairs(db.ledger) do
     ledger[key] = value
@@ -69,12 +66,15 @@ local function testTestCommand()
     "Crafter: Ench-Realm",
     "Greeting: " .. GREETING,
   })
+  local lead = ns.Leads.Latest()
+  Assert.same({ lead.test, lead.customer, #ns.Leads.List() }, { true, "Test0-Realm", 1 })
+  Assert.equal(ns.AlertToast.VisibleLead(), lead)
   Assert.truthy(string.find(toastTexts(), "Test", 1, true), toastTexts())
-  Assert.truthy(string.find(toastTexts(), GREETING, 1, true), toastTexts())
-  Assert.same({ #db.leads, #ns.Leads.List(), ns.Leads.HasActive() }, { 0, 0, false })
+  Assert.truthy(string.find(toastTexts(), "LF mongoose", 1, true), toastTexts())
   Assert.same(db.ledger, ledger, "no ledger count")
-  Assert.same(calls, {}, "nothing sent, no sound or flash")
-  Assert.equal(ns.AlertToast.VisibleLead(), nil, "the test toast is no lead")
+  for _, api in ipairs({ "addon", "chat", "prefill", "empty" }) do
+    Assert.equal(#UiFixture.callsTo(calls, api), 0, api)
+  end
 
   -- A profession word names the profession; text keeps its spaces and case.
   Wow.chat = {}
@@ -87,6 +87,23 @@ local function testTestCommand()
   })
 end
 
+-- The ignore list is the real one: an ignored Test0 makes no lead and says so.
+local function testTestCommandIgnored()
+  local ns, _, _, handler = setup()
+  Wow.stub("C_FriendList", {
+    IsIgnored = function()
+      return true
+    end,
+  })
+  Wow.chat = {}
+  handler("test LF mongoose")
+  Wow.stub("C_FriendList", nil)
+  Assert.same(SlashFixture.chat(), {
+    "Matched, but none of your enabled characters can answer it, or the customer is on your ignore list",
+  })
+  Assert.same({ #ns.Leads.List(), rawget(_G, TOAST) }, { 0, nil })
+end
+
 local function testTestCommandStops()
   local _, db, _, handler = setup()
   handler("test hello there")
@@ -94,7 +111,7 @@ local function testTestCommandStops()
   Assert.equal(rawget(_G, TOAST), nil, "no toast for a line that stopped")
   Wow.chat = {}
   handler("test")
-  Assert.same(SlashFixture.chat(), { "Usage: /ca test <a trade chat line>" })
+  Assert.same(SlashFixture.chat(), { "Usage: /ca test [as <class>] [x<N>] <a trade chat line>" })
 
   -- Matched, but every crafter is switched off since the index was built.
   for _, character in pairs(db.characters) do
@@ -102,7 +119,9 @@ local function testTestCommandStops()
   end
   Wow.chat = {}
   handler("test any enchanters")
-  Assert.same(SlashFixture.chat(), { "Matched, but none of your enabled characters can answer it" })
+  Assert.same(SlashFixture.chat(), {
+    "Matched, but none of your enabled characters can answer it, or the customer is on your ignore list",
+  })
   Assert.equal(rawget(_G, TOAST), nil)
 end
 
@@ -126,6 +145,7 @@ return function()
   testRegister()
   testWindows()
   testTestCommand()
+  testTestCommandIgnored()
   testTestCommandStops()
   testPerfAndHelp()
   Wow.reset()

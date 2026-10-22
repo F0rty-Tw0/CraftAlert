@@ -180,32 +180,17 @@ local function testClicks()
   Assert.equal(toastFrame():IsShown(), false)
 end
 
-local function testTestToast()
-  -- `/ca test` (§7.3): marked "Test", shows the greeting, never greets; right-click only hides it.
-  local ns, _, calls = UiFixture.load({ leads = 1 })
-  local testLead = UiFixture.lead(nil, "Test-Realm")
-  local keys = { shift = false }
-  Wow.stub("IsShiftKeyDown", function()
-    return keys.shift
-  end)
-  ns.AlertToast.ShowTest(testLead, "Hi! I have Blacksmithing, what do you need?")
-  local shown = texts()
-  Assert.truthy(string.find(shown, "Test", 1, true), shown)
-  Assert.truthy(string.find(shown, "Hi! I have Blacksmithing", 1, true), shown)
-  Assert.equal(ns.AlertToast.VisibleLead(), nil, "a test toast is no lead")
-  Wow.clock.gettime = 60
-  Widgets.click(toastFrame(), "LeftButton")
-  keys.shift = true
-  Widgets.click(toastFrame(), "LeftButton")
-  Assert.same(calls, {}, "no greeting, prefill, sound or flash")
-  Assert.equal(toastFrame():IsShown(), true)
-  Widgets.click(toastFrame(), "RightButton")
-  Assert.equal(toastFrame():IsShown(), false)
-  Assert.equal(ns.Leads.IsActive(1), true, "the real lead is untouched")
-  -- A real alert after a test toast starts without a badge.
-  ns.AlertToast.ShowTest(testLead, "x")
-  ns.AlertToast.Show(ns.Leads.Latest())
-  Assert.falsy(string.find(texts(), "more", 1, true), texts())
+-- `/ca test` makes a real lead now: there is no separate test toast, and the message line is the
+-- lead's own message (trimmed), never a greeting.
+local function testNoTestToast()
+  local ns = UiFixture.load({ leads = 1 })
+  Assert.equal(ns.AlertToast.ShowTest, nil)
+  local lead = ns.Leads.Latest()
+  ns.AlertToast.Show(lead)
+  Assert.truthy(string.find(texts(), "LF plate belt", 1, true), texts())
+  Assert.falsy(string.find(texts(), "Hi!", 1, true), texts())
+  Assert.equal(fontStringWith("LF plate belt").text, "LF plate belt", "the message is the trimmed lead.message")
+  Assert.equal(ns.AlertToast.VisibleLead(), lead)
 end
 
 local function loadTestLeads(count)
@@ -302,7 +287,7 @@ return function()
   testLazyFrameAndContent()
   testNewerLeadAndAutoHide()
   testClicks()
-  testTestToast()
+  testNoTestToast()
   testRealPathTestLead()
   testClassColor()
   testSavedPosition()
