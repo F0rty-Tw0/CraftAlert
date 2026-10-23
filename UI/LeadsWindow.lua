@@ -158,6 +158,7 @@ end
 
 local function enterSettings()
   local frame = window.frame
+  window.mode = "settings"
   WindowSize.Apply(frame, SETTINGS)
   clearRows()
   window.empty:Hide()
@@ -165,7 +166,6 @@ local function enterSettings()
   SettingsPane.Show()
   frame:SetTitle(Localization.Text("Craft Alert — Settings"))
   SettingsGear.Paint(frame.gear, true)
-  window.mode = "settings"
 end
 
 local function enterList()

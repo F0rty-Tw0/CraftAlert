@@ -110,6 +110,35 @@ local function testGearSwitchesModes()
   Assert.equal(select(2, ns.LeadsWindow.VisibleLatest()), 60, "the row is shown afresh")
 end
 
+-- Makes the window's SetSize act like a client that clamps to the resize bounds and then fires
+-- OnSizeChanged (the fake does neither).
+local function clientSizing()
+  local target, setSize = frame(), frame().SetSize
+  function target:SetSize(width, height)
+    setSize(self, math.max(width, self.resizeBounds[1]), math.max(height, self.resizeBounds[2]))
+    self:GetScript("OnSizeChanged")(self, self:GetWidth(), self:GetHeight())
+  end
+end
+
+local function rowCount()
+  local count = 0
+  for _, candidate in ipairs(Wow.frames) do
+    if candidate.isLeadRow then
+      count = count + 1
+    end
+  end
+  return count
+end
+
+local function testNoRowsDrawnEnteringSettings()
+  local ns = UiFixture.load({ leads = 8 })
+  ns.LeadsWindow.Toggle()
+  clientSizing()
+  local before = rowCount()
+  Widgets.click(gear())
+  Assert.equal(rowCount(), before, "the resize to the settings size draws no new row")
+end
+
 local function testWheelIgnoredInSettings()
   local ns = UiFixture.load({
     leads = 8,
@@ -280,6 +309,7 @@ end
 return function()
   testToggleSettingsFromHidden()
   testGearSwitchesModes()
+  testNoRowsDrawnEnteringSettings()
   testWheelIgnoredInSettings()
   testReopenRefreshesPage()
   testCloseReturnsToList()
