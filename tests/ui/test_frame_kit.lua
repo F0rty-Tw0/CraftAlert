@@ -102,6 +102,34 @@ local function testListHighlight()
   Assert.same(texture.points, { { "ALL", button } })
 end
 
+-- The client's icon for a skill-line ID; a Classic name key, or a client without the API, has none.
+local function testProfessionIcon()
+  local FrameKit = load({})
+  Assert.equal(FrameKit.ProfessionIcon(333), nil, "no C_TradeSkillUI")
+  Wow.stub("C_TradeSkillUI", {
+    GetTradeSkillTexture = function(id)
+      return (id == 333 or id == "Enchanting") and 136244 or nil
+    end,
+  })
+  Assert.equal(FrameKit.ProfessionIcon(333), 136244)
+  Assert.equal(FrameKit.ProfessionIcon(164), nil, "unknown id")
+  Assert.equal(FrameKit.ProfessionIcon("Enchanting"), nil, "Classic name key")
+  Assert.equal(FrameKit.ProfessionIcon(nil), nil)
+  Wow.stub("C_TradeSkillUI", {})
+  Assert.equal(FrameKit.ProfessionIcon(333), nil, "no GetTradeSkillTexture")
+end
+
+-- The class colour of a class token, from RAID_CLASS_COLORS.
+local function testClassColor()
+  local FrameKit = load({})
+  Assert.equal(FrameKit.ClassColor("MAGE"), nil, "no RAID_CLASS_COLORS")
+  Wow.stub("RAID_CLASS_COLORS", { MAGE = { r = 0.25, g = 0.78, b = 0.92 } })
+  Assert.same(FrameKit.ClassColor("MAGE"), { r = 0.25, g = 0.78, b = 0.92 })
+  Assert.equal(FrameKit.ClassColor("ROGUE"), nil, "unknown token")
+  Assert.equal(FrameKit.ClassColor(nil), nil)
+  Assert.equal(FrameKit.ClassColor(5), nil, "non-string token")
+end
+
 -- The WhisperMessenger look is gone: no panel/title-bar builders, no surface or control colours.
 local function testLookCodeGone()
   local FrameKit = load({})
@@ -133,6 +161,8 @@ return function()
   testMalformedFallsBack()
   testArt()
   testListHighlight()
+  testProfessionIcon()
+  testClassColor()
   testLookCodeGone()
   Wow.reset()
 end

@@ -79,16 +79,37 @@ function FrameKit.ListHighlight(button)
   return texture
 end
 
+-- RAID_CLASS_COLORS entry of a class token, or nil. A client without the table makes no lookup.
+function FrameKit.ClassColor(token)
+  local colors = _G["RAID_CLASS_COLORS"]
+  if type(colors) ~= "table" or type(token) ~= "string" then
+    return nil
+  end
+
+  return colors[token]
+end
+
+-- The client's icon for a profession skill-line ID, or nil: Classic name keys and a client without
+-- the API have none. C_TradeSkillUI is read through _G (luacheck's read_globals lacks it).
+function FrameKit.ProfessionIcon(prof)
+  local api = _G["C_TradeSkillUI"]
+  local canAsk = type(prof) == "number" and type(api) == "table" and type(api.GetTradeSkillTexture) == "function"
+  if not canAsk then
+    return nil
+  end
+
+  return api.GetTradeSkillTexture(prof)
+end
+
 -- RAID_CLASS_COLORS entry of the player with this chat GUID, or nil. A secret GUID or class is
 -- never passed on or compared: FlavorCompat.ClassOf owns that guard. The colour table is checked
 -- first, so a client without it makes no API call.
 local function classColor(guid)
-  local colors = _G["RAID_CLASS_COLORS"]
-  if type(colors) ~= "table" then
+  if type(_G["RAID_CLASS_COLORS"]) ~= "table" then
     return nil
   end
-  local classFile = FlavorCompat.ClassOf(guid)
-  return classFile ~= nil and colors[classFile] or nil
+
+  return FrameKit.ClassColor(FlavorCompat.ClassOf(guid))
 end
 
 -- Colours a customer's name by class, or in the plain text colour when the class is unknown.
