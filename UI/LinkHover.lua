@@ -39,10 +39,10 @@ local function onEnter(frame, link)
   showTooltip(frame, link)
 end
 
+-- Off a link: hides the link's tooltip, never one a child frame has shown since.
 local function makeOnLeave(onBodyEnter)
   return function(frame)
-    frame.hoveredLink = nil
-    tooltip():Hide()
+    LinkHover.Clear(frame)
     local backOnBody = onBodyEnter ~= nil and frame:IsMouseOver()
     if backOnBody then
       onBodyEnter(frame)

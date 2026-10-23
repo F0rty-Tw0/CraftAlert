@@ -38,6 +38,17 @@ local function testEnterLeave()
   Assert.equal(#body, 1)
 end
 
+-- Off a link after another frame took the tooltip (a client's leave can come after the next enter):
+-- that frame's tooltip stays.
+local function testLeaveKeepsOtherTip()
+  local ns, frame, tip = setup(false)
+  enter(frame, ITEM)
+  tip:SetOwner(rawget(_G, "UIParent"), "ANCHOR_TOP")
+  tip:Show()
+  frame.scripts.OnHyperlinkLeave(frame)
+  Assert.same({ ns.LinkHover.IsOverLink(frame), tip.shown }, { false, true })
+end
+
 local function testTradeAndFailure()
   local _, frame, tip = setup(false)
   enter(frame, TRADE)
@@ -73,6 +84,7 @@ end
 
 return function()
   testEnterLeave()
+  testLeaveKeepsOtherTip()
   testTradeAndFailure()
   testClickAndClear()
   Wow.reset()
