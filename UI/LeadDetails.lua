@@ -10,25 +10,18 @@ local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local LinkHover = ns.LinkHover or require("CraftAlert.UI.LinkHover")
 
--- Spec §4: the details pane right of the leads window's list column. It shows one lead: the
--- pinned one (a row's hover pins it) while it is listed, else the newest; nothing for an empty
--- list. Leaving the rows, scrolling and new leads keep the pin; the window clears it on open,
--- on the way back from the settings, and hides the pane while they show.
+-- Leads-details spec §4: the details pane right of the leads window's list column. It shows one
+-- lead: the pinned one (a row's hover pins it) while it is listed, else the newest; nothing for an
+-- empty list. Leaving the rows, scrolling and new leads keep the pin; the window clears it on
+-- open, on the way back from the settings, and hides the pane while they show.
 local LeadDetails = {}
 
 local concat = table.concat
 local sort = table.sort
 local tostring = tostring
+local type = type
 
 local LINE_GAP = 6
-
-local function setShown(region, shown)
-  if shown then
-    region:Show()
-  else
-    region:Hide()
-  end
-end
 
 -- A wrapped line under `above`, as wide as the pane.
 local function addLine(pane, above, font, color)
@@ -40,6 +33,14 @@ local function addLine(pane, above, font, color)
   return line
 end
 
+-- The pane takes the left-drag over its half of the window: the window's own drag handlers (set
+-- by FrameKit.Draggable, which saves the position) run for it, with the window as `self`.
+local function forwardDrag(pane, window, script)
+  pane:SetScript(script, function()
+    window:GetScript(script)(window)
+  end)
+end
+
 -- The hidden pane in `inset` (the window's inset), right of the list column.
 function LeadDetails.New(inset)
   local layout, colors, fonts = Theme.LAYOUT, Theme.COLORS, Theme.FONTS
@@ -48,6 +49,9 @@ function LeadDetails.New(inset)
   pane:SetPoint("BOTTOMRIGHT", inset, "BOTTOMRIGHT", 0, 0)
   -- Mouse on, so the message's links get their hyperlink scripts.
   pane:EnableMouse(true)
+  pane:RegisterForDrag("LeftButton")
+  forwardDrag(pane, inset:GetParent(), "OnDragStart")
+  forwardDrag(pane, inset:GetParent(), "OnDragStop")
   pane.name = FrameKit.Text(pane, fonts.name)
   pane.name:SetPoint("TOPLEFT", pane, "TOPLEFT", layout.PADDING, -layout.PADDING)
   pane.age = FrameKit.Text(pane, fonts.detail, colors.textTimestamp)
@@ -80,10 +84,22 @@ local function pick(pane, leads)
   return leads[1]
 end
 
--- A restored lead has no crafters list: its picked crafter alone.
+-- A { key = string, rank = number or nil } entry.
+local function isCrafter(entry)
+  return type(entry) == "table" and type(entry.key) == "string" and (entry.rank == nil or type(entry.rank) == "number")
+end
+
+-- lead.crafters' valid entries (a newer schema's data is kept as it is, by Schema); a restored lead
+-- has none, or no usable one: its picked crafter alone.
 local function craftersOf(lead)
-  if lead.crafters then
-    return lead.crafters
+  local valid = {}
+  for _, entry in ipairs(type(lead.crafters) == "table" and lead.crafters or {}) do
+    if isCrafter(entry) then
+      valid[#valid + 1] = entry
+    end
+  end
+  if #valid > 0 then
+    return valid
   end
   if lead.crafter == nil then
     return {}
@@ -98,25 +114,28 @@ local function crafterLine(line)
   return line.name .. " · " .. line.rank
 end
 
+local function pickedFirst(a, b)
+  if a.picked ~= b.picked then
+    return a.picked
+  end
+  return a.name < b.name
+end
+
 -- "Crafters:" and a line each, the picked crafter first, then the rest by the name shown.
 local function craftersText(lead)
   local lines = {}
   for _, crafter in ipairs(craftersOf(lead)) do
+    local ranked = { rank = crafter.rank, rankConc = crafter.byConc }
     lines[#lines + 1] = {
       picked = crafter.key == lead.crafter,
-      name = Greeting.CrafterName(tostring(crafter.key)),
-      rank = LeadText.Rank({ rank = crafter.rank, rankConc = crafter.byConc }),
+      name = Greeting.CrafterName(crafter.key),
+      rank = LeadText.Rank(ranked),
     }
   end
   if #lines == 0 then
     return Localization.Text("Crafters: none known")
   end
-  sort(lines, function(a, b)
-    if a.picked ~= b.picked then
-      return a.picked
-    end
-    return a.name < b.name
-  end)
+  sort(lines, pickedFirst)
   local texts = { Localization.Text("Crafters:") }
   for _, line in ipairs(lines) do
     texts[#texts + 1] = crafterLine(line)
@@ -124,19 +143,23 @@ local function craftersText(lead)
   return concat(texts, "\n")
 end
 
--- Sets `line` to `value` through `format`, hidden when the lead has no such field.
-local function setLine(line, format, value)
-  setShown(line, value ~= nil)
-  line:SetText(value ~= nil and Localization.Text(format, tostring(value)) or nil)
+-- Sets `line` to `text`, hidden when the lead has no such field (nil).
+local function setLine(line, text)
+  if text == nil then
+    line:Hide()
+    return
+  end
+  line:SetText(text)
+  line:Show()
 end
 
 local function paint(pane, lead)
   pane.name:SetText(tostring(lead.customer))
   FrameKit.PaintName(pane.name, lead.guid)
   pane.age:SetText(LeadText.Age(_G["time"]() - lead.time))
-  setLine(pane.message, "%s", lead.message)
-  setLine(pane.why, "Matched: %s", lead.why)
-  setLine(pane.profession, "%s", lead.profName)
+  setLine(pane.message, lead.message)
+  setLine(pane.why, lead.why and Localization.Text("Matched: %s", lead.why))
+  setLine(pane.profession, lead.profName)
   pane.crafters:SetText(craftersText(lead))
 end
 

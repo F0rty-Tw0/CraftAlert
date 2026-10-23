@@ -33,9 +33,9 @@ function RecipeTooltip.Show(row, character)
   _G["GameTooltip_SetTitle"](tooltip, recipe.name or tostring(key), _G["NORMAL_FONT_COLOR"])
   local profession = character and character.professions[recipe.prof]
   if profession and profession.name ~= "" then
-    tooltip:AddLine(profession.name, 1, 1, 1)
+    _G["GameTooltip_AddHighlightLine"](tooltip, profession.name)
   end
-  tooltip:AddLine(Localization.Text("Known by: %s", knownBy(key)), 1, 1, 1)
+  _G["GameTooltip_AddHighlightLine"](tooltip, Localization.Text("Known by: %s", knownBy(key)))
   if recipe.muted == true then
     tooltip:AddLine(Localization.Text("Muted"), GREY, GREY, GREY)
   end

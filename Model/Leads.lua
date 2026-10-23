@@ -330,7 +330,7 @@ local function buildLead(result, customerKey, text, channelKey, pick)
     cannotOrder = pick.cannotOrder,
     rank = pick.rank,
     rankConc = pick.rankConc,
-    crafters = pick.candidates, -- not saved: Schema drops it; a restored lead has none
+    crafters = pick.candidates, -- live only: written at logout, dropped by Schema on the next load
     time = now(),
     greeted = false,
     replied = false,

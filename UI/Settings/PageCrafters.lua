@@ -105,6 +105,11 @@ local function shownCharacter(page)
   return db().characters[page.character.Value()]
 end
 
+-- The recipe tooltip for `row`, read at hover time: the row is reused and the character can change.
+local function showTooltip(row)
+  RecipeTooltip.Show(row, shownCharacter(row.page))
+end
+
 local function createRecipeRow(row)
   local size = Theme.LAYOUT.ROW_ICON_SIZE
   row.icon = row:CreateTexture(nil, "ARTWORK")
@@ -118,9 +123,7 @@ local function createRecipeRow(row)
     row.page.ShowRecipes()
   end)
   row.mute:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-  row:SetScript("OnEnter", function()
-    RecipeTooltip.Show(row, shownCharacter(row.page))
-  end)
+  row:SetScript("OnEnter", showTooltip)
   row:SetScript("OnLeave", function()
     _G["GameTooltip"]:Hide()
   end)
@@ -135,7 +138,7 @@ local function showRecipe(row, item)
   row.icon:SetAlpha(muted and Theme.DIM_ALPHA or 1)
   row.mute.label:SetText(muted and Localization.Text("Unmute") or Localization.Text("Mute"))
   if _G["GameTooltip"]:IsOwned(row) then
-    RecipeTooltip.Show(row, shownCharacter(row.page))
+    showTooltip(row)
   end
 end
 

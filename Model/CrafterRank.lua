@@ -130,12 +130,15 @@ function CrafterRank.Pick(result, customerKey, db, opts)
   end
   local bestBy = {}
   local function consider(key, prof, recipeKey)
+    local cannot = cannotOrder(key) == true and 1 or 0
     local rank, top, byConc = effectiveRank(db, key, recipeKey)
+    local fraction = rank and rank / top or -1
+    local conc = byConc and 1 or 0
     local entry = {
       key = key,
-      cannot = cannotOrder(key) == true and 1 or 0,
-      fraction = rank and rank / top or -1,
-      conc = byConc and 1 or 0,
+      cannot = cannot,
+      fraction = fraction,
+      conc = conc,
       tier = tierOf(db.characters[key], key, prof),
       rank = rank,
       byConc = byConc,

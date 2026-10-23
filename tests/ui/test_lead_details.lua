@@ -3,7 +3,7 @@ local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 
--- Spec §4: in list mode the leads window shows its rows in a left column and the details of one
+-- Leads-details spec §4: in list mode the leads window shows its rows in a left column and the details of one
 -- lead on the right. One pinned lead: a row's hover pins it; leaving, scrolling or a new lead
 -- changes nothing; no pin (or the pinned lead gone) shows the newest.
 local LINK = "item:4305"
@@ -174,7 +174,8 @@ local function testSettingsHidesPane()
   Assert.equal(pane():IsShown(), false)
 end
 
--- Spec §4 items 1-5, the picked crafter first, then the rest by the name the greeting uses.
+-- Leads-details spec §4 items 1-5, the picked crafter first, then the rest by the name the
+-- greeting uses.
 local function testDetailsContent()
   local ns = load({}, function(accountDb)
     local lead = UiFixture.lead(1, "Buyer-Realm")
@@ -224,6 +225,64 @@ local function testDetailsFallbacks()
   Assert.equal(pane().crafters:GetText(), "Crafters: none known")
 end
 
+-- A lead with no why or profession shows neither line, even after a lead that had both.
+local function testMissingFieldsHideLines()
+  local ns = load({ "Ann-Draenor", "Bob-Draenor" }, function(accountDb)
+    accountDb.leads[2].why = nil
+    accountDb.leads[2].profName = nil
+  end)
+  ns.LeadsWindow.Toggle()
+  Assert.equal(shown(ns), byCustomer(ns, "Bob-Draenor"))
+  Assert.same({ pane().why:IsShown(), pane().profession:IsShown() }, { false, false })
+  Widgets.fire(rowOf(byCustomer(ns, "Ann-Draenor")), "OnEnter")
+  Assert.same({ pane().why:IsShown(), pane().profession:IsShown() }, { true, true })
+  Widgets.fire(rowOf(byCustomer(ns, "Bob-Draenor")), "OnEnter")
+  Assert.same({ pane().why:IsShown(), pane().profession:IsShown() }, { false, false })
+end
+
+-- Saved data from a newer schema keeps crafters as it is: a bad list or entry falls back to the
+-- lead's picked crafter.
+local function testBadCrafters()
+  for _, bad in ipairs({ "bad", { 5, { key = "Me-Realm", rank = "x" }, { key = 7 } } }) do
+    local ns = load({}, function(accountDb)
+      local lead = UiFixture.lead(1, "Buyer-Realm")
+      lead.rank = 2
+      lead.crafters = bad
+      accountDb.leads[1] = lead
+    end)
+    ns.LeadsWindow.Toggle()
+    Assert.equal(pane().crafters:GetText(), "Crafters:\nMe · R2")
+    Wow.reset()
+  end
+end
+
+-- A drag that starts on the pane moves the window and saves its position like a drag on the frame.
+local function testPaneDragMovesWindow()
+  local ns = load({ "Ann-Draenor" })
+  ns.LeadsWindow.Toggle()
+  local frame, details = window(), pane()
+  Assert.equal(details.dragButtons[1], "LeftButton")
+  details.scripts.OnDragStart(details)
+  Assert.equal(frame.moving, true)
+  frame:ClearAllPoints()
+  frame:SetPoint("LEFT", rawget(_G, "UIParent"), "LEFT", 30, 40)
+  details.scripts.OnDragStop(details)
+  Assert.equal(frame.moving, false)
+  local saved = rawget(_G, "CraftAlertDB").ui.window
+  Assert.same({ saved.point, saved.x, saved.y }, { "LEFT", 30, 40 })
+end
+
+-- The link under the cursor belonged to the old lead: a lead change clears it and its tooltip.
+local function testLeadChangeClearsLinkHover()
+  local ns = load({ "Ann-Draenor", "Bob-Draenor" })
+  ns.LeadsWindow.Toggle()
+  local details, tip = pane(), rawget(_G, "GameTooltip")
+  details.scripts.OnHyperlinkEnter(details, LINK, LINK_TEXT)
+  Assert.same({ tip.owner, tip.shown, details.hoveredLink }, { details, true, LINK })
+  Widgets.fire(rowOf(byCustomer(ns, "Ann-Draenor")), "OnEnter")
+  Assert.same({ tip.shown, details.hoveredLink }, { false, nil })
+end
+
 local function testAgeRefreshes()
   local ns = load({ "Ann-Draenor" })
   ns.LeadsWindow.Toggle()
@@ -244,6 +303,10 @@ return function()
   testSettingsHidesPane()
   testDetailsContent()
   testDetailsFallbacks()
+  testMissingFieldsHideLines()
+  testBadCrafters()
+  testPaneDragMovesWindow()
+  testLeadChangeClearsLinkHover()
   testAgeRefreshes()
   Wow.reset()
 end

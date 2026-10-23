@@ -18,8 +18,9 @@ local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.Settings
 -- them. ESC closes it (UISpecialFrames, the one sanctioned insert). Ages and rows refresh on open
 -- and on each lead change, never on a ticker. Native-HUD spec §7.1: a gear swaps the rows for the
 -- settings pane. Movable and resizable: one position and one size (CraftAlertDB.ui.window), shared
--- by both modes. The mode is never saved: every open is the list, except /ca config. Spec §4: the
--- list mode shows the details pane (UI/LeadDetails.lua) right of the rows; a row's hover pins it.
+-- by both modes. The mode is never saved: every open is the list, except /ca config. Leads-details
+-- spec §4: the list mode shows the details pane (UI/LeadDetails.lua) right of the rows; a row's
+-- hover pins it.
 local LeadsWindow = {}
 
 local FRAME_NAME = "CraftAlertLeadsWindow"
@@ -109,7 +110,6 @@ local function enterSettings()
   local frame = window.frame
   window.mode = "settings"
   LeadsList.Clear(window.list)
-  window.list.empty:Hide()
   frame.details:Hide()
   SettingsPane.Build(frame.Inset, enterList)
   SettingsPane.Show()

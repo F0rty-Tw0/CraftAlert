@@ -26,18 +26,13 @@ end
 function WindowSize.Apply(frame, size)
   frame:SetResizable(true)
   frame:SetResizeBounds(size.minWidth, size.minHeight)
-  local resizeButton = frame.resizeButton
-  if resizeButton then
-    resizeButton:SetMinWidth(size.minWidth)
-    resizeButton:SetMinHeight(size.minHeight)
-  end
   local saved, screen = FrameKit.Saved(size.key) or {}, _G["UIParent"]
   local width = clamped(saved.width, size.width, size.minWidth, screen:GetWidth())
   local height = clamped(saved.height, size.height, size.minHeight, screen:GetHeight())
   frame:SetSize(width, height)
 end
 
--- Saves the shared position under `positionKey` and the frame's size under `size.key`.
+-- Saves the position under `positionKey` and the frame's size under `size.key`.
 function WindowSize.Save(frame, size, positionKey)
   FrameKit.SavePosition(frame, positionKey)
   local saved = FrameKit.Saved(size.key)
