@@ -273,7 +273,26 @@ local function testIsTestGuid()
   Assert.equal(FlavorCompat.IsTestGuid(42), false, "not a string")
 end
 
+-- The player's own class guard: the API is read per call; a missing API, a secret or a non-string token is nil.
+local function testOwnClass()
+  local FlavorCompat = load("retail")
+  Assert.equal(FlavorCompat.OwnClass(), nil, "no UnitClass")
+  Wow.stub("UnitClass", function()
+    return "Mage", "MAGE"
+  end)
+  Assert.equal(FlavorCompat.OwnClass(), "MAGE", "stubbed after load: read per call")
+  Wow.stub("UnitClass", function()
+    return "Mage", Wow.secret("MAGE")
+  end)
+  Assert.equal(FlavorCompat.OwnClass(), nil, "secret token")
+  Wow.stub("UnitClass", function()
+    return "Mage", 7
+  end)
+  Assert.equal(FlavorCompat.OwnClass(), nil, "non-string token")
+end
+
 return function()
+  testOwnClass()
   testIsTestGuid()
   testTestClasses()
   testFlavorKeys()
