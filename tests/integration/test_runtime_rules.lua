@@ -236,9 +236,9 @@ local function testTrapsCatchViolations()
     rawset(_G, "Foo", nil)
     verify()
 
-    -- Raw writes skip a proxy's __newindex; verify() finds what landed in it. The leads and
-    -- settings windows' frame names in UISpecialFrames are the one sanctioned insert (rule 3):
-    -- any other name traps, our own prefix included.
+    -- Raw writes skip a proxy's __newindex; verify() finds what landed in it. The leads window's
+    -- frame name in UISpecialFrames is the one sanctioned insert (rule 3): any other name traps,
+    -- our own prefix and the old settings window's included.
     rawset(G("C_Timer"), "After", function() end)
     Assert.raises(verify, "raw write into Blizzard table C_Timer%[After%]")
     rawset(G("C_Timer"), "After", nil)
@@ -252,8 +252,9 @@ local function testTrapsCatchViolations()
     Assert.raises(verify, "UISpecialFrames%[1%]")
     rawset(G("UISpecialFrames"), 1, nil)
     table.insert(G("UISpecialFrames"), "CraftAlertLeadsWindow")
-    table.insert(G("UISpecialFrames"), "CraftAlertSettingsWindow")
     verify()
+    table.insert(G("UISpecialFrames"), "CraftAlertSettingsWindow")
+    Assert.raises(verify, "UISpecialFrames%[2%]")
     rawset(G("UISpecialFrames"), 2, nil)
     rawset(G("UISpecialFrames"), 1, nil)
 
@@ -381,7 +382,7 @@ local function testAddonObeysTheRules()
     Assert.same(publicChatEvents(), { CHANNEL })
 
     -- The settings pages under the traps: every page, and settings that rebuild, re-evaluate,
-    -- re-arm and repaint (its UISpecialFrames insert).
+    -- re-arm and repaint (the pane in the leads window adds no UISpecialFrames entry).
     for _, title in ipairs({ "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" }) do
       SettingsFixture.open(ns, title)
     end
@@ -405,7 +406,7 @@ local function testAddonObeysTheRules()
     G("CraftAlert_ToggleLeads")()
     Assert.same(
       { rawget(G("UISpecialFrames"), 1), rawget(G("UISpecialFrames"), 2), rawget(G("UISpecialFrames"), 3) },
-      { "CraftAlertLeadsWindow", "CraftAlertSettingsWindow", nil }
+      { "CraftAlertLeadsWindow", nil, nil }
     )
     Assert.same(publicChatEvents(), { CHANNEL }, "and drops it at once")
 

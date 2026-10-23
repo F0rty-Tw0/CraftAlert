@@ -64,6 +64,9 @@ UI/ClickRouter.lua
 UI/LinkHover.lua
 UI/Dock.lua
 UI/LeadRow.lua
+UI/WindowSize.lua
+UI/SettingsGear.lua
+UI/Settings/SettingsPane.lua
 UI/LeadsWindow.lua
 UI/LauncherArt.lua
 UI/Launcher.lua
@@ -76,7 +79,6 @@ UI/Settings/PageGreetings.lua
 UI/Settings/PageKeywords.lua
 UI/Settings/PageCrafters.lua
 UI/Settings/PageTest.lua
-UI/Settings/SettingsWindow.lua
 Core/Bindings.lua
 Core/Perf.lua
 Core/TestReport.lua

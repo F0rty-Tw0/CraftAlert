@@ -81,6 +81,7 @@ Theme.LAYOUT = {
   INPUT_HEIGHT = 22,
   BUTTON_HEIGHT = 20,
   LIST_ROW_HEIGHT = 20,
+  GEAR_SIZE = 20,
 }
 
 Theme.ICON = "Interface\\Icons\\INV_Misc_Bell_01"
@@ -93,6 +94,9 @@ Theme.ART = {
   LIST_HOVER = "Interface\\QuestFrame\\UI-QuestTitleHighlight",
   LIST_SELECTED_ALPHA = 0.45,
   LIST_HOVER_ALPHA = 0.18,
+  -- The leads window's settings gear (spec §7.1): the GM-ticket gear, the world map's where missing.
+  GEAR_ATLAS = "GM-icon-settings",
+  GEAR_FILE = "Interface\\WorldMap\\Gear_64Grey",
 }
 Theme.DIM_ALPHA = 0.5
 

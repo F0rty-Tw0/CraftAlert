@@ -39,7 +39,7 @@ local function testKeywordsPage()
   end
   Widgets.type(row("Intent words").input, table.concat(long, " "))
   Widgets.type(row("Extra slang (word=slot)").input, table.concat(slang, " "))
-  ns.SettingsWindow.Toggle()
+  ns.LeadsWindow.ToggleSettings()
   open(ns, "Keywords")
   for _, label in ipairs({ "Intent words", "Extra slang (word=slot)" }) do
     local box = row(label).input

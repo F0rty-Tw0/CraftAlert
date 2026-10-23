@@ -9,10 +9,9 @@ local Perf = ns.Perf or require("CraftAlert.Core.Perf")
 local SavedState = ns.SavedState or require("CraftAlert.Persistence.SavedState")
 local TestLine = ns.TestLine or require("CraftAlert.Core.TestLine")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
-local SettingsWindow = ns.SettingsWindow or require("CraftAlert.UI.Settings.SettingsWindow")
 
--- Spec §7.3 and §4.4: /craftalert and /ca. No argument toggles the leads window; `config` the
--- settings window; `test` runs a trade line through the real path (TestLine); `perf` toggles timing.
+-- Spec §7.3 and §4.4: /craftalert and /ca. No argument toggles the leads window; `config` its
+-- settings pane; `test` runs a trade line through the real path (TestLine); `perf` toggles timing.
 local SlashCommands = {}
 
 local lower = string.lower
@@ -41,7 +40,7 @@ end
 local COMMANDS = {
   config = function()
     if hasDb() then
-      SettingsWindow.Toggle()
+      LeadsWindow.ToggleSettings()
     end
   end,
   test = TestLine.Run,
