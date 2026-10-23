@@ -16,6 +16,10 @@ Theme.COLORS = {
   badgeText = { 0.98, 0.99, 1.00, 1.0 },
   greeted = { 0.30, 0.82, 0.40, 1.0 },
   warning = { 0.90, 0.72, 0.20, 1.0 },
+  -- Blizzard's HIGHLIGHT_FONT_COLOR, NORMAL_FONT_COLOR and GRAY_FONT_COLOR, for colour codes.
+  white = { 1.0, 1.0, 1.0, 1.0 },
+  gold = { 1.0, 0.82, 0.0, 1.0 },
+  grey = { 0.5, 0.5, 0.5, 1.0 },
 }
 
 -- Blizzard font object names (WhisperMessenger's FONT_MAP bases).
@@ -38,10 +42,13 @@ Theme.LAYOUT = {
   INSET_TOP = 28,
   INSET_BOTTOM = 26,
   ROW_ICON_SIZE = 14,
-  ROW_HEIGHT = 36,
-  ROW_GAP = 2,
-  -- The leads window's list column; the details pane takes the rest of the inset.
-  LIST_COLUMN_WIDTH = 300,
+  -- The leads window's cards: full width, the customer on the left, the labelled rows from
+  -- CARD_LEFT_WIDTH, values CARD_LABEL_WIDTH further right.
+  CARD_HEIGHT = 76,
+  CARD_GAP = 2,
+  CARD_LEFT_WIDTH = 230,
+  CARD_LABEL_WIDTH = 74,
+  HEADER_ICON_SIZE = 32,
   ICON_SIZE = 53,
   PORTRAIT_SIZE = 44,
   RING_SIZE = 56,

@@ -4,40 +4,44 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
 local LinkHover = ns.LinkHover or require("CraftAlert.UI.LinkHover")
+local CardBody = ns.CardBody or require("CraftAlert.UI.CardBody")
 
--- Spec §7.3: one row of the leads window. Customer and age on top; item or profession, crafter
--- and realm tag below; greeted check and replied tag on the right. No fill: the quest-log hover
--- texture lights the row under the cursor. Clicks follow the toast's table (§7.1); the item link
--- in the detail line shows its tooltip, and a click while it is hovered goes to the link, never
--- to the lead (native-HUD spec §4.6). The row frame carries its lead and the GetTime() at which
--- that lead appeared in it (§7.5 rule 3).
+-- Lead-cards spec §1: one card of the leads window, full width. On the left the item or profession
+-- icon, the customer, the age, the greeted check and the replied tag, then what matched and the
+-- realm tag; on the right the Request / Matched / Crafters rows (UI/CardBody.lua). Every text is a
+-- region of the card. No fill: the quest-log hover texture lights the card under the cursor.
+-- Clicks follow the toast's table (§7.1); a link under the cursor shows its tooltip, and a click
+-- while it is hovered goes to the link, never to the lead (native-HUD spec §4.6). The card frame
+-- carries its lead and the GetTime() at which that lead appeared in it (§7.5 rule 3).
 local LeadRow = {}
 
-local concat = table.concat
+local select = select
 local tostring = tostring
+local type = type
 
 local function now()
   return _G["GetTime"]()
 end
 
-local function onClick(row, button)
-  local overLink = LinkHover.IsOverLink(row)
+local function onClick(card, button)
+  local overLink = LinkHover.IsOverLink(card)
   if overLink then
     return
   end
-  ClickRouter.Handle(button, row.lead, row.shownAt)
+  ClickRouter.Handle(button, card.lead, card.shownAt)
 end
 
 -- On screen again (the window reopened, UIParent back after Alt+Z): the lead counts as shown
 -- from now, so the time under the hidden UI is no look (§7.5 rule 3).
-local function onShow(row)
-  if row.lead then
-    row.shownAt = now()
+local function onShow(card)
+  if card.lead then
+    card.shownAt = now()
   end
 end
 
@@ -49,70 +53,92 @@ local function setShown(region, shown)
   end
 end
 
-local function createMarks(row)
+-- The greeted check right after the age; the replied tag's place depends on the check (placeReplied).
+local function createMarks(card)
   local size = Theme.LAYOUT.ROW_ICON_SIZE
-  local replied = FrameKit.Text(row, Theme.FONTS.detail, Theme.COLORS.accent)
-  replied:SetPoint("RIGHT", row, "RIGHT", -Theme.LAYOUT.PADDING, 0)
-  replied:SetText(Localization.Text("replied"))
-  local greeted = row:CreateTexture(nil, "ARTWORK")
+  local greeted = card:CreateTexture(nil, "ARTWORK")
   greeted:SetSize(size, size)
-  greeted:SetPoint("RIGHT", replied, "LEFT", -4, 0)
+  greeted:SetPoint("LEFT", card.age, "RIGHT", 4, 0)
   greeted:SetTexture(Theme.GREETED_ICON)
+  local replied = FrameKit.Text(card, Theme.FONTS.detail, Theme.COLORS.accent)
+  replied:SetText(Localization.Text("replied"))
   return greeted, replied
 end
 
--- A hidden row inside `parent`; the window anchors it. index: its slot, 1 at the top.
+-- The replied tag follows the greeted check when it shows, else the age.
+local function placeReplied(card, greeted)
+  card.repliedTag:ClearAllPoints()
+  card.repliedTag:SetPoint("LEFT", greeted and card.greetedIcon or card.age, "RIGHT", 4, 0)
+end
+
+-- A left-column line right under `above`, ending PADDING short of the right column.
+local function leftLine(card, above, font, color)
+  local layout = Theme.LAYOUT
+  local line = FrameKit.Text(card, font, color)
+  line:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, 0)
+  line:SetPoint("RIGHT", card, "LEFT", layout.CARD_LEFT_WIDTH - layout.PADDING, 0)
+  return line
+end
+
+-- A hidden card inside `parent`; the list anchors it. index: its slot, 1 at the top.
 function LeadRow.Create(parent, index)
   local layout, colors, fonts = Theme.LAYOUT, Theme.COLORS, Theme.FONTS
-  local row = _G["CreateFrame"]("Button", nil, parent)
-  row:SetHeight(layout.ROW_HEIGHT)
-  row.isLeadRow, row.rowIndex = true, index
-  row.hover = FrameKit.ListHighlight(row)
-  row.greetedIcon, row.repliedTag = createMarks(row)
-  row.name = FrameKit.Text(row, fonts.name)
-  row.name:SetPoint("TOPLEFT", row, "TOPLEFT", layout.PADDING, -4)
-  row.age = FrameKit.Text(row, fonts.detail, colors.textTimestamp)
-  row.age:SetPoint("LEFT", row.name, "RIGHT", 6, 0)
-  row.detail = FrameKit.Text(row, fonts.body, colors.textSecondary)
-  row.detail:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", layout.PADDING, 4)
-  row.detail:SetPoint("RIGHT", row.greetedIcon, "LEFT", -layout.PADDING, 0)
-  row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  row:SetScript("OnClick", onClick)
-  row:SetScript("OnShow", onShow)
-  LinkHover.Attach(row, nil)
-  row:Hide()
-  return row
+  local card = _G["CreateFrame"]("Button", nil, parent)
+  card:SetHeight(layout.CARD_HEIGHT)
+  card.isLeadRow, card.rowIndex = true, index
+  card.hover = FrameKit.ListHighlight(card)
+  card.icon = card:CreateTexture(nil, "ARTWORK")
+  card.icon:SetSize(layout.HEADER_ICON_SIZE, layout.HEADER_ICON_SIZE)
+  card.icon:SetPoint("TOPLEFT", card, "TOPLEFT", layout.PADDING, -4)
+  card.name = FrameKit.Text(card, fonts.name)
+  card.name:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", 6, 0)
+  card.age = FrameKit.Text(card, fonts.detail, colors.textTimestamp)
+  card.age:SetPoint("LEFT", card.name, "RIGHT", 6, 0)
+  card.greetedIcon, card.repliedTag = createMarks(card)
+  card.what = leftLine(card, card.name, fonts.name)
+  card.realm = leftLine(card, card.what, fonts.body, colors.warning)
+  CardBody.Create(card)
+  card:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  card:SetScript("OnClick", onClick)
+  card:SetScript("OnShow", onShow)
+  LinkHover.Attach(card, nil)
+  card:Hide()
+  return card
 end
 
--- What matched, the crafter, the rank and the realm tag on one line.
-local function detailText(lead)
-  local parts = { LeadText.What(lead), LeadText.Crafter(lead) }
-  parts[#parts + 1] = LeadText.Rank(lead)
-  parts[#parts + 1] = LeadText.RealmTag(lead)
-  return concat(parts, " · ")
+-- The item's icon, else the profession's, else the addon's.
+local function iconOf(lead)
+  local itemIcon = type(lead.itemID) == "number" and select(5, FlavorCompat.GetItemInfoInstant(lead.itemID))
+  return itemIcon or FrameKit.ProfessionIcon(lead.prof) or Theme.ICON
 end
 
--- Shows `lead` in the row; a lead new to the row counts as shown from now, and the link under
+-- Shows `lead` in the card; a lead new to the card counts as shown from now, and the link under
 -- the cursor belonged to the old lead.
-function LeadRow.Show(row, lead)
-  if row.lead ~= lead then
-    row.shownAt = now()
-    LinkHover.Clear(row)
+function LeadRow.Show(card, lead)
+  if card.lead ~= lead then
+    card.shownAt = now()
+    LinkHover.Clear(card)
   end
-  row.lead = lead
-  row.name:SetText(tostring(lead.customer))
-  FrameKit.PaintName(row.name, lead.guid)
-  row.age:SetText(LeadText.Age(_G["time"]() - lead.time))
-  row.detail:SetText(detailText(lead))
-  setShown(row.greetedIcon, lead.greeted)
-  setShown(row.repliedTag, lead.replied)
-  row:Show()
+  card.lead = lead
+  card.icon:SetTexture(iconOf(lead))
+  card.name:SetText(tostring(lead.customer))
+  FrameKit.PaintName(card.name, lead.guid)
+  card.age:SetText(LeadText.Age(_G["time"]() - lead.time))
+  card.what:SetText(LeadText.What(lead))
+  local realm = LeadText.RealmTag(lead)
+  card.realm:SetText(realm)
+  setShown(card.realm, realm ~= nil)
+  setShown(card.greetedIcon, lead.greeted)
+  setShown(card.repliedTag, lead.replied)
+  placeReplied(card, lead.greeted)
+  CardBody.Paint(card, lead)
+  card:Show()
 end
 
-function LeadRow.Clear(row)
-  row.lead, row.shownAt = nil, nil
-  LinkHover.Clear(row)
-  row:Hide()
+function LeadRow.Clear(card)
+  card.lead, card.shownAt = nil, nil
+  LinkHover.Clear(card)
+  card:Hide()
 end
 
 ns.LeadRow = LeadRow

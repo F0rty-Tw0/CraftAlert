@@ -8,19 +8,17 @@ local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadsList = ns.LeadsList or require("CraftAlert.UI.LeadsList")
-local LeadDetails = ns.LeadDetails or require("CraftAlert.UI.LeadDetails")
 local WindowSize = ns.WindowSize or require("CraftAlert.UI.WindowSize")
 local SettingsGear = ns.SettingsGear or require("CraftAlert.UI.SettingsGear")
 local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.SettingsPane")
 
 -- Spec §7.3: the leads window, frame CraftAlertLeadsWindow, created on first open (§4.4 rule
--- 5). The rows (UI/LeadsList.lua) show newest first, as many as fit; the mouse wheel scrolls
--- them. ESC closes it (UISpecialFrames, the one sanctioned insert). Ages and rows refresh on open
--- and on each lead change, never on a ticker. Native-HUD spec §7.1: a gear swaps the rows for the
--- settings pane. Movable and resizable: one position and one size (CraftAlertDB.ui.window), shared
--- by both modes. The mode is never saved: every open is the list, except /ca config. Leads-details
--- spec §4: the list mode shows the details pane (UI/LeadDetails.lua) right of the rows; a row's
--- hover pins it.
+-- 5). The lead cards (UI/LeadsList.lua) show newest first, as many as fit, each with its details;
+-- the mouse wheel scrolls them. ESC closes it (UISpecialFrames, the one sanctioned insert). Ages
+-- and cards refresh on open and on each lead change, never on a ticker. Native-HUD spec §7.1: a
+-- gear swaps the cards for the settings pane. Movable and resizable: one position and one size
+-- (CraftAlertDB.ui.window), shared by both modes. The mode is never saved: every open is the list,
+-- except /ca config.
 local LeadsWindow = {}
 
 local FRAME_NAME = "CraftAlertLeadsWindow"
@@ -48,9 +46,7 @@ function LeadsWindow.Refresh()
   if window.mode == "settings" then
     return
   end
-  local leads = Leads.List()
-  LeadsList.Refresh(window.list, leads)
-  LeadDetails.Refresh(window.frame.details, leads)
+  LeadsList.Refresh(window.list, Leads.List())
 end
 
 local function onMouseWheel(_, delta)
@@ -102,7 +98,6 @@ local function enterList()
   frame:SetTitle(Localization.Text("Craft Alert — Leads"))
   SettingsGear.Paint(frame.gear, false)
   window.mode = "list"
-  LeadDetails.Unpin(frame.details)
   LeadsWindow.Refresh()
 end
 
@@ -110,7 +105,6 @@ local function enterSettings()
   local frame = window.frame
   window.mode = "settings"
   LeadsList.Clear(window.list)
-  frame.details:Hide()
   SettingsPane.Build(frame.Inset, enterList)
   SettingsPane.Show()
   frame:SetTitle(Localization.Text("Craft Alert — Settings"))
@@ -122,14 +116,6 @@ local function onGearClick()
     enterList()
   else
     enterSettings()
-  end
-end
-
--- The pane follows hover, not click: a plain click greets (UI/ClickRouter.lua).
-local function onRowEnter(row)
-  if row.lead then
-    LeadDetails.Pin(window.frame.details, row.lead.id)
-    LeadsWindow.Refresh()
   end
 end
 
@@ -148,16 +134,13 @@ local function create()
   createResizeButton(frame)
   frame.gear = SettingsGear.Create(frame, onGearClick)
   local list = LeadsList.New(frame.Inset)
-  list.onRowEnter = onRowEnter
-  frame.details = LeadDetails.New(frame.Inset)
   frame:Hide()
   table.insert(_G["UISpecialFrames"], FRAME_NAME)
   return { frame = frame, list = list, mode = "list" }
 end
 
--- Opens the window on the list, at the top (every row counts as shown from now) and with no lead
--- pinned in the details pane, or closes it in either mode. X and Esc only hide: a window closed in
--- Settings comes back on the list here.
+-- Opens the window on the list, at the top (every card counts as shown from now), or closes it in
+-- either mode. X and Esc only hide: a window closed in Settings comes back on the list here.
 function LeadsWindow.Toggle()
   window = window or create()
   local frame = window.frame
@@ -168,7 +151,6 @@ function LeadsWindow.Toggle()
   if window.mode == "settings" then
     enterList()
   end
-  LeadDetails.Unpin(frame.details)
   LeadsList.ResetTop(window.list)
   LeadsList.Clear(window.list)
   frame:Show()
@@ -189,7 +171,6 @@ function LeadsWindow.ToggleSettings()
   else
     SettingsPane.Show()
   end
-  LeadDetails.Unpin(frame.details)
   frame:Show()
   LeadsWindow.Refresh()
 end

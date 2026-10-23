@@ -63,9 +63,9 @@ UI/LeadText.lua
 UI/ClickRouter.lua
 UI/LinkHover.lua
 UI/Dock.lua
+UI/CardBody.lua
 UI/LeadRow.lua
 UI/LeadsList.lua
-UI/LeadDetails.lua
 UI/WindowSize.lua
 UI/SettingsGear.lua
 UI/Settings/SettingsPane.lua
