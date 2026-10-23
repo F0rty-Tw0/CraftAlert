@@ -229,12 +229,12 @@ local function testRowLinkHover()
   Assert.equal(row.hoveredLink, nil)
 end
 
--- Rows sit in the inset and fit its height (320 high: inset 320 - 28 - 26 = 266; floor((266 - 16 + 2) / 38) = 6).
+-- Rows sit in the inset and fit its height (480 high: inset 480 - 28 - 26 = 426; floor((426 - 16 + 2) / 38) = 10).
 local function testRowsFitTheInset()
   local ns = load(customerNames(12))
   ns.LeadsWindow.Toggle()
   local frame = window()
-  Assert.equal(#rows(), 6)
+  Assert.equal(#rows(), 10)
   Assert.equal(rows()[1].parent, frame.Inset)
   Assert.same({ rows()[1]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -8 })
   Assert.same({ rows()[2]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -46 })
@@ -247,7 +247,7 @@ local function testRowsFitTheInset()
     return 0
   end
   ns.LeadsWindow.Toggle()
-  Assert.equal(#rows(), 6, "rows fit before the inset is laid out")
+  Assert.equal(#rows(), 10, "rows fit before the inset is laid out")
   ns = load({})
   ns.LeadsWindow.Toggle()
   Assert.truthy(string.find(textOf(window().Inset), "No leads", 1, true), "empty text is in the inset")
@@ -263,35 +263,35 @@ local function testResizeButton()
   Assert.equal(button.template, "PanelResizeButtonTemplate")
   Assert.same(
     { button.target == frame, button.minWidth, button.minHeight, button.maxWidth, button.maxHeight },
-    { true, 360, 160, screen:GetWidth(), screen:GetHeight() }
+    { true, 600, 480, screen:GetWidth(), screen:GetHeight() }
   )
-  Assert.equal(#rows(), 6)
+  Assert.equal(#rows(), 10)
   -- Dragging: the client resizes and fires OnSizeChanged. Init wrapped our refresh, so rows refit.
   button.scripts.OnMouseDown(button, "LeftButton")
   Assert.equal(frame.sizing, "BOTTOMRIGHT")
-  frame:SetSize(500, 400)
-  frame.scripts.OnSizeChanged(frame, 500, 400)
-  Assert.equal(#rows(), 8) -- 400 - 54 = 346; floor((346 - 16 + 2) / 38) = 8
+  frame:SetSize(700, 520)
+  frame.scripts.OnSizeChanged(frame, 700, 520)
+  Assert.equal(#rows(), 11) -- 520 - 54 = 466; floor((466 - 16 + 2) / 38) = 11
   -- Below the minimum, the button's wrapper pulls the size back (it only works if our script was set before Init).
   frame:SetSize(100, 100)
   frame.scripts.OnSizeChanged(frame, 100, 100)
-  Assert.same({ frame:GetWidth(), frame:GetHeight() }, { 360, 160 })
-  frame:SetSize(500, 400)
-  frame.scripts.OnSizeChanged(frame, 500, 400)
+  Assert.same({ frame:GetWidth(), frame:GetHeight() }, { 600, 480 })
+  frame:SetSize(700, 520)
+  frame.scripts.OnSizeChanged(frame, 700, 520)
   button.scripts.OnMouseUp(button, "LeftButton")
   Assert.equal(frame.sizing, nil)
-  Assert.same({ db.ui.window.width, db.ui.window.height }, { 500, 400 })
+  Assert.same({ db.ui.window.width, db.ui.window.height }, { 700, 520 })
   -- Closed and reopened: same size, rows refit.
   ns.LeadsWindow.Toggle()
   ns.LeadsWindow.Toggle()
-  Assert.same({ frame:GetWidth(), frame:GetHeight(), #rows() }, { 500, 400, 8 })
+  Assert.same({ frame:GetWidth(), frame:GetHeight(), #rows() }, { 700, 520, 11 })
   -- After a /reload it opens at the saved size with the rows refit.
   local saved = db.ui.window
   ns = load(customers, function(accountDb)
     accountDb.ui.window = saved
   end)
   ns.LeadsWindow.Toggle()
-  Assert.same({ window():GetWidth(), window():GetHeight(), #rows() }, { 500, 400, 8 })
+  Assert.same({ window():GetWidth(), window():GetHeight(), #rows() }, { 700, 520, 11 })
 end
 
 local function testVisibleLatestAndScroll()
@@ -340,9 +340,9 @@ local function testSavedFrameAndOpacity()
   local button = frame.resizeButton
   button.scripts.OnMouseDown(button, "LeftButton")
   Assert.equal(frame.sizing, "BOTTOMRIGHT")
-  frame:SetSize(500, 400)
+  frame:SetSize(700, 560)
   button.scripts.OnMouseUp(button, "LeftButton")
-  Assert.same(db.ui.window, { point = "LEFT", relativePoint = "LEFT", x = 30, y = 40, width = 500, height = 400 })
+  Assert.same(db.ui.window, { point = "LEFT", relativePoint = "LEFT", x = 30, y = 40, width = 700, height = 560 })
 
   -- The saved shapes are flat scalars, which the load-time Schema check keeps as they are.
   local Schema = Fresh.require("Persistence.Schema")
@@ -361,7 +361,7 @@ local function testSavedFrameAndOpacity()
   end)
   ns.LeadsWindow.Toggle()
   local point, _, relativePoint, x, y = window():GetPoint()
-  Assert.same({ point, relativePoint, x, y, window():GetWidth(), window():GetHeight() }, { "LEFT", "LEFT", 30, 40, 500, 400 })
+  Assert.same({ point, relativePoint, x, y, window():GetWidth(), window():GetHeight() }, { "LEFT", "LEFT", 30, 40, 700, 560 })
 end
 
 -- Runs fn, raising instead of hanging when it loops (a client freeze).
@@ -388,7 +388,7 @@ local function testHugeSavedSize()
   Assert.equal(#rows(), 2)
   -- Even a frame taller than the screen (the client does not guarantee the clamp) rows only
   -- the leads there are.
-  window():SetSize(500, 1e300)
+  window():SetSize(600, 1e300)
   bounded(ns.LeadsWindow.Refresh)
   Assert.equal(#rows(), 2)
 end

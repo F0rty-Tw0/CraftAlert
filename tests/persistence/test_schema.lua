@@ -43,10 +43,18 @@ local function testValidDbIsUntouched()
   db.recentGreeted["Cus-Realm"] = 100
   db.leads[1] = { id = 1, customer = "Cus-Realm", crafter = "Me-Realm", time = 100, message = "LF belt" }
   db.ui.toast = { point = "TOP", x = 10, y = -20 }
-  db.ui.settings = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 40 }
+  db.ui.window = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 40, width = 640, height = 500 }
   local before = deepCopy(db)
   Assert.same(Schema.Validate(db), before)
   Assert.equal(#printedLines(), 0)
+end
+
+-- The leads window has one size under ui.window; the per-mode ui.settings of older saves goes.
+local function testLegacySettingsSizeDropped()
+  local Schema = load()
+  local db = Schema.Validate({ ui = { window = { width = 640, height = 500 }, settings = { width = 700, height = 520 } } })
+  Assert.equal(db.ui.settings, nil)
+  Assert.same(db.ui.window, { width = 640, height = 500 })
 end
 
 local function testBadTopLevelTypes()
@@ -472,6 +480,7 @@ end
 
 return function()
   testValidDbIsUntouched()
+  testLegacySettingsSizeDropped()
   testBadTopLevelTypes()
   testSettingsTypesAndRanges()
   testClampBounds()

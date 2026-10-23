@@ -16,7 +16,7 @@ local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.Settings
 -- 5). Rows newest first, as many as fit; the mouse wheel scrolls. ESC closes it (UISpecialFrames,
 -- the one sanctioned insert). Ages and rows refresh on open and on each lead change, never on a
 -- ticker. Native-HUD spec §7.1: a gear swaps the rows for the settings pane. Movable and resizable:
--- one position (CraftAlertDB.ui.window), a size per mode (ui.window, ui.settings). The mode is
+-- one position and one size (CraftAlertDB.ui.window), shared by both modes. The mode is
 -- never saved: every open is the list, except /ca config.
 local LeadsWindow = {}
 
@@ -28,11 +28,9 @@ local FRAME_NAME = "CraftAlertLeadsWindow"
 local UI_KEY = "window"
 local FALLBACK_POSITION = { "CENTER", 0, 0 }
 local LAYOUT = Theme.LAYOUT
--- The WindowSize of each mode; the settings pane is never smaller than its default size.
-local LIST = { key = UI_KEY, width = LAYOUT.WINDOW_WIDTH, height = LAYOUT.WINDOW_HEIGHT }
-LIST.minWidth, LIST.minHeight = LAYOUT.WINDOW_MIN_WIDTH, LAYOUT.WINDOW_MIN_HEIGHT
-local SETTINGS = { key = "settings", width = LAYOUT.SETTINGS_WIDTH, height = LAYOUT.SETTINGS_HEIGHT }
-SETTINGS.minWidth, SETTINGS.minHeight = SETTINGS.width, SETTINGS.height
+-- The WindowSize both modes share.
+local SIZE = { key = UI_KEY, width = LAYOUT.WINDOW_WIDTH, height = LAYOUT.WINDOW_HEIGHT }
+SIZE.minWidth, SIZE.minHeight = LAYOUT.WINDOW_MIN_WIDTH, LAYOUT.WINDOW_MIN_HEIGHT
 
 ---@type table
 local window = nil -- { frame, rows = { row, ... }, empty, mode = "list" | "settings" }, nil until the first open
@@ -113,7 +111,7 @@ local function anchorInset(frame)
 end
 
 local function onResizeStopped(target)
-  WindowSize.Save(target, window.mode == "settings" and SETTINGS or LIST, UI_KEY)
+  WindowSize.Save(target, SIZE, UI_KEY)
   LeadsWindow.Refresh()
 end
 
@@ -123,7 +121,7 @@ local function createResizeButton(frame)
   button:SetFrameLevel(frame.TitleContainer:GetFrameLevel()) -- above the NineSlice border's corner
   -- Init wraps the frame's OnSizeChanged as it is now, so the refresh must already be set.
   frame:SetScript("OnSizeChanged", LeadsWindow.Refresh)
-  button:Init(frame, LAYOUT.WINDOW_MIN_WIDTH, LAYOUT.WINDOW_MIN_HEIGHT, _G["UIParent"]:GetWidth(), _G["UIParent"]:GetHeight())
+  button:Init(frame, SIZE.minWidth, SIZE.minHeight, _G["UIParent"]:GetWidth(), _G["UIParent"]:GetHeight())
   button:SetOnResizeStoppedCallback(onResizeStopped)
   frame.resizeButton = button
 end
@@ -159,7 +157,6 @@ end
 local function enterList()
   local frame = window.frame
   SettingsPane.Hide()
-  WindowSize.Apply(frame, LIST)
   frame:SetTitle(Localization.Text("Craft Alert — Leads"))
   SettingsGear.Paint(frame.gear, false)
   window.mode = "list"
@@ -169,7 +166,6 @@ end
 local function enterSettings()
   local frame = window.frame
   window.mode = "settings"
-  WindowSize.Apply(frame, SETTINGS)
   clearRows()
   window.empty:Hide()
   SettingsPane.Build(frame.Inset, enterList)
@@ -193,7 +189,7 @@ local function create()
   _G["ButtonFrameTemplate_HidePortrait"](frame)
   frame:SetTitle(Localization.Text("Craft Alert — Leads"))
   anchorInset(frame)
-  WindowSize.Apply(frame, LIST)
+  WindowSize.Apply(frame, SIZE)
   FrameKit.Draggable(frame, UI_KEY)
   FrameKit.Place(frame, UI_KEY, FALLBACK_POSITION)
   frame:EnableMouseWheel(true)

@@ -5,9 +5,9 @@ end
 
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 
--- Native-HUD spec §7.1: the leads window keeps one size per mode, each under its own key of
--- CraftAlertDB.ui, and one position under the caller's key. A size is
--- { key, width, height, minWidth, minHeight }: the saved key, the defaults and the bounds.
+-- The leads window keeps one size, shared by both modes, under its key of CraftAlertDB.ui, and
+-- one position under the caller's key. A size is { key, width, height, minWidth, minHeight }:
+-- the saved key, the defaults and the bounds.
 local WindowSize = {}
 
 local max = math.max
@@ -21,8 +21,8 @@ local function clamped(saved, default, minimum, screen)
   return max(min(value, screen), minimum)
 end
 
--- Sets the resize bounds of `size.key`'s mode, then sizes the frame to its saved size: bounds
--- first, so a client that clamps SetSize to them lets the window shrink to a smaller mode.
+-- Sets the resize bounds, then sizes the frame to its saved size (a saved size under the minimum
+-- opens at the minimum): bounds first, so a client that clamps SetSize to them agrees.
 function WindowSize.Apply(frame, size)
   frame:SetResizable(true)
   frame:SetResizeBounds(size.minWidth, size.minHeight)

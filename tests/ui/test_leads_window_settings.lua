@@ -6,7 +6,7 @@ local UiFixture = require("tests.helpers.ui_fixture")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 
 -- Native-HUD spec §7.1–7.2: the settings pane lives in the leads window behind a gear. One
--- window, two modes (List and Settings), a size saved per mode and one shared position.
+-- window, two modes (List and Settings), one size (min 600x480) and one position shared by both.
 local PAGES = { "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" }
 
 local function frame()
@@ -90,7 +90,7 @@ local function testGearSwitchesModes()
     end,
   })
   ns.LeadsWindow.Toggle()
-  Assert.same(size(), { 500, 300 })
+  Assert.same(size(), { 600, 480 }, "a saved size under the minimum opens at the minimum")
   Assert.equal(rowVisible(1), true)
   Assert.equal(gear():GetNormalTexture().atlas, "GM-icon-settings", "list: gear art")
   Widgets.click(gear())
@@ -104,9 +104,9 @@ local function testGearSwitchesModes()
   Assert.equal(emptyText():IsShown(), false)
   Wow.clock.gettime = 60
   Widgets.click(gear())
-  Assert.same(size(), { 500, 300 })
-  Assert.same({ frame().resizeBounds[1], frame().resizeBounds[2] }, { 360, 160 })
-  Assert.same({ frame().resizeButton.minWidth, frame().resizeButton.minHeight }, { 360, 160 })
+  Assert.same(size(), { 600, 480 })
+  Assert.same({ frame().resizeBounds[1], frame().resizeBounds[2] }, { 600, 480 })
+  Assert.same({ frame().resizeButton.minWidth, frame().resizeButton.minHeight }, { 600, 480 })
   Assert.equal(title(), "Craft Alert — Leads")
   Assert.equal(gear():GetNormalTexture().atlas, "GM-icon-settings", "back in the list: gear art")
   Assert.equal(navVisible(), false)
@@ -151,7 +151,7 @@ local function testBackButton()
   Widgets.click(back)
   Assert.equal(frame():IsShown(), true)
   Assert.equal(title(), "Craft Alert — Leads")
-  Assert.same(size(), { 500, 300 })
+  Assert.same(size(), { 600, 480 })
   Assert.equal(nav:IsVisible(), false)
   Assert.equal(gear():GetNormalTexture().atlas, "GM-icon-settings")
   Assert.equal(gear().highlightLocked, nil)
@@ -166,9 +166,10 @@ local function testModeSwitchUnderClientSizing()
   clientSizing()
   local before = rowCount()
   Widgets.click(gear())
-  Assert.equal(rowCount(), before, "the resize to the settings size draws no new row")
+  Assert.equal(rowCount(), before, "a mode switch draws no new row")
+  Assert.same(size(), { 600, 480 }, "a mode switch does not resize")
   Widgets.click(gear())
-  Assert.same(size(), { 460, 320 }, "the list bounds come before the size, so it can shrink")
+  Assert.same(size(), { 600, 480 }, "the same size back in the list")
 end
 
 local function testWheelIgnoredInSettings()
@@ -201,7 +202,7 @@ local function testCloseReturnsToList()
   ns.LeadsWindow.ToggleSettings()
   frame():Hide()
   ns.LeadsWindow.Toggle()
-  Assert.same(size(), { 460, 320 })
+  Assert.same(size(), { 600, 480 })
   Assert.equal(title(), "Craft Alert — Leads")
   Assert.equal(navVisible(), false)
   frame():Hide()
@@ -238,39 +239,50 @@ local function resizeTo(width, height)
   Widgets.fire(button, "OnMouseUp", "LeftButton")
 end
 
-local function testSizeSavedPerMode()
+local function testSizeSharedByModes()
   local ns, db = UiFixture.load()
-  ns.LeadsWindow.ToggleSettings()
+  ns.LeadsWindow.Toggle()
   resizeTo(700, 520)
-  Assert.same({ db.ui.settings.width, db.ui.settings.height }, { 700, 520 })
-  Assert.equal(db.ui.window.width, nil, "the list size is untouched")
-  Assert.equal(db.ui.window.point, "CENTER", "the position is saved under window")
-  Assert.equal(db.ui.settings.point, nil)
+  Assert.same({ db.ui.window.width, db.ui.window.height }, { 700, 520 })
+  Assert.equal(db.ui.window.point, "CENTER", "the position is saved beside the size")
   Widgets.click(gear())
-  resizeTo(400, 200)
-  Assert.same({ db.ui.window.width, db.ui.window.height }, { 400, 200 })
-  Assert.same({ db.ui.settings.width, db.ui.settings.height }, { 700, 520 })
+  Assert.same(size(), { 700, 520 }, "settings keeps the list size")
+  resizeTo(640, 500)
+  Assert.same({ db.ui.window.width, db.ui.window.height }, { 640, 500 })
+  Widgets.click(gear())
+  Assert.same(size(), { 640, 500 }, "list takes the settings resize")
+  Assert.equal(db.ui.settings, nil, "no size saved under settings")
   frame():Hide()
   ns.LeadsWindow.ToggleSettings()
-  Assert.same(size(), { 700, 520 })
+  Assert.same(size(), { 640, 500 }, "reopened in settings at the shared size")
 end
 
-local function testSettingsSizeClamped()
+local function testSavedSizeClampedToScreen()
   local ns = UiFixture.load({
     db = function(db)
-      db.ui.settings = { width = 1e6, height = 1e6 }
+      db.ui.window = { width = 1e6, height = 1e6 }
     end,
   })
   ns.LeadsWindow.ToggleSettings()
   local screen = rawget(_G, "UIParent")
   Assert.same(size(), { screen:GetWidth(), screen:GetHeight() }, "no bigger than the screen")
+end
+
+local function testSmallSavedSizeClampsUp()
+  local ns = UiFixture.load({
+    db = function(db)
+      db.ui.window = { width = 460, height = 320 } -- a size saved before the minimum grew
+    end,
+  })
+  ns.LeadsWindow.Toggle()
+  Assert.same(size(), { 600, 480 }, "no smaller than the minimum")
   ns = UiFixture.load({
     db = function(db)
-      db.ui.settings = { width = 100, height = 100 }
+      db.ui.window = { width = 100, height = 100 }
     end,
   })
   ns.LeadsWindow.ToggleSettings()
-  Assert.same(size(), { 600, 480 }, "no smaller than the minimum")
+  Assert.same(size(), { 600, 480 }, "in settings too")
 end
 
 local function testRefreshInSettings()
@@ -353,8 +365,9 @@ return function()
   testReopenRefreshesPage()
   testCloseReturnsToList()
   testReopenKeepsPage()
-  testSizeSavedPerMode()
-  testSettingsSizeClamped()
+  testSizeSharedByModes()
+  testSavedSizeClampedToScreen()
+  testSmallSavedSizeClampsUp()
   testRefreshInSettings()
   testGearTooltip()
   testGearArtAndPlace()
