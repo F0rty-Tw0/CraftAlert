@@ -6,9 +6,10 @@ end
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 
--- The Crafters page's recipe tooltip: Blizzard's own recipe lists show none, and the item or
--- spell tooltip says nothing about who here can craft it. Gold title, the profession in white,
--- who knows it, and a grey note when it is muted.
+-- The Crafters page's recipe tooltip: Blizzard's own recipe lists show none, and the item
+-- tooltip says nothing about who here can craft it. A recipe that makes an item shows the
+-- client's tooltip of that item; one without (enchants, Classic name keys) a gold title and its
+-- profession in white. Under either: who knows it, and a grey note when it is muted.
 local RecipeTooltip = {}
 
 local GREY = 0.5
@@ -30,10 +31,14 @@ function RecipeTooltip.Show(row, character)
   local key, recipe = row.item.key, row.item.recipe
   local tooltip = _G["GameTooltip"]
   tooltip:SetOwner(row, "ANCHOR_RIGHT")
-  _G["GameTooltip_SetTitle"](tooltip, recipe.name or tostring(key), _G["NORMAL_FONT_COLOR"])
-  local profession = character and character.professions[recipe.prof]
-  if profession and profession.name ~= "" then
-    _G["GameTooltip_AddHighlightLine"](tooltip, profession.name)
+  if recipe.item ~= nil then
+    tooltip:SetHyperlink("item:" .. recipe.item)
+  else
+    _G["GameTooltip_SetTitle"](tooltip, recipe.name or tostring(key), _G["NORMAL_FONT_COLOR"])
+    local profession = character and character.professions[recipe.prof]
+    if profession and profession.name ~= "" then
+      _G["GameTooltip_AddHighlightLine"](tooltip, profession.name)
+    end
   end
   _G["GameTooltip_AddHighlightLine"](tooltip, Localization.Text("Known by: %s", knownBy(key)))
   if recipe.muted == true then

@@ -222,11 +222,12 @@ local function testCraftersRecipeIcons()
   Assert.equal(iconOf(9001).texture, "item-icon", "muted keeps its icon")
 end
 
--- Hovering a recipe row shows our own tooltip: the recipe name in gold, its profession, who
--- knows it, and a grey note when it is muted. Rows are reused by the scroll: the tooltip reads
--- the row's recipe at hover time, and a tooltip a row owns follows the repaint.
+-- Hovering a recipe row that makes an item shows the item's tooltip; one without an item shows
+-- our own: the recipe name in gold and its profession. Under either: who knows it, and a grey
+-- note when it is muted. Rows are reused by the scroll: the tooltip reads the row's recipe at
+-- hover time, and a tooltip a row owns follows the repaint.
 local function testCraftersRecipeTooltip()
-  local ns = SettingsFixture.load({
+  local ns, db = SettingsFixture.load({
     db = function(accountDb)
       crafters(accountDb)
       accountDb.characters["Alt-Other"] = {
@@ -257,14 +258,23 @@ local function testCraftersRecipeTooltip()
   Widgets.fire(itemRow, "OnEnter")
   Assert.equal(tooltip.owner, itemRow)
   Assert.equal(tooltip.anchor, "ANCHOR_RIGHT")
-  Assert.same(tooltip.lines, { "A Belt", "Blacksmithing", "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other" })
-  Assert.same(tooltip.colors[1], { 1, 0.82, 0 })
+  Assert.same(tooltip.hyperlinks, { "item:501" }, "the crafted item's tooltip")
+  Assert.same(tooltip.lines, { "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other" })
+  Assert.same(tooltip.colors[1], { 1, 1, 1 })
   Assert.equal(tooltip.shown, true)
   Widgets.fire(itemRow, "OnLeave")
   Assert.equal(tooltip.shown, false)
+  db.characters["Me-Realm"].recipes[9001].muted = true
+  Widgets.fire(itemRow, "OnEnter")
+  Assert.same(tooltip.lines, { "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other", "Muted" })
+  Assert.same(tooltip.colors[2], { 0.5, 0.5, 0.5 })
+  Widgets.fire(itemRow, "OnLeave")
+  db.characters["Me-Realm"].recipes[9001].muted = nil
 
   Widgets.fire(mutedRow, "OnEnter")
-  Assert.equal(tooltip.lines[#tooltip.lines], "Muted")
+  Assert.same(tooltip.lines, { "B Bracer", "Blacksmithing", "Known by: Me", "Muted" }, "no item: our own lines")
+  Assert.same(tooltip.colors[1], { 1, 0.82, 0 })
+  Assert.equal(#tooltip.hyperlinks, 2, "no item: no item tooltip")
   Assert.equal(tooltip.owner, mutedRow)
   Widgets.fire(mutedRow, "OnLeave")
 
@@ -286,7 +296,7 @@ local function testCraftersRecipeTooltip()
   Assert.equal(tooltip.shown, false)
   Assert.equal(itemRow.item.key, 9101)
   Widgets.fire(itemRow, "OnEnter")
-  Assert.equal(tooltip.lines[1], "D 1")
+  Assert.equal(tooltip.hyperlinks[#tooltip.hyperlinks], "item:601")
   Assert.equal(tooltip.shown, true)
 end
 
