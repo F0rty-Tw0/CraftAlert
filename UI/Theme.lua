@@ -74,6 +74,8 @@ Theme.ART = {
   -- The leads window's settings gear (spec §7.1): the GM-ticket gear, the world map's where missing.
   GEAR_ATLAS = "GM-icon-settings",
   GEAR_FILE = "Interface\\WorldMap\\Gear_64Grey",
+  BACK_ATLAS = "common-icon-backarrow",
+  BACK_FILE = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up",
 }
 Theme.DIM_ALPHA = 0.5
 
