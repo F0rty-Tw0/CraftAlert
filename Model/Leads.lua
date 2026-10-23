@@ -330,6 +330,7 @@ local function buildLead(result, customerKey, text, channelKey, pick)
     cannotOrder = pick.cannotOrder,
     rank = pick.rank,
     rankConc = pick.rankConc,
+    crafters = pick.candidates, -- not saved: Schema drops it; a restored lead has none
     time = now(),
     greeted = false,
     replied = false,
@@ -371,11 +372,18 @@ function Leads.OnMatch(result, customerKey, text, channelKey, guid)
     fire("change")
     return lead, false
   end
-  local crafter, cannotOrder, rank, rankConc, recipeKey = CrafterRank.Pick(result, customerKey, db)
+  local crafter, cannotOrder, rank, rankConc, recipeKey, candidates = CrafterRank.Pick(result, customerKey, db)
   if crafter == nil then
     return nil
   end
-  local pick = { crafter = crafter, cannotOrder = cannotOrder, rank = rank, rankConc = rankConc, recipeKey = recipeKey }
+  local pick = {
+    crafter = crafter,
+    cannotOrder = cannotOrder,
+    rank = rank,
+    rankConc = rankConc,
+    recipeKey = recipeKey,
+    candidates = candidates,
+  }
   lead = buildLead(result, customerKey, text, channelKey, pick)
   lead.id = nextId
   lead.guid = type(guid) == "string" and not FlavorCompat.issecretvalue(guid) and guid or nil

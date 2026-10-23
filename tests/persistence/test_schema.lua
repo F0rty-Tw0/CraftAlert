@@ -415,6 +415,10 @@ local function testLeadsFromOnMatchSurvive()
     Assert.truthy(itemLead[field] ~= nil, "the item lead sets " .. field)
   end
   local expected = deepCopy(db.leads)
+  -- crafters is a live-only list: Validate drops it, so a restored lead has none.
+  for _, lead in ipairs(expected) do
+    lead.crafters = nil
+  end
   Fresh.require("Core.Localization")
   Fresh.require("Core.ChatPrint")
   local Schema = Fresh.require("Persistence.Schema")

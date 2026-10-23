@@ -181,8 +181,27 @@ local function testRankOnLead()
   ns.CrafterRank.Pick = pick
 end
 
+-- The lead lists every character that can craft the recipe, with its rank from the data.
+local function testCraftersOnLead()
+  local ns = setup(nil, function(data)
+    local alt, smith = data.characters["Alt-Realm"].recipes[1], data.characters["Smith-Realm"].recipes[1]
+    alt.ranks, alt.reachRank, alt.reachCost = { 1, 2, 3 }, 3, 0
+    smith.ranks, smith.reachRank, smith.reachCost = { 1, 2, 3 }, 1, 0
+  end)
+  local lead = newLead(ns, "LF plate belt")
+  Assert.equal(lead.crafter, "Alt-Realm", "rank 3 beats rank 1")
+  Assert.equal(#lead.crafters, 2)
+  local byKey = {}
+  for _, candidate in ipairs(lead.crafters) do
+    byKey[candidate.key] = candidate
+  end
+  Assert.same(byKey["Alt-Realm"], { key = "Alt-Realm", rank = 3, byConc = false })
+  Assert.same(byKey["Smith-Realm"], { key = "Smith-Realm", rank = 1, byConc = false })
+end
+
 return function()
   testIgnoreList()
+  testCraftersOnLead()
   testTestFlag()
   testTestGuards()
   testRankOnLead()
@@ -246,7 +265,8 @@ return function()
   match(ns, "LF plate greaves")
   Assert.same({ group = lead.group, prof = lead.prof, why = lead.why, kind = lead.kind, itemID = lead.itemID }, before)
   for key, value in pairs(lead) do
-    Assert.falsy(type(value) == "table", key .. " holds a table")
+    -- crafters is Pick's own list, not a buffer of the result.
+    Assert.falsy(type(value) == "table" and key ~= "crafters", key .. " holds a table")
   end
 
   -- Same sender + same match inside the timeout updates the lead: no new alert, one lead.

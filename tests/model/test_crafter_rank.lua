@@ -355,6 +355,21 @@ return function()
   picked, _, rank, _, recipeKey = ranked({ "Alt-Realm", 11 }, { "Alt-Realm", 10 })
   Assert.same({ picked, rank, recipeKey }, { "Alt-Realm", 2, 11 })
 
+  -- Candidates: one { key, rank, byConc } per character, its best entry (rank 3 beats rank 2).
+  data = db()
+  learn("Alt-Realm", 10, { ranks = { 1, 2, 3 }, reachRank = 3, reachCost = 0 })
+  learn("Alt-Realm", 11, { ranks = { 1, 2, 3 }, reachRank = 2, reachCost = 0 })
+  learn("Zed-Realm", 10, { ranks = { 1, 2, 3 }, reachRank = 1, reachCost = 0 })
+  local candidates
+  _, _, _, _, _, candidates = ranked({ "Alt-Realm", 10 }, { "Alt-Realm", 11 }, { "Zed-Realm", 10 })
+  Assert.equal(#candidates, 2, "one entry per character")
+  local byKey = {}
+  for _, candidate in ipairs(candidates) do
+    byKey[candidate.key] = candidate
+  end
+  Assert.same(byKey["Alt-Realm"], { key = "Alt-Realm", rank = 3, byConc = false }, "Alt's best entry")
+  Assert.same(byKey["Zed-Realm"], { key = "Zed-Realm", rank = 1, byConc = false })
+
   -- The highest rank wins even when it costs concentration; at the same rank, the crafter who
   -- reaches it without concentration wins (user ruling 2026-10-22).
   data = db()
@@ -370,6 +385,15 @@ return function()
   -- A profession-word match has no recipe: no rank, no recipeKey.
   _, _, rank, byConc, recipeKey = CrafterRank.Pick({ kind = "profession", entries = {}, entryCount = 0, prof = BS }, CUSTOMER, data)
   Assert.same({ rank, byConc, recipeKey }, {})
+  -- Every character with the profession is a candidate, none with a rank (the index built for
+  -- the mute tests above would still hide Me-Realm).
+  Index.Configure(withSettings(data), { ownKey = "Me-Realm" })
+  Index.Rebuild()
+  local words = select(6, CrafterRank.Pick({ kind = "profession", entries = {}, entryCount = 0, prof = BS }, CUSTOMER, data))
+  Assert.equal(#words, 5)
+  for _, word in ipairs(words) do
+    Assert.same({ word.rank, word.byConc }, {}, word.key)
+  end
 
   -- Forever has no crafting orders, so realms never reorder anything.
   CrafterRank = load("forever")
