@@ -8,13 +8,14 @@ local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
 -- Spec §9 Crafters: one character at a time (current, same-account, imported) with enable,
 -- remove (asks for a second click) and, per profession, the primary flag and the recipe list
--- with search, bell markers and mute. Enable, remove and mute rebuild the index (§6.2); the
+-- with search, recipe icons and mute. Enable, remove and mute rebuild the index (§6.2); the
 -- primary flag is read when a lead picks its crafter (§6.3 step 5), so it rebuilds nothing.
 local PageCrafters = { id = "crafters", title = Localization.Text("Crafters") }
 
@@ -92,29 +93,58 @@ local function setPrimary(charKey, prof, on)
   end
 end
 
+local function recipeIcon(item)
+  local itemId, spellId = item.recipe.item, item.key
+  return (type(itemId) == "number" and select(5, FlavorCompat.GetItemInfoInstant(itemId)))
+    or (type(spellId) == "number" and FlavorCompat.GetSpellTexture(spellId))
+    or Theme.ICON
+end
+
+-- Item tooltip, else spell tooltip, else none; reads row.item at hover time (scrolls reuse rows).
+local function showTooltip(row)
+  local tooltip, itemId, spellId = _G["GameTooltip"], row.item.recipe.item, row.item.key
+  tooltip:SetOwner(row, "ANCHOR_RIGHT")
+  if type(itemId) == "number" then
+    tooltip:SetItemByID(itemId)
+  elseif type(spellId) == "number" then
+    tooltip:SetSpellByID(spellId)
+  else
+    tooltip:Hide()
+    return
+  end
+  tooltip:Show()
+end
+
 local function createRecipeRow(row)
   local size = Theme.LAYOUT.ROW_ICON_SIZE
-  row.bell = row:CreateTexture(nil, "ARTWORK")
-  row.bell:SetSize(size, size)
-  row.bell:SetPoint("LEFT", row, "LEFT", 0, 0)
-  row.bell:SetTexture(Theme.ICON)
+  row.icon = row:CreateTexture(nil, "ARTWORK")
+  row.icon:SetSize(size, size)
+  row.icon:SetPoint("LEFT", row, "LEFT", 0, 0)
   row.name = FrameKit.Text(row, Theme.FONTS.body)
-  row.name:SetPoint("LEFT", row.bell, "RIGHT", Theme.LAYOUT.PADDING, 0)
+  row.name:SetPoint("LEFT", row.icon, "RIGHT", Theme.LAYOUT.PADDING, 0)
   row.mute = Controls.Button(row, "", MUTE_WIDTH, function()
     row.item.recipe.muted = not row.item.recipe.muted or nil
     Index.RequestRebuild("mute")
     row.page.ShowRecipes()
   end)
   row.mute:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+  row:SetScript("OnEnter", showTooltip)
+  row:SetScript("OnLeave", function()
+    _G["GameTooltip"]:Hide()
+  end)
 end
 
 local function showRecipe(row, item)
   local muted = item.recipe.muted == true
   row.item = item
   row.name:SetText(item.text)
-  row.bell:SetDesaturated(muted)
-  row.bell:SetAlpha(muted and Theme.DIM_ALPHA or 1)
+  row.icon:SetTexture(recipeIcon(item))
+  row.icon:SetDesaturated(muted)
+  row.icon:SetAlpha(muted and Theme.DIM_ALPHA or 1)
   row.mute.label:SetText(muted and Localization.Text("Unmute") or Localization.Text("Mute"))
+  if _G["GameTooltip"]:IsOwned(row) then
+    showTooltip(row)
+  end
 end
 
 local function shownCharacter(page)
