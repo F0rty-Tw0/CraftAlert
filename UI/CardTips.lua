@@ -49,6 +49,23 @@ local function hideOwned(card)
   end
 end
 
+-- True while the cursor is on a link in the card or on one of its shown zones or buttons: those own
+-- the tooltip there. The client may send the card's OnLeave and a zone's OnEnter before a link's
+-- OnHyperlinkLeave, and card:IsMouseOver() stays true over a child.
+local function onLinkOrChild(card)
+  if card.hoveredLink ~= nil then
+    return true
+  end
+  for _, children in ipairs({ card.zones, card.buttons }) do
+    for _, child in pairs(children) do
+      if child:IsShown() and child:IsMouseOver() then
+        return true
+      end
+    end
+  end
+  return false
+end
+
 -- A mouse-enabled Button over `first` through `last` (card regions); clicks go to the card's OnClick.
 local function createZone(card, first, last, build)
   local zone = _G["CreateFrame"]("Button", nil, card)
@@ -76,10 +93,11 @@ end
 
 -- Spec §2.1: the lead's latest chat line, owned by the card. Shown when the cursor comes onto the card
 -- itself (OnEnter, also when it comes back from a zone or a button) and when it leaves a link onto the
--- card (LinkHover's body hook); nothing shows for a lead without a message.
+-- card (LinkHover's body hook); nothing shows for a lead without a message, nor while the cursor is
+-- on a link, a zone or a button.
 function CardTips.ShowChat(card)
   local lead = card.lead
-  if lead == nil or lead.message == nil then
+  if lead == nil or lead.message == nil or onLinkOrChild(card) then
     return
   end
   local tip = tooltip()

@@ -387,6 +387,30 @@ local function testChatTipYieldsToLink()
   Assert.equal(tip().shown, false)
 end
 
+-- The cursor goes off a link straight onto a child: from the what line up onto the name zone, from
+-- the request down onto the Matched zone, or onto the Greet button. The client may send the card's
+-- OnLeave and the child's OnEnter before OnHyperlinkLeave, and the card still reports the cursor
+-- (IsMouseOver is geometric): the child keeps its tooltip, and leaving it and the card leaves none.
+local function testLinkToChildLeaveFirst()
+  for _, key in ipairs({ "name", "matched", "greet" }) do
+    local lead = itemLead()
+    lead.message = "LF " .. LINK_TEXT .. " crafter"
+    local _, _, card = open({ lead })
+    local child = card.zones[key] or card.buttons[key]
+    enter(card)
+    Widgets.fire(card, "OnHyperlinkEnter", LINK, LINK_TEXT)
+    child.mouseOver = true
+    Widgets.fire(card, "OnLeave")
+    Widgets.fire(child, "OnEnter")
+    Widgets.fire(card, "OnHyperlinkLeave", LINK, LINK_TEXT)
+    Assert.same({ tip():IsOwned(card), tip():IsOwned(child) }, { false, true }, key)
+    child.mouseOver = false
+    leave(card, child, false)
+    Assert.equal(tip().shown, false, key)
+    Wow.reset()
+  end
+end
+
 -- The customer tooltip reads the class once; without a colour table the chat tooltip reads none.
 local function testClassReads()
   local _, _, card = open({ itemLead() })
@@ -512,6 +536,7 @@ return function()
   testChatTipHidesOnLeave()
   testZoneThenBackToCard()
   testChatTipYieldsToLink()
+  testLinkToChildLeaveFirst()
   testClassReads()
   testChatTipLatestLine()
   testRepeatLeavesOtherTips()
