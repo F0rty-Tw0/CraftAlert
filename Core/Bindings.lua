@@ -6,6 +6,7 @@ end
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
+local SendGuard = ns.SendGuard or require("CraftAlert.Model.SendGuard")
 local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local SavedState = ns.SavedState or require("CraftAlert.Persistence.SavedState")
@@ -44,11 +45,18 @@ function Bindings.GreetLatest()
   GreetAction.Greet(lead, since)
 end
 
+-- §7.5 rule 3: a latest lead the toast or the window has shown for under 0.5 s stays, so a key
+-- pressed as a new lead pops up never drops it unseen; one on neither is dismissed.
 function Bindings.DismissLatest()
   local lead = Leads.Latest()
-  if lead then
-    Leads.Dismiss(lead.id)
+  if lead == nil then
+    return
   end
+  local since = shownAt(lead)
+  if since ~= nil and not SendGuard.Looked(since) then
+    return
+  end
+  Leads.Dismiss(lead.id)
 end
 
 -- The window reads its settings from CraftAlertDB, missing or unchecked when the saved data

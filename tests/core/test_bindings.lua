@@ -144,10 +144,30 @@ local function testDismissAndToggle()
   Assert.equal(G("CraftAlertLeadsWindow"), nil, "no window is built without saved data")
 end
 
+-- §7.5 rule 3: the key keeps a latest lead the toast or the window top row has shown for under
+-- 0.5 s, and dismisses it from 0.5 s on.
+local function testDismissLooks()
+  for _, show in ipairs({ "toast", "window" }) do
+    local ns = UiFixture.load({ leads = 2 })
+    if show == "toast" then
+      ns.AlertToast.Show(ns.Leads.Latest())
+    else
+      ns.LeadsWindow.Toggle()
+    end
+    Wow.clock.gettime = 50.2
+    G("CraftAlert_DismissLatest")()
+    Assert.equal(ns.Leads.Latest().id, 2, show .. ": shown 0.2 s")
+    Wow.clock.gettime = 50.6
+    G("CraftAlert_DismissLatest")()
+    Assert.equal(ns.Leads.Latest().id, 1, show .. ": shown 0.6 s")
+  end
+end
+
 return function()
   testGlobalsMatchBindingsXml()
   testGreetLatest()
   testDismissAndToggle()
+  testDismissLooks()
   Wow.reset()
   Assert.equal(G("CraftAlert_GreetLatest"), nil, "the stubs are removed again")
 end

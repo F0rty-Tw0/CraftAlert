@@ -377,6 +377,8 @@ local function testAddonObeysTheRules()
     G("CraftAlert_ToggleLeads")()
     Assert.same({ rawget(G("UISpecialFrames"), 1), rawget(G("UISpecialFrames"), 2) }, { "CraftAlertLeadsWindow", nil })
 
+    -- The dismiss key waits for the 0.5 s look at a lead on screen (§7.5 rule 3).
+    Wow.clock.gettime = Wow.clock.gettime + 1
     G("CraftAlert_DismissLatest")()
     Assert.equal(ns.Leads.HasActive(), false)
     Assert.same(publicChatEvents(), { CHANNEL })
