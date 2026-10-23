@@ -195,6 +195,22 @@ local function testRepeatKeepsClassInSync()
   Assert.same({ #ns.Leads.List(), classOf(ns, lead) }, { 1, "PRIEST" })
 end
 
+-- No `as`: the line takes the player's class, so a repeat re-colours the lead to it. With no class
+-- API the lead keeps the one it has (testRepeatKeepsClassInSync).
+local function testDefaultsToOwnClass()
+  local ns, _, _, handler = load()
+  Wow.stub("UnitClass", function()
+    return "Priest", "PRIEST"
+  end)
+  run(handler, "LF plate belt")
+  local lead = ns.Leads.Latest()
+  Assert.equal(classOf(ns, lead), "PRIEST", "no `as`")
+  run(handler, "as warrior LF plate belt")
+  Assert.equal(classOf(ns, lead), "WARRIOR", "explicit class")
+  run(handler, "LF plate belt")
+  Assert.same({ #ns.Leads.List(), classOf(ns, lead) }, { 1, "PRIEST" })
+end
+
 -- /ca perf counts the test line like any chat line.
 local function testPerf()
   local ns, _, _, handler = load()
@@ -299,6 +315,7 @@ return function()
   testUsage()
   testClass()
   testRepeatKeepsClassInSync()
+  testDefaultsToOwnClass()
   testPerf()
   testNothingIsSent()
   testReply()
