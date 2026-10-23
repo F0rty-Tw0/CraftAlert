@@ -387,6 +387,35 @@ local function testChatTipYieldsToLink()
   Assert.equal(tip().shown, false)
 end
 
+-- The client may send the card's OnEnter after a link's OnHyperlinkEnter: the link keeps its tooltip.
+local function testCardEnterAfterLink()
+  local lead = itemLead()
+  lead.message = "LF " .. LINK_TEXT .. " crafter"
+  local _, _, card = open({ lead })
+  card.mouseOver = true
+  Widgets.fire(card, "OnHyperlinkEnter", LINK, LINK_TEXT)
+  Widgets.fire(card, "OnEnter")
+  Assert.same({ tip().hyperlinks, tip().owner, tip().anchor, tip().shown }, { { LINK }, card, "ANCHOR_CURSOR", true })
+end
+
+-- A trade link has no tooltip of its own (LinkHover), so the chat line goes while the cursor is on
+-- it and comes back off it; a tooltip another frame owns stays.
+local function testTradeLinkHidesChatTip()
+  local trade, tradeText = "trade:Player-1-0A:2018:164", "|cffffd000|Htrade:Player-1-0A:2018:164|h[Blacksmithing]|h|r"
+  local lead = itemLead()
+  lead.message = "LF " .. tradeText
+  local _, _, card = open({ lead })
+  enter(card)
+  Widgets.fire(card, "OnHyperlinkEnter", trade, tradeText)
+  Assert.same({ tip().shown, tip().hyperlinks }, { false, {} })
+  Widgets.fire(card, "OnHyperlinkLeave", trade, tradeText)
+  Assert.same({ tip().owner, tip().shown, tip().lines[1] }, { card, true, "Chat with Buyer-Realm" })
+  tip():SetOwner(_G["UIParent"], "ANCHOR_TOP")
+  tip():Show()
+  Widgets.fire(card, "OnHyperlinkEnter", trade, tradeText)
+  Assert.same({ tip().owner, tip().shown }, { _G["UIParent"], true })
+end
+
 -- The cursor goes off a link straight onto a child: from the what line up onto the name zone, from
 -- the request down onto the Matched zone, or onto the Greet button. The client may send the card's
 -- OnLeave and the child's OnEnter before OnHyperlinkLeave, and the card still reports the cursor
@@ -536,6 +565,8 @@ return function()
   testChatTipHidesOnLeave()
   testZoneThenBackToCard()
   testChatTipYieldsToLink()
+  testCardEnterAfterLink()
+  testTradeLinkHidesChatTip()
   testLinkToChildLeaveFirst()
   testClassReads()
   testChatTipLatestLine()
