@@ -170,6 +170,36 @@ local function testProfessionLeadCard()
   Assert.equal(card.icon.texture, ns.Theme.ICON)
 end
 
+-- A saved item lead the client had not cached the item of: the card names the recipe, and the
+-- link the client loads later (Leads asks again at login) replaces it.
+local function testLinkArrivesLater()
+  local lead = itemLead()
+  lead.itemLink, lead.recipeName = nil, "Bolt of Silk"
+  local requests = {}
+  local ns = load({ lead }, function()
+    Wow.stub("C_Item", {
+      GetItemInfo = function() end,
+      RequestLoadItemDataByID = function(itemID)
+        requests[#requests + 1] = itemID
+      end,
+    })
+  end)
+  ns.LeadsWindow.Toggle()
+  local card = cards()[1]
+  Assert.same(requests, { 4305 }, "asked at login")
+  Assert.equal(card.what:GetText(), "Bolt of Silk")
+  Wow.stub("C_Item", {
+    GetItemInfoInstant = _G["C_Item"].GetItemInfoInstant,
+    GetItemInfo = function(itemID)
+      if itemID == 4305 then
+        return "Bolt of Silk", LINK_TEXT
+      end
+    end,
+  })
+  Wow.fireEvent("GET_ITEM_INFO_RECEIVED", 4305, true)
+  Assert.equal(card.what:GetText(), LINK_TEXT)
+end
+
 local function testHiddenRows()
   local full, bare = UiFixture.lead(1, "Ann-Draenor"), UiFixture.lead(2, "Bob-Draenor")
   bare.why, bare.profName, bare.message = nil, nil, nil
@@ -575,6 +605,7 @@ end
 return function()
   testCardContent()
   testProfessionLeadCard()
+  testLinkArrivesLater()
   testHiddenRows()
   testBadCrafters()
   testNoCrafters()
