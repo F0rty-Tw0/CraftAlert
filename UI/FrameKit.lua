@@ -6,10 +6,9 @@ end
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 
--- Builders the toast, leads window, rows and launcher share: the WhisperMessenger panel look
--- (dark surface, 1 px border), text, the customer's class colour, and dragging with the
--- position saved account-wide in `CraftAlertDB.ui[key]` (flat { point, relativePoint, x, y },
--- plus width/height for the window).
+-- Builders the toast, leads window, rows, launcher and settings share: text, the customer's class
+-- colour, atlas-or-file art, list highlight, and dragging with the position saved account-wide in
+-- `CraftAlertDB.ui[key]`.
 local FrameKit = {}
 
 local type = type
@@ -25,36 +24,6 @@ local ANCHORS = {
   BOTTOM = true,
   BOTTOMRIGHT = true,
 }
-
-function FrameKit.Fill(texture, color)
-  texture:SetColorTexture(color[1], color[2], color[3], color[4])
-end
-
--- Surface fill plus a 1 px border on each edge, all inside the frame.
-function FrameKit.Panel(frame, surface)
-  local background = frame:CreateTexture(nil, "BACKGROUND")
-  background:SetAllPoints(frame)
-  FrameKit.Fill(background, surface or Theme.COLORS.surface)
-  local size = Theme.LAYOUT.BORDER
-  local edges = {
-    { "TOPLEFT", "TOPRIGHT", nil, size },
-    { "BOTTOMLEFT", "BOTTOMRIGHT", nil, size },
-    { "TOPLEFT", "BOTTOMLEFT", size, nil },
-    { "TOPRIGHT", "BOTTOMRIGHT", size, nil },
-  }
-  for _, edge in ipairs(edges) do
-    local line = frame:CreateTexture(nil, "BORDER")
-    line:SetPoint(edge[1], frame, edge[1], 0, 0)
-    line:SetPoint(edge[2], frame, edge[2], 0, 0)
-    if edge[3] then
-      line:SetWidth(edge[3])
-    else
-      line:SetHeight(edge[4])
-    end
-    FrameKit.Fill(line, Theme.COLORS.border)
-  end
-  return background
-end
 
 -- One-line, left-aligned text in a Blizzard font object.
 function FrameKit.Text(parent, font, color)
@@ -193,28 +162,6 @@ function FrameKit.Draggable(frame, key)
   frame:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
     FrameKit.SavePosition(self, key)
-  end)
-end
-
--- The window chrome: a title bar with the title on the left and an "X" that hides the frame.
-function FrameKit.TitleBar(frame, title)
-  local layout = Theme.LAYOUT
-  local bar = frame:CreateTexture(nil, "ARTWORK")
-  bar:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
-  bar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
-  bar:SetHeight(layout.TITLE_BAR_HEIGHT)
-  FrameKit.Fill(bar, Theme.COLORS.chrome)
-  local text = FrameKit.Text(frame, Theme.FONTS.title, Theme.COLORS.textPrimary)
-  text:SetPoint("LEFT", bar, "LEFT", layout.PADDING, 0)
-  text:SetText(title)
-  local close = _G["CreateFrame"]("Button", nil, frame)
-  close:SetSize(layout.TITLE_BUTTON_SIZE, layout.TITLE_BUTTON_SIZE)
-  close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
-  local glyph = FrameKit.Text(close, Theme.FONTS.name, Theme.COLORS.textSecondary)
-  glyph:SetPoint("CENTER", close, "CENTER", 0, 0)
-  glyph:SetText("X")
-  close:SetScript("OnClick", function()
-    frame:Hide()
   end)
 end
 
