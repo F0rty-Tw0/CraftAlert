@@ -154,6 +154,22 @@ local function testCloseReturnsToList()
   Assert.same(size(), { 600, 480 })
 end
 
+local function selectedPage()
+  local general, alerts = SettingsFixture.navButton("General"), SettingsFixture.navButton("Alerts")
+  return { general = general.selected:IsShown(), alerts = alerts.selected:IsShown() }
+end
+
+local function testReopenKeepsPage()
+  local ns = UiFixture.load()
+  SettingsFixture.open(ns, "Alerts")
+  frame():Hide()
+  ns.LeadsWindow.ToggleSettings()
+  Assert.same(selectedPage(), { general = false, alerts = true }, "reopens on the page last shown")
+  Widgets.click(gear())
+  Widgets.click(gear())
+  Assert.same(selectedPage(), { general = false, alerts = true }, "List and back keeps the page")
+end
+
 local function resizeTo(width, height)
   local button = frame().resizeButton
   Widgets.fire(button, "OnMouseDown", "LeftButton")
@@ -267,6 +283,7 @@ return function()
   testWheelIgnoredInSettings()
   testReopenRefreshesPage()
   testCloseReturnsToList()
+  testReopenKeepsPage()
   testSizeSavedPerMode()
   testSettingsSizeClamped()
   testRefreshInSettings()
