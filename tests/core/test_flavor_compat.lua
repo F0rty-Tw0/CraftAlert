@@ -281,10 +281,13 @@ local function testOwnClass()
     return "Mage", "MAGE"
   end)
   Assert.equal(FlavorCompat.OwnClass(), "MAGE", "stubbed after load: read per call")
-  Wow.stub("UnitClass", function()
-    return "Mage", Wow.secret("MAGE")
-  end)
-  Assert.equal(FlavorCompat.OwnClass(), nil, "secret token")
+  -- In game a secret token is still a string, so only the secret test can stop it.
+  local realSecret = FlavorCompat.issecretvalue
+  FlavorCompat.issecretvalue = function(value)
+    return value == "MAGE" or realSecret(value)
+  end
+  Assert.equal(FlavorCompat.OwnClass(), nil, "secret token that is a string")
+  FlavorCompat.issecretvalue = realSecret
   Wow.stub("UnitClass", function()
     return "Mage", 7
   end)
