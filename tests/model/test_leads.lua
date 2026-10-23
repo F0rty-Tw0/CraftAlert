@@ -183,7 +183,7 @@ end
 
 -- The lead lists every character that can craft the recipe, with its rank from the data.
 local function testCraftersOnLead()
-  local ns = setup(nil, function(data)
+  local ns, db = setup(nil, function(data)
     local alt, smith = data.characters["Alt-Realm"].recipes[1], data.characters["Smith-Realm"].recipes[1]
     alt.ranks, alt.reachRank, alt.reachCost = { 1, 2, 3 }, 3, 0
     smith.ranks, smith.reachRank, smith.reachCost = { 1, 2, 3 }, 1, 0
@@ -197,6 +197,11 @@ local function testCraftersOnLead()
   end
   Assert.same(byKey["Alt-Realm"], { key = "Alt-Realm", rank = 3, byConc = false })
   Assert.same(byKey["Smith-Realm"], { key = "Smith-Realm", rank = 1, byConc = false })
+  -- Spec §4.4 rule 8: the list is live only; it leaves the saved lead at logout, the rest stays.
+  Wow.fireEvent("PLAYER_LOGOUT")
+  Assert.equal(db.leads[1], lead)
+  Assert.equal(lead.crafters, nil)
+  Assert.equal(lead.crafter, "Alt-Realm")
 end
 
 return function()

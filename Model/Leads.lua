@@ -5,6 +5,7 @@ end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
+local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 
 -- Spec §7.2: the leads (matched requests) the player can answer. Steps 5-7 of §6.3 run here
 -- on matched lines only. Leads live in `db.leads`, oldest first (an updated lead moves to the
@@ -215,6 +216,15 @@ local function dropTest(list)
   end
 end
 
+-- Spec §4.4 rule 8, small saved data: a lead's `crafters` list is live only, so it leaves every
+-- lead just before the client writes CraftAlertDB (PLAYER_LOGOUT, also on /reload). Schema still
+-- drops it from a save written before this.
+local function dropLiveFields()
+  for i = 1, #leads do
+    leads[i].crafters = nil
+  end
+end
+
 -- Binds db.leads (Bootstrap, at PLAYER_LOGIN): repairs a hand-edited list (ids, times, order,
 -- size), drops test leads and expired leads and starts the timer. The db is bound last: while a
 -- repair raises, Leads stays unbound and makes no lead.
@@ -229,6 +239,7 @@ function Leads.Restore(accountDb)
   local removed = sweep(list, limit)
   armExpiry(list, limit)
   db, leads = accountDb, list
+  EventRouter.On("PLAYER_LOGOUT", dropLiveFields)
   if removed then
     fire("change")
   end
@@ -330,7 +341,7 @@ local function buildLead(result, customerKey, text, channelKey, pick)
     cannotOrder = pick.cannotOrder,
     rank = pick.rank,
     rankConc = pick.rankConc,
-    crafters = pick.candidates, -- live only: written at logout, dropped by Schema on the next load
+    crafters = pick.candidates, -- live only: dropped at logout (dropLiveFields)
     time = now(),
     greeted = false,
     replied = false,
