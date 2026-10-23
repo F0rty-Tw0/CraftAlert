@@ -12,6 +12,7 @@ local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
+local RecipeTooltip = ns.RecipeTooltip or require("CraftAlert.UI.Settings.RecipeTooltip")
 
 -- Spec §9 Crafters: one character at a time (current, same-account, imported) with enable,
 -- remove (asks for a second click) and, per profession, the primary flag and the recipe list
@@ -100,19 +101,8 @@ local function recipeIcon(item)
     or Theme.ICON
 end
 
--- Item tooltip, else spell tooltip, else none; reads row.item at hover time (scrolls reuse rows).
-local function showTooltip(row)
-  local tooltip, itemId, spellId = _G["GameTooltip"], row.item.recipe.item, row.item.key
-  tooltip:SetOwner(row, "ANCHOR_RIGHT")
-  if type(itemId) == "number" then
-    tooltip:SetItemByID(itemId)
-  elseif type(spellId) == "number" then
-    tooltip:SetSpellByID(spellId)
-  else
-    tooltip:Hide()
-    return
-  end
-  tooltip:Show()
+local function shownCharacter(page)
+  return db().characters[page.character.Value()]
 end
 
 local function createRecipeRow(row)
@@ -128,7 +118,9 @@ local function createRecipeRow(row)
     row.page.ShowRecipes()
   end)
   row.mute:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-  row:SetScript("OnEnter", showTooltip)
+  row:SetScript("OnEnter", function()
+    RecipeTooltip.Show(row, shownCharacter(row.page))
+  end)
   row:SetScript("OnLeave", function()
     _G["GameTooltip"]:Hide()
   end)
@@ -143,12 +135,8 @@ local function showRecipe(row, item)
   row.icon:SetAlpha(muted and Theme.DIM_ALPHA or 1)
   row.mute.label:SetText(muted and Localization.Text("Unmute") or Localization.Text("Mute"))
   if _G["GameTooltip"]:IsOwned(row) then
-    showTooltip(row)
+    RecipeTooltip.Show(row, shownCharacter(row.page))
   end
-end
-
-local function shownCharacter(page)
-  return db().characters[page.character.Value()]
 end
 
 -- page: { character, enabled, remove, profession, primary, search, recipes, ... }
