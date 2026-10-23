@@ -71,11 +71,19 @@ local function result(keys, prof)
 end
 
 -- Pick judges a character's many entries without a table per entry (it runs per matched line).
+-- Each entry reaches a higher rank than the one before, so every entry wins and the win path runs.
 local function testPickAllocation()
   local CrafterRank = load("retail")
   local data = db()
+  local ranks = {}
+  for i = 1, 200 do
+    ranks[i] = i
+  end
+  local alt = data.characters["Alt-Realm"]
+  alt.recipes = {}
   local many = result({})
   for i = 1, 200 do
+    alt.recipes[i] = { reachRank = i, ranks = ranks }
     many.entries[i] = { character = "Alt-Realm", recipeKey = i, group = 501, prof = BS }
   end
   many.entryCount = 200
