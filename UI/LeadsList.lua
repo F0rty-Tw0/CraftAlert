@@ -9,8 +9,9 @@ local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadRow = ns.LeadRow or require("CraftAlert.UI.LeadRow")
 
 -- Spec §7.3: the rows of the leads window. Newest first, as many as fit the frame; the window
--- feeds it the leads and the wheel. Rows are children of the window's inset and anchor to
--- list.column. list.onRowEnter, when set, is called with the row the cursor enters.
+-- feeds it the leads and the wheel. Rows are children of the window's inset and fill the left
+-- LIST_COLUMN_WIDTH of list.column (the details pane takes the rest). list.onRowEnter, when
+-- set, is called with the row the cursor enters.
 local LeadsList = {}
 
 local floor = math.floor
@@ -41,7 +42,7 @@ local function rowAt(list, index)
   row = LeadRow.Create(list.inset, index)
   local top = layout.PADDING + (index - 1) * (layout.ROW_HEIGHT + layout.ROW_GAP)
   row:SetPoint("TOPLEFT", column, "TOPLEFT", layout.PADDING, -top)
-  row:SetPoint("RIGHT", column, "RIGHT", -layout.PADDING, 0)
+  row:SetPoint("RIGHT", column, "LEFT", layout.LIST_COLUMN_WIDTH - layout.PADDING, 0)
   -- HookScript, not SetScript: LinkHover's hooks on the row stay.
   row:HookScript("OnEnter", function(entered)
     onRowEnter(list, entered)

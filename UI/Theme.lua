@@ -40,6 +40,8 @@ Theme.LAYOUT = {
   ROW_ICON_SIZE = 14,
   ROW_HEIGHT = 36,
   ROW_GAP = 2,
+  -- The leads window's list column; the details pane takes the rest of the inset.
+  LIST_COLUMN_WIDTH = 300,
   ICON_SIZE = 53,
   PORTRAIT_SIZE = 44,
   RING_SIZE = 56,

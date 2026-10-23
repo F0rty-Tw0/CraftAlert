@@ -229,7 +229,8 @@ local function testRowLinkHover()
   Assert.equal(row.hoveredLink, nil)
 end
 
--- Rows sit in the inset and fit its height (480 high: inset 480 - 28 - 26 = 426; floor((426 - 16 + 2) / 38) = 10).
+-- Rows sit in the inset's left column and fit its height (480 high: inset 480 - 28 - 26 = 426;
+-- floor((426 - 16 + 2) / 38) = 10). The details pane takes the rest of the inset.
 local function testRowsFitTheInset()
   local ns = load(customerNames(12))
   ns.LeadsWindow.Toggle()
@@ -238,6 +239,13 @@ local function testRowsFitTheInset()
   Assert.equal(rows()[1].parent, frame.Inset)
   Assert.same({ rows()[1]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -8 })
   Assert.same({ rows()[2]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -46 })
+  -- The right edge is the column's (300 wide), inset by PADDING.
+  Assert.same(rows()[1].points[2], { "RIGHT", frame.Inset, "LEFT", 292, 0 })
+  Assert.same(frame.details.points, {
+    { "TOPLEFT", frame.Inset, "TOPLEFT", 300, 0 },
+    { "BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", 0, 0 },
+  })
+  Assert.equal(frame.details.parent, frame.Inset)
   -- No footer hint under the list: the clicks are the toast's, and its tooltip lists them.
   Assert.falsy(string.find(textOf(frame), "Click: greet", 1, true), "no footer hint: " .. textOf(frame))
   -- The client sizes the inset from its anchors only, which may be unresolved (0 high) on the

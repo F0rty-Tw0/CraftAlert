@@ -33,6 +33,7 @@ local UI = {
   "UI.Dock",
   "UI.LeadRow",
   "UI.LeadsList",
+  "UI.LeadDetails",
   "UI.WindowSize",
   "UI.SettingsGear",
   "UI.Settings.SettingsPane",
