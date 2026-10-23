@@ -3,6 +3,7 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
 
 -- Spec §5.1: the current character's crafting professions, keyed by base skill-line ID
@@ -95,6 +96,20 @@ local function seedOrder(character)
   order = keys
 end
 
+-- The player's class token, or nil when the API is missing or the value is secret.
+local function ownClass()
+  local unitClass = _G["UnitClass"]
+  if type(unitClass) ~= "function" then
+    return nil
+  end
+  local token = select(2, unitClass("player"))
+  if FlavorCompat.issecretvalue(token) or type(token) ~= "string" then
+    return nil
+  end
+
+  return token
+end
+
 local function dropRecipes(recipes, professionKey)
   for recipeKey, recipe in pairs(recipes) do
     if recipe.prof == professionKey then
@@ -123,6 +138,7 @@ function ProfessionList.Refresh(db, charKey)
     character = { source = "local", enabled = true, realms = {}, professions = {}, recipes = {} }
     db.characters[charKey] = character
   end
+  character.class = ownClass() or character.class
   local previous = character.professions
   local professions, keys = {}, {}
   for _, profession in ipairs(list) do
