@@ -11,7 +11,8 @@
 --   Widgets.texts(frame, frames)    the shown texts under frame (itself and its descendants
 --                                   among `frames`, usually Wow.frames), in creation order
 --   Widgets.fire(frame, name, ...)  runs the `name` script, then its HookScript hooks
---   Widgets.LINE_HEIGHT, Widgets.CHAR_WIDTH   the fake font metrics GetStringHeight wraps with
+--   Widgets.LINE_HEIGHT, Widgets.CHAR_WIDTH   the fake font metrics GetStringHeight and
+--                                   GetStringWidth measure with
 -- A frame made with a template name gets that template's fake (tests/helpers/templates.lua).
 local Templates = require("tests.helpers.templates")
 
@@ -144,6 +145,19 @@ local function addRegion(region)
     return self.alpha
   end
 
+  function region:GetParent()
+    return self.parent
+  end
+
+  -- Through Show and Hide, so a frame still runs its OnShow and OnHide.
+  function region:SetShown(shown)
+    if shown then
+      self:Show()
+    else
+      self:Hide()
+    end
+  end
+
   function region:CreateAnimationGroup()
     return newAnimationGroup()
   end
@@ -252,8 +266,23 @@ local function newFontString(parent, layer, template)
     self.nonSpaceWrap = wrap
   end
 
+  function fontString:SetMaxLines(count)
+    self.maxLines = count
+  end
+
+  -- CHAR_WIDTH per visible character on one line; a set width bounds it, as the client measures
+  -- a truncated text (0: no width set).
+  function fontString:GetStringWidth()
+    local width = visibleLength(self.text or "") * Widgets.CHAR_WIDTH
+    if self.width > 0 then
+      return math.min(width, self.width)
+    end
+
+    return width
+  end
+
   -- 0 for no text; one line when wrapping is off or the width is unset; else LINE_HEIGHT per
-  -- row of CHAR_WIDTH-wide characters the visible text fills.
+  -- row of CHAR_WIDTH-wide characters the visible text fills, at most maxLines rows (0: no cap).
   function fontString:GetStringHeight()
     local text = self.text
     if text == nil or text == "" then
@@ -262,9 +291,12 @@ local function newFontString(parent, layer, template)
     if not self.wordWrap or self.width == 0 then
       return Widgets.LINE_HEIGHT
     end
-    local rows = ceil(visibleLength(text) * Widgets.CHAR_WIDTH / self.width)
+    local rows = math.max(ceil(visibleLength(text) * Widgets.CHAR_WIDTH / self.width), 1)
+    if self.maxLines and self.maxLines > 0 then
+      rows = math.min(rows, self.maxLines)
+    end
 
-    return Widgets.LINE_HEIGHT * math.max(rows, 1)
+    return Widgets.LINE_HEIGHT * rows
   end
 
   function fontString:Show()

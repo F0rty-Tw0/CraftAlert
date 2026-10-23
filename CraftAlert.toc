@@ -63,7 +63,12 @@ UI/LeadText.lua
 UI/ClickRouter.lua
 UI/LinkHover.lua
 UI/Dock.lua
+UI/CardBody.lua
+UI/CardHover.lua
+UI/CardTipText.lua
+UI/CardTips.lua
 UI/LeadRow.lua
+UI/LeadsList.lua
 UI/WindowSize.lua
 UI/SettingsGear.lua
 UI/Settings/SettingsPane.lua
@@ -77,6 +82,7 @@ UI/Settings/PageGeneral.lua
 UI/Settings/PageAlerts.lua
 UI/Settings/PageGreetings.lua
 UI/Settings/PageKeywords.lua
+UI/Settings/RecipeTooltip.lua
 UI/Settings/PageCrafters.lua
 UI/Settings/PageTest.lua
 Core/Bindings.lua

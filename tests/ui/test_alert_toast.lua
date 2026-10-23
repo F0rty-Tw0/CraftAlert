@@ -287,7 +287,7 @@ local function testClicks()
   Assert.equal(#UiFixture.callsTo(calls, "chat"), 0)
   Assert.equal(#UiFixture.callsTo(calls, "prefill"), 1)
 
-  -- Shift prefills, ctrl opens an empty whisper, right dismisses the lead.
+  -- Shift prefills, ctrl opens an empty whisper, right dismisses the lead (once up 0.5 s).
   local keys = { shift = false, ctrl = false }
   local function withKeys()
     Wow.stub("IsShiftKeyDown", function()
@@ -311,6 +311,10 @@ local function testClicks()
   Assert.equal(#UiFixture.callsTo(calls, "chat"), 0)
   keys.ctrl = false
   ns.AlertToast.Show(lead)
+  -- Right-click obeys the look rule too: under 0.5 s it does nothing and the toast stays.
+  Widgets.click(toastFrame(), "RightButton")
+  Assert.same({ ns.Leads.IsActive(lead.id), toastFrame():IsShown() }, { true, true }, "shown under 0.5 s")
+  Wow.clock.gettime = Wow.clock.gettime + 0.5
   Widgets.click(toastFrame(), "RightButton")
   Assert.equal(ns.Leads.IsActive(lead.id), false)
   Assert.equal(toastFrame():IsShown(), false)
@@ -495,7 +499,39 @@ local function testHiddenLauncherAndPulse()
   Assert.equal(launcher.pulseLoop:IsPlaying(), false)
 end
 
+-- The item link the client loads after the alert replaces the recipe name in the shown headline,
+-- and the toast fits the longer line.
+local function testLinkArrivesLater()
+  local link = "|cffffffff|Hitem:4305|h[Bolt of Silk Woven Under Two Moons]|h|r"
+  local cached = false
+  local ns = UiFixture.load({
+    db = function(accountDb)
+      local lead = UiFixture.lead(1)
+      lead.kind, lead.itemID, lead.recipeName = "item", 4305, "Bolt of Silk"
+      accountDb.leads[1] = lead
+      Wow.stub("C_Item", {
+        GetItemInfo = function()
+          if cached then
+            return "Bolt of Silk", link
+          end
+        end,
+        RequestLoadItemDataByID = function() end,
+      })
+    end,
+  })
+  local lead = ns.Leads.Latest()
+  ns.AlertToast.Show(lead)
+  local headline = fontStringWith("Wants Bolt of Silk — you can craft it")
+  local height = toastFrame():GetHeight()
+  cached = true
+  Wow.fireEvent("GET_ITEM_INFO_RECEIVED", 4305, true)
+  Assert.equal(headline:GetText(), "Wants " .. link .. " — you can craft it")
+  Assert.equal(headline:GetStringHeight(), 2 * Widgets.LINE_HEIGHT, "the link wraps")
+  Assert.equal(toastFrame():GetHeight(), height + Widgets.LINE_HEIGHT)
+end
+
 return function()
+  testLinkArrivesLater()
   testLazyFrameAndContent()
   testDetailLine()
   testHeight()

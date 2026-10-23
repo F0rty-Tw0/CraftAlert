@@ -104,7 +104,7 @@ end
 
 -- An update keeps its lead's first guid, but the Matcher reads the class of this line's guid.
 -- The lead this line would update takes the line's class, so what is painted is what matched.
--- No class given → the lead keeps the one it has.
+-- No class given → the player's class (FlavorCompat.OwnClass); with no class at all the lead keeps the one it has.
 local function syncDuplicate(customer, sender, line, guid, class)
   if class == nil or Leads.FindActiveByCustomer(customer) == nil then
     return
@@ -151,6 +151,7 @@ function TestLine.Run(args)
   if line == nil or gateStops() then
     return
   end
+  class = class or FlavorCompat.OwnClass()
   local realm = PlayerName.RealmOf(PlayerName.Own() or "") or ""
   for i = 1, count do
     deliver(line, "Test" .. (count == 1 and 0 or i) .. "-" .. realm, class)

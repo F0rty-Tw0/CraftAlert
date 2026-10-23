@@ -20,7 +20,48 @@ local function slot(name, skillLine)
   return { name = name, skillLine = skillLine }
 end
 
+-- A full list saves the player's class token; no UnitClass, a secret class or a partial list leaves it unset.
+local function testSavesClass()
+  local ProfessionList, Defaults = load()
+  local db = Defaults.Db()
+  ProfessionsRetail.install({ slots = { slot("Enchanting", ENCH) } })
+  ProfessionList.Refresh(db, CHAR)
+  Assert.equal(db.characters[CHAR].class, nil, "no UnitClass")
+
+  Wow.stub("UnitClass", function()
+    return "Mage", "MAGE"
+  end)
+  ProfessionList.Refresh(db, CHAR)
+  Assert.equal(db.characters[CHAR].class, "MAGE")
+
+  ProfessionList, Defaults = load()
+  db = Defaults.Db()
+  Wow.stub("UnitClass", function()
+    return "Mage", "MAGE"
+  end)
+  -- In game a secret token is still a string, so only the secret test can stop it.
+  local FlavorCompat = require("CraftAlert.Core.FlavorCompat")
+  local realSecret = FlavorCompat.issecretvalue
+  FlavorCompat.issecretvalue = function(value)
+    return value == "MAGE" or realSecret(value)
+  end
+  ProfessionsRetail.install({ slots = { slot("Enchanting", ENCH) } })
+  ProfessionList.Refresh(db, CHAR)
+  FlavorCompat.issecretvalue = realSecret
+  Assert.equal(db.characters[CHAR].class, nil, "secret class")
+
+  ProfessionList, Defaults = load()
+  db = Defaults.Db()
+  Wow.stub("UnitClass", function()
+    return "Mage", "MAGE"
+  end)
+  ProfessionsRetail.install({ slots = { false, false, slot("Cooking", COOKING) } })
+  ProfessionList.Refresh(db, CHAR)
+  Assert.equal(db.characters[CHAR], nil, "a partial list creates nothing")
+end
+
 return function()
+  testSavesClass()
   for _, flavor in ipairs({ "retail", "forever" }) do
     local ProfessionList, Defaults = load(flavor)
     local db = Defaults.Db()

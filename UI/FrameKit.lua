@@ -6,9 +6,9 @@ end
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 
--- Builders the toast, leads window, rows, launcher and settings share: text, the customer's class
--- colour, atlas-or-file art, list highlight, and dragging with the position saved account-wide in
--- `CraftAlertDB.ui[key]`.
+-- Builders the toast, leads window, cards, launcher and settings share: text, colour codes, the
+-- customer's class colour, atlas-or-file art, list highlight, and dragging with the position saved
+-- account-wide in `CraftAlertDB.ui[key]`.
 local FrameKit = {}
 
 local type = type
@@ -79,21 +79,47 @@ function FrameKit.ListHighlight(button)
   return texture
 end
 
+-- RAID_CLASS_COLORS entry of a class token, or nil. A client without the table makes no lookup.
+function FrameKit.ClassColor(token)
+  local colors = _G["RAID_CLASS_COLORS"]
+  if type(colors) ~= "table" or type(token) ~= "string" then
+    return nil
+  end
+
+  return colors[token]
+end
+
+-- The client's icon for a profession skill-line ID, or nil: Classic name keys and a client without
+-- the API have none. C_TradeSkillUI is read through _G (luacheck's read_globals lacks it).
+function FrameKit.ProfessionIcon(prof)
+  local api = _G["C_TradeSkillUI"]
+  local canAsk = type(prof) == "number" and type(api) == "table" and type(api.GetTradeSkillTexture) == "function"
+  if not canAsk then
+    return nil
+  end
+
+  return api.GetTradeSkillTexture(prof)
+end
+
 -- RAID_CLASS_COLORS entry of the player with this chat GUID, or nil. A secret GUID or class is
 -- never passed on or compared: FlavorCompat.ClassOf owns that guard. The colour table is checked
 -- first, so a client without it makes no API call.
-local function classColor(guid)
-  local colors = _G["RAID_CLASS_COLORS"]
-  if type(colors) ~= "table" then
+function FrameKit.GuidClassColor(guid)
+  if type(_G["RAID_CLASS_COLORS"]) ~= "table" then
     return nil
   end
-  local classFile = FlavorCompat.ClassOf(guid)
-  return classFile ~= nil and colors[classFile] or nil
+
+  return FrameKit.ClassColor(FlavorCompat.ClassOf(guid))
+end
+
+-- `text` in r, g, b as a colour code. From r/g/b only: a RAID_CLASS_COLORS entry may lack colorStr.
+function FrameKit.ColorCode(text, r, g, b)
+  return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) .. text .. "|r"
 end
 
 -- Colours a customer's name by class, or in the plain text colour when the class is unknown.
 function FrameKit.PaintName(text, guid)
-  local color = classColor(guid)
+  local color = FrameKit.GuidClassColor(guid)
   if color then
     text:SetTextColor(color.r, color.g, color.b, 1)
     return

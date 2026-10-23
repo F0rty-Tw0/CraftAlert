@@ -8,7 +8,7 @@ local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 
 -- Native-HUD spec §7.1: the gear left of the leads window's close button. A click switches
--- between the list and the settings pane; the gear stays lit while the pane shows.
+-- between the list and the settings pane; the gear turns into a back arrow while the pane shows.
 local SettingsGear = {}
 
 -- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua): gold title, a
@@ -36,12 +36,12 @@ function SettingsGear.Create(frame, onClick)
   -- With the title above the NineSlice border, whose metal top edge covers the title strip. Not the
   -- close button's level: the Classic template leaves that one under the border.
   gear:SetFrameLevel(frame.TitleContainer:GetFrameLevel())
-  local normal = gear:CreateTexture(nil, "ARTWORK")
-  FrameKit.Art(normal, art.GEAR_ATLAS, art.GEAR_FILE)
-  gear:SetNormalTexture(normal)
-  local highlight = gear:CreateTexture(nil, "HIGHLIGHT")
-  FrameKit.Art(highlight, art.GEAR_ATLAS, art.GEAR_FILE, "ADD")
-  gear:SetHighlightTexture(highlight)
+  gear.normal = gear:CreateTexture(nil, "ARTWORK")
+  FrameKit.Art(gear.normal, art.GEAR_ATLAS, art.GEAR_FILE)
+  gear:SetNormalTexture(gear.normal)
+  gear.highlight = gear:CreateTexture(nil, "HIGHLIGHT")
+  FrameKit.Art(gear.highlight, art.GEAR_ATLAS, art.GEAR_FILE, "ADD")
+  gear:SetHighlightTexture(gear.highlight)
   gear:SetScript("OnClick", function()
     onClick()
   end)
@@ -51,14 +51,16 @@ function SettingsGear.Create(frame, onClick)
   return gear
 end
 
--- Lights the gear while the pane shows; an open tooltip follows the new mode.
+-- Swaps the gear for a back arrow while the pane shows; an open tooltip follows the new mode.
 function SettingsGear.Paint(gear, inSettings)
   gear.inSettings = inSettings
+  local art = Theme.ART
+  local atlas, file = art.GEAR_ATLAS, art.GEAR_FILE
   if inSettings then
-    gear:LockHighlight()
-  else
-    gear:UnlockHighlight()
+    atlas, file = art.BACK_ATLAS, art.BACK_FILE
   end
+  FrameKit.Art(gear.normal, atlas, file)
+  FrameKit.Art(gear.highlight, atlas, file, "ADD")
   if _G["GameTooltip"]:IsOwned(gear) then
     showTooltip(gear)
   end

@@ -35,13 +35,14 @@ function Wow.secret(value)
   return wrapper
 end
 
--- As the client: OnShow (then its hooks) runs on a frame that becomes visible, and on each of
--- its shown descendants, so showing UIParent again after Alt+Z reaches the addon's frames.
-local function fireOnShow(frame)
-  Widgets.fire(frame, "OnShow")
+-- As the client: OnShow or OnHide (then its hooks) runs on a frame that becomes visible or stops
+-- being visible, and on each of its shown descendants, so hiding UIParent (Alt+Z) or a window, or
+-- showing it again, reaches the addon's frames.
+local function fireTree(frame, script)
+  Widgets.fire(frame, script)
   for _, child in ipairs(Wow.frames) do
     if child.parent == frame and child.shown then
-      fireOnShow(child)
+      fireTree(child, script)
     end
   end
 end
@@ -80,16 +81,17 @@ local function newFrame(frameType, name, parent, template)
     local wasVisible = self:IsVisible()
     self.shown = true
     if not wasVisible and self:IsVisible() then
-      fireOnShow(self)
+      fireTree(self, "OnShow")
     end
   end
 
-  -- As the client: OnHide (then its hooks) runs when a shown frame hides.
+  -- As the client: OnHide (then its hooks) runs when a visible frame hides, then on each shown
+  -- descendant.
   function frame:Hide()
-    local wasShown = self.shown
+    local wasVisible = self:IsVisible()
     self.shown = false
-    if wasShown then
-      Widgets.fire(self, "OnHide")
+    if wasVisible then
+      fireTree(self, "OnHide")
     end
   end
 
@@ -171,6 +173,8 @@ local function newTooltip()
   function tooltip:SetText() end
 
   function tooltip:AddLine() end
+
+  function tooltip:AddDoubleLine() end
 
   function tooltip:ClearLines() end
 

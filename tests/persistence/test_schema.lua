@@ -43,10 +43,18 @@ local function testValidDbIsUntouched()
   db.recentGreeted["Cus-Realm"] = 100
   db.leads[1] = { id = 1, customer = "Cus-Realm", crafter = "Me-Realm", time = 100, message = "LF belt" }
   db.ui.toast = { point = "TOP", x = 10, y = -20 }
-  db.ui.settings = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 40 }
+  db.ui.window = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 40, width = 640, height = 500 }
   local before = deepCopy(db)
   Assert.same(Schema.Validate(db), before)
   Assert.equal(#printedLines(), 0)
+end
+
+-- The leads window has one size under ui.window; the per-mode ui.settings of older saves goes.
+local function testLegacySettingsSizeDropped()
+  local Schema = load()
+  local db = Schema.Validate({ ui = { window = { width = 640, height = 500 }, settings = { width = 700, height = 520 } } })
+  Assert.equal(db.ui.settings, nil)
+  Assert.same(db.ui.window, { width = 640, height = 500 })
 end
 
 local function testBadTopLevelTypes()
@@ -183,6 +191,16 @@ local function testImportCharacter()
   Assert.same(alt.realms, {})
   Assert.same(alt.professions, {})
   Assert.same(alt.recipes, {})
+end
+
+-- An own character's class token is optional: kept when a string, cleared otherwise.
+local function testCharacterClass()
+  local Schema = load()
+  local db = Schema.Validate({
+    characters = { ["Mage-Realm"] = { class = "MAGE" }, ["Bad-Realm"] = { class = 7 } },
+  })
+  Assert.equal(db.characters["Mage-Realm"].class, "MAGE")
+  Assert.equal(db.characters["Bad-Realm"].class, nil)
 end
 
 local function testLedgerRecentIgnoredLeadsUi()
@@ -407,6 +425,10 @@ local function testLeadsFromOnMatchSurvive()
     Assert.truthy(itemLead[field] ~= nil, "the item lead sets " .. field)
   end
   local expected = deepCopy(db.leads)
+  -- crafters is a live-only list: Validate drops it, so a restored lead has none.
+  for _, lead in ipairs(expected) do
+    lead.crafters = nil
+  end
   Fresh.require("Core.Localization")
   Fresh.require("Core.ChatPrint")
   local Schema = Fresh.require("Persistence.Schema")
@@ -472,11 +494,13 @@ end
 
 return function()
   testValidDbIsUntouched()
+  testLegacySettingsSizeDropped()
   testBadTopLevelTypes()
   testSettingsTypesAndRanges()
   testClampBounds()
   testCharactersUnknownKeysAndBadRecords()
   testImportCharacter()
+  testCharacterClass()
   testLedgerRecentIgnoredLeadsUi()
   testListWithHoles()
   testNewerSchemaKeepsNestedUiValues()

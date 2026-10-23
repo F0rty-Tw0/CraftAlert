@@ -181,8 +181,144 @@ local function testRankOnLead()
   ns.CrafterRank.Pick = pick
 end
 
+-- The lead lists every character that can craft the recipe, with its rank from the data.
+local function testCraftersOnLead()
+  local ns, db = setup(nil, function(data)
+    local alt, smith = data.characters["Alt-Realm"].recipes[1], data.characters["Smith-Realm"].recipes[1]
+    alt.ranks, alt.reachRank, alt.reachCost = { 1, 2, 3 }, 3, 0
+    smith.ranks, smith.reachRank, smith.reachCost = { 1, 2, 3 }, 1, 0
+  end)
+  local lead = newLead(ns, "LF plate belt")
+  Assert.equal(lead.crafter, "Alt-Realm", "rank 3 beats rank 1")
+  Assert.equal(#lead.crafters, 2)
+  local byKey = {}
+  for _, candidate in ipairs(lead.crafters) do
+    byKey[candidate.key] = candidate
+  end
+  Assert.same(byKey["Alt-Realm"], { key = "Alt-Realm", rank = 3, byConc = false })
+  Assert.same(byKey["Smith-Realm"], { key = "Smith-Realm", rank = 1, byConc = false })
+  -- Spec §4.4 rule 8: the list is live only; it leaves the saved lead at logout, the rest stays.
+  Wow.fireEvent("PLAYER_LOGOUT")
+  Assert.equal(db.leads[1], lead)
+  Assert.equal(lead.crafters, nil)
+  Assert.equal(lead.crafter, "Alt-Realm")
+end
+
+local ITEM_EVENT = "GET_ITEM_INFO_RECEIVED"
+
+-- The client's item cache: items in `cached` have a link; every load asked for lands in the
+-- returned list.
+local function stubItemCache(cached)
+  local requests = {}
+  Wow.stub("C_Item", {
+    GetItemInfoInstant = _G["C_Item"].GetItemInfoInstant,
+    GetItemInfo = function(itemID)
+      if cached[itemID] then
+        return "Item " .. itemID, "|Hitem:" .. itemID .. "|h[Item " .. itemID .. "]|h"
+      end
+    end,
+    RequestLoadItemDataByID = function(itemID)
+      requests[#requests + 1] = itemID
+    end,
+  })
+  return requests
+end
+
+local function awaitingItems()
+  for _, frame in ipairs(Wow.frames) do
+    if frame:IsEventRegistered(ITEM_EVENT) then
+      return true
+    end
+  end
+  return false
+end
+
+-- An item the client has not cached: the lead has no link and the client is asked once for
+-- the item (two leads, one request). Its GET_ITEM_INFO_RECEIVED links every lead of it with one
+-- "change"; the event is registered only while an item is awaited.
+local function testLinkArrivesLater()
+  local ns = setup()
+  local cached = {}
+  local requests = stubItemCache(cached)
+  Assert.equal(awaitingItems(), false)
+  local lead = newLead(ns, "LF plate belt")
+  local twin = newLead(ns, "LF plate belt", "Carl-Draenor")
+  Assert.equal(lead.itemLink, nil)
+  Assert.same(requests, { 501 })
+  Assert.equal(awaitingItems(), true)
+  local seen = listen(ns.Leads)
+  Wow.fireEvent(ITEM_EVENT, 999, true)
+  Assert.equal(seen.change, 0, "another item changes nothing")
+  cached[501] = true
+  Wow.fireEvent(ITEM_EVENT, 501, true)
+  Assert.same({ lead.itemLink, twin.itemLink }, { "|Hitem:501|h[Item 501]|h", "|Hitem:501|h[Item 501]|h" })
+  Assert.equal(seen.change, 1, "one change for both leads")
+  Assert.equal(awaitingItems(), false)
+  Assert.equal(newLead(ns, "LF plate belt", "Dan-Draenor").itemLink, "|Hitem:501|h[Item 501]|h", "cached now")
+  Assert.same(requests, { 501 })
+end
+
+-- The client failed to load the item (success false): it stops waiting, the lead keeps no link,
+-- and the next lead of the item asks again.
+local function testLinkLoadFails()
+  local ns = setup()
+  local requests = stubItemCache({})
+  local lead = newLead(ns, "LF plate belt")
+  local seen = listen(ns.Leads)
+  Wow.fireEvent(ITEM_EVENT, 501, false)
+  Assert.equal(lead.itemLink, nil)
+  Assert.equal(seen.change, 0)
+  Assert.equal(awaitingItems(), false)
+  newLead(ns, "LF plate belt", "Carl-Draenor")
+  Assert.same(requests, { 501, 501 })
+end
+
+-- No timer of its own: an item no listed lead lacks the link of any more (dismissed, expired)
+-- is no longer awaited, and an answer for it changes nothing.
+local function testLinkWaitEndsWithLead()
+  local ns, db = setup()
+  local Leads = ns.Leads
+  local cached = {}
+  stubItemCache(cached)
+  local belt = newLead(ns, "LF plate belt")
+  Wow.clock.time = T0 + 100
+  local greaves = newLead(ns, "LF plate greaves")
+  Leads.Dismiss(belt.id)
+  Assert.equal(awaitingItems(), true, "502 is still awaited")
+  local seen = listen(Leads)
+  cached[501] = true
+  Wow.fireEvent(ITEM_EVENT, 501, true)
+  Assert.equal(seen.change, 0, "the dismissed lead's item is no longer awaited")
+  Assert.equal(belt.itemLink, nil)
+  Wow.clock.time = T0 + 100 + TIMEOUT + 1
+  fireTimer()
+  Assert.same(db.leads, {}, "the greaves lead expired")
+  Assert.equal(awaitingItems(), false)
+  Assert.equal(greaves.itemLink, nil)
+end
+
+-- Restore asks again for the links of saved item leads that have none; a saved link stays.
+local function testRestoreAsksForLinks()
+  local ns, db = setup()
+  local cached = {}
+  local requests = stubItemCache(cached)
+  local saved = { id = 1, customer = "A-Draenor", time = T0 - 10, kind = "item", itemID = 501, greeted = false, replied = false }
+  local linked = { id = 2, customer = "B-Draenor", time = T0 - 5, kind = "item", itemID = 502, itemLink = "kept", greeted = false, replied = false }
+  db.leads = { saved, linked }
+  ns.Leads.Restore(db)
+  Assert.same(requests, { 501 })
+  cached[501] = true
+  Wow.fireEvent(ITEM_EVENT, 501, true)
+  Assert.same({ saved.itemLink, linked.itemLink }, { "|Hitem:501|h[Item 501]|h", "kept" })
+end
+
 return function()
+  testLinkArrivesLater()
+  testLinkLoadFails()
+  testLinkWaitEndsWithLead()
+  testRestoreAsksForLinks()
   testIgnoreList()
+  testCraftersOnLead()
   testTestFlag()
   testTestGuards()
   testRankOnLead()
@@ -246,7 +382,8 @@ return function()
   match(ns, "LF plate greaves")
   Assert.same({ group = lead.group, prof = lead.prof, why = lead.why, kind = lead.kind, itemID = lead.itemID }, before)
   for key, value in pairs(lead) do
-    Assert.falsy(type(value) == "table", key .. " holds a table")
+    -- crafters is Pick's own list, not a buffer of the result.
+    Assert.falsy(type(value) == "table" and key ~= "crafters", key .. " holds a table")
   end
 
   -- Same sender + same match inside the timeout updates the lead: no new alert, one lead.

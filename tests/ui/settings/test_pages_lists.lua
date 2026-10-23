@@ -222,16 +222,27 @@ local function testCraftersRecipeIcons()
   Assert.equal(iconOf(9001).texture, "item-icon", "muted keeps its icon")
 end
 
--- Hovering a recipe row shows the item's tooltip, else the spell's, else none. Rows are reused
--- by the scroll: the tooltip reads the row's recipe at hover time, and a tooltip a row owns
--- follows the repaint.
+-- Hovering a recipe row that makes an item shows the item's tooltip; one without an item shows
+-- our own: the recipe name in gold and its profession. Under either: who knows it, and a grey
+-- note when it is muted. Rows are reused by the scroll: the tooltip reads the row's recipe at
+-- hover time, and a tooltip a row owns follows the repaint.
 local function testCraftersRecipeTooltip()
-  local ns = SettingsFixture.load({
+  local ns, db = SettingsFixture.load({
     db = function(accountDb)
       crafters(accountDb)
+      accountDb.characters["Alt-Other"] = {
+        source = "local",
+        enabled = true,
+        realms = { "Other" },
+        professions = { [BS] = { name = "Blacksmithing" } },
+        recipes = { [9001] = { item = 501, name = "A Belt", prof = BS } },
+      }
+      -- Two more owners, added so pairs() order is not already sorted (the sort is what the line shows).
+      accountDb.characters["Bob-Other"] = accountDb.characters["Alt-Other"]
+      accountDb.characters["Zed-Other"] = accountDb.characters["Alt-Other"]
       local recipes = {
         [9001] = { item = 501, name = "A Belt", prof = BS },
-        [9002] = { name = "B Bracer", prof = BS },
+        [9002] = { name = "B Bracer", prof = BS, muted = true },
         ["Old Recipe"] = { name = "C Old Recipe", prof = BS },
       }
       for id = 1, 8 do
@@ -242,24 +253,30 @@ local function testCraftersRecipeTooltip()
   })
   open(ns, "Crafters")
   local tooltip = _G["GameTooltip"]
-  local itemRow, spellRow, oldRow = rowOf(9001), rowOf(9002), rowOf("Old Recipe")
+  local itemRow, mutedRow = rowOf(9001), rowOf(9002)
 
   Widgets.fire(itemRow, "OnEnter")
   Assert.equal(tooltip.owner, itemRow)
   Assert.equal(tooltip.anchor, "ANCHOR_RIGHT")
-  Assert.equal(tooltip.itemId, 501)
+  Assert.same(tooltip.hyperlinks, { "item:501" }, "the crafted item's tooltip")
+  Assert.same(tooltip.lines, { "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other" })
+  Assert.same(tooltip.colors[1], { 1, 1, 1 })
   Assert.equal(tooltip.shown, true)
   Widgets.fire(itemRow, "OnLeave")
   Assert.equal(tooltip.shown, false)
+  db.characters["Me-Realm"].recipes[9001].muted = true
+  Widgets.fire(itemRow, "OnEnter")
+  Assert.same(tooltip.lines, { "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other", "Muted" })
+  Assert.same(tooltip.colors[2], { 0.5, 0.5, 0.5 })
+  Widgets.fire(itemRow, "OnLeave")
+  db.characters["Me-Realm"].recipes[9001].muted = nil
 
-  Widgets.fire(spellRow, "OnEnter")
-  Assert.equal(tooltip.spellId, 9002)
-  Assert.equal(tooltip.itemId, nil, "spell row: no item tooltip")
-  Assert.equal(tooltip.shown, true)
-  Widgets.fire(spellRow, "OnLeave")
-
-  Widgets.fire(oldRow, "OnEnter")
-  Assert.equal(tooltip.shown, false, "name key without an item: no tooltip")
+  Widgets.fire(mutedRow, "OnEnter")
+  Assert.same(tooltip.lines, { "B Bracer", "Blacksmithing", "Known by: Me", "Muted" }, "no item: our own lines")
+  Assert.same(tooltip.colors[1], { 1, 0.82, 0 })
+  Assert.equal(#tooltip.hyperlinks, 2, "no item: no item tooltip")
+  Assert.equal(tooltip.owner, mutedRow)
+  Widgets.fire(mutedRow, "OnLeave")
 
   -- 11 recipes, 8 rows: each wheel step moves the rows one recipe. A row that owns the tooltip repaints it.
   local list = itemRow.parent
@@ -267,11 +284,11 @@ local function testCraftersRecipeTooltip()
   Widgets.fire(list, "OnMouseWheel", -1)
   Assert.equal(itemRow.item.key, 9002)
   Assert.equal(tooltip.owner, itemRow)
-  Assert.equal(tooltip.spellId, 9002, "repainted to the row's new recipe")
-  Assert.equal(tooltip.itemId, nil)
+  Assert.equal(tooltip.lines[1], "B Bracer", "repainted to the row's new recipe")
+  Assert.equal(tooltip.lines[#tooltip.lines], "Muted")
   Widgets.fire(list, "OnMouseWheel", -1)
   Assert.equal(itemRow.item.key, "Old Recipe")
-  Assert.equal(tooltip.shown, false, "repainted onto a name key: hidden")
+  Assert.equal(tooltip.lines[1], "C Old Recipe", "repainted onto a name key: shows")
 
   -- No tooltip open: the scroll shows none, the next hover shows the row's new recipe.
   Widgets.fire(itemRow, "OnLeave")
@@ -279,8 +296,67 @@ local function testCraftersRecipeTooltip()
   Assert.equal(tooltip.shown, false)
   Assert.equal(itemRow.item.key, 9101)
   Widgets.fire(itemRow, "OnEnter")
-  Assert.equal(tooltip.itemId, 601)
+  Assert.equal(tooltip.hyperlinks[#tooltip.hyperlinks], "item:601")
   Assert.equal(tooltip.shown, true)
+end
+
+-- Classic keys a recipe by its name: the tooltip title is the recipe's name, and its owners are
+-- the characters that hold that key.
+local function testRecipeTooltipNameKey()
+  local ns = SettingsFixture.load({
+    db = function(accountDb)
+      crafters(accountDb)
+      accountDb.characters["Me-Realm"].recipes = {
+        ["Old Recipe"] = { name = "C Old Recipe", prof = BS },
+      }
+    end,
+  })
+  open(ns, "Crafters")
+  Widgets.fire(rowOf("Old Recipe"), "OnEnter")
+  Assert.same(_G["GameTooltip"].lines, { "C Old Recipe", "Blacksmithing", "Known by: Me" })
+end
+
+-- GameTooltip_OnUpdate (Blizzard GameTooltip.lua): the owner's UpdateTooltip when it has one;
+-- else, once an item load flagged the tooltip (TOOLTIP_DATA_UPDATE), the rebuild from the item
+-- data, which drops lines added after SetHyperlink. Only that rebuild clears the flag.
+local function clientUpdate(tooltip)
+  local owner = tooltip.owner
+  if owner.UpdateTooltip then
+    owner:UpdateTooltip()
+  elseif tooltip.shouldRefreshData then
+    tooltip.shouldRefreshData = false
+    tooltip:ClearLines()
+  end
+end
+
+-- An item that loads while its tooltip shows: the client's rebuild would drop our lines, so the
+-- recipe row has an UpdateTooltip that shows our tooltip again on every update, lines included
+-- and read anew. A link the client rejects gets our own tooltip.
+local function testRecipeTooltipItemLoads()
+  local ns, db = SettingsFixture.load({
+    db = function(accountDb)
+      crafters(accountDb)
+      accountDb.characters["Me-Realm"].recipes = { [9001] = { item = 501, name = "A Belt", prof = BS } }
+    end,
+  })
+  open(ns, "Crafters")
+  local tooltip, itemRow = _G["GameTooltip"], rowOf(9001)
+  Widgets.fire(itemRow, "OnEnter")
+  local ours = tooltip.lines[1]
+  Assert.truthy(ours:find("^Known by: "), ours)
+  tooltip.shouldRefreshData = true -- the item loaded
+  for _ = 1, 3 do
+    clientUpdate(tooltip)
+    Assert.same(tooltip.lines, { ours }, "every update keeps our lines")
+  end
+  Assert.same(tooltip.hyperlinks, { "item:501", "item:501", "item:501", "item:501" })
+  db.characters["Me-Realm"].recipes[9001].muted = true
+  clientUpdate(tooltip)
+  Assert.same(tooltip.lines, { ours, "Muted" }, "read anew")
+
+  tooltip.badLinks = { ["item:501"] = true }
+  Widgets.fire(itemRow, "OnEnter")
+  Assert.same(tooltip.lines, { "A Belt", "Blacksmithing", ours, "Muted" }, "rejected link: our own tooltip")
 end
 
 -- Removing the current character stores it again from the client at once (as at login), so its
@@ -363,6 +439,8 @@ return function()
   testCraftersRecipeOrder()
   testCraftersRecipeIcons()
   testCraftersRecipeTooltip()
+  testRecipeTooltipNameKey()
+  testRecipeTooltipItemLoads()
   testRemoveOwnCharacter()
   testTestPage()
 end

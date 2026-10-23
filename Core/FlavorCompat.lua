@@ -171,5 +171,19 @@ function FlavorCompat.ClassOf(guid)
   return classToken
 end
 
+-- The player's own class token, or nil when the API is missing or the value is secret. The API is
+-- read on each call, so tests that stub it after load still reach this code.
+function FlavorCompat.OwnClass()
+  local unitClass = _G["UnitClass"]
+  if type(unitClass) ~= "function" then
+    return nil
+  end
+  local token = select(2, unitClass("player"))
+  if FlavorCompat.issecretvalue(token) or type(token) ~= "string" then
+    return nil
+  end
+  return token
+end
+
 ns.FlavorCompat = FlavorCompat
 return FlavorCompat

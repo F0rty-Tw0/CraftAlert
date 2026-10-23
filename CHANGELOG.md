@@ -6,6 +6,14 @@ Player-friendly release notes for Craft Alert.
 
 - A toast pops up beside the launcher, on the side facing the middle of the screen, when someone in Trade asks for something you can craft. It shows a plain headline ("Wants … — you can craft it"), their whole Trade message with item and recipe links you can hover, and what matched in its tooltip. Left-click to greet them, shift-click to edit the greeting first, ctrl-click for an empty whisper, right-click to dismiss; a click on a link only opens the link. Dragging the toast moves the launcher.
 - A leads window lists every open request, newest first, with the same clicks as the toast. Drag it, resize it, close it with Escape.
+- Each lead is a card with its details beside it: the customer in their class colour, how long ago they asked, what they want, then their message with hoverable links, what matched, and which of your characters can craft it.
+- Your crafters show in their class colour, the one picked for the lead first, with its quality rank.
+- Hovering a card shows Greet, Whisper and Dismiss buttons on it.
+- Hover a card's name, what it wants, what matched or its crafters for a tooltip with more; hover the rest of the card to see the customer's latest chat line.
+- `/ca test` uses your own class when you don't name one.
+- The leads window keeps one size for the list and the settings, 600×480 at least; a resize in one view carries over to the other.
+- In the settings, the gear on the title bar turns into a back arrow.
+- In Settings → Crafters, hovering a recipe shows its name, its profession, which of your characters know it, and whether it is muted.
 - The launcher, a ring with your profession's icon (a bell when Craft Alert knows none yet), opens the leads window and shows how many leads are open. It glows when you hover it and pulses when a new lead arrives. It is lit while Craft Alert is listening and dim while it is paused; hover it to see why.
 - Key bindings (under Craft Alert): greet the latest lead, dismiss it, show or hide the leads window.
 - Settings, opened with the gear on the leads window's title bar or `/ca config`: turn scanning and each channel on or off, pick the alert sound and toast time, set the lead timeout, edit the four greetings with a live preview and a note per profession, edit request words and extra slang, enable, remove or mute your crafters and their recipes, and try a trade line on the Test page.

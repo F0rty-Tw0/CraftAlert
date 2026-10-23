@@ -12,15 +12,10 @@ local LeadText = {}
 
 local floor = math.floor
 local max = math.max
-local tostring = tostring
 
 -- The matched item link, else the recipe, else the profession.
 function LeadText.What(lead)
   return lead.itemLink or lead.recipeName or lead.profName or ""
-end
-
-function LeadText.Crafter(lead)
-  return Localization.Text("by %s", tostring(lead.crafter))
 end
 
 -- Native-HUD spec §4.2: "Wants <what> — you can craft it" / "— your alt <name> can craft it"; a lead without

@@ -3,6 +3,7 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
 
 -- Spec §5.1: the current character's crafting professions, keyed by base skill-line ID
@@ -123,6 +124,7 @@ function ProfessionList.Refresh(db, charKey)
     character = { source = "local", enabled = true, realms = {}, professions = {}, recipes = {} }
     db.characters[charKey] = character
   end
+  character.class = FlavorCompat.OwnClass() or character.class
   local previous = character.professions
   local professions, keys = {}, {}
   for _, profession in ipairs(list) do

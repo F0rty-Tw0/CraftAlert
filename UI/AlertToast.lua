@@ -186,8 +186,11 @@ local function onLeadsChange()
     hide()
     return
   end
-  local shown = toast.frame:IsShown()
-  if shown then
+  local frame, parts = toast.frame, toast.parts
+  if lead and frame:IsShown() then
+    -- The item link can arrive after the alert (Leads waits for the client's item cache).
+    parts.headline:SetText(LeadText.Headline(lead))
+    ToastLayout.Fit(frame, parts, parts.detail:IsShown())
     AlertToast.Dock()
   end
 end

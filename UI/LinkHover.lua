@@ -30,19 +30,29 @@ local function showTooltip(frame, link)
   tip:Show()
 end
 
+local function hideIfOwned(frame)
+  local tip = tooltip()
+  local owned = tip:IsOwned(frame)
+  if owned then
+    tip:Hide()
+  end
+end
+
+-- A trade link shows no tooltip, so one the frame itself owns (a card's chat line) goes instead.
 local function onEnter(frame, link)
   frame.hoveredLink = link
   local isTrade = linkType(link) == "trade"
   if isTrade then
+    hideIfOwned(frame)
     return
   end
   showTooltip(frame, link)
 end
 
+-- Off a link: hides the link's tooltip, never one a child frame has shown since.
 local function makeOnLeave(onBodyEnter)
   return function(frame)
-    frame.hoveredLink = nil
-    tooltip():Hide()
+    LinkHover.Clear(frame)
     local backOnBody = onBodyEnter ~= nil and frame:IsMouseOver()
     if backOnBody then
       onBodyEnter(frame)
@@ -65,11 +75,7 @@ end
 -- Forgets the hovered link; hides the tooltip only when frame owns it.
 function LinkHover.Clear(frame)
   frame.hoveredLink = nil
-  local tip = tooltip()
-  local owned = tip:IsOwned(frame)
-  if owned then
-    tip:Hide()
-  end
+  hideIfOwned(frame)
 end
 
 -- onBodyEnter(frame): called when the cursor leaves a link while still over the frame.

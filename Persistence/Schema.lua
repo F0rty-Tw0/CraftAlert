@@ -37,7 +37,7 @@ local RECIPE_FIELDS = {
   reachConc = "number",
 }
 local CHARACTER_FIELDS =
-  { source = "string", importedAt = "number", realms = "table", professions = "table", recipes = "table", concentration = "table" }
+  { source = "string", class = "string", importedAt = "number", realms = "table", professions = "table", recipes = "table", concentration = "table" }
 local LEAD_FIELDS = {
   id = "number",
   customer = "string",
@@ -63,7 +63,7 @@ local LEAD_FIELDS = {
   rankConc = "boolean",
 }
 local COUNTERS = { seen = 0, greeted = 0, replied = 0, filled = 0 }
-local UI_FRAMES = { toast = true, window = true, launcher = true, settings = true }
+local UI_FRAMES = { toast = true, window = true, launcher = true }
 local DAY_PATTERN = "^%d%d%d%d%-%d%d%-%d%d$"
 
 -- Set by Validate; read by every dropUnknown.

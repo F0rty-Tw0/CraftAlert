@@ -5,6 +5,7 @@ end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
+local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 
 -- Spec §7.2: the leads (matched requests) the player can answer. Steps 5-7 of §6.3 run here
 -- on matched lines only. Leads live in `db.leads`, oldest first (an updated lead moves to the
@@ -24,6 +25,7 @@ local MAX_LEADS = 100
 -- A lead whose guid starts with this is a synthetic `/ca test` lead: flagged `test`, never saved.
 Leads.TEST_GUID_PREFIX = FlavorCompat.TEST_GUID_PREFIX
 local EVENTS = { new = true, change = true, greeted = true, replied = true }
+local ITEM_EVENT = "GET_ITEM_INFO_RECEIVED"
 
 ---@type table
 local db = nil
@@ -32,7 +34,37 @@ local nextId = 1
 local timerArmed = false
 local timerGeneration = 0 -- only the timer started last acts when it fires
 local timerDeadline = 0 -- time() when the pending timer fires
-local listeners = { new = {}, change = {}, greeted = {}, replied = {} }
+local awaited = {} -- itemID -> true while the client loads an item a lead lacks the link of
+
+-- A lead's item link is nil until the client has cached the item: a miss asks the client to
+-- load it, and GET_ITEM_INFO_RECEIVED is registered only while an item is awaited (as in
+-- BindLookup, §5.2). No timer of its own: every "change" stops waiting for items no listed lead
+-- lacks any more (pruneAwaited), so the lead expiry bounds the wait.
+local onItemInfo
+
+local function stopIfIdle()
+  if next(awaited) == nil then
+    EventRouter.Off(ITEM_EVENT, onItemInfo)
+  end
+end
+
+local function pruneAwaited()
+  if next(awaited) == nil then
+    return
+  end
+  local needed = {}
+  for i = 1, #leads do
+    if leads[i].itemID ~= nil and leads[i].itemLink == nil then
+      needed[leads[i].itemID] = true
+    end
+  end
+  for itemID in pairs(awaited) do
+    awaited[itemID] = needed[itemID]
+  end
+  stopIfIdle()
+end
+
+local listeners = { new = {}, change = { pruneAwaited }, greeted = {}, replied = {} }
 
 local function now()
   return _G["time"]()
@@ -73,6 +105,51 @@ function Leads.On(name, fn)
   end
   local list = listeners[name]
   list[#list + 1] = fn
+end
+
+local function linkOf(itemID)
+  return (select(2, FlavorCompat.GetItemInfo(itemID)))
+end
+
+-- Sets lead.itemLink from the item cache; on a miss, asks the client to load the item.
+local function fillLink(lead)
+  local itemID = lead.itemID
+  lead.itemLink = linkOf(itemID)
+  local items = _G["C_Item"]
+  if lead.itemLink ~= nil or awaited[itemID] or type(items) ~= "table" then
+    return
+  end
+  if type(items.RequestLoadItemDataByID) ~= "function" then
+    return
+  end
+  awaited[itemID] = true
+  EventRouter.On(ITEM_EVENT, onItemInfo)
+  items.RequestLoadItemDataByID(itemID)
+end
+
+-- The client loaded an item, or failed to (its second argument false; GetItemInfo then stays
+-- nil): either way it is no longer awaited. Every listed lead of it that lacks the link gets
+-- it, with one "change" so the cards and the toast repaint.
+onItemInfo = function(itemID)
+  if not awaited[itemID] then
+    return
+  end
+  awaited[itemID] = nil
+  stopIfIdle()
+  local link = linkOf(itemID)
+  if not link then
+    return
+  end
+  local filled = false
+  for i = 1, #leads do
+    if leads[i].itemID == itemID and leads[i].itemLink == nil then
+      leads[i].itemLink = link
+      filled = true
+    end
+  end
+  if filled then
+    fire("change")
+  end
 end
 
 local function sweep(list, limit)
@@ -215,9 +292,19 @@ local function dropTest(list)
   end
 end
 
+-- Spec §4.4 rule 8, small saved data: a lead's `crafters` list is live only, so it leaves every
+-- lead just before the client writes CraftAlertDB (PLAYER_LOGOUT, also on /reload). Schema still
+-- drops it from a save written before this.
+local function dropLiveFields()
+  for i = 1, #leads do
+    leads[i].crafters = nil
+  end
+end
+
 -- Binds db.leads (Bootstrap, at PLAYER_LOGIN): repairs a hand-edited list (ids, times, order,
--- size), drops test leads and expired leads and starts the timer. The db is bound last: while a
--- repair raises, Leads stays unbound and makes no lead.
+-- size), drops test leads and expired leads, starts the timer and asks again for the item links
+-- the last session never got. The db is bound last: while a repair raises, Leads stays unbound
+-- and makes no lead.
 function Leads.Restore(accountDb)
   local list = accountDb.leads
   dropTest(list)
@@ -229,6 +316,12 @@ function Leads.Restore(accountDb)
   local removed = sweep(list, limit)
   armExpiry(list, limit)
   db, leads = accountDb, list
+  EventRouter.On("PLAYER_LOGOUT", dropLiveFields)
+  for i = 1, #list do
+    if list[i].itemID ~= nil and list[i].itemLink == nil then
+      fillLink(list[i])
+    end
+  end
   if removed then
     fire("change")
   end
@@ -311,7 +404,7 @@ local function describeCrafter(lead, result, crafter, recipeKey)
   lead.recipeName = recipe and recipe.name or (type(key) == "string" and key or nil)
   lead.itemID = recipe and recipe.item or nil
   if lead.itemID then
-    lead.itemLink = select(2, FlavorCompat.GetItemInfo(lead.itemID))
+    fillLink(lead)
   end
 end
 
@@ -330,6 +423,7 @@ local function buildLead(result, customerKey, text, channelKey, pick)
     cannotOrder = pick.cannotOrder,
     rank = pick.rank,
     rankConc = pick.rankConc,
+    crafters = pick.candidates, -- live only: dropped at logout (dropLiveFields)
     time = now(),
     greeted = false,
     replied = false,
@@ -371,11 +465,18 @@ function Leads.OnMatch(result, customerKey, text, channelKey, guid)
     fire("change")
     return lead, false
   end
-  local crafter, cannotOrder, rank, rankConc, recipeKey = CrafterRank.Pick(result, customerKey, db)
+  local crafter, cannotOrder, rank, rankConc, recipeKey, candidates = CrafterRank.Pick(result, customerKey, db)
   if crafter == nil then
     return nil
   end
-  local pick = { crafter = crafter, cannotOrder = cannotOrder, rank = rank, rankConc = rankConc, recipeKey = recipeKey }
+  local pick = {
+    crafter = crafter,
+    cannotOrder = cannotOrder,
+    rank = rank,
+    rankConc = rankConc,
+    recipeKey = recipeKey,
+    candidates = candidates,
+  }
   lead = buildLead(result, customerKey, text, channelKey, pick)
   lead.id = nextId
   lead.guid = type(guid) == "string" and not FlavorCompat.issecretvalue(guid) and guid or nil

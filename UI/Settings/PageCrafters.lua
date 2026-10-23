@@ -12,6 +12,7 @@ local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
+local RecipeTooltip = ns.RecipeTooltip or require("CraftAlert.UI.Settings.RecipeTooltip")
 
 -- Spec §9 Crafters: one character at a time (current, same-account, imported) with enable,
 -- remove (asks for a second click) and, per profession, the primary flag and the recipe list
@@ -100,19 +101,13 @@ local function recipeIcon(item)
     or Theme.ICON
 end
 
--- Item tooltip, else spell tooltip, else none; reads row.item at hover time (scrolls reuse rows).
+local function shownCharacter(page)
+  return db().characters[page.character.Value()]
+end
+
+-- The recipe tooltip for `row`, read at hover time: the row is reused and the character can change.
 local function showTooltip(row)
-  local tooltip, itemId, spellId = _G["GameTooltip"], row.item.recipe.item, row.item.key
-  tooltip:SetOwner(row, "ANCHOR_RIGHT")
-  if type(itemId) == "number" then
-    tooltip:SetItemByID(itemId)
-  elseif type(spellId) == "number" then
-    tooltip:SetSpellByID(spellId)
-  else
-    tooltip:Hide()
-    return
-  end
-  tooltip:Show()
+  RecipeTooltip.Show(row, shownCharacter(row.page))
 end
 
 local function createRecipeRow(row)
@@ -129,6 +124,9 @@ local function createRecipeRow(row)
   end)
   row.mute:SetPoint("RIGHT", row, "RIGHT", 0, 0)
   row:SetScript("OnEnter", showTooltip)
+  -- GameTooltip's own update (every 0.2 s while shown) calls this instead of rebuilding from the
+  -- item data, which would drop our lines once an uncached item loads.
+  row.UpdateTooltip = showTooltip
   row:SetScript("OnLeave", function()
     _G["GameTooltip"]:Hide()
   end)
@@ -145,10 +143,6 @@ local function showRecipe(row, item)
   if _G["GameTooltip"]:IsOwned(row) then
     showTooltip(row)
   end
-end
-
-local function shownCharacter(page)
-  return db().characters[page.character.Value()]
 end
 
 -- page: { character, enabled, remove, profession, primary, search, recipes, ... }

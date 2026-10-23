@@ -100,19 +100,27 @@ local function testRowFields()
   ns.LeadsWindow.Toggle()
   local shown = rows()
   Assert.equal(#shown, 2)
-  -- §7.3: newest first, with age, customer, item/profession, crafter, greeted and replied.
+  -- §7.3: newest first, with age, customer, item/profession, crafter (by the name the greeting
+  -- uses), realm tag, greeted and replied.
   local first, second = textOf(shown[1]), textOf(shown[2])
-  for _, part in ipairs({ "Bob-Draenor", "30s", "[Sim Plate Belt]", "Me-Realm", "can't order (realm)" }) do
+  for _, part in ipairs({ "Bob-Draenor", "30s", "[Sim Plate Belt]", "Me|r", "can't order (realm)" }) do
     Assert.truthy(string.find(first, part, 1, true), part .. " missing from: " .. first)
   end
-  for _, part in ipairs({ "Ann-Draenor", "2m", "Blacksmithing", "Me-Realm" }) do
+  for _, part in ipairs({ "Ann-Draenor", "2m", "Blacksmithing", "Me|r" }) do
     Assert.truthy(string.find(second, part, 1, true), part .. " missing from: " .. second)
   end
+  Assert.equal(shown[1].what:GetText(), "|cff1eff00|Hitem:190001|h[Sim Plate Belt]|h|r")
+  Assert.equal(shown[1].realm:GetText(), "can't order (realm)")
+  Assert.equal(shown[2].what:GetText(), "Blacksmithing")
+  Assert.equal(shown[2].realm:IsShown(), false)
+  Assert.falsy(string.find(first, "Me-Realm", 1, true), "the crafter's own realm is dropped: " .. first)
   Assert.falsy(string.find(first, "R2", 1, true), "no rank, no R part: " .. first)
   Assert.equal(shown[1].greetedIcon:IsShown(), false)
   Assert.equal(shown[1].repliedTag:IsShown(), false)
   Assert.equal(shown[2].greetedIcon:IsShown(), true)
   Assert.equal(shown[2].repliedTag:IsShown(), true)
+  -- Greeted: the replied tag follows the check.
+  Assert.same({ shown[2].repliedTag:GetPoint() }, { "LEFT", shown[2].greetedIcon, "RIGHT", 4, 0 })
   -- Ages are refreshed on each refresh (window open or lead event), never by a ticker.
   Wow.clock.time = UiFixture.T0 + 60
   ns.LeadsWindow.Refresh()
@@ -126,7 +134,7 @@ local function testRowFields()
   Assert.truthy(string.find(textOf(window()), "No leads", 1, true))
 end
 
--- §4.5: the rank sits between the crafter and the realm tag.
+-- §4.5: the rank follows the crafter in the Crafters row; the realm tag is its own line.
 local function testRowRank()
   local ns = load({ "Ann-Draenor", "Bob-Draenor" }, function(accountDb)
     accountDb.leads[1].rank, accountDb.leads[1].rankConc = 2, false
@@ -134,10 +142,12 @@ local function testRowRank()
   end)
   ns.LeadsWindow.Toggle()
   local shown = rows()
-  local conc, plain = textOf(shown[1]), textOf(shown[2])
-  Assert.truthy(string.find(conc, "by Me-Realm · R2 (conc) · can't order (realm)", 1, true), conc)
-  Assert.truthy(string.find(plain, "by Me-Realm · R2", 1, true), plain)
+  local conc, plain = shown[1].values.crafters:GetText(), shown[2].values.crafters:GetText()
+  Assert.truthy(string.find(conc, "Me|r", 1, true) and string.find(conc, "R2 (conc)", 1, true), conc)
+  Assert.equal(shown[1].realm:GetText(), "can't order (realm)")
+  Assert.truthy(string.find(plain, "Me|r", 1, true) and string.find(plain, "R2", 1, true), plain)
   Assert.falsy(string.find(plain, "(conc)", 1, true), plain)
+  Assert.equal(shown[2].realm:IsShown(), false)
 end
 
 local function testRowClicks()
@@ -146,12 +156,12 @@ local function testRowClicks()
   local left = rows()
   Assert.equal(#left, 1)
   Assert.truthy(string.find(textOf(left[1]), "Bob-Draenor", 1, true))
-  -- With no button on the right, the replied tag sits at the row's right edge, inset by PADDING.
+  -- Not greeted: the replied tag follows the age, no longer right-aligned.
   local point, relativeTo, relativePoint, x, y = left[1].repliedTag:GetPoint()
-  Assert.equal(point, "RIGHT")
-  Assert.equal(relativeTo, left[1], "anchored to the row")
+  Assert.equal(point, "LEFT")
+  Assert.equal(relativeTo, left[1].age, "anchored after the age")
   Assert.equal(relativePoint, "RIGHT")
-  Assert.equal(x, -ns.Theme.LAYOUT.PADDING)
+  Assert.equal(x, 4)
   Assert.equal(y, 0)
 
   -- Rows take the toast's clicks: left greets once the row has been up 0.5 s, right dismisses.
@@ -183,7 +193,7 @@ local function testRowHighlight()
   Assert.equal(fills, 0, "no colour fill on the row")
 end
 
--- native-HUD spec §6, §4.5, §4.6: the item link in the detail line hovers, clicks through SetItemRef, and guards the row's clicks.
+-- native-HUD spec §6, §4.5, §4.6: the item link in the card's what line hovers, clicks through SetItemRef, and guards the row's clicks.
 local function testRowLinkHover()
   local ns, _, calls = load({ "Ann-Draenor", "Bob-Draenor" }, function(accountDb)
     accountDb.leads[2].kind, accountDb.leads[2].itemLink = "item", LINK_TEXT
@@ -229,15 +239,19 @@ local function testRowLinkHover()
   Assert.equal(row.hoveredLink, nil)
 end
 
--- Rows sit in the inset and fit its height (320 high: inset 320 - 28 - 26 = 266; floor((266 - 16 + 2) / 38) = 6).
+-- Cards span the inset's width and fit its height (480 high: inset 480 - 28 - 26 = 426;
+-- floor((426 - 16 + 2) / 78) = 5). No details pane.
 local function testRowsFitTheInset()
   local ns = load(customerNames(12))
   ns.LeadsWindow.Toggle()
   local frame = window()
-  Assert.equal(#rows(), 6)
+  Assert.equal(#rows(), 5)
   Assert.equal(rows()[1].parent, frame.Inset)
   Assert.same({ rows()[1]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -8 })
-  Assert.same({ rows()[2]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -46 })
+  Assert.same({ rows()[2]:GetPoint() }, { "TOPLEFT", frame.Inset, "TOPLEFT", 8, -86 })
+  -- The right edge is the inset's, inset by PADDING.
+  Assert.same(rows()[1].points[2], { "TOPRIGHT", frame.Inset, "TOPRIGHT", -8, -8 })
+  Assert.equal(frame.details, nil)
   -- No footer hint under the list: the clicks are the toast's, and its tooltip lists them.
   Assert.falsy(string.find(textOf(frame), "Click: greet", 1, true), "no footer hint: " .. textOf(frame))
   -- The client sizes the inset from its anchors only, which may be unresolved (0 high) on the
@@ -247,7 +261,7 @@ local function testRowsFitTheInset()
     return 0
   end
   ns.LeadsWindow.Toggle()
-  Assert.equal(#rows(), 6, "rows fit before the inset is laid out")
+  Assert.equal(#rows(), 5, "cards fit before the inset is laid out")
   ns = load({})
   ns.LeadsWindow.Toggle()
   Assert.truthy(string.find(textOf(window().Inset), "No leads", 1, true), "empty text is in the inset")
@@ -263,35 +277,35 @@ local function testResizeButton()
   Assert.equal(button.template, "PanelResizeButtonTemplate")
   Assert.same(
     { button.target == frame, button.minWidth, button.minHeight, button.maxWidth, button.maxHeight },
-    { true, 360, 160, screen:GetWidth(), screen:GetHeight() }
+    { true, 600, 480, screen:GetWidth(), screen:GetHeight() }
   )
-  Assert.equal(#rows(), 6)
-  -- Dragging: the client resizes and fires OnSizeChanged. Init wrapped our refresh, so rows refit.
+  Assert.equal(#rows(), 5)
+  -- Dragging: the client resizes and fires OnSizeChanged. Init wrapped our refresh, so cards refit.
   button.scripts.OnMouseDown(button, "LeftButton")
   Assert.equal(frame.sizing, "BOTTOMRIGHT")
-  frame:SetSize(500, 400)
-  frame.scripts.OnSizeChanged(frame, 500, 400)
-  Assert.equal(#rows(), 8) -- 400 - 54 = 346; floor((346 - 16 + 2) / 38) = 8
+  frame:SetSize(700, 560)
+  frame.scripts.OnSizeChanged(frame, 700, 560)
+  Assert.equal(#rows(), 6) -- 560 - 54 = 506; floor((506 - 16 + 2) / 78) = 6
   -- Below the minimum, the button's wrapper pulls the size back (it only works if our script was set before Init).
   frame:SetSize(100, 100)
   frame.scripts.OnSizeChanged(frame, 100, 100)
-  Assert.same({ frame:GetWidth(), frame:GetHeight() }, { 360, 160 })
-  frame:SetSize(500, 400)
-  frame.scripts.OnSizeChanged(frame, 500, 400)
+  Assert.same({ frame:GetWidth(), frame:GetHeight() }, { 600, 480 })
+  frame:SetSize(700, 560)
+  frame.scripts.OnSizeChanged(frame, 700, 560)
   button.scripts.OnMouseUp(button, "LeftButton")
   Assert.equal(frame.sizing, nil)
-  Assert.same({ db.ui.window.width, db.ui.window.height }, { 500, 400 })
-  -- Closed and reopened: same size, rows refit.
+  Assert.same({ db.ui.window.width, db.ui.window.height }, { 700, 560 })
+  -- Closed and reopened: same size, cards refit.
   ns.LeadsWindow.Toggle()
   ns.LeadsWindow.Toggle()
-  Assert.same({ frame:GetWidth(), frame:GetHeight(), #rows() }, { 500, 400, 8 })
-  -- After a /reload it opens at the saved size with the rows refit.
+  Assert.same({ frame:GetWidth(), frame:GetHeight(), #rows() }, { 700, 560, 6 })
+  -- After a /reload it opens at the saved size with the cards refit.
   local saved = db.ui.window
   ns = load(customers, function(accountDb)
     accountDb.ui.window = saved
   end)
   ns.LeadsWindow.Toggle()
-  Assert.same({ window():GetWidth(), window():GetHeight(), #rows() }, { 500, 400, 8 })
+  Assert.same({ window():GetWidth(), window():GetHeight(), #rows() }, { 700, 560, 6 })
 end
 
 local function testVisibleLatestAndScroll()
@@ -340,9 +354,9 @@ local function testSavedFrameAndOpacity()
   local button = frame.resizeButton
   button.scripts.OnMouseDown(button, "LeftButton")
   Assert.equal(frame.sizing, "BOTTOMRIGHT")
-  frame:SetSize(500, 400)
+  frame:SetSize(700, 560)
   button.scripts.OnMouseUp(button, "LeftButton")
-  Assert.same(db.ui.window, { point = "LEFT", relativePoint = "LEFT", x = 30, y = 40, width = 500, height = 400 })
+  Assert.same(db.ui.window, { point = "LEFT", relativePoint = "LEFT", x = 30, y = 40, width = 700, height = 560 })
 
   -- The saved shapes are flat scalars, which the load-time Schema check keeps as they are.
   local Schema = Fresh.require("Persistence.Schema")
@@ -361,7 +375,7 @@ local function testSavedFrameAndOpacity()
   end)
   ns.LeadsWindow.Toggle()
   local point, _, relativePoint, x, y = window():GetPoint()
-  Assert.same({ point, relativePoint, x, y, window():GetWidth(), window():GetHeight() }, { "LEFT", "LEFT", 30, 40, 500, 400 })
+  Assert.same({ point, relativePoint, x, y, window():GetWidth(), window():GetHeight() }, { "LEFT", "LEFT", 30, 40, 700, 560 })
 end
 
 -- Runs fn, raising instead of hanging when it loops (a client freeze).
@@ -388,7 +402,7 @@ local function testHugeSavedSize()
   Assert.equal(#rows(), 2)
   -- Even a frame taller than the screen (the client does not guarantee the clamp) rows only
   -- the leads there are.
-  window():SetSize(500, 1e300)
+  window():SetSize(600, 1e300)
   bounded(ns.LeadsWindow.Refresh)
   Assert.equal(#rows(), 2)
 end

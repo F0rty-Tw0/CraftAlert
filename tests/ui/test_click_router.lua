@@ -44,8 +44,14 @@ return function()
   Assert.equal(ClickRouter.Handle("LeftButton", LEAD, 1), "prefill")
   Assert.same(calls, { { "prefill", LEAD }, { "empty", LEAD }, { "prefill", LEAD } })
 
-  -- Right dismisses the lead, whatever modifier is held.
+  -- Right dismisses the lead, whatever modifier is held, once it has been up 0.5 s (§7.5 look
+  -- rule); before that, or with no shown time, the click does nothing.
   ClickRouter, calls, keys = setup()
+  Wow.clock.gettime = 1.4
+  Assert.equal(ClickRouter.Handle("RightButton", LEAD, 1), nil, "shown 0.4 s ago")
+  Assert.equal(ClickRouter.Handle("RightButton", LEAD, nil), nil, "not shown")
+  Assert.same(calls, {})
+  Wow.clock.gettime = 1.5
   Assert.equal(ClickRouter.Handle("RightButton", LEAD, 1), "dismiss")
   keys.shift, keys.ctrl = true, true
   Assert.equal(ClickRouter.Handle("RightButton", LEAD, 1), "dismiss")

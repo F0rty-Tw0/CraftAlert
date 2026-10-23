@@ -18,7 +18,21 @@ local function load(flavor)
   Fresh.require("Core.FlavorCompat")
   Fresh.require("Core.PlayerName").Init()
   Fresh.require("Model.RealmTag")
-  return Fresh.require("Model.CrafterRank")
+  local CrafterRank = Fresh.require("Model.CrafterRank")
+  -- Every Pick in this file also checks that its pick is one of its candidates.
+  local pick = CrafterRank.Pick
+  CrafterRank.Pick = function(...)
+    local picked = { pick(...) }
+    if picked[1] ~= nil then
+      local keys = {}
+      for _, candidate in ipairs(picked[6]) do
+        keys[candidate.key] = true
+      end
+      Assert.truthy(keys[picked[1]], "the pick is a candidate: " .. picked[1])
+    end
+    return unpack(picked, 1, 6)
+  end
+  return CrafterRank
 end
 
 local function character(source, primaryProf, realms)
@@ -56,7 +70,36 @@ local function result(keys, prof)
   return { kind = "item", entries = entries, entryCount = #entries, group = 501, prof = prof or BS, why = { "lf" }, whyCount = 1 }
 end
 
+-- Pick judges a character's many entries without a table per entry (it runs per matched line).
+-- Each entry reaches a higher rank than the one before, so every entry wins and the win path runs.
+local function testPickAllocation()
+  local CrafterRank = load("retail")
+  local data = db()
+  local ranks = {}
+  for i = 1, 200 do
+    ranks[i] = i
+  end
+  local alt = data.characters["Alt-Realm"]
+  alt.recipes = {}
+  local many = result({})
+  for i = 1, 200 do
+    alt.recipes[i] = { reachRank = i, ranks = ranks }
+    many.entries[i] = { character = "Alt-Realm", recipeKey = i, group = 501, prof = BS }
+  end
+  many.entryCount = 200
+  CrafterRank.Pick(many, CUSTOMER, data) -- warm-up: first-call caches stay out of the count
+  collectgarbage("collect")
+  collectgarbage("stop")
+  local before = collectgarbage("count")
+  local recipeKey = select(5, CrafterRank.Pick(many, CUSTOMER, data))
+  local grownKb = collectgarbage("count") - before
+  collectgarbage("restart")
+  Assert.equal(recipeKey, 200, "the last entry won, so every entry did")
+  Assert.truthy(grownKb < 4, "Pick over 200 entries allocated " .. grownKb .. " KB")
+end
+
 return function()
+  testPickAllocation()
   local CrafterRank = load("retail")
   local data = db()
 
@@ -355,6 +398,21 @@ return function()
   picked, _, rank, _, recipeKey = ranked({ "Alt-Realm", 11 }, { "Alt-Realm", 10 })
   Assert.same({ picked, rank, recipeKey }, { "Alt-Realm", 2, 11 })
 
+  -- Candidates: one { key, rank, byConc } per character, its best entry (rank 3 beats rank 2).
+  data = db()
+  learn("Alt-Realm", 10, { ranks = { 1, 2, 3 }, reachRank = 3, reachCost = 0 })
+  learn("Alt-Realm", 11, { ranks = { 1, 2, 3 }, reachRank = 2, reachCost = 0 })
+  learn("Zed-Realm", 10, { ranks = { 1, 2, 3 }, reachRank = 1, reachCost = 0 })
+  local candidates
+  _, _, _, _, _, candidates = ranked({ "Alt-Realm", 10 }, { "Alt-Realm", 11 }, { "Zed-Realm", 10 })
+  Assert.equal(#candidates, 2, "one entry per character")
+  local byKey = {}
+  for _, candidate in ipairs(candidates) do
+    byKey[candidate.key] = candidate
+  end
+  Assert.same(byKey["Alt-Realm"], { key = "Alt-Realm", rank = 3, byConc = false }, "Alt's best entry")
+  Assert.same(byKey["Zed-Realm"], { key = "Zed-Realm", rank = 1, byConc = false })
+
   -- The highest rank wins even when it costs concentration; at the same rank, the crafter who
   -- reaches it without concentration wins (user ruling 2026-10-22).
   data = db()
@@ -370,6 +428,15 @@ return function()
   -- A profession-word match has no recipe: no rank, no recipeKey.
   _, _, rank, byConc, recipeKey = CrafterRank.Pick({ kind = "profession", entries = {}, entryCount = 0, prof = BS }, CUSTOMER, data)
   Assert.same({ rank, byConc, recipeKey }, {})
+  -- Every character with the profession is a candidate, none with a rank (the index built for
+  -- the mute tests above would still hide Me-Realm).
+  Index.Configure(withSettings(data), { ownKey = "Me-Realm" })
+  Index.Rebuild()
+  local words = select(6, CrafterRank.Pick({ kind = "profession", entries = {}, entryCount = 0, prof = BS }, CUSTOMER, data))
+  Assert.equal(#words, 5)
+  for _, word in ipairs(words) do
+    Assert.same({ word.rank, word.byConc }, {}, word.key)
+  end
 
   -- Forever has no crafting orders, so realms never reorder anything.
   CrafterRank = load("forever")
