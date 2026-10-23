@@ -6,7 +6,11 @@ Player-friendly release notes for Craft Alert.
 
 - A toast pops up beside the launcher, on the side facing the middle of the screen, when someone in Trade asks for something you can craft. It shows a plain headline ("Wants … — you can craft it"), their whole Trade message with item and recipe links you can hover, and what matched in its tooltip. Left-click to greet them, shift-click to edit the greeting first, ctrl-click for an empty whisper, right-click to dismiss; a click on a link only opens the link. Dragging the toast moves the launcher.
 - A leads window lists every open request, newest first, with the same clicks as the toast. Drag it, resize it, close it with Escape.
-- Beside the list, a details pane shows the newest lead, or the last one you hovered: the customer and how long ago they asked, their whole message with hoverable links, what matched, the profession, and every character of yours that can craft it with its quality rank.
+- Each lead is a card with its details beside it: the customer in their class colour, how long ago they asked, what they want, then their message with hoverable links, what matched, and which of your characters can craft it.
+- Your crafters show in their class colour, the one picked for the lead first, with its quality rank.
+- Hovering a card shows Greet, Whisper and Dismiss buttons on it.
+- Hover a card's name, what it wants, what matched or its crafters for a tooltip with more; hover the rest of the card to see the customer's latest chat line.
+- `/ca test` uses your own class when you don't name one.
 - The leads window keeps one size for the list and the settings, 600×480 at least; a resize in one view carries over to the other.
 - In the settings, the gear on the title bar turns into a back arrow.
 - In Settings → Crafters, hovering a recipe shows its name, its profession, which of your characters know it, and whether it is muted.
