@@ -6,9 +6,9 @@ end
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 
--- Builders the toast, leads window, rows, launcher and settings share: text, the customer's class
--- colour, atlas-or-file art, list highlight, and dragging with the position saved account-wide in
--- `CraftAlertDB.ui[key]`.
+-- Builders the toast, leads window, cards, launcher and settings share: text, colour codes, the
+-- customer's class colour, atlas-or-file art, list highlight, and dragging with the position saved
+-- account-wide in `CraftAlertDB.ui[key]`.
 local FrameKit = {}
 
 local type = type
@@ -104,7 +104,7 @@ end
 -- RAID_CLASS_COLORS entry of the player with this chat GUID, or nil. A secret GUID or class is
 -- never passed on or compared: FlavorCompat.ClassOf owns that guard. The colour table is checked
 -- first, so a client without it makes no API call.
-local function classColor(guid)
+function FrameKit.GuidClassColor(guid)
   if type(_G["RAID_CLASS_COLORS"]) ~= "table" then
     return nil
   end
@@ -112,9 +112,14 @@ local function classColor(guid)
   return FrameKit.ClassColor(FlavorCompat.ClassOf(guid))
 end
 
+-- `text` in r, g, b as a colour code. From r/g/b only: a RAID_CLASS_COLORS entry may lack colorStr.
+function FrameKit.ColorCode(text, r, g, b)
+  return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) .. text .. "|r"
+end
+
 -- Colours a customer's name by class, or in the plain text colour when the class is unknown.
 function FrameKit.PaintName(text, guid)
-  local color = classColor(guid)
+  local color = FrameKit.GuidClassColor(guid)
   if color then
     text:SetTextColor(color.r, color.g, color.b, 1)
     return

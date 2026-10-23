@@ -18,6 +18,9 @@ local MAGE_CODE = "|cff3fc6ea"
 local CARD_STEP = 78
 local LABEL_LEFT, VALUE_LEFT = 230, 304
 local ROW_TOPS = { -4, -32, -50 }
+-- The keys of card.labels / card.values and of card.buttons, top to bottom and left to right.
+local ROWS = { "request", "matched", "crafters" }
+local BUTTONS = { "greet", "whisper", "dismiss" }
 
 local function window()
   return rawget(_G, "CraftAlertLeadsWindow")
@@ -98,6 +101,15 @@ local function shownOf(regions)
   return shown
 end
 
+-- The entries of `map` in the order of `keys`.
+local function inOrder(map, keys)
+  local list = {}
+  for index, key in ipairs(keys) do
+    list[index] = map[key]
+  end
+  return list
+end
+
 local function has(text, part)
   Assert.truthy(string.find(text, part, 1, true), part .. " missing from: " .. tostring(text))
 end
@@ -115,9 +127,10 @@ local function testCardContent()
   Assert.same({ card.icon.width, card.icon.height }, { 32, 32 })
   Assert.same({ card.what:GetText(), card.what.font, card.what.wordWrap }, { LINK_TEXT, "GameFontNormal", false })
   -- Labels as written, never upper-cased.
-  Assert.same(field(card.labels, "text"), { "Request", "Matched", "Crafters" })
-  Assert.same(field(card.labels, "font"), { "GameFontNormal", "GameFontNormal", "GameFontNormal" })
-  local request, matched, crafters = card.values[1], card.values[2], card.values[3]
+  local labels = inOrder(card.labels, ROWS)
+  Assert.same(field(labels, "text"), { "Request", "Matched", "Crafters" })
+  Assert.same(field(labels, "font"), { "GameFontNormal", "GameFontNormal", "GameFontNormal" })
+  local request, matched, crafters = card.values.request, card.values.matched, card.values.crafters
   Assert.same({ request:GetText(), request.font, request.wordWrap }, { "LF bolt of silk", "GameFontHighlight", true })
   Assert.equal(request.maxLines, 2)
   Assert.same({ matched.font, matched.wordWrap }, { "GameFontHighlightSmall", false })
@@ -149,8 +162,8 @@ local function testProfessionLeadCard()
   local card = cards()[1]
   Assert.equal(card.icon.texture, "prof-icon-333")
   Assert.equal(card.what:GetText(), "Enchanting")
-  Assert.falsy(string.find(card.values[3]:GetText(), "more", 1, true), card.values[3]:GetText())
-  has(card.values[3]:GetText(), "Me")
+  Assert.falsy(string.find(card.values.crafters:GetText(), "more", 1, true), card.values.crafters:GetText())
+  has(card.values.crafters:GetText(), "Me")
   -- No profession icon either: the addon's own.
   Wow.stub("C_TradeSkillUI", {})
   ns.LeadsWindow.Refresh()
@@ -164,27 +177,28 @@ local function testHiddenRows()
   ns.LeadsWindow.Toggle()
   local card = cards()[1]
   Assert.equal(card.lead.customer, "Bob-Draenor")
-  Assert.same(shownOf(card.labels), { false, false, true })
-  Assert.same(shownOf(card.values), { false, false, true })
+  Assert.same(shownOf(inOrder(card.labels, ROWS)), { false, false, true })
+  Assert.same(shownOf(inOrder(card.values, ROWS)), { false, false, true })
   -- Rows keep fixed positions: a hidden row leaves its space empty.
-  for row = 1, 3 do
-    Assert.same(card.labels[row].points[1], { "TOPLEFT", card, "TOPLEFT", LABEL_LEFT, ROW_TOPS[row] })
-    Assert.same(card.values[row].points[1], { "TOPLEFT", card, "TOPLEFT", VALUE_LEFT, ROW_TOPS[row] })
-    Assert.equal(card.labels[row].width, 74)
+  for row, key in ipairs(ROWS) do
+    Assert.same(card.labels[key].points[1], { "TOPLEFT", card, "TOPLEFT", LABEL_LEFT, ROW_TOPS[row] })
+    Assert.same(card.values[key].points[1], { "TOPLEFT", card, "TOPLEFT", VALUE_LEFT, ROW_TOPS[row] })
+    Assert.equal(card.labels[key].width, 74)
   end
   -- The same slot then shows a lead with all three: the rows come back.
   ns.Leads.Dismiss(card.lead.id)
   Assert.equal(cards()[1], card)
   Assert.equal(card.lead.customer, "Ann-Draenor")
-  Assert.same(shownOf(card.labels), { true, true, true })
-  Assert.same(shownOf(card.values), { true, true, true })
-  Assert.equal(card.values[1]:GetText(), "  LF plate belt  ")
+  Assert.same(shownOf(inOrder(card.labels, ROWS)), { true, true, true })
+  Assert.same(shownOf(inOrder(card.values, ROWS)), { true, true, true })
+  Assert.equal(card.values.request:GetText(), "  LF plate belt  ")
   -- Only one of why and profName: the row shows that one.
   ns.Leads.List()[1].why = nil
   ns.LeadsWindow.Refresh()
-  Assert.same({ card.values[2]:IsShown(), card.labels[2]:IsShown() }, { true, true })
-  has(card.values[2]:GetText(), "Blacksmithing")
-  Assert.falsy(string.find(card.values[2]:GetText(), " · ", 1, true), card.values[2]:GetText())
+  local matched = card.values.matched
+  Assert.same({ matched:IsShown(), card.labels.matched:IsShown() }, { true, true })
+  has(matched:GetText(), "Blacksmithing")
+  Assert.falsy(string.find(matched:GetText(), " · ", 1, true), matched:GetText())
 end
 
 -- Saved data from a newer schema keeps crafters as it is: a bad list or entry falls back to the
@@ -199,9 +213,10 @@ local function testBadCrafters()
     local entries = ns.CardBody.Crafters(card.lead)
     Assert.same(field(entries, "key"), { "Me-Realm" })
     Assert.same({ entries[1].name, entries[1].rank, entries[1].picked }, { "Me", "R2", true })
-    Assert.equal(string.sub(card.values[3]:GetText(), 1, #MAGE_CODE + 2), MAGE_CODE .. "Me")
-    has(card.values[3]:GetText(), "R2")
-    Assert.falsy(string.find(card.values[3]:GetText(), "more", 1, true))
+    local crafters = card.values.crafters:GetText()
+    Assert.equal(string.sub(crafters, 1, #MAGE_CODE + 2), MAGE_CODE .. "Me")
+    has(crafters, "R2")
+    Assert.falsy(string.find(crafters, "more", 1, true))
     Wow.reset()
   end
 end
@@ -213,8 +228,8 @@ local function testNoCrafters()
   ns.LeadsWindow.Toggle()
   local card = cards()[1]
   Assert.same(ns.CardBody.Crafters(card.lead), {})
-  has(card.values[3]:GetText(), "None known")
-  Assert.equal(card.values[3]:IsShown(), true)
+  has(card.values.crafters:GetText(), "None known")
+  Assert.equal(card.values.crafters:IsShown(), true)
 end
 
 local function testRealmTag()
@@ -270,15 +285,16 @@ local function testLinksStillHover()
   local card = cards()[1]
   local texts = { card.name, card.age, card.what, card.realm, card.repliedTag }
   for _, list in ipairs({ card.labels, card.values }) do
-    for _, text in ipairs(list) do
-      texts[#texts + 1] = text
+    for _, key in ipairs(ROWS) do
+      texts[#texts + 1] = list[key]
     end
   end
+  Assert.equal(#texts, 11)
   for _, text in ipairs(texts) do
     Assert.equal(text:GetParent(), card)
   end
   Assert.equal(card.icon:GetParent(), card)
-  Assert.equal(card.values[1]:GetText(), "LF " .. LINK_TEXT .. " crafter")
+  Assert.equal(card.values.request:GetText(), "LF " .. LINK_TEXT .. " crafter")
   local tip = rawget(_G, "GameTooltip")
   Assert.equal(card.hyperlinksEnabled, true)
   card.scripts.OnHyperlinkEnter(card, LINK, LINK_TEXT)
@@ -298,7 +314,7 @@ local IDLE = { false, false, false, false }
 -- The three buttons' shown flags, then whether the card's highlight is locked.
 local function look(card)
   local b = card.buttons
-  return { b[1]:IsShown(), b[2]:IsShown(), b[3]:IsShown(), card.highlightLocked == true }
+  return { b.greet:IsShown(), b.whisper:IsShown(), b.dismiss:IsShown(), card.highlightLocked == true }
 end
 
 -- The cursor comes onto `frame` (a card or a child of one) of `card`.
@@ -319,7 +335,7 @@ local function testButtonsHiddenUntilEnter()
   local shown = cards()
   Assert.same(look(shown[1]), IDLE)
   Assert.same(look(shown[2]), IDLE)
-  local buttons = shown[1].buttons
+  local buttons = inOrder(shown[1].buttons, BUTTONS)
   Assert.same(field(buttons, "template"), { "UIPanelButtonTemplate", "UIPanelButtonTemplate", "UIPanelButtonTemplate" })
   Assert.same({ buttons[1]:GetText(), buttons[2]:GetText(), buttons[3]:GetText() }, { "Greet", "Whisper", "Dismiss" })
   enter(shown[1])
@@ -342,9 +358,9 @@ local function testButtonsStayOnChild()
   -- The cursor moves onto the Greet button: the card is left (the cursor still on it), the button entered.
   leave(card, card, true)
   Assert.same(look(card), HOVERED)
-  enter(card, card.buttons[1])
+  enter(card, card.buttons.greet)
   Assert.same(look(card), HOVERED)
-  leave(card, card.buttons[1], true)
+  leave(card, card.buttons.greet, true)
   Assert.same(look(card), HOVERED)
 end
 
@@ -355,9 +371,9 @@ local function testButtonsHideOnLeave()
   enter(card)
   leave(card, card, false)
   Assert.same(look(card), IDLE)
-  enter(card, card.buttons[2])
+  enter(card, card.buttons.whisper)
   Assert.same(look(card), HOVERED)
-  leave(card, card.buttons[2], false)
+  leave(card, card.buttons.whisper, false)
   Assert.same(look(card), IDLE)
 end
 
@@ -419,7 +435,7 @@ local function testGreetButton()
   local card = cards()[1]
   enter(card)
   Wow.clock.gettime = Wow.clock.gettime + 1
-  Widgets.click(card.buttons[1], "LeftButton")
+  Widgets.click(card.buttons.greet, "LeftButton")
   local chats = UiFixture.callsTo(calls, "chat")
   Assert.equal(#chats, 1)
   Assert.equal(chats[1][5], "Buyer-Realm")
@@ -436,7 +452,7 @@ local function testGreetModifiers()
   Wow.stub("IsShiftKeyDown", function()
     return true
   end)
-  Widgets.click(card.buttons[1], "LeftButton")
+  Widgets.click(card.buttons.greet, "LeftButton")
   Assert.same({ #UiFixture.callsTo(calls, "prefill"), #UiFixture.callsTo(calls, "chat") }, { 1, 0 })
   Wow.stub("IsShiftKeyDown", function()
     return false
@@ -444,7 +460,7 @@ local function testGreetModifiers()
   Wow.stub("IsControlKeyDown", function()
     return true
   end)
-  Widgets.click(card.buttons[1], "LeftButton")
+  Widgets.click(card.buttons.greet, "LeftButton")
   Assert.same({ #UiFixture.callsTo(calls, "empty"), #UiFixture.callsTo(calls, "chat") }, { 1, 0 })
 end
 
@@ -463,7 +479,7 @@ local function testGreetAfterListShifts()
   window().scripts.OnMouseWheel(window(), -1)
   Assert.equal(card.lead.customer, "Customer5-Draenor")
   Assert.same(look(card), HOVERED)
-  Widgets.click(card.buttons[1], "LeftButton")
+  Widgets.click(card.buttons.greet, "LeftButton")
   local prefills = UiFixture.callsTo(calls, "prefill")
   Assert.same({ #prefills, #UiFixture.callsTo(calls, "chat") }, { 1, 0 })
   Assert.equal(prefills[1][2], "Customer5-Draenor")
@@ -476,7 +492,7 @@ local function testWhisperButton()
   local card = cards()[1]
   enter(card)
   Wow.clock.gettime = Wow.clock.gettime + 1
-  Widgets.click(card.buttons[2], "LeftButton")
+  Widgets.click(card.buttons.whisper, "LeftButton")
   local empties = UiFixture.callsTo(calls, "empty")
   Assert.same({ #empties, #UiFixture.callsTo(calls, "chat") }, { 1, 0 })
   Assert.equal(empties[1][2], "Buyer-Realm")
@@ -487,12 +503,12 @@ local function testDismissButton()
   ns.LeadsWindow.Toggle()
   local card = cards()[1]
   enter(card)
-  Widgets.click(card.buttons[3], "LeftButton")
+  Widgets.click(card.buttons.dismiss, "LeftButton")
   Assert.same(field(ns.Leads.List(), "customer"), { "Ann-Realm" })
   -- The card shows the next lead and, the cursor still on it, keeps its buttons.
   Assert.equal(card.lead.customer, "Ann-Realm")
   Assert.same(look(card), HOVERED)
-  Widgets.click(card.buttons[3], "LeftButton")
+  Widgets.click(card.buttons.dismiss, "LeftButton")
   Assert.same(ns.Leads.List(), {})
   Assert.equal(card:IsShown(), false)
   Assert.same(look(card), IDLE)
@@ -503,7 +519,7 @@ local function testButtonsDoNotDrag()
   ns.LeadsWindow.Toggle()
   local card = cards()[1]
   Assert.equal(card.dragButtons, nil)
-  for _, button in ipairs(card.buttons) do
+  for _, button in pairs(card.buttons) do
     Assert.equal(button.dragButtons, nil)
   end
 end

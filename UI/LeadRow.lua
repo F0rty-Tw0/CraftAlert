@@ -48,14 +48,6 @@ local function onShow(card)
   end
 end
 
-local function setShown(region, shown)
-  if shown then
-    region:Show()
-  else
-    region:Hide()
-  end
-end
-
 -- The greeted check right after the age; the replied tag's place depends on the check (placeReplied).
 local function createMarks(card)
   local size = Theme.LAYOUT.ROW_ICON_SIZE
@@ -134,9 +126,9 @@ function LeadRow.Show(card, lead)
   card.what:SetText(LeadText.What(lead))
   local realm = LeadText.RealmTag(lead)
   card.realm:SetText(realm)
-  setShown(card.realm, realm ~= nil)
-  setShown(card.greetedIcon, lead.greeted)
-  setShown(card.repliedTag, lead.replied)
+  card.realm:SetShown(realm ~= nil)
+  card.greetedIcon:SetShown(lead.greeted)
+  card.repliedTag:SetShown(lead.replied)
   placeReplied(card, lead.greeted)
   CardBody.Paint(card, lead)
   CardTips.Refresh(card, leadChanged)

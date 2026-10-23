@@ -148,6 +148,15 @@ local function addRegion(region)
     return self.parent
   end
 
+  -- Through Show and Hide, so a frame still runs its OnShow and OnHide.
+  function region:SetShown(shown)
+    if shown then
+      self:Show()
+    else
+      self:Hide()
+    end
+  end
+
   function region:CreateAnimationGroup()
     return newAnimationGroup()
   end
@@ -258,11 +267,6 @@ local function newFontString(parent, layer, template)
 
   function fontString:SetMaxLines(count)
     self.maxLines = count
-  end
-
-  -- Tests set `mouseOver` to put the cursor on the text.
-  function fontString:IsMouseOver()
-    return self.mouseOver == true
   end
 
   -- 0 for no text; one line when wrapping is off or the width is unset; else LINE_HEIGHT per

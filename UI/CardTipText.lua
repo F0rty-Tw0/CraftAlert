@@ -21,7 +21,8 @@ local tostring = tostring
 local type = type
 
 local WHY_SEPARATOR = " + "
--- The words of a lead's channel key (Core/ScanGate.lua), localized when shown.
+-- A lead's channel key and its word, localized when shown. Only the keys come from
+-- Core/ScanGate.lua:33; the words are the spec's (§2.1), not the status line's.
 local CHANNEL_NAMES = {
   trade = "Trade",
   services = "Services",
@@ -31,8 +32,10 @@ local CHANNEL_NAMES = {
   communities = "Community",
 }
 
+-- As GameTooltip_SetTitle: replaces the lines, wrapping.
 local function title(tip, text)
-  _G["GameTooltip_SetTitle"](tip, text, _G["NORMAL_FONT_COLOR"])
+  local gold = Theme.COLORS.gold
+  tip:SetText(text, gold[1], gold[2], gold[3], 1, true)
 end
 
 local function white(tip, text)
@@ -52,14 +55,15 @@ local function rgbOf(color, fallback)
 end
 
 local function customerColor(lead, fallback)
-  return rgbOf(FrameKit.ClassColor(FlavorCompat.ClassOf(lead.guid)), fallback)
+  return rgbOf(FrameKit.GuidClassColor(lead.guid), fallback)
 end
 
--- The customer in class colour, their class, and whether they were greeted or replied.
+-- The customer in class colour, their class, and whether they were greeted or replied. The class
+-- name needs the token anyway, so it is read once, with or without a colour table.
 function CardTipText.Customer(tip, lead)
-  tip:SetText(tostring(lead.customer), customerColor(lead, Theme.COLORS.gold))
-  local names = _G["LOCALIZED_CLASS_NAMES_MALE"]
   local token = FlavorCompat.ClassOf(lead.guid)
+  tip:SetText(tostring(lead.customer), rgbOf(FrameKit.ClassColor(token), Theme.COLORS.gold))
+  local names = _G["LOCALIZED_CLASS_NAMES_MALE"]
   local className = token and type(names) == "table" and names[token]
   if className then
     white(tip, className)
@@ -97,7 +101,8 @@ function CardTipText.Matched(tip, lead)
     white(tip, part)
   end
   if lead.profName then
-    _G["GameTooltip_AddColoredLine"](tip, lead.profName, _G["NORMAL_FONT_COLOR"])
+    local gold = Theme.COLORS.gold
+    tip:AddLine(lead.profName, gold[1], gold[2], gold[3], true)
   end
 end
 
@@ -131,14 +136,9 @@ local function channelName(key)
   return name and Localization.Text(name) or tostring(key)
 end
 
--- `text` in r, g, b as a colour code.
-local function colored(text, r, g, b)
-  return format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) .. text .. "|r"
-end
-
 -- "[HH:MM] [Channel] [Name]: message", the customer in class colour, the message with its links.
 local function chatText(lead)
-  local name = colored(tostring(lead.customer), customerColor(lead, Theme.COLORS.white))
+  local name = FrameKit.ColorCode(tostring(lead.customer), customerColor(lead, Theme.COLORS.white))
   return format("[%s] [%s] [%s]: %s", _G["date"]("%H:%M", lead.time), channelName(lead.channel), name, lead.message)
 end
 

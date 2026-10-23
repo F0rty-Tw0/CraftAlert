@@ -15,23 +15,20 @@ local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 -- leaves its space empty. §1.1: the crafters in order, the picked one first, in class colours.
 local CardBody = {}
 
-local format = string.format
 local sort = table.sort
 local type = type
 
-local REQUEST, MATCHED, CRAFTERS = 1, 2, 3
-local LABELS = { "Request", "Matched", "Crafters" }
--- Row tops below the card's top: the request takes two lines, the others one.
-local TOPS = { -4, -32, -50 }
-
--- `text` in r, g, b as a colour code. From r/g/b only: a RAID_CLASS_COLORS entry may lack colorStr.
-local function colored(text, r, g, b)
-  return format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) .. text .. "|r"
-end
+-- Each row's key in card.labels and card.values, its label, and its top below the card's top: the
+-- request takes two lines, the others one.
+local ROWS = {
+  { key = "request", label = "Request", top = -4 },
+  { key = "matched", label = "Matched", top = -32 },
+  { key = "crafters", label = "Crafters", top = -50 },
+}
 
 -- `text` in a Theme colour ({ r, g, b, a }).
 local function themed(text, color)
-  return colored(text, color[1], color[2], color[3])
+  return FrameKit.ColorCode(text, color[1], color[2], color[3])
 end
 
 -- The request wraps to two lines at most; a client without SetMaxLines clips it at two lines'
@@ -42,26 +39,26 @@ local function wrapTwoLines(value)
   if value.SetMaxLines then
     value:SetMaxLines(2)
   else
-    value:SetHeight(TOPS[REQUEST] - TOPS[MATCHED])
+    value:SetHeight(ROWS[1].top - ROWS[2].top)
   end
 end
 
--- The labels and values on `card`: card.labels and card.values, each { request, matched, crafters }.
+-- The labels and values on `card`: card.labels and card.values, each keyed request, matched, crafters.
 function CardBody.Create(card)
   local layout, fonts = Theme.LAYOUT, Theme.FONTS
   local valueLeft = layout.CARD_LEFT_WIDTH + layout.CARD_LABEL_WIDTH
   card.labels, card.values = {}, {}
-  for row, label in ipairs(LABELS) do
+  for _, row in ipairs(ROWS) do
     local title = FrameKit.Text(card, fonts.name)
-    title:SetPoint("TOPLEFT", card, "TOPLEFT", layout.CARD_LEFT_WIDTH, TOPS[row])
+    title:SetPoint("TOPLEFT", card, "TOPLEFT", layout.CARD_LEFT_WIDTH, row.top)
     title:SetWidth(layout.CARD_LABEL_WIDTH)
-    title:SetText(Localization.Text(label))
-    local value = FrameKit.Text(card, row == REQUEST and fonts.title or fonts.body)
-    value:SetPoint("TOPLEFT", card, "TOPLEFT", valueLeft, TOPS[row])
+    title:SetText(Localization.Text(row.label))
+    local value = FrameKit.Text(card, row.key == "request" and fonts.title or fonts.body)
+    value:SetPoint("TOPLEFT", card, "TOPLEFT", valueLeft, row.top)
     value:SetPoint("RIGHT", card, "RIGHT", -layout.PADDING, 0)
-    card.labels[row], card.values[row] = title, value
+    card.labels[row.key], card.values[row.key] = title, value
   end
-  wrapTwoLines(card.values[REQUEST])
+  wrapTwoLines(card.values.request)
 end
 
 -- A { key = string, rank = number or nil } entry.
@@ -142,7 +139,7 @@ local function craftersText(lead)
     return themed(Localization.Text("None known"), colors.grey)
   end
   local color = first.color
-  local text = color and colored(first.name, color.r, color.g, color.b) or themed(first.name, colors.white)
+  local text = color and FrameKit.ColorCode(first.name, color.r, color.g, color.b) or themed(first.name, colors.white)
   local tail = first.rank and (" " .. first.rank) or ""
   if #entries > 1 then
     tail = tail .. " " .. Localization.Text("+%d more", #entries - 1)
@@ -153,9 +150,9 @@ local function craftersText(lead)
   return text .. themed(tail, colors.grey)
 end
 
--- Shows `text` in the row's value, or hides the label and value when it is nil.
-local function setRow(card, row, text)
-  local label, value = card.labels[row], card.values[row]
+-- Shows `text` in the value of the row `key`, or hides the label and value when it is nil.
+local function setRow(card, key, text)
+  local label, value = card.labels[key], card.values[key]
   if text == nil then
     label:Hide()
     value:Hide()
@@ -167,9 +164,9 @@ local function setRow(card, row, text)
 end
 
 function CardBody.Paint(card, lead)
-  setRow(card, REQUEST, lead.message)
-  setRow(card, MATCHED, matchedText(lead))
-  setRow(card, CRAFTERS, craftersText(lead))
+  setRow(card, "request", lead.message)
+  setRow(card, "matched", matchedText(lead))
+  setRow(card, "crafters", craftersText(lead))
 end
 
 ns.CardBody = CardBody

@@ -18,21 +18,25 @@ local CardHover = {}
 local BUTTON_GAP = 4
 local BUTTON_BOTTOM = 4
 
--- Each button's label and what it does to the card's lead, read at click time.
+-- Left to right: each button's key in card.buttons, its label and what it does to the card's lead,
+-- read at click time.
 local ACTIONS = {
   {
+    key = "greet",
     label = "Greet",
     run = function(card)
       ClickRouter.Handle("LeftButton", card.lead, card.shownAt)
     end,
   },
   {
+    key = "whisper",
     label = "Whisper",
     run = function(card)
       GreetAction.Empty(card.lead)
     end,
   },
   {
+    key = "dismiss",
     label = "Dismiss",
     run = function(card)
       Leads.Dismiss(card.lead.id)
@@ -41,7 +45,7 @@ local ACTIONS = {
 }
 
 local function hideHover(card)
-  for _, button in ipairs(card.buttons) do
+  for _, button in pairs(card.buttons) do
     button:Hide()
   end
   card:UnlockHighlight()
@@ -54,7 +58,7 @@ function CardHover.Enter(card)
       hideHover(other)
     end
   end
-  for _, button in ipairs(card.buttons) do
+  for _, button in pairs(card.buttons) do
     button:Show()
   end
   card:LockHighlight()
@@ -90,8 +94,9 @@ local function createButton(card, action, index, width)
   return button
 end
 
--- Adds the three buttons (card.buttons, hidden) and the hover scripts to a card of `list`. The card's
--- own scripts stay: HookScript runs after them. No card or button registers a drag.
+-- Adds the three buttons (card.buttons, keyed greet, whisper, dismiss; hidden) and the hover scripts
+-- to a card of `list`. The card's own scripts stay: HookScript runs after them. No card or button
+-- registers a drag.
 function CardHover.Attach(card, list)
   local layout = Theme.LAYOUT
   local count = #ACTIONS
@@ -99,7 +104,7 @@ function CardHover.Attach(card, list)
   card.list = list
   card.buttons = {}
   for index, action in ipairs(ACTIONS) do
-    card.buttons[index] = createButton(card, action, index, width)
+    card.buttons[action.key] = createButton(card, action, index, width)
   end
   card:HookScript("OnEnter", CardHover.Enter)
   card:HookScript("OnLeave", CardHover.Leave)

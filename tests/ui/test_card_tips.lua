@@ -139,7 +139,7 @@ local function testNoZoneOverLinks()
   for name, zone in pairs(card.zones) do
     Assert.same({ zone.frameType, zone.parent, zone.mouseEnabled, #zone.regions }, { "Button", card, true, 0 }, name)
     for _, point in ipairs(zone.points) do
-      Assert.truthy(point[2] ~= card.values[1] and point[2] ~= card.labels[1], name .. " is anchored over the Request")
+      Assert.truthy(point[2] ~= card.values.request and point[2] ~= card.labels.request, name .. " is anchored over the Request")
     end
   end
   Assert.equal(card.zones.what.points[1][2], card.what)
@@ -200,7 +200,7 @@ end
 
 local function testGreetTip()
   local _, _, card = open({ itemLead() })
-  local greet = card.buttons[1]
+  local greet = card.buttons.greet
   enter(card, greet)
   Assert.same({ tip().owner, tip().anchor, tip().shown }, { greet, "ANCHOR_RIGHT", true })
   Assert.same(tip().lines, { "Greet", "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper" })
@@ -208,7 +208,7 @@ local function testGreetTip()
   leave(card, greet, true)
   Assert.equal(tip().shown, false)
   -- The other buttons have no tooltip.
-  enter(card, card.buttons[2])
+  enter(card, card.buttons.whisper)
   Assert.equal(tip().shown, false)
 end
 
@@ -216,7 +216,7 @@ local function testLeaveHidesOwnedOnly()
   local _, _, card = open({ itemLead() })
   local zone = card.zones.name
   enter(card, zone)
-  tip().owner = card.buttons[2]
+  tip().owner = card.buttons.whisper
   leave(card, zone, true)
   Assert.equal(tip().shown, true)
   tip().owner = zone
@@ -256,7 +256,7 @@ local function testLeadChangeHidesZoneTip()
   end
   local ns, _, card = open(leads)
   -- A zone, a button and the card itself (the chat tooltip) each own the tip, then the card shows another lead.
-  for _, owner in ipairs({ card.zones.crafters, card.buttons[1], card }) do
+  for _, owner in ipairs({ card.zones.crafters, card.buttons.greet, card }) do
     enter(card, owner)
     Assert.equal(tip():IsOwned(owner), true)
     ns.Leads.Dismiss(card.lead.id)
@@ -277,7 +277,7 @@ local function testCloseHidesZoneTip()
   ns.LeadsWindow.Toggle()
   Assert.equal(tip().shown, false)
   ns.LeadsWindow.Toggle()
-  enter(card, card.buttons[1])
+  enter(card, card.buttons.greet)
   Assert.equal(tip().shown, true)
   _G["UIParent"]:Hide()
   Assert.equal(tip().shown, false)
@@ -291,7 +291,7 @@ local function testZonesKeepButtons()
   local _, _, card = open({ itemLead() })
   local function look()
     local b = card.buttons
-    return { b[1]:IsShown(), b[2]:IsShown(), b[3]:IsShown(), card.highlightLocked == true }
+    return { b.greet:IsShown(), b.whisper:IsShown(), b.dismiss:IsShown(), card.highlightLocked == true }
   end
   enter(card)
   -- The cursor moves from the card onto a zone: the card is left, still under the cursor.
@@ -387,6 +387,23 @@ local function testChatTipYieldsToLink()
   Assert.equal(tip().shown, false)
 end
 
+-- The customer tooltip reads the class once; without a colour table the chat tooltip reads none.
+local function testClassReads()
+  local _, _, card = open({ itemLead() })
+  local reads = 0
+  Wow.stub("GetPlayerInfoByGUID", function()
+    reads = reads + 1
+    return "Warrior", "WARRIOR"
+  end)
+  enter(card, card.zones.name)
+  Assert.same({ reads, tip().lines[2] }, { 1, "Warrior" })
+  leave(card, card.zones.name, true)
+  Wow.stub("RAID_CLASS_COLORS", nil)
+  reads = 0
+  enter(card)
+  Assert.same({ reads, tip().owner, tip().colors[1] }, { 0, card, GOLD })
+end
+
 -- A repeat from the same customer edits the lead in place (Model/Leads.lua:368) and the window repaints
 -- the card with that lead: the shown tooltip gets the newest line, with no new OnEnter.
 local function testChatTipLatestLine()
@@ -466,9 +483,9 @@ local function testNoOnUpdate()
   enter(card, card.zones.crafters)
   check()
   leave(card, card.zones.crafters, true)
-  enter(card, card.buttons[1])
+  enter(card, card.buttons.greet)
   check()
-  leave(card, card.buttons[1], false)
+  leave(card, card.buttons.greet, false)
   leave(card, card, false)
   check()
   card:Hide()
@@ -495,6 +512,7 @@ return function()
   testChatTipHidesOnLeave()
   testZoneThenBackToCard()
   testChatTipYieldsToLink()
+  testClassReads()
   testChatTipLatestLine()
   testRepeatLeavesOtherTips()
   testChatTipChannelNames()

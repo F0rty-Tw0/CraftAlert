@@ -42,11 +42,10 @@ end
 -- Hides the tooltip when one of the card's zones, buttons or the card itself owns it.
 local function hideOwned(card)
   hideIfOwned(card)
-  for _, zone in pairs(card.zones) do
-    hideIfOwned(zone)
-  end
-  for _, button in ipairs(card.buttons) do
-    hideIfOwned(button)
+  for _, children in ipairs({ card.zones, card.buttons }) do
+    for _, child in pairs(children) do
+      hideIfOwned(child)
+    end
   end
 end
 
@@ -87,7 +86,7 @@ function CardTips.ShowChat(card)
   tip:SetOwner(card, ANCHOR)
   CardTipText.Chat(tip, lead)
   tip:Show()
-  card.chatTip = { lead = lead, time = lead.time, message = lead.message }
+  card.chatTip = { time = lead.time, message = lead.message }
 end
 
 -- Adds the four zones (card.zones), the Greet button's tooltip and the chat tooltip's OnEnter to a card;
@@ -96,10 +95,10 @@ function CardTips.Attach(card)
   card.zones = {
     name = createZone(card, card.name, card.name, CardTipText.Customer),
     what = createZone(card, card.what, card.what, CardTipText.What),
-    matched = createZone(card, card.labels[2], card.values[2], CardTipText.Matched),
-    crafters = createZone(card, card.labels[3], card.values[3], CardTipText.Crafters),
+    matched = createZone(card, card.labels.matched, card.values.matched, CardTipText.Matched),
+    crafters = createZone(card, card.labels.crafters, card.values.crafters, CardTipText.Crafters),
   }
-  local greet = card.buttons[1]
+  local greet = card.buttons.greet
   greet:HookScript("OnEnter", function()
     local tip = tooltip()
     tip:SetOwner(greet, ANCHOR)
@@ -111,14 +110,6 @@ function CardTips.Attach(card)
   end)
   card:HookScript("OnEnter", CardTips.ShowChat)
   card:HookScript("OnHide", hideOwned)
-end
-
-local function setShown(region, shown)
-  if shown then
-    region:Show()
-  else
-    region:Hide()
-  end
 end
 
 -- True while the card shows its chat tooltip (not a link's) for a line older than the lead's newest.
@@ -139,8 +130,8 @@ function CardTips.Refresh(card, leadChanged)
   elseif chatTipStale(card) then
     CardTips.ShowChat(card)
   end
-  setShown(card.zones.what, card.lead.itemLink == nil)
-  setShown(card.zones.matched, card.values[2]:IsShown())
+  card.zones.what:SetShown(card.lead.itemLink == nil)
+  card.zones.matched:SetShown(card.values.matched:IsShown())
 end
 
 ns.CardTips = CardTips
