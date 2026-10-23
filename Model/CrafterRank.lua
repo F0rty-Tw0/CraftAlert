@@ -128,24 +128,23 @@ function CrafterRank.Pick(result, customerKey, db, opts)
     end
     return cannotOrderBy[key]
   end
-  local bestBy = {}
+  -- Each entry is judged in `probe`, which every call fills in full. A winner keeps its table and
+  -- the one it beat becomes the next probe, so a character's many entries allocate nothing.
+  local bestBy, probe = {}, {}
   local function consider(key, prof, recipeKey)
-    local cannot = cannotOrder(key) == true and 1 or 0
+    probe.key = key
+    probe.cannot = cannotOrder(key) == true and 1 or 0
     local rank, top, byConc = effectiveRank(db, key, recipeKey)
-    local fraction = rank and rank / top or -1
-    local conc = byConc and 1 or 0
-    local entry = {
-      key = key,
-      cannot = cannot,
-      fraction = fraction,
-      conc = conc,
-      tier = tierOf(db.characters[key], key, prof),
-      rank = rank,
-      byConc = byConc,
-      recipeKey = recipeKey,
-    }
-    if better(entry, bestBy[key]) then
-      bestBy[key] = entry
+    probe.fraction = rank and rank / top or -1
+    probe.conc = byConc and 1 or 0
+    probe.tier = tierOf(db.characters[key], key, prof)
+    probe.rank = rank
+    probe.byConc = byConc
+    probe.recipeKey = recipeKey
+    local held = bestBy[key]
+    if better(probe, held) then
+      bestBy[key] = probe
+      probe = held or {}
     end
   end
   if result.entryCount > 0 then

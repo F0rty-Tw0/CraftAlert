@@ -18,7 +18,21 @@ local function load(flavor)
   Fresh.require("Core.FlavorCompat")
   Fresh.require("Core.PlayerName").Init()
   Fresh.require("Model.RealmTag")
-  return Fresh.require("Model.CrafterRank")
+  local CrafterRank = Fresh.require("Model.CrafterRank")
+  -- Every Pick in this file also checks that its pick is one of its candidates.
+  local pick = CrafterRank.Pick
+  CrafterRank.Pick = function(...)
+    local picked = { pick(...) }
+    if picked[1] ~= nil then
+      local keys = {}
+      for _, candidate in ipairs(picked[6]) do
+        keys[candidate.key] = true
+      end
+      Assert.truthy(keys[picked[1]], "the pick is a candidate: " .. picked[1])
+    end
+    return unpack(picked, 1, 6)
+  end
+  return CrafterRank
 end
 
 local function character(source, primaryProf, realms)
@@ -56,7 +70,27 @@ local function result(keys, prof)
   return { kind = "item", entries = entries, entryCount = #entries, group = 501, prof = prof or BS, why = { "lf" }, whyCount = 1 }
 end
 
+-- Pick judges a character's many entries without a table per entry (it runs per matched line).
+local function testPickAllocation()
+  local CrafterRank = load("retail")
+  local data = db()
+  local many = result({})
+  for i = 1, 200 do
+    many.entries[i] = { character = "Alt-Realm", recipeKey = i, group = 501, prof = BS }
+  end
+  many.entryCount = 200
+  CrafterRank.Pick(many, CUSTOMER, data) -- warm-up: first-call caches stay out of the count
+  collectgarbage("collect")
+  collectgarbage("stop")
+  local before = collectgarbage("count")
+  CrafterRank.Pick(many, CUSTOMER, data)
+  local grownKb = collectgarbage("count") - before
+  collectgarbage("restart")
+  Assert.truthy(grownKb < 4, "Pick over 200 entries allocated " .. grownKb .. " KB")
+end
+
 return function()
+  testPickAllocation()
   local CrafterRank = load("retail")
   local data = db()
 
