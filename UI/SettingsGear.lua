@@ -33,8 +33,9 @@ function SettingsGear.Create(frame, onClick)
   local gear = _G["CreateFrame"]("Button", nil, frame)
   gear:SetSize(size, size)
   gear:SetPoint("RIGHT", frame.CloseButton, "LEFT", -2, 0)
-  -- With the close button above the NineSlice border, whose metal top edge covers the title strip.
-  gear:SetFrameLevel(frame.CloseButton:GetFrameLevel())
+  -- With the title above the NineSlice border, whose metal top edge covers the title strip. Not the
+  -- close button's level: the Classic template leaves that one under the border.
+  gear:SetFrameLevel(frame.TitleContainer:GetFrameLevel())
   local normal = gear:CreateTexture(nil, "ARTWORK")
   FrameKit.Art(normal, art.GEAR_ATLAS, art.GEAR_FILE)
   gear:SetNormalTexture(normal)

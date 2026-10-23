@@ -82,8 +82,10 @@ end
 -- SharedUIPanelTemplates.lua:144-155 (UIPanelCloseButton_OnClick: the parent's onCloseCallback first,
 -- then HideUIPanel(parent) only when there is none or it returns truthy) and
 -- Blizzard_SharedXML/PortraitFrame.lua:4-14 (TitledPanelMixin GetTitleText and SetTitle).
--- Frame levels: the NineSlice border at 500 (:381, its metal top edge covers the title strip), the
--- CloseButton (:134) and TitleContainer (:576) at 510; a plain child of `frame` sits under both.
+-- Frame levels: the NineSlice border at 500 (:381, its metal top edge covers the title strip) and
+-- the TitleContainer at 510 (:576; Classic/SharedUIPanelTemplates.xml:419 too). The CloseButton is
+-- at 510 only in Mainline (:134); the Classic template (:172) sets no level, so it is modelled here
+-- as a plain child of `frame`, under the border.
 -- Children come from the stubbed CreateFrame: they are complete frames, unlike `frame` here.
 function Templates.fakes.ButtonFrameTemplate(frame)
   local createFrame = _G["CreateFrame"]
@@ -108,7 +110,6 @@ function Templates.fakes.ButtonFrameTemplate(frame)
       _G["HideUIPanel"](parent)
     end
   end)
-  close:SetFrameLevel(510)
   frame.CloseButton = close
 
   local titleContainer = createFrame("Frame", nil, frame)
