@@ -32,6 +32,9 @@ local UI = {
   "UI.LinkHover",
   "UI.Dock",
   "UI.LeadRow",
+  "UI.WindowSize",
+  "UI.SettingsGear",
+  "UI.Settings.SettingsPane",
   "UI.LeadsWindow",
   "UI.LauncherArt",
   "UI.Launcher",
@@ -44,8 +47,6 @@ local UI = {
   "UI.Settings.PageKeywords",
   "UI.Settings.PageCrafters",
   "UI.Settings.PageTest",
-  "UI.Settings.SettingsWindow",
-  "UI.Settings.BlizzardCategory",
   "Core.Bindings",
   "Core.Perf",
   "Core.TestReport",
@@ -109,12 +110,19 @@ end
 
 -- The Blizzard UI tables the window and launcher touch: UISpecialFrames, and a GameTooltip
 -- that records what it was given (lines, their colours as { r, g, b } or {}, owner, shown,
--- hyperlinks; badLinks[link] makes SetHyperlink raise).
+-- hyperlinks, itemId, spellId; badLinks[link] makes SetHyperlink raise).
 local function stubBlizzardUi()
   Wow.stub("UISpecialFrames", {})
   local tooltip = { lines = {}, colors = {}, shown = false, hyperlinks = {} }
   function tooltip:SetOwner(owner, anchor)
     self.owner, self.anchor, self.lines, self.colors = owner, anchor, {}, {}
+    self.itemId, self.spellId = nil, nil
+  end
+  function tooltip:SetItemByID(itemId)
+    self.itemId = itemId
+  end
+  function tooltip:SetSpellByID(spellId)
+    self.spellId = spellId
   end
   function tooltip:ClearLines()
     self.lines, self.colors = {}, {}

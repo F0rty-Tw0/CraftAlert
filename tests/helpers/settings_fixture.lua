@@ -1,4 +1,4 @@
--- The settings window over UiFixture, with the refreshes a setting may trigger recorded instead
+-- The settings pane in the leads window over UiFixture, with the refreshes a setting may trigger recorded instead
 -- of run: Index.RequestRebuild(reason) → "rebuild:<reason>", ScanGate.Evaluate → "evaluate",
 -- Leads.Rearm → "rearm", Launcher.Refresh → "launcher", LeadsWindow.Refresh → "leadsWindow".
 --   local ns, db, refreshes = SettingsFixture.load(opts)   -- opts as UiFixture.load
@@ -11,7 +11,7 @@ local UiFixture = require("tests.helpers.ui_fixture")
 
 local SettingsFixture = {}
 
-SettingsFixture.WINDOW = "CraftAlertSettingsWindow"
+SettingsFixture.WINDOW = "CraftAlertLeadsWindow"
 
 local function spy(module, name, record)
   module[name] = function(...)
@@ -73,11 +73,11 @@ function SettingsFixture.navButton(title)
   error("no nav button " .. title)
 end
 
--- Opens the window if needed and selects the page with that title.
+-- Opens the window on the settings pane if needed and selects the page with that title.
 function SettingsFixture.open(ns, title)
   local window = SettingsFixture.window()
-  if window == nil or not window:IsShown() then
-    ns.SettingsWindow.Toggle()
+  if window == nil or not window:IsShown() or window:GetTitleText():GetText() ~= "Craft Alert — Settings" then
+    ns.LeadsWindow.ToggleSettings()
   end
   Widgets.click(SettingsFixture.navButton(title), "LeftButton")
 end

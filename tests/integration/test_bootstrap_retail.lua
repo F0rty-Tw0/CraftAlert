@@ -210,8 +210,8 @@ local function testFreshInstall()
   Assert.equal(isLit(launcher), false, "dim while paused")
   Assert.equal(isRegistered("CHAT_MSG_CHANNEL"), false, "paused: nothing read yet")
   Assert.same(ns.ProfessionList.Order(), { BS })
-  Assert.equal(#session.categories, 1, "one Blizzard Settings category")
-  Assert.same(session.addOnCategories, session.categories, "listed under AddOns once")
+  Assert.equal(#session.categories, 0, "no Blizzard Settings category (spec R10)")
+  Assert.same(session.addOnCategories, {}, "nothing listed under AddOns")
   Assert.same(db.characters[OWN_KEY].realms, { "OwnRealm", "OtherRealm" }, "the connected realms are stored")
 
   -- Opening the window reads the 3 recipes; the coalesced rebuild activates the scan, and the
@@ -359,7 +359,7 @@ local function testRaisingLoginStep(db)
   Assert.same(errors, { "realm list failed" }, "the error reaches the error handler")
   Assert.equal(type(rawget(_G, "SlashCmdList").CRAFTALERT), "function", "/ca works")
   Assert.truthy(rawget(_G, "CraftAlertLauncher"), "the launcher exists")
-  Assert.equal(#session.categories, 1, "the settings category is registered")
+  Assert.equal(#session.categories, 0, "no settings category")
   Assert.equal(ns.Index.Current().size, 3, "the index is built")
   Assert.equal(ns.ScanGate.IsActive(), true)
   Assert.truthy(isRegistered("CHAT_MSG_CHANNEL"), "the gate registered the chat events")
@@ -445,8 +445,7 @@ local function testRaisingLoadKeepsWindowsClosed(db)
   slash("config")
   rawget(_G, "CraftAlert_ToggleLeads")()
   Assert.same(chatSince(0), { NO_DB, NO_DB })
-  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil, "no leads window on unchecked data")
-  Assert.equal(rawget(_G, "CraftAlertSettingsWindow"), nil, "no settings window on unchecked data")
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil, "no window from /ca or /ca config on unchecked data")
 end
 
 -- A fresh install whose saved variables fail to load has no CraftAlertDB at all: the windows
@@ -468,8 +467,7 @@ local function testRaisingLoadOnFreshInstall()
     chatSince(0),
     { NO_DB, NO_DB, "Test: Paused — Craft Alert did not start; /reload to try again, a real Trade line would be ignored too" }
   )
-  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil, "no leads window without a db")
-  Assert.equal(rawget(_G, "CraftAlertSettingsWindow"), nil, "no settings window without a db")
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil, "no window from /ca or /ca config without a db")
   Assert.same(errors, { "load failed" }, "only the load error is reported")
 end
 

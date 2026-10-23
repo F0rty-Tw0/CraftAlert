@@ -1,0 +1,356 @@
+local Assert = require("tests.helpers.assert")
+local Fresh = require("tests.helpers.fresh")
+local Wow = require("tests.helpers.wow")
+local Widgets = require("tests.helpers.widgets")
+local UiFixture = require("tests.helpers.ui_fixture")
+local SettingsFixture = require("tests.helpers.settings_fixture")
+
+-- Native-HUD spec §7.1–7.2: the settings pane lives in the leads window behind a gear. One
+-- window, two modes (List and Settings), a size saved per mode and one shared position.
+local PAGES = { "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" }
+
+local function frame()
+  return rawget(_G, "CraftAlertLeadsWindow")
+end
+
+local function gear()
+  return frame().gear
+end
+
+-- The lead row frame at `index` (top first), or nil when the window never made one.
+local function row(index)
+  for _, candidate in ipairs(Wow.frames) do
+    if candidate.isLeadRow and candidate.rowIndex == index then
+      return candidate
+    end
+  end
+  return nil
+end
+
+local function rowVisible(index)
+  local found = row(index)
+  return found ~= nil and found:IsVisible()
+end
+
+local function anyRowShown()
+  for _, candidate in ipairs(Wow.frames) do
+    if candidate.isLeadRow and candidate:IsShown() then
+      return true
+    end
+  end
+  return false
+end
+
+-- The empty-state font string in the inset.
+local function emptyText()
+  for _, region in ipairs(frame().Inset.regions) do
+    if region.GetText and string.find(region:GetText() or "", "No leads", 1, true) then
+      return region
+    end
+  end
+  error("no empty text")
+end
+
+local function title()
+  return frame():GetTitleText():GetText()
+end
+
+local function size()
+  return { frame():GetWidth(), frame():GetHeight() }
+end
+
+local function navVisible()
+  return SettingsFixture.navButton("General"):IsVisible()
+end
+
+local function testToggleSettingsFromHidden()
+  local ns = UiFixture.load({ leads = 2 })
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(frame():IsShown(), true)
+  Assert.equal(title(), "Craft Alert — Settings")
+  Assert.same(size(), { 600, 480 }, "default settings size")
+  Assert.same({ frame().resizeBounds[1], frame().resizeBounds[2] }, { 600, 480 })
+  Assert.same({ frame().resizeButton.minWidth, frame().resizeButton.minHeight }, { 600, 480 })
+  Assert.equal(gear().highlightLocked, true)
+  Assert.equal(navVisible(), true)
+  Assert.equal(rowVisible(1), false, "no lead row in Settings")
+  Assert.equal(emptyText():IsShown(), false)
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(frame():IsShown(), false, "shown in Settings: ToggleSettings hides")
+  ns.LeadsWindow.ToggleSettings()
+  ns.LeadsWindow.Toggle()
+  Assert.equal(frame():IsShown(), false, "Toggle hides in either mode")
+end
+
+local function testGearSwitchesModes()
+  local ns = UiFixture.load({
+    leads = 2,
+    db = function(db)
+      db.ui.window = { width = 500, height = 300 }
+    end,
+  })
+  ns.LeadsWindow.Toggle()
+  Assert.same(size(), { 500, 300 })
+  Assert.equal(rowVisible(1), true)
+  Widgets.click(gear())
+  Assert.same(size(), { 600, 480 })
+  Assert.equal(title(), "Craft Alert — Settings")
+  Assert.equal(anyRowShown(), false, "no row drawn over the pane")
+  Assert.equal(row(1).lead, nil, "rows cleared (LeadRow.Clear), not just hidden")
+  Assert.equal(emptyText():IsShown(), false)
+  Wow.clock.gettime = 60
+  Widgets.click(gear())
+  Assert.same(size(), { 500, 300 })
+  Assert.same({ frame().resizeBounds[1], frame().resizeBounds[2] }, { 360, 160 })
+  Assert.same({ frame().resizeButton.minWidth, frame().resizeButton.minHeight }, { 360, 160 })
+  Assert.equal(title(), "Craft Alert — Leads")
+  Assert.equal(gear().highlightLocked, false)
+  Assert.equal(navVisible(), false)
+  Assert.equal(rowVisible(1), true)
+  Assert.equal(select(2, ns.LeadsWindow.VisibleLatest()), 60, "the row is shown afresh")
+end
+
+-- Makes the window's SetSize act like a client that clamps to the resize bounds and then fires
+-- OnSizeChanged (the fake does neither).
+local function clientSizing()
+  local target, setSize = frame(), frame().SetSize
+  function target:SetSize(width, height)
+    setSize(self, math.max(width, self.resizeBounds[1]), math.max(height, self.resizeBounds[2]))
+    self:GetScript("OnSizeChanged")(self, self:GetWidth(), self:GetHeight())
+  end
+end
+
+local function rowCount()
+  local count = 0
+  for _, candidate in ipairs(Wow.frames) do
+    if candidate.isLeadRow then
+      count = count + 1
+    end
+  end
+  return count
+end
+
+-- Spec 3b §1: a panel button at the bottom of the nav does what the gear does in Settings.
+local function testBackButton()
+  local ns = UiFixture.load({
+    leads = 2,
+    db = function(db)
+      db.ui.window = { width = 500, height = 300 }
+    end,
+  })
+  ns.LeadsWindow.ToggleSettings()
+  local back = SettingsFixture.button(frame(), "Back to leads")
+  local nav = back.parent
+  Assert.equal(back:IsVisible(), true)
+  Assert.same(back.points[1], { "BOTTOMLEFT", nav, "BOTTOMLEFT", 4, 4 })
+  Assert.equal(back:GetHeight(), 24)
+  Widgets.click(back)
+  Assert.equal(frame():IsShown(), true)
+  Assert.equal(title(), "Craft Alert — Leads")
+  Assert.same(size(), { 500, 300 })
+  Assert.equal(nav:IsVisible(), false)
+  Assert.equal(gear().highlightLocked, false)
+  Assert.equal(rowVisible(1), true)
+  Widgets.click(gear())
+  Assert.equal(title(), "Craft Alert — Settings", "the gear still opens Settings")
+end
+
+local function testModeSwitchUnderClientSizing()
+  local ns = UiFixture.load({ leads = 8 })
+  ns.LeadsWindow.Toggle()
+  clientSizing()
+  local before = rowCount()
+  Widgets.click(gear())
+  Assert.equal(rowCount(), before, "the resize to the settings size draws no new row")
+  Widgets.click(gear())
+  Assert.same(size(), { 460, 320 }, "the list bounds come before the size, so it can shrink")
+end
+
+local function testWheelIgnoredInSettings()
+  local ns = UiFixture.load({
+    leads = 8,
+    db = function(db)
+      db.ui.window = { width = 360, height = 160 }
+    end,
+  })
+  ns.LeadsWindow.ToggleSettings()
+  for _ = 1, 3 do
+    frame():GetScript("OnMouseWheel")(frame(), -1)
+  end
+  Widgets.click(gear())
+  Assert.equal(row(1).lead, ns.Leads.Latest(), "the list is still at the top")
+end
+
+local function testReopenRefreshesPage()
+  local ns, db = UiFixture.load()
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(SettingsFixture.row("Guild").input:GetChecked(), false)
+  frame():Hide()
+  db.settings.channels.guild = true
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(SettingsFixture.row("Guild").input:GetChecked(), true, "the page reads the db on reopen")
+end
+
+local function testCloseReturnsToList()
+  local ns = UiFixture.load()
+  ns.LeadsWindow.ToggleSettings()
+  frame():Hide()
+  ns.LeadsWindow.Toggle()
+  Assert.same(size(), { 460, 320 })
+  Assert.equal(title(), "Craft Alert — Leads")
+  Assert.equal(navVisible(), false)
+  frame():Hide()
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(title(), "Craft Alert — Settings")
+  Assert.equal(navVisible(), true)
+  frame():Hide()
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(frame():IsShown(), true)
+  Assert.equal(title(), "Craft Alert — Settings", "a window hidden in Settings reopens there")
+  Assert.same(size(), { 600, 480 })
+end
+
+local function selectedPage()
+  local general, alerts = SettingsFixture.navButton("General"), SettingsFixture.navButton("Alerts")
+  return { general = general.selected:IsShown(), alerts = alerts.selected:IsShown() }
+end
+
+local function testReopenKeepsPage()
+  local ns = UiFixture.load()
+  SettingsFixture.open(ns, "Alerts")
+  frame():Hide()
+  ns.LeadsWindow.ToggleSettings()
+  Assert.same(selectedPage(), { general = false, alerts = true }, "reopens on the page last shown")
+  Widgets.click(gear())
+  Widgets.click(gear())
+  Assert.same(selectedPage(), { general = false, alerts = true }, "List and back keeps the page")
+end
+
+local function resizeTo(width, height)
+  local button = frame().resizeButton
+  Widgets.fire(button, "OnMouseDown", "LeftButton")
+  frame():SetSize(width, height)
+  Widgets.fire(button, "OnMouseUp", "LeftButton")
+end
+
+local function testSizeSavedPerMode()
+  local ns, db = UiFixture.load()
+  ns.LeadsWindow.ToggleSettings()
+  resizeTo(700, 520)
+  Assert.same({ db.ui.settings.width, db.ui.settings.height }, { 700, 520 })
+  Assert.equal(db.ui.window.width, nil, "the list size is untouched")
+  Assert.equal(db.ui.window.point, "CENTER", "the position is saved under window")
+  Assert.equal(db.ui.settings.point, nil)
+  Widgets.click(gear())
+  resizeTo(400, 200)
+  Assert.same({ db.ui.window.width, db.ui.window.height }, { 400, 200 })
+  Assert.same({ db.ui.settings.width, db.ui.settings.height }, { 700, 520 })
+  frame():Hide()
+  ns.LeadsWindow.ToggleSettings()
+  Assert.same(size(), { 700, 520 })
+end
+
+local function testSettingsSizeClamped()
+  local ns = UiFixture.load({
+    db = function(db)
+      db.ui.settings = { width = 1e6, height = 1e6 }
+    end,
+  })
+  ns.LeadsWindow.ToggleSettings()
+  local screen = rawget(_G, "UIParent")
+  Assert.same(size(), { screen:GetWidth(), screen:GetHeight() }, "no bigger than the screen")
+  ns = UiFixture.load({
+    db = function(db)
+      db.ui.settings = { width = 100, height = 100 }
+    end,
+  })
+  ns.LeadsWindow.ToggleSettings()
+  Assert.same(size(), { 600, 480 }, "no smaller than the minimum")
+end
+
+local function testRefreshInSettings()
+  local ns, db = UiFixture.load({ leads = 2 })
+  db.settings.opacity = 0.5
+  ns.LeadsWindow.ToggleSettings()
+  ns.LeadsWindow.Refresh()
+  Assert.equal(rowVisible(1), false)
+  Assert.equal(emptyText():IsShown(), false)
+  Assert.equal(frame():GetAlpha(), 0.5)
+  frame():GetScript("OnSizeChanged")(frame(), 700, 500)
+  Assert.equal(anyRowShown(), false, "a resize in Settings draws no rows")
+end
+
+local function testGearTooltip()
+  local ns = UiFixture.load()
+  ns.LeadsWindow.Toggle()
+  local tooltip = rawget(_G, "GameTooltip")
+  Widgets.fire(gear(), "OnEnter")
+  Assert.equal(tooltip.owner, gear())
+  Assert.equal(tooltip.anchor, "ANCHOR_BOTTOMLEFT")
+  Assert.same(tooltip.lines, { "Settings", " ", "Click: open settings" })
+  Assert.same(tooltip.colors[1], { 1, 0.82, 0 })
+  Assert.same(tooltip.colors[3], { 0.1, 1, 0.1 })
+  Widgets.click(gear())
+  Assert.equal(tooltip.lines[3], "Click: back to leads", "the line follows the click")
+  Widgets.fire(gear(), "OnLeave")
+  Assert.equal(tooltip.shown, false)
+end
+
+local function testGearArtAndPlace()
+  local ns = UiFixture.load()
+  ns.LeadsWindow.Toggle()
+  Assert.same(gear().points[1], { "RIGHT", frame().CloseButton, "LEFT", -2, 0 })
+  Assert.same({ gear():GetWidth(), gear():GetHeight() }, { 20, 20 })
+  Assert.equal(gear():GetNormalTexture().atlas, "GM-icon-settings")
+  Assert.equal(gear():GetHighlightTexture().blendMode, "ADD")
+  -- Above the NineSlice border (level 500), or its title strip hides them in game.
+  local border = frame().NineSlice:GetFrameLevel()
+  Assert.truthy(gear():GetFrameLevel() > border, "the gear sits above the border")
+  Assert.truthy(frame().resizeButton:GetFrameLevel() > border, "the resize button sits above the border")
+  ns = UiFixture.load()
+  Wow.stub("C_Texture", {
+    GetAtlasInfo = function()
+      return nil
+    end,
+  })
+  ns.LeadsWindow.Toggle()
+  Assert.equal(gear():GetNormalTexture().texture, "Interface\\WorldMap\\Gear_64Grey")
+end
+
+-- The module's package.loaded entry under either key: the test runners strip the "CraftAlert."
+-- prefix before requiring (scripts/run_test.py), so the module sits under the short one.
+local function loaded(path)
+  return package.loaded[path] or package.loaded["CraftAlert." .. path]
+end
+
+-- Spec §7.1: the pane loads before the pages; a load-time page require would loop.
+local function testNoPageAtLoad()
+  UiFixture.load()
+  Assert.truthy(loaded("UI.Settings.PageGeneral"), "the fixture loaded the pages")
+  for _, name in ipairs(PAGES) do
+    package.loaded["UI.Settings.Page" .. name] = nil
+    package.loaded["CraftAlert.UI.Settings.Page" .. name] = nil
+  end
+  Fresh.require("UI.Settings.SettingsPane")
+  for _, name in ipairs(PAGES) do
+    Assert.equal(loaded("UI.Settings.Page" .. name), nil, "Page" .. name .. " loaded with the pane")
+  end
+end
+
+return function()
+  testToggleSettingsFromHidden()
+  testGearSwitchesModes()
+  testBackButton()
+  testModeSwitchUnderClientSizing()
+  testWheelIgnoredInSettings()
+  testReopenRefreshesPage()
+  testCloseReturnsToList()
+  testReopenKeepsPage()
+  testSizeSavedPerMode()
+  testSettingsSizeClamped()
+  testRefreshInSettings()
+  testGearTooltip()
+  testGearArtAndPlace()
+  testNoPageAtLoad()
+  Wow.reset()
+end

@@ -8,6 +8,7 @@ local Toc = require("tests.helpers.toc")
 local RuntimeTraps = require("tests.helpers.runtime_traps")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
 local SettingsFixture = require("tests.helpers.settings_fixture")
+local Widgets = require("tests.helpers.widgets")
 
 local CHANNEL, PLAYER_RESTING = "CHAT_MSG_CHANNEL", "PLAYER_UPDATE_RESTING"
 -- Timer delays the plan allows (§4.3 rule 1): index coalescing 0, bind tick 1, toast auto-hide
@@ -235,9 +236,9 @@ local function testTrapsCatchViolations()
     rawset(_G, "Foo", nil)
     verify()
 
-    -- Raw writes skip a proxy's __newindex; verify() finds what landed in it. The leads and
-    -- settings windows' frame names in UISpecialFrames are the one sanctioned insert (rule 3):
-    -- any other name traps, our own prefix included.
+    -- Raw writes skip a proxy's __newindex; verify() finds what landed in it. The leads window's
+    -- frame name in UISpecialFrames is the one sanctioned insert (rule 3): any other name traps,
+    -- our own prefix and the old settings window's included.
     rawset(G("C_Timer"), "After", function() end)
     Assert.raises(verify, "raw write into Blizzard table C_Timer%[After%]")
     rawset(G("C_Timer"), "After", nil)
@@ -251,8 +252,9 @@ local function testTrapsCatchViolations()
     Assert.raises(verify, "UISpecialFrames%[1%]")
     rawset(G("UISpecialFrames"), 1, nil)
     table.insert(G("UISpecialFrames"), "CraftAlertLeadsWindow")
-    table.insert(G("UISpecialFrames"), "CraftAlertSettingsWindow")
     verify()
+    table.insert(G("UISpecialFrames"), "CraftAlertSettingsWindow")
+    Assert.raises(verify, "UISpecialFrames%[2%]")
     rawset(G("UISpecialFrames"), 2, nil)
     rawset(G("UISpecialFrames"), 1, nil)
 
@@ -379,33 +381,24 @@ local function testAddonObeysTheRules()
     Assert.equal(ns.Leads.HasActive(), false)
     Assert.same(publicChatEvents(), { CHANNEL })
 
-    -- The settings window under the traps: its Blizzard category and button, every page, and
-    -- settings that rebuild, re-evaluate, re-arm and repaint (its UISpecialFrames insert).
-    local category = ns.BlizzardCategory.Register()
-    Assert.truthy(category, "registered through the Settings API")
-    for _, frame in ipairs(Wow.frames) do
-      if frame.parent == category.frame and frame.frameType == "Button" then
-        frame:GetScript("OnClick")(frame, "LeftButton")
-      end
-    end
+    -- The settings pages under the traps: every page, and settings that rebuild, re-evaluate,
+    -- re-arm and repaint (the pane in the leads window adds no UISpecialFrames entry).
     for _, title in ipairs({ "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" }) do
       SettingsFixture.open(ns, title)
     end
     SettingsFixture.open(ns, "General")
     local onlyResting = SettingsFixture.row("Only while resting (city or inn)").input
-    onlyResting:GetScript("OnClick")(onlyResting, "LeftButton")
-    onlyResting:GetScript("OnClick")(onlyResting, "LeftButton")
+    Widgets.click(onlyResting)
+    Widgets.click(onlyResting)
     local guild = SettingsFixture.row("Guild").input
-    guild:GetScript("OnClick")(guild, "LeftButton")
+    Widgets.click(guild)
     Assert.same(publicChatEvents(), { CHANNEL, "CHAT_MSG_GUILD" }, "the gate registers a new channel at once")
-    guild:GetScript("OnClick")(guild, "LeftButton")
+    Widgets.click(guild)
     SettingsFixture.open(ns, "Alerts")
-    local timeout = SettingsFixture.row("Lead timeout").input
-    timeout:SetValue(5)
-    timeout:GetScript("OnMouseUp")(timeout, "LeftButton")
+    Widgets.slide(SettingsFixture.row("Lead timeout").input, 5)
     local hide = SettingsFixture.row("Hide the launcher when there are no leads").input
-    hide:GetScript("OnClick")(hide, "LeftButton")
-    hide:GetScript("OnClick")(hide, "LeftButton")
+    Widgets.click(hide)
+    Widgets.click(hide)
     SettingsFixture.open(ns, "Test")
     local line = SettingsFixture.row("Test a line").input
     line:SetText("LF plate belt")
@@ -413,7 +406,7 @@ local function testAddonObeysTheRules()
     G("CraftAlert_ToggleLeads")()
     Assert.same(
       { rawget(G("UISpecialFrames"), 1), rawget(G("UISpecialFrames"), 2), rawget(G("UISpecialFrames"), 3) },
-      { "CraftAlertLeadsWindow", "CraftAlertSettingsWindow", nil }
+      { "CraftAlertLeadsWindow", nil, nil }
     )
     Assert.same(publicChatEvents(), { CHANNEL }, "and drops it at once")
 

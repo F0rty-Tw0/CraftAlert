@@ -39,7 +39,7 @@ local function testKeywordsPage()
   end
   Widgets.type(row("Intent words").input, table.concat(long, " "))
   Widgets.type(row("Extra slang (word=slot)").input, table.concat(slang, " "))
-  ns.SettingsWindow.Toggle()
+  ns.LeadsWindow.ToggleSettings()
   open(ns, "Keywords")
   for _, label in ipairs({ "Intent words", "Extra slang (word=slot)" }) do
     local box = row(label).input
@@ -79,14 +79,18 @@ local function crafters(accountDb)
   accountDb.characters["Far-Away"] = { source = "import", importedAt = 1, enabled = true, realms = {}, professions = {}, recipes = {} }
 end
 
--- The bell of the visible recipe row showing recipe `key`.
-local function bellOf(key)
+-- The visible recipe row showing recipe `key`.
+local function rowOf(key)
   for _, frame in ipairs(Wow.frames) do
-    if frame.bell and frame.item and frame.item.key == key and SettingsFixture.visible(frame) then
-      return frame.bell
+    if frame.icon and frame.item and frame.item.key == key and SettingsFixture.visible(frame) then
+      return frame
     end
   end
   error("no visible recipe row " .. tostring(key))
+end
+
+local function iconOf(key)
+  return rowOf(key).icon
 end
 
 -- §6.2: crafter enable/disable, removal and mute rebuild the index; the primary crafter is
@@ -97,19 +101,19 @@ local function testCraftersPage()
   open(ns, "Crafters")
   take(refreshes)
   local character = row("Character").input
-  Assert.equal(character.label:GetText(), "Me-Realm (this character)", "opens on the current character")
-  Widgets.click(character, "LeftButton")
-  Assert.equal(character.label:GetText(), "Alt-Realm (same account)", "then by name, wrapping")
-  Widgets.click(character, "LeftButton")
-  Assert.equal(character.label:GetText(), "Far-Away (imported)")
-  Widgets.click(character, "LeftButton")
+  Assert.equal(character.Text:GetText(), "Me-Realm (this character)", "opens on the current character")
+  Widgets.pick(character, "Alt-Realm")
+  Assert.equal(character.Text:GetText(), "Alt-Realm (same account)")
+  Widgets.pick(character, "Far-Away")
+  Assert.equal(character.Text:GetText(), "Far-Away (imported)")
+  Widgets.pick(character, "Me-Realm")
 
   Widgets.click(row("Listen for this character").input)
   Assert.equal(me.enabled, false)
   Assert.same(take(refreshes), { "rebuild:crafter" })
 
   -- Primary: one crafter per profession; it is the shown character's for the shown profession.
-  Assert.equal(row("Profession").input.label:GetText(), "Blacksmithing")
+  Assert.equal(row("Profession").input.Text:GetText(), "Blacksmithing")
   Widgets.click(row("Primary crafter for this profession").input)
   Assert.equal(me.professions[BS].primary, true)
   Assert.equal(db.characters["Alt-Realm"].professions[BS].primary, false, "the other primary is cleared")
@@ -119,7 +123,7 @@ local function testCraftersPage()
   Widgets.click(row("Primary crafter for this profession").input)
   Assert.same(take(refreshes), {})
 
-  -- Recipes of that profession by name, with search; mute toggles the bell and rebuilds.
+  -- Recipes of that profession by name, with search; mute toggles the icon and rebuilds.
   local shown = texts()
   Assert.truthy(shown:find("Plate Greaves / Mute / Thick Plate Belt / Mute", 1, true), shown)
   Assert.falsy(shown:find("Enchant Bracer", 1, true))
@@ -129,12 +133,12 @@ local function testCraftersPage()
   Assert.equal(me.recipes[9001].muted, true)
   Assert.same(take(refreshes), { "rebuild:mute" })
   Assert.truthy(texts():find("Thick Plate Belt / Unmute", 1, true))
-  Assert.equal(bellOf(9001).desaturated, true, "a muted recipe's bell is grey")
+  Assert.equal(iconOf(9001).desaturated, true, "a muted recipe's icon is grey")
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Unmute"))
   Assert.equal(me.recipes[9001].muted, nil)
-  Assert.equal(bellOf(9001).desaturated, false)
+  Assert.equal(iconOf(9001).desaturated, false)
   Assert.same(take(refreshes), { "rebuild:mute" })
-  Widgets.click(row("Profession").input)
+  Widgets.pick(row("Profession").input, ENCH)
   Assert.truthy(texts():find("Enchant Bracer - Health", 1, true), "the search clears with the profession")
 
   -- Remove asks for a second click, then drops the character and shows the next one.
@@ -145,14 +149,14 @@ local function testCraftersPage()
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Click again to remove"))
   Assert.equal(db.characters["Me-Realm"], nil)
   Assert.same(take(refreshes), { "rebuild:crafter" })
-  Assert.equal(character.label:GetText(), "Alt-Realm (same account)")
+  Assert.equal(character.Text:GetText(), "Alt-Realm (same account)")
 end
 
 -- The recipe keys of the visible recipe rows, top to bottom.
 local function shownRecipeKeys()
   local keys = {}
   for _, frame in ipairs(Wow.frames) do
-    if frame.bell and frame.item and SettingsFixture.visible(frame) then
+    if frame.icon and frame.item and SettingsFixture.visible(frame) then
       keys[#keys + 1] = frame.item.key
     end
   end
@@ -182,6 +186,101 @@ local function testCraftersRecipeOrder()
   open(ns, "Crafters")
   -- Equal names: recipe IDs in number order (9 before 10), then name keys. The page shows 8 rows.
   Assert.same(shownRecipeKeys(), { 9, 10, "1x", "25y", 9003, 9004, 9002, 9001 })
+end
+
+-- Recipe rows show the crafted item's icon, else the recipe spell's (number keys), else the
+-- addon icon (a name key from Classic has neither); a muted row is grey and dim.
+local function testCraftersRecipeIcons()
+  local ns, db = SettingsFixture.load({
+    db = function(accountDb)
+      crafters(accountDb)
+      accountDb.characters["Me-Realm"].recipes = {
+        [9001] = { item = 501, name = "Belt", prof = BS },
+        [9002] = { name = "Bracer", prof = BS },
+        ["Old Recipe"] = { name = "Old Recipe", prof = BS },
+      }
+    end,
+  })
+  Wow.stub("GetItemInfoInstant", function(id)
+    return id, nil, nil, nil, "item-icon"
+  end)
+  Wow.stub("C_Spell", {
+    GetSpellTexture = function(id)
+      return id == 9002 and "spell-icon" or nil
+    end,
+  })
+  open(ns, "Crafters")
+  Assert.equal(iconOf(9001).texture, "item-icon", "item recipe")
+  Assert.equal(iconOf(9002).texture, "spell-icon", "no item: the spell")
+  Assert.equal(iconOf("Old Recipe").texture, ns.Theme.ICON, "name key: the addon icon")
+  Assert.equal(iconOf(9001).desaturated, false)
+  db.characters["Me-Realm"].recipes[9001].muted = true
+  Widgets.pick(row("Profession").input, ENCH)
+  Widgets.pick(row("Profession").input, BS)
+  Assert.equal(iconOf(9001).desaturated, true, "muted: grey")
+  Assert.equal(iconOf(9001).alpha, ns.Theme.DIM_ALPHA, "muted: dim")
+  Assert.equal(iconOf(9001).texture, "item-icon", "muted keeps its icon")
+end
+
+-- Hovering a recipe row shows the item's tooltip, else the spell's, else none. Rows are reused
+-- by the scroll: the tooltip reads the row's recipe at hover time, and a tooltip a row owns
+-- follows the repaint.
+local function testCraftersRecipeTooltip()
+  local ns = SettingsFixture.load({
+    db = function(accountDb)
+      crafters(accountDb)
+      local recipes = {
+        [9001] = { item = 501, name = "A Belt", prof = BS },
+        [9002] = { name = "B Bracer", prof = BS },
+        ["Old Recipe"] = { name = "C Old Recipe", prof = BS },
+      }
+      for id = 1, 8 do
+        recipes[9100 + id] = { item = 600 + id, name = "D " .. id, prof = BS }
+      end
+      accountDb.characters["Me-Realm"].recipes = recipes
+    end,
+  })
+  open(ns, "Crafters")
+  local tooltip = _G["GameTooltip"]
+  local itemRow, spellRow, oldRow = rowOf(9001), rowOf(9002), rowOf("Old Recipe")
+
+  Widgets.fire(itemRow, "OnEnter")
+  Assert.equal(tooltip.owner, itemRow)
+  Assert.equal(tooltip.anchor, "ANCHOR_RIGHT")
+  Assert.equal(tooltip.itemId, 501)
+  Assert.equal(tooltip.shown, true)
+  Widgets.fire(itemRow, "OnLeave")
+  Assert.equal(tooltip.shown, false)
+
+  Widgets.fire(spellRow, "OnEnter")
+  Assert.equal(tooltip.spellId, 9002)
+  Assert.equal(tooltip.itemId, nil, "spell row: no item tooltip")
+  Assert.equal(tooltip.shown, true)
+  Widgets.fire(spellRow, "OnLeave")
+
+  Widgets.fire(oldRow, "OnEnter")
+  Assert.equal(tooltip.shown, false, "name key without an item: no tooltip")
+
+  -- 11 recipes, 8 rows: each wheel step moves the rows one recipe. A row that owns the tooltip repaints it.
+  local list = itemRow.parent
+  Widgets.fire(itemRow, "OnEnter")
+  Widgets.fire(list, "OnMouseWheel", -1)
+  Assert.equal(itemRow.item.key, 9002)
+  Assert.equal(tooltip.owner, itemRow)
+  Assert.equal(tooltip.spellId, 9002, "repainted to the row's new recipe")
+  Assert.equal(tooltip.itemId, nil)
+  Widgets.fire(list, "OnMouseWheel", -1)
+  Assert.equal(itemRow.item.key, "Old Recipe")
+  Assert.equal(tooltip.shown, false, "repainted onto a name key: hidden")
+
+  -- No tooltip open: the scroll shows none, the next hover shows the row's new recipe.
+  Widgets.fire(itemRow, "OnLeave")
+  Widgets.fire(list, "OnMouseWheel", -1)
+  Assert.equal(tooltip.shown, false)
+  Assert.equal(itemRow.item.key, 9101)
+  Widgets.fire(itemRow, "OnEnter")
+  Assert.equal(tooltip.itemId, 601)
+  Assert.equal(tooltip.shown, true)
 end
 
 -- Removing the current character stores it again from the client at once (as at login), so its
@@ -214,8 +313,8 @@ local function testRemoveOwnCharacter()
 
   -- Another character is not the client's: it stays removed.
   local character = row("Character").input
-  Widgets.click(character, "LeftButton")
-  Assert.equal(character.label:GetText(), "Alt-Realm (same account)")
+  Widgets.pick(character, "Alt-Realm")
+  Assert.equal(character.Text:GetText(), "Alt-Realm (same account)")
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Remove character"))
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Click again to remove"))
   Assert.equal(db.characters["Alt-Realm"], nil, "an alt is not stored again")
@@ -262,6 +361,8 @@ return function()
   testKeywordsPage()
   testCraftersPage()
   testCraftersRecipeOrder()
+  testCraftersRecipeIcons()
+  testCraftersRecipeTooltip()
   testRemoveOwnCharacter()
   testTestPage()
 end

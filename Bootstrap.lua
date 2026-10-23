@@ -23,7 +23,6 @@ local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
-local BlizzardCategory = ns.BlizzardCategory or require("CraftAlert.UI.Settings.BlizzardCategory")
 local Perf = ns.Perf or require("CraftAlert.Core.Perf")
 local TestLine = ns.TestLine or require("CraftAlert.Core.TestLine")
 local SlashCommands = ns.SlashCommands or require("CraftAlert.Core.SlashCommands")
@@ -128,10 +127,6 @@ local function createLauncher()
   ScanGate.OnChange(Launcher.Refresh)
 end
 
-local function registerCategory()
-  BlizzardCategory.Register()
-end
-
 local function buildIndex()
   Index.Rebuild()
 end
@@ -149,7 +144,6 @@ local LOGIN_STEPS = {
   installQualityReach,
   installScanGate,
   createLauncher,
-  registerCategory,
   buildIndex,
   printLoginLines,
 }

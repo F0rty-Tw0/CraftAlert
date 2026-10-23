@@ -2,8 +2,11 @@
 -- Setters store what they were given and getters read it back; anything the client draws
 -- (fonts, textures, layout) is only recorded.
 --   Widgets.extend(frame)           adds region, frame and child-creation methods
---   Widgets.click(frame, button)    runs the OnClick script as a mouse click would
---   Widgets.slide(slider, value)    drags a Slider to value and lets go
+--   Widgets.click(frame, button)    runs the OnClick script as a mouse click would (a check button flips first)
+--   Widgets.slide(control, value)   drags a slider template frame's inner Slider to value and lets go
+--   Widgets.step(control, forward)  clicks a slider template's Forward or Back stepper
+--   Widgets.pick(dropdown, value)   picks the dropdown's radio whose data is value
+--   Widgets.mouse                   buttons held right now (`LeftButton = true`), read by IsMouseButtonDown
 --   Widgets.type(editBox, text)     types text into an EditBox and presses Enter
 --   Widgets.texts(frame, frames)    the shown texts under frame (itself and its descendants
 --                                   among `frames`, usually Wow.frames), in creation order
@@ -13,6 +16,8 @@
 local Templates = require("tests.helpers.templates")
 
 local Widgets = {}
+
+Widgets.mouse = {}
 
 Widgets.LINE_HEIGHT = 12
 Widgets.CHAR_WIDTH = 6
@@ -380,6 +385,14 @@ local function addFrameState(frame)
   function frame:GetHighlightTexture()
     return self.highlightTexture
   end
+
+  function frame:LockHighlight()
+    self.highlightLocked = true
+  end
+
+  function frame:UnlockHighlight()
+    self.highlightLocked = false
+  end
 end
 
 -- As the client: SetValue clamps and fires OnValueChanged(self, value, false) when it changes.
@@ -400,6 +413,10 @@ local function addSlider(slider)
 
   function slider:SetValueStep(step)
     self.valueStep = step
+  end
+
+  function slider:GetValueStep()
+    return self.valueStep or 0
   end
 
   function slider:SetObeyStepOnDrag(obey)
@@ -530,17 +547,37 @@ end
 function Widgets.click(frame, button)
   local onClick = frame.scripts.OnClick
   assert(onClick, "frame has no OnClick script")
+  if frame.toggleOnClick then
+    frame:SetChecked(not frame:GetChecked())
+  end
   onClick(frame, button or "LeftButton")
 end
 
--- A drag that ends at `value`: the client moves the thumb (OnValueChanged), then the button
--- comes up (OnMouseUp).
-function Widgets.slide(slider, value)
+-- A drag that ends at `value`: the button goes down, the client moves the thumb (OnValueChanged),
+-- then the button comes up (OnMouseUp, then its hooks). `control` is a slider template frame,
+-- whose inner Slider is dragged.
+function Widgets.slide(control, value)
+  local slider = control.Slider
+  Widgets.mouse.LeftButton = true
   slider:SetValue(value)
-  local onMouseUp = slider.scripts.OnMouseUp
-  if onMouseUp then
-    onMouseUp(slider, "LeftButton")
+  Widgets.mouse.LeftButton = false
+  Widgets.fire(slider, "OnMouseUp", "LeftButton")
+end
+
+-- A click on the slider template's Forward (or Back) stepper.
+function Widgets.step(control, forward)
+  Widgets.click(forward and control.Forward or control.Back)
+end
+
+-- The player opens the dropdown and chooses the radio holding `value`.
+function Widgets.pick(dropdown, value)
+  for _, entry in ipairs(dropdown.menuEntries) do
+    if entry.data == value then
+      dropdown:Pick(entry)
+      return
+    end
   end
+  error("no radio " .. tostring(value), 2)
 end
 
 -- The player clicks into the box, replaces its text and presses Enter.

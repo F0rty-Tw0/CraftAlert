@@ -88,6 +88,10 @@ function FlavorCompat.GetItemInfo(itemId)
   return callPreferred("C_Item", "GetItemInfo", itemId)
 end
 
+function FlavorCompat.GetSpellTexture(spellId)
+  return callPreferred("C_Spell", "GetSpellTexture", spellId)
+end
+
 function FlavorCompat.SendChatMessage(message, chatType, language, target)
   return callPreferred("C_ChatInfo", "SendChatMessage", message, chatType, language, target)
 end

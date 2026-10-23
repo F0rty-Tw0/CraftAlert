@@ -8,20 +8,22 @@ local open, row, take = SettingsFixture.open, SettingsFixture.row, SettingsFixtu
 
 local function testLazyWindow()
   local ns = SettingsFixture.load()
-  -- §4.4 rule 5: no frame before the first Toggle.
-  Assert.equal(SettingsFixture.window(), nil)
-  ns.SettingsWindow.Toggle()
+  -- §4.4 rule 5: no frame before the first open. The pane lives in the leads window.
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil)
+  ns.LeadsWindow.ToggleSettings()
   local window = SettingsFixture.window()
   Assert.truthy(window, "created on first open")
+  Assert.equal(window.template, "ButtonFrameTemplate")
+  Assert.equal(window:GetTitleText():GetText(), "Craft Alert — Settings")
   Assert.equal(window:IsShown(), true)
   Assert.equal(window.movable, true)
   Assert.equal(window.clamped, true)
   -- Opens on the first page; ESC closes it (own name in UISpecialFrames, once).
   Assert.truthy(SettingsFixture.texts():find("Enable Craft Alert", 1, true))
-  ns.SettingsWindow.Toggle()
+  ns.LeadsWindow.ToggleSettings()
   Assert.equal(window:IsShown(), false)
-  ns.SettingsWindow.Toggle()
-  Assert.same(rawget(_G, "UISpecialFrames"), { SettingsFixture.WINDOW })
+  ns.LeadsWindow.ToggleSettings()
+  Assert.same(rawget(_G, "UISpecialFrames"), { "CraftAlertLeadsWindow" })
   -- One nav button per §9 page, in order (Linked accounts comes with Task 4.2).
   local titles = {}
   for _, frame in ipairs(Wow.frames) do
@@ -46,8 +48,8 @@ local function testAddPage()
     end,
   }
   -- Added before the window exists: listed once it is made, built on first selection.
-  ns.SettingsWindow.AddPage(page)
-  ns.SettingsWindow.Toggle()
+  ns.SettingsPane.AddPage(page)
+  ns.LeadsWindow.ToggleSettings()
   Assert.equal(built, 0, "a page is built when first shown")
   open(ns, "Linked accounts")
   open(ns, "General")
@@ -56,9 +58,59 @@ local function testAddPage()
   Assert.truthy(SettingsFixture.texts():find("export box", 1, true))
   Assert.falsy(SettingsFixture.texts():find("Enable Craft Alert", 1, true), "other pages hidden")
   -- Added after the window exists: gets its nav button at once.
-  ns.SettingsWindow.AddPage({ id = "late", title = "Late", Create = page.Create })
+  ns.SettingsPane.AddPage({ id = "late", title = "Late", Create = page.Create })
   open(ns, "Late")
   Assert.equal(built, 2)
+end
+
+-- Native-HUD spec §7.1: quest-log list art on the nav (selected and hover), the nav in an inset
+-- at the top left of the leads window's inset, each page to its right.
+local function testNavHighlight()
+  local ns = SettingsFixture.load()
+  local Theme, padding = ns.Theme, ns.Theme.LAYOUT.PADDING
+  open(ns, "General")
+  local function selectedPages()
+    local shown = {}
+    for _, title in ipairs({ "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" }) do
+      if SettingsFixture.navButton(title).selected:IsShown() then
+        shown[#shown + 1] = title
+      end
+    end
+    return shown
+  end
+  Assert.same(selectedPages(), { "General" })
+  local selected = SettingsFixture.navButton("General").selected
+  Assert.equal(selected.texture, Theme.ART.LIST_SELECTED)
+  Assert.equal(selected.blendMode, "ADD")
+  Assert.equal(selected:GetAlpha(), 0.45)
+  open(ns, "Alerts")
+  Assert.same(selectedPages(), { "Alerts" }, "the highlight follows the page")
+  for _, frame in ipairs(Wow.frames) do
+    if frame.pageId then
+      local hover
+      for _, region in ipairs(frame.regions) do
+        if region.layer == "HIGHLIGHT" then
+          hover = region
+        end
+      end
+      Assert.truthy(hover, frame.pageId .. " has a hover highlight")
+      Assert.same({ hover.texture, hover:GetAlpha() }, { Theme.ART.LIST_HOVER, 0.18 })
+    end
+  end
+  local window = SettingsFixture.window()
+  local nav = SettingsFixture.navButton("General").parent
+  Assert.equal(nav.template, "InsetFrameTemplate")
+  Assert.same(nav.points[1], { "TOPLEFT", window.Inset, "TOPLEFT", padding, -padding })
+  -- The Alerts page's content frame: the pane container's child that holds its rows.
+  local content = SettingsFixture.row("Lead timeout")
+  while content.parent ~= nav.parent do
+    content = content.parent
+  end
+  local besideNav = false
+  for _, point in ipairs(content.points) do
+    besideNav = besideNav or point[2] == nav
+  end
+  Assert.truthy(besideNav, "a page sits right of the nav")
 end
 
 -- §6.1: enable and "Only while resting" re-evaluate the gate; §6.2: channels, profession-word
@@ -91,9 +143,9 @@ local function testGeneralPage()
   end
   -- The page shows what the db holds each time it opens.
   settings.channels.guild = true
-  ns.SettingsWindow.Toggle()
-  ns.SettingsWindow.Toggle()
-  Assert.equal(row("Guild").input.knob.points[1][1], "RIGHT")
+  ns.LeadsWindow.ToggleSettings()
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(row("Guild").input:GetChecked(), true)
 end
 
 local function testChannelsPerFlavor()
@@ -119,14 +171,13 @@ local function testAlertsPage()
   local settings = db.settings
   open(ns, "Alerts")
   take(refreshes)
-  -- Sound: steps through None and the flavor's kits; "Play" plays the chosen one.
+  -- Sound: None or one of the flavor's kits; "Play" plays the chosen one.
   local sound = row("Alert sound").input
-  Widgets.click(sound, "RightButton")
-  Assert.equal(settings.sound, 0, "before the first kit: None")
+  Widgets.pick(sound, 0)
+  Assert.equal(settings.sound, 0, "None")
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Play"))
   Assert.equal(#UiFixture.callsTo(calls, "sound"), 0, "None plays nothing")
-  Widgets.click(sound, "LeftButton")
-  Widgets.click(sound, "LeftButton")
+  Widgets.pick(sound, 3081)
   Assert.equal(settings.sound, 3081)
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Play"))
   Assert.same(UiFixture.callsTo(calls, "sound"), { { "sound", 3081, "Master" } })
@@ -134,6 +185,10 @@ local function testAlertsPage()
   Assert.equal(settings.flash, false)
   Assert.same(take(refreshes), {}, "sound and flash are read when an alert fires")
 
+  -- Each slider counts its steps as (max - min) / step, rounded (§7.3).
+  Assert.equal(row("Toast duration").input.initArgs[4], 23)
+  Assert.equal(row("Lead timeout").input.initArgs[4], 59)
+  Assert.equal(row("Opacity").input.initArgs[4], 14)
   Widgets.slide(row("Toast duration").input, 45)
   Assert.equal(settings.toastDuration, 45)
   Assert.same(take(refreshes), {})
@@ -189,15 +244,15 @@ local function testGreetingsPage()
   Assert.equal(row("Note").input.maxLetters, 255)
 
   -- Professions by name; the note goes to the one shown and joins its preview lines.
-  Assert.equal(row("Note for").input.label:GetText(), "Blacksmithing")
+  Assert.equal(row("Note for").input.Text:GetText(), "Blacksmithing")
   Widgets.type(row("Note").input, "Bring mats.")
   Assert.same(settings.notes, { [164] = "Bring mats." })
   Assert.truthy(SettingsFixture.texts():find("what do you need? Bring mats.", 1, true))
-  Widgets.click(row("Note for").input)
-  Assert.equal(row("Note for").input.label:GetText(), "Enchanting")
+  Widgets.pick(row("Note for").input, 333)
+  Assert.equal(row("Note for").input.Text:GetText(), "Enchanting")
   Assert.equal(row("Note").input:GetText(), "", "the shown note follows the profession")
   Assert.truthy(SettingsFixture.texts():find("Profession: Hi! I have Enchanting, what do you need?", 1, true))
-  Widgets.click(row("Note for").input)
+  Widgets.pick(row("Note for").input, 164)
   Widgets.type(row("Note").input, "")
   Assert.same(settings.notes, {}, "an emptied note is removed")
   Assert.same(take(refreshes), {})
@@ -206,6 +261,7 @@ end
 return function()
   testLazyWindow()
   testAddPage()
+  testNavHighlight()
   testGeneralPage()
   testChannelsPerFlavor()
   testAlertsPage()

@@ -4,7 +4,7 @@ local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 local SlashFixture = require("tests.helpers.slash_fixture")
 
-local LEADS_WINDOW, SETTINGS_WINDOW, TOAST = "CraftAlertLeadsWindow", "CraftAlertSettingsWindow", "CraftAlertToast"
+local LEADS_WINDOW, TOAST = "CraftAlertLeadsWindow", "CraftAlertToast"
 local GREETING = "Hi! My alt Ench can craft Enchant Weapon - Mongoose, send the order there."
 
 -- The loaded chain with /ca registered on a fresh SlashCmdList. → ns, db, calls, handler.
@@ -44,19 +44,25 @@ local function testRegister()
   Assert.same(Wow.timers, {}, "registering arms no timer")
 end
 
--- `/ca` toggles the leads window, `/ca config` the settings window; both lazily created.
+-- `/ca` toggles the leads window on its list, `/ca config` on its settings pane; lazily created.
 local function testWindows()
   local _, _, _, handler = setup()
+  local function title()
+    return rawget(_G, LEADS_WINDOW):GetTitleText():GetText()
+  end
   Assert.equal(rawget(_G, LEADS_WINDOW), nil, "no window before the first command")
   handler("")
   Assert.equal(shown(LEADS_WINDOW), true)
   handler("   ")
   Assert.equal(shown(LEADS_WINDOW), false)
-  Assert.equal(shown(SETTINGS_WINDOW), false)
   handler("config")
-  Assert.equal(shown(SETTINGS_WINDOW), true)
+  Assert.equal(shown(LEADS_WINDOW), true)
+  Assert.equal(title(), "Craft Alert — Settings")
   handler("  CONFIG ")
-  Assert.equal(shown(SETTINGS_WINDOW), false, "case and spaces do not matter")
+  Assert.equal(shown(LEADS_WINDOW), false, "case and spaces do not matter")
+  handler("")
+  Assert.equal(shown(LEADS_WINDOW), true)
+  Assert.equal(title(), "Craft Alert — Leads")
 end
 
 -- §7.3: the text goes through the real path as customer Test0 on the own realm. It makes a test

@@ -3,18 +3,12 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
--- The WhisperMessenger look (its default preset, UI/Theme/Presets/Data/WowDefault.lua, and the
--- Layout values the toast, leads window and launcher use), trimmed to what Craft Alert draws.
--- No presets and no font objects of its own: text uses Blizzard's font objects, which carry
--- the client's glyph fallback chain. Data only.
+-- Colours, font-object names, layout numbers and art paths Craft Alert draws with, in the native
+-- WoW HUD look: Blizzard templates and font objects carry the rest. Data only.
 local Theme = {}
 
 -- { r, g, b, a }
 Theme.COLORS = {
-  surface = { 0.07, 0.07, 0.10, 0.97 },
-  chrome = { 0.09, 0.09, 0.13, 0.60 },
-  border = { 1.0, 1.0, 1.0, 0.10 },
-  divider = { 1.0, 1.0, 1.0, 0.08 },
   textPrimary = { 0.92, 0.92, 0.95, 1.0 },
   textSecondary = { 1.0, 1.0, 1.0, 0.55 },
   textTimestamp = { 1.0, 1.0, 1.0, 0.40 },
@@ -22,14 +16,6 @@ Theme.COLORS = {
   badgeText = { 0.98, 0.99, 1.00, 1.0 },
   greeted = { 0.30, 0.82, 0.40, 1.0 },
   warning = { 0.90, 0.72, 0.20, 1.0 },
-  -- Settings controls (WowDefault toggle_on / toggle_off / option_bg / button_fill_hover / input_bg).
-  toggleOn = { 0.12, 0.72, 0.96, 1.0 },
-  toggleOff = { 0.32, 0.33, 0.40, 0.95 },
-  knob = { 0.98, 0.99, 1.00, 1.0 },
-  option = { 0.12, 0.13, 0.18, 0.90 },
-  optionHover = { 0.20, 0.45, 0.65, 1.0 },
-  optionSelected = { 0.12, 0.72, 0.96, 0.16 },
-  input = { 0.17, 0.19, 0.26, 1.0 },
 }
 
 -- Blizzard font object names (WhisperMessenger's FONT_MAP bases).
@@ -42,10 +28,7 @@ Theme.FONTS = {
 }
 
 Theme.LAYOUT = {
-  TITLE_BAR_HEIGHT = 24,
-  TITLE_BUTTON_SIZE = 22,
   PADDING = 8,
-  BORDER = 1,
   TOAST_WIDTH = 320,
   DOCK_GAP = 8,
   WINDOW_WIDTH = 460,
@@ -70,15 +53,12 @@ Theme.LAYOUT = {
   CONTROL_GAP = 4,
   SECTION_GAP = 14,
   LABEL_WIDTH = 150,
-  SWITCH_WIDTH = 28,
-  SWITCH_HEIGHT = 16,
-  KNOB_SIZE = 12,
-  KNOB_INSET = 2,
-  SLIDER_HEIGHT = 16,
-  SLIDER_THUMB_WIDTH = 10,
+  -- Room right of the slider bar for the template's value text (drawn 25 px right of the bar).
+  SLIDER_VALUE_WIDTH = 56,
   INPUT_HEIGHT = 22,
   BUTTON_HEIGHT = 20,
   LIST_ROW_HEIGHT = 20,
+  GEAR_SIZE = 20,
 }
 
 Theme.ICON = "Interface\\Icons\\INV_Misc_Bell_01"
@@ -91,6 +71,9 @@ Theme.ART = {
   LIST_HOVER = "Interface\\QuestFrame\\UI-QuestTitleHighlight",
   LIST_SELECTED_ALPHA = 0.45,
   LIST_HOVER_ALPHA = 0.18,
+  -- The leads window's settings gear (spec §7.1): the GM-ticket gear, the world map's where missing.
+  GEAR_ATLAS = "GM-icon-settings",
+  GEAR_FILE = "Interface\\WorldMap\\Gear_64Grey",
 }
 Theme.DIM_ALPHA = 0.5
 

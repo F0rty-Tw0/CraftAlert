@@ -102,10 +102,37 @@ local function testListHighlight()
   Assert.same(texture.points, { { "ALL", button } })
 end
 
+-- The WhisperMessenger look is gone: no panel/title-bar builders, no surface or control colours.
+local function testLookCodeGone()
+  local FrameKit = load({})
+  local Theme = Fresh.require("UI.Theme")
+  Assert.equal(FrameKit.Panel, nil, "Panel")
+  Assert.equal(FrameKit.Fill, nil, "Fill")
+  Assert.equal(FrameKit.TitleBar, nil, "TitleBar")
+  local deleted = { "surface", "chrome", "border", "divider", "toggleOn", "toggleOff", "knob", "option", "optionHover", "optionSelected", "input" }
+  for _, key in ipairs(deleted) do
+    Assert.equal(Theme.COLORS[key], nil, "COLORS." .. key)
+  end
+  local kept = { "textPrimary", "textSecondary", "textTimestamp", "accent", "badgeText", "greeted", "warning" }
+  for _, key in ipairs(kept) do
+    local color = Theme.COLORS[key]
+    Assert.equal(type(color), "table", "COLORS." .. key)
+    Assert.equal(#color, 4, "COLORS." .. key .. " has four numbers")
+    for i = 1, 4 do
+      Assert.equal(type(color[i]), "number", "COLORS." .. key .. "[" .. i .. "]")
+    end
+  end
+  local gone = { "SWITCH_WIDTH", "KNOB_SIZE", "SLIDER_THUMB_WIDTH", "TITLE_BAR_HEIGHT" }
+  for _, key in ipairs(gone) do
+    Assert.equal(Theme.LAYOUT[key], nil, "LAYOUT." .. key)
+  end
+end
+
 return function()
   testSavedPosition()
   testMalformedFallsBack()
   testArt()
   testListHighlight()
+  testLookCodeGone()
   Wow.reset()
 end
