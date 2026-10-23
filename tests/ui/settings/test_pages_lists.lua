@@ -316,61 +316,47 @@ local function testRecipeTooltipNameKey()
   Assert.same(_G["GameTooltip"].lines, { "C Old Recipe", "Blacksmithing", "Known by: Me" })
 end
 
--- GameTooltip_OnUpdate's choice (Blizzard GameTooltip.lua): the owner's UpdateTooltip when it
--- has one, else the rebuild from the item data, which drops lines added after SetHyperlink.
+-- GameTooltip_OnUpdate (Blizzard GameTooltip.lua): the owner's UpdateTooltip when it has one;
+-- else, once an item load flagged the tooltip (TOOLTIP_DATA_UPDATE), the rebuild from the item
+-- data, which drops lines added after SetHyperlink. Only that rebuild clears the flag.
 local function clientUpdate(tooltip)
   local owner = tooltip.owner
   if owner.UpdateTooltip then
     owner:UpdateTooltip()
-  else
+  elseif tooltip.shouldRefreshData then
+    tooltip.shouldRefreshData = false
     tooltip:ClearLines()
   end
 end
 
--- The client rebuilds an item tooltip once the item loads, dropping our lines, unless the owner
--- has an UpdateTooltip: while its item loads the row has one, which shows the tooltip again,
--- lines included, once the item is cached, and is gone after. A link the client rejects gets
--- our own tooltip.
+-- An item that loads while its tooltip shows: the client's rebuild would drop our lines, so the
+-- recipe row has an UpdateTooltip that shows our tooltip again on every update, lines included
+-- and read anew. A link the client rejects gets our own tooltip.
 local function testRecipeTooltipItemLoads()
-  local ns = SettingsFixture.load({
+  local ns, db = SettingsFixture.load({
     db = function(accountDb)
       crafters(accountDb)
       accountDb.characters["Me-Realm"].recipes = { [9001] = { item = 501, name = "A Belt", prof = BS } }
     end,
   })
-  local cached = {}
-  Wow.stub(
-    "C_Item",
-    setmetatable({
-      IsItemDataCachedByID = function(itemID)
-        return cached[itemID] == true
-      end,
-    }, { __index = _G["C_Item"] })
-  )
   open(ns, "Crafters")
   local tooltip, itemRow = _G["GameTooltip"], rowOf(9001)
   Widgets.fire(itemRow, "OnEnter")
   local ours = tooltip.lines[1]
   Assert.truthy(ours:find("^Known by: "), ours)
+  tooltip.shouldRefreshData = true -- the item loaded
+  for _ = 1, 3 do
+    clientUpdate(tooltip)
+    Assert.same(tooltip.lines, { ours }, "every update keeps our lines")
+  end
+  Assert.same(tooltip.hyperlinks, { "item:501", "item:501", "item:501", "item:501" })
+  db.characters["Me-Realm"].recipes[9001].muted = true
   clientUpdate(tooltip)
-  Assert.same(tooltip.lines, { ours }, "still loading: no rebuild, nothing shown again")
-  Assert.same(tooltip.hyperlinks, { "item:501" })
-  cached[501] = true
-  clientUpdate(tooltip)
-  Assert.same(tooltip.lines, { ours }, "loaded: shown again with our lines")
-  Assert.same(tooltip.hyperlinks, { "item:501", "item:501" })
-  Assert.equal(itemRow.UpdateTooltip, nil, "loaded: the client's own refresh again")
+  Assert.same(tooltip.lines, { ours, "Muted" }, "read anew")
 
-  -- A cached item never waits.
-  Widgets.fire(itemRow, "OnLeave")
-  Widgets.fire(itemRow, "OnEnter")
-  Assert.equal(itemRow.UpdateTooltip, nil)
-
-  cached[501] = nil
   tooltip.badLinks = { ["item:501"] = true }
   Widgets.fire(itemRow, "OnEnter")
-  Assert.same(tooltip.lines, { "A Belt", "Blacksmithing", ours }, "rejected link: our own tooltip")
-  Assert.equal(itemRow.UpdateTooltip, nil)
+  Assert.same(tooltip.lines, { "A Belt", "Blacksmithing", ours, "Muted" }, "rejected link: our own tooltip")
 end
 
 -- Removing the current character stores it again from the client at once (as at login), so its

@@ -124,6 +124,9 @@ local function createRecipeRow(row)
   end)
   row.mute:SetPoint("RIGHT", row, "RIGHT", 0, 0)
   row:SetScript("OnEnter", showTooltip)
+  -- GameTooltip's own update (every 0.2 s while shown) calls this instead of rebuilding from the
+  -- item data, which would drop our lines once an uncached item loads.
+  row.UpdateTooltip = showTooltip
   row:SetScript("OnLeave", function()
     _G["GameTooltip"]:Hide()
   end)
