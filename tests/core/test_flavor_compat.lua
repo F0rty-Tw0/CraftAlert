@@ -110,6 +110,20 @@ local function testWrappersPreferNamespacedApis()
   Assert.equal(select(2, FlavorCompat.GetItemInfoInstant(7)), "global")
   Assert.equal(FlavorCompat.GetItemInfo(7), nil)
 
+  Wow.stub("C_Spell", {
+    GetSpellTexture = function(id)
+      return "namespaced-" .. id
+    end,
+  })
+  Wow.stub("GetSpellTexture", function(id)
+    return "global-" .. id
+  end)
+  Assert.equal(FlavorCompat.GetSpellTexture(9), "namespaced-9")
+  Wow.stub("C_Spell", nil)
+  Assert.equal(FlavorCompat.GetSpellTexture(9), "global-9")
+  Wow.stub("GetSpellTexture", nil)
+  Assert.equal(FlavorCompat.GetSpellTexture(9), nil)
+
   Wow.stub("C_AutoComplete", {
     GetAutoCompleteRealms = function()
       return { "OwnRealm" }
