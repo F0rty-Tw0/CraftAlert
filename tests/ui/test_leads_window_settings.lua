@@ -278,6 +278,10 @@ local function testGearArtAndPlace()
   Assert.same({ gear():GetWidth(), gear():GetHeight() }, { 20, 20 })
   Assert.equal(gear():GetNormalTexture().atlas, "GM-icon-settings")
   Assert.equal(gear():GetHighlightTexture().blendMode, "ADD")
+  -- Above the NineSlice border (level 500), or its title strip hides them in game.
+  local border = frame().NineSlice:GetFrameLevel()
+  Assert.truthy(gear():GetFrameLevel() > border, "the gear sits above the border")
+  Assert.truthy(frame().resizeButton:GetFrameLevel() > border, "the resize button sits above the border")
   ns = UiFixture.load()
   Wow.stub("C_Texture", {
     GetAtlasInfo = function()

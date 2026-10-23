@@ -118,12 +118,12 @@ local function onResizeStopped(target)
 end
 
 local function createResizeButton(frame)
-  local layout, screen = Theme.LAYOUT, _G["UIParent"]
   local button = _G["CreateFrame"]("Button", nil, frame, "PanelResizeButtonTemplate")
   button:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 4)
+  button:SetFrameLevel(frame.CloseButton:GetFrameLevel()) -- above the NineSlice border's corner
   -- Init wraps the frame's OnSizeChanged as it is now, so the refresh must already be set.
   frame:SetScript("OnSizeChanged", LeadsWindow.Refresh)
-  button:Init(frame, layout.WINDOW_MIN_WIDTH, layout.WINDOW_MIN_HEIGHT, screen:GetWidth(), screen:GetHeight())
+  button:Init(frame, LAYOUT.WINDOW_MIN_WIDTH, LAYOUT.WINDOW_MIN_HEIGHT, _G["UIParent"]:GetWidth(), _G["UIParent"]:GetHeight())
   button:SetOnResizeStoppedCallback(onResizeStopped)
   frame.resizeButton = button
 end

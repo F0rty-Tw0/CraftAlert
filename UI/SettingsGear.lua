@@ -33,6 +33,8 @@ function SettingsGear.Create(frame, onClick)
   local gear = _G["CreateFrame"]("Button", nil, frame)
   gear:SetSize(size, size)
   gear:SetPoint("RIGHT", frame.CloseButton, "LEFT", -2, 0)
+  -- With the close button above the NineSlice border, whose metal top edge covers the title strip.
+  gear:SetFrameLevel(frame.CloseButton:GetFrameLevel())
   local normal = gear:CreateTexture(nil, "ARTWORK")
   FrameKit.Art(normal, art.GEAR_ATLAS, art.GEAR_FILE)
   gear:SetNormalTexture(normal)
