@@ -91,9 +91,10 @@ local function testPickAllocation()
   collectgarbage("collect")
   collectgarbage("stop")
   local before = collectgarbage("count")
-  CrafterRank.Pick(many, CUSTOMER, data)
+  local recipeKey = select(5, CrafterRank.Pick(many, CUSTOMER, data))
   local grownKb = collectgarbage("count") - before
   collectgarbage("restart")
+  Assert.equal(recipeKey, 200, "the last entry won, so every entry did")
   Assert.truthy(grownKb < 4, "Pick over 200 entries allocated " .. grownKb .. " KB")
 end
 
