@@ -7,22 +7,18 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
-local LeadRow = ns.LeadRow or require("CraftAlert.UI.LeadRow")
+local LeadsList = ns.LeadsList or require("CraftAlert.UI.LeadsList")
 local WindowSize = ns.WindowSize or require("CraftAlert.UI.WindowSize")
 local SettingsGear = ns.SettingsGear or require("CraftAlert.UI.SettingsGear")
 local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.SettingsPane")
 
 -- Spec §7.3: the leads window, frame CraftAlertLeadsWindow, created on first open (§4.4 rule
--- 5). Rows newest first, as many as fit; the mouse wheel scrolls. ESC closes it (UISpecialFrames,
--- the one sanctioned insert). Ages and rows refresh on open and on each lead change, never on a
--- ticker. Native-HUD spec §7.1: a gear swaps the rows for the settings pane. Movable and resizable:
--- one position and one size (CraftAlertDB.ui.window), shared by both modes. The mode is
--- never saved: every open is the list, except /ca config.
+-- 5). The rows (UI/LeadsList.lua) show newest first, as many as fit; the mouse wheel scrolls
+-- them. ESC closes it (UISpecialFrames, the one sanctioned insert). Ages and rows refresh on open
+-- and on each lead change, never on a ticker. Native-HUD spec §7.1: a gear swaps the rows for the
+-- settings pane. Movable and resizable: one position and one size (CraftAlertDB.ui.window), shared
+-- by both modes. The mode is never saved: every open is the list, except /ca config.
 local LeadsWindow = {}
-
-local floor = math.floor
-local max = math.max
-local min = math.min
 
 local FRAME_NAME = "CraftAlertLeadsWindow"
 local UI_KEY = "window"
@@ -33,31 +29,7 @@ local SIZE = { key = UI_KEY, width = LAYOUT.WINDOW_WIDTH, height = LAYOUT.WINDOW
 SIZE.minWidth, SIZE.minHeight = LAYOUT.WINDOW_MIN_WIDTH, LAYOUT.WINDOW_MIN_HEIGHT
 
 ---@type table
-local window = nil -- { frame, rows = { row, ... }, empty, mode = "list" | "settings" }, nil until the first open
-local offset = 0 -- leads scrolled past the top row
-
--- The inset's height from the frame's own size and the offsets anchorInset gives it: the client
--- sizes the inset from its anchors only, which may still read 0 on the first open.
-local function rowsThatFit(frame)
-  local layout = Theme.LAYOUT
-  local insetHeight = frame:GetHeight() - layout.INSET_TOP - layout.INSET_BOTTOM
-  local height = insetHeight - 2 * layout.PADDING
-  return max(0, floor((height + layout.ROW_GAP) / (layout.ROW_HEIGHT + layout.ROW_GAP)))
-end
-
-local function rowAt(index)
-  local row = window.rows[index]
-  if row then
-    return row
-  end
-  local layout, inset = Theme.LAYOUT, window.frame.Inset
-  row = LeadRow.Create(inset, index)
-  local top = layout.PADDING + (index - 1) * (layout.ROW_HEIGHT + layout.ROW_GAP)
-  row:SetPoint("TOPLEFT", inset, "TOPLEFT", layout.PADDING, -top)
-  row:SetPoint("RIGHT", inset, "RIGHT", -layout.PADDING, 0)
-  window.rows[index] = row
-  return row
-end
+local window = nil -- { frame, list, mode = "list" | "settings" }, nil until the first open
 
 local function settings()
   return _G["CraftAlertDB"].settings
@@ -73,31 +45,14 @@ function LeadsWindow.Refresh()
   if window.mode == "settings" then
     return
   end
-  local leads = Leads.List()
-  local fit = rowsThatFit(window.frame)
-  offset = max(0, min(offset, #leads - fit))
-  -- Bounded by the leads, not the frame height: a huge saved height must not loop for ever.
-  local shown = max(0, min(fit, #leads - offset))
-  for index = 1, max(shown, #window.rows) do
-    local lead = index <= shown and leads[offset + index] or nil
-    if lead then
-      LeadRow.Show(rowAt(index), lead)
-    elseif window.rows[index] then
-      LeadRow.Clear(window.rows[index])
-    end
-  end
-  if #leads == 0 then
-    window.empty:Show()
-  else
-    window.empty:Hide()
-  end
+  LeadsList.Refresh(window.list, Leads.List())
 end
 
 local function onMouseWheel(_, delta)
   if window.mode == "settings" then
     return
   end
-  offset = offset - delta
+  LeadsList.Scroll(window.list, delta)
   LeadsWindow.Refresh()
 end
 
@@ -126,16 +81,6 @@ local function createResizeButton(frame)
   frame.resizeButton = button
 end
 
-local function createEmptyText(frame)
-  local inset = frame.Inset
-  local empty = FrameKit.Text(inset, Theme.FONTS.body, Theme.COLORS.textSecondary)
-  empty:SetPoint("CENTER", inset, "CENTER", 0, 0)
-  empty:SetJustifyH("CENTER")
-  empty:SetText(Localization.Text("No leads right now. Requests you can craft show up here."))
-
-  return empty
-end
-
 -- The template's close button runs UIPanelCloseButton_OnClick
 -- (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.lua:144-155): this callback first, and
 -- HideUIPanel only when it returns truthy. HideUIPanel
@@ -144,14 +89,6 @@ end
 local function onClose(closeButton)
   closeButton:GetParent():Hide()
   return false
-end
-
--- Hides every row and drops its lead, so the next list draw shows each one afresh (its shownAt
--- is then new, which VisibleLatest and SendGuard's look rule read).
-local function clearRows()
-  for _, row in ipairs(window.rows) do
-    LeadRow.Clear(row)
-  end
 end
 
 local function enterList()
@@ -166,8 +103,8 @@ end
 local function enterSettings()
   local frame = window.frame
   window.mode = "settings"
-  clearRows()
-  window.empty:Hide()
+  LeadsList.Clear(window.list)
+  window.list.empty:Hide()
   SettingsPane.Build(frame.Inset, enterList)
   SettingsPane.Show()
   frame:SetTitle(Localization.Text("Craft Alert — Settings"))
@@ -196,10 +133,10 @@ local function create()
   frame:SetScript("OnMouseWheel", onMouseWheel)
   createResizeButton(frame)
   frame.gear = SettingsGear.Create(frame, onGearClick)
-  local empty = createEmptyText(frame)
+  local list = LeadsList.New(frame.Inset)
   frame:Hide()
   table.insert(_G["UISpecialFrames"], FRAME_NAME)
-  return { frame = frame, rows = {}, empty = empty, mode = "list" }
+  return { frame = frame, list = list, mode = "list" }
 end
 
 -- Opens the window on the list, at the top (every row counts as shown from now), or closes it in
@@ -214,8 +151,8 @@ function LeadsWindow.Toggle()
   if window.mode == "settings" then
     enterList()
   end
-  offset = 0
-  clearRows()
+  LeadsList.ResetTop(window.list)
+  LeadsList.Clear(window.list)
   frame:Show()
   LeadsWindow.Refresh()
 end
@@ -241,15 +178,14 @@ end
 -- The lead in the top row and GetTime() when it appeared there, or nil (closed, hidden by Alt+Z,
 -- scrolled, empty). IsVisible, not IsShown: a window under a hidden UIParent stays shown.
 function LeadsWindow.VisibleLatest()
-  if window == nil or not window.frame:IsVisible() or offset ~= 0 then
+  if window == nil or not window.frame:IsVisible() then
     return nil
   end
-  local row = window.rows[1]
-  local lead = row and row:IsVisible() and row.lead
-  if not lead or not Leads.IsActive(lead.id) then
+  local row = LeadsList.TopRow(window.list)
+  if not row or not row.lead or not Leads.IsActive(row.lead.id) then
     return nil
   end
-  return lead, row.shownAt
+  return row.lead, row.shownAt
 end
 
 ns.LeadsWindow = LeadsWindow

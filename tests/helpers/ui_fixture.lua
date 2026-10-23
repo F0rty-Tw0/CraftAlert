@@ -32,6 +32,7 @@ local UI = {
   "UI.LinkHover",
   "UI.Dock",
   "UI.LeadRow",
+  "UI.LeadsList",
   "UI.WindowSize",
   "UI.SettingsGear",
   "UI.Settings.SettingsPane",
