@@ -156,18 +156,6 @@ local function clearRows()
   end
 end
 
-local function enterSettings()
-  local frame = window.frame
-  window.mode = "settings"
-  WindowSize.Apply(frame, SETTINGS)
-  clearRows()
-  window.empty:Hide()
-  SettingsPane.Build(frame.Inset)
-  SettingsPane.Show()
-  frame:SetTitle(Localization.Text("Craft Alert — Settings"))
-  SettingsGear.Paint(frame.gear, true)
-end
-
 local function enterList()
   local frame = window.frame
   SettingsPane.Hide()
@@ -176,6 +164,18 @@ local function enterList()
   SettingsGear.Paint(frame.gear, false)
   window.mode = "list"
   LeadsWindow.Refresh()
+end
+
+local function enterSettings()
+  local frame = window.frame
+  window.mode = "settings"
+  WindowSize.Apply(frame, SETTINGS)
+  clearRows()
+  window.empty:Hide()
+  SettingsPane.Build(frame.Inset, enterList)
+  SettingsPane.Show()
+  frame:SetTitle(Localization.Text("Craft Alert — Settings"))
+  SettingsGear.Paint(frame.gear, true)
 end
 
 local function onGearClick()

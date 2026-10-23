@@ -130,6 +130,31 @@ local function rowCount()
   return count
 end
 
+-- Spec 3b §1: a panel button at the bottom of the nav does what the gear does in Settings.
+local function testBackButton()
+  local ns = UiFixture.load({
+    leads = 2,
+    db = function(db)
+      db.ui.window = { width = 500, height = 300 }
+    end,
+  })
+  ns.LeadsWindow.ToggleSettings()
+  local back = SettingsFixture.button(frame(), "Back to leads")
+  local nav = back.parent
+  Assert.equal(back:IsVisible(), true)
+  Assert.same(back.points[1], { "BOTTOMLEFT", nav, "BOTTOMLEFT", 4, 4 })
+  Assert.equal(back:GetHeight(), 24)
+  Widgets.click(back)
+  Assert.equal(frame():IsShown(), true)
+  Assert.equal(title(), "Craft Alert — Leads")
+  Assert.same(size(), { 500, 300 })
+  Assert.equal(nav:IsVisible(), false)
+  Assert.equal(gear().highlightLocked, false)
+  Assert.equal(rowVisible(1), true)
+  Widgets.click(gear())
+  Assert.equal(title(), "Craft Alert — Settings", "the gear still opens Settings")
+end
+
 local function testModeSwitchUnderClientSizing()
   local ns = UiFixture.load({ leads = 8 })
   ns.LeadsWindow.Toggle()
@@ -315,6 +340,7 @@ end
 return function()
   testToggleSettingsFromHidden()
   testGearSwitchesModes()
+  testBackButton()
   testModeSwitchUnderClientSizing()
   testWheelIgnoredInSettings()
   testReopenRefreshesPage()

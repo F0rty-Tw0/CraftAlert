@@ -3,6 +3,7 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 
@@ -97,7 +98,8 @@ function SettingsPane.AddPage(page)
 end
 
 -- Makes the pane in `host` (the leads window's inset), hidden. Runs once; later calls return.
-function SettingsPane.Build(host)
+-- `onBack` runs when the Back button at the bottom of the nav is clicked.
+function SettingsPane.Build(host, onBack)
   if pane then
     return
   end
@@ -119,6 +121,14 @@ function SettingsPane.Build(host)
   for index, page in ipairs(pages) do
     addNavButton(page, index)
   end
+  -- Controls loads after the pane (TOC), so it resolves here, not at load.
+  local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
+  local back = Controls.Button(nav, Localization.Text("Back to leads"), Theme.LAYOUT.NAV_WIDTH - 8, function()
+    onBack()
+  end)
+  back:SetHeight(Theme.LAYOUT.NAV_BUTTON_HEIGHT)
+  back:SetPoint("BOTTOMLEFT", nav, "BOTTOMLEFT", 4, 4)
+  back:SetPoint("BOTTOMRIGHT", nav, "BOTTOMRIGHT", -4, 4)
 end
 
 -- Shows the pane on the page last shown (the first page at first), refreshed from the db.
