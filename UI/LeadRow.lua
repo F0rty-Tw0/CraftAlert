@@ -12,12 +12,13 @@ local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
 local LinkHover = ns.LinkHover or require("CraftAlert.UI.LinkHover")
 local CardBody = ns.CardBody or require("CraftAlert.UI.CardBody")
 local CardHover = ns.CardHover or require("CraftAlert.UI.CardHover")
+local CardTips = ns.CardTips or require("CraftAlert.UI.CardTips")
 
 -- Lead-cards spec §1: one card of the leads window, full width. On the left the item or profession
 -- icon, the customer, the age, the greeted check and the replied tag, then what matched and the
 -- realm tag; on the right the Request / Matched / Crafters rows (UI/CardBody.lua). Every text is a
 -- region of the card. No fill: the quest-log hover texture lights the card under the cursor, and
--- the Greet / Whisper / Dismiss buttons show with it (UI/CardHover.lua).
+-- the Greet / Whisper / Dismiss buttons show with it (UI/CardHover.lua). Tooltips: UI/CardTips.lua.
 -- Clicks follow the toast's table (§7.1); a link under the cursor shows its tooltip, and a click
 -- while it is hovered goes to the link, never to the lead (native-HUD spec §4.6). The card frame
 -- carries its lead and the GetTime() at which that lead appeared in it (§7.5 rule 3).
@@ -104,8 +105,9 @@ function LeadRow.Create(parent, index, list)
   card:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   card:SetScript("OnClick", onClick)
   card:SetScript("OnShow", onShow)
-  LinkHover.Attach(card, nil)
+  LinkHover.Attach(card, CardTips.ShowChat)
   CardHover.Attach(card, list)
+  CardTips.Attach(card)
   card:Hide()
   return card
 end
@@ -116,10 +118,11 @@ local function iconOf(lead)
   return itemIcon or FrameKit.ProfessionIcon(lead.prof) or Theme.ICON
 end
 
--- Shows `lead` in the card; a lead new to the card counts as shown from now, and the link under
--- the cursor belonged to the old lead.
+-- Shows `lead` in the card; a lead new to the card counts as shown from now, the link under the
+-- cursor belonged to the old lead, and so does a tooltip any of the card's frames owns (CardTips).
 function LeadRow.Show(card, lead)
-  if card.lead ~= lead then
+  local leadChanged = card.lead ~= lead
+  if leadChanged then
     card.shownAt = now()
     LinkHover.Clear(card)
   end
@@ -136,6 +139,7 @@ function LeadRow.Show(card, lead)
   setShown(card.repliedTag, lead.replied)
   placeReplied(card, lead.greeted)
   CardBody.Paint(card, lead)
+  CardTips.Refresh(card, leadChanged)
   card:Show()
 end
 

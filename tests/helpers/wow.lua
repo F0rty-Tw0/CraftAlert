@@ -184,6 +184,8 @@ local function newTooltip()
 
   function tooltip:AddLine() end
 
+  function tooltip:AddDoubleLine() end
+
   function tooltip:ClearLines() end
 
   function tooltip:SetHyperlink() end
