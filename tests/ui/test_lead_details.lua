@@ -33,6 +33,26 @@ local function rowOf(lead)
   error("no row for " .. tostring(lead.customer))
 end
 
+-- Runs the timers pending now with a delay of 0.2 s or less (the hover dwell), as if that much
+-- time had passed. Not Wow.runTimers: the lead-expiry timer re-arms.
+local function runDwell()
+  local due, kept = {}, {}
+  for _, timer in ipairs(Wow.timers) do
+    table.insert(timer.delay <= 0.2 and due or kept, timer)
+  end
+  Wow.timers = kept
+  for _, timer in ipairs(due) do
+    timer.fn()
+  end
+end
+
+-- The cursor on `row` for the dwell: enters, rests, the pane follows.
+local function hover(row)
+  row.mouseOver = true
+  Widgets.fire(row, "OnEnter")
+  runDwell()
+end
+
 local function byCustomer(ns, customer)
   for _, lead in ipairs(ns.Leads.List()) do
     if lead.customer == customer then
@@ -73,7 +93,7 @@ local function testHoverPins()
   ns.LeadsWindow.Toggle()
   local ann = byCustomer(ns, "Ann-Draenor")
   local row = rowOf(ann)
-  Widgets.fire(row, "OnEnter")
+  hover(row)
   Assert.equal(shown(ns), ann)
   Assert.equal(pane().name:GetText(), "Ann-Draenor")
   -- The cursor leaving the rows changes nothing.
@@ -96,8 +116,7 @@ local function testScrollKeepsPin()
   ns.LeadsWindow.Toggle()
   local pinned = byCustomer(ns, "Customer10-Draenor")
   local row = rowOf(pinned)
-  row.mouseOver = true
-  Widgets.fire(row, "OnEnter")
+  hover(row)
   Assert.equal(shown(ns), pinned)
   window().scripts.OnMouseWheel(window(), -1)
   Assert.equal(row.lead.customer, "Customer9-Draenor", "another lead sits under the cursor")
@@ -108,7 +127,7 @@ local function testPinnedRemovedFallsBack()
   local ns = load({ "Ann-Draenor", "Bob-Draenor", "Cid-Draenor" })
   ns.LeadsWindow.Toggle()
   local ann = byCustomer(ns, "Ann-Draenor")
-  Widgets.fire(rowOf(ann), "OnEnter")
+  hover(rowOf(ann))
   Assert.equal(shown(ns), ann)
   ns.Leads.Dismiss(ann.id)
   Assert.equal(shown(ns), byCustomer(ns, "Cid-Draenor"))
@@ -142,13 +161,13 @@ local function testReopenUnpins()
   local ns = load({ "Ann-Draenor", "Bob-Draenor" })
   ns.LeadsWindow.Toggle()
   local ann, bob = byCustomer(ns, "Ann-Draenor"), byCustomer(ns, "Bob-Draenor")
-  Widgets.fire(rowOf(ann), "OnEnter")
+  hover(rowOf(ann))
   Assert.equal(shown(ns), ann)
   ns.LeadsWindow.Toggle()
   ns.LeadsWindow.Toggle()
   Assert.equal(shown(ns), bob, "reopened: no pin")
   -- The same after the gear's round trip through the settings.
-  Widgets.fire(rowOf(ann), "OnEnter")
+  hover(rowOf(ann))
   Assert.equal(shown(ns), ann)
   Widgets.click(window().gear)
   Widgets.click(window().gear)
@@ -221,7 +240,7 @@ local function testDetailsFallbacks()
   ns.LeadsWindow.Toggle()
   -- A restored lead has no crafters list: the picked crafter alone.
   Assert.equal(pane().crafters:GetText(), "Crafters:\nMe · R1")
-  Widgets.fire(rowOf(byCustomer(ns, "Ann-Draenor")), "OnEnter")
+  hover(rowOf(byCustomer(ns, "Ann-Draenor")))
   Assert.equal(pane().crafters:GetText(), "Crafters: none known")
 end
 
@@ -234,9 +253,11 @@ local function testMissingFieldsHideLines()
   ns.LeadsWindow.Toggle()
   Assert.equal(shown(ns), byCustomer(ns, "Bob-Draenor"))
   Assert.same({ pane().why:IsShown(), pane().profession:IsShown() }, { false, false })
-  Widgets.fire(rowOf(byCustomer(ns, "Ann-Draenor")), "OnEnter")
+  local annRow = rowOf(byCustomer(ns, "Ann-Draenor"))
+  hover(annRow)
   Assert.same({ pane().why:IsShown(), pane().profession:IsShown() }, { true, true })
-  Widgets.fire(rowOf(byCustomer(ns, "Bob-Draenor")), "OnEnter")
+  annRow.mouseOver = false
+  hover(rowOf(byCustomer(ns, "Bob-Draenor")))
   Assert.same({ pane().why:IsShown(), pane().profession:IsShown() }, { false, false })
 end
 
@@ -279,7 +300,7 @@ local function testLeadChangeClearsLinkHover()
   local details, tip = pane(), rawget(_G, "GameTooltip")
   details.scripts.OnHyperlinkEnter(details, LINK, LINK_TEXT)
   Assert.same({ tip.owner, tip.shown, details.hoveredLink }, { details, true, LINK })
-  Widgets.fire(rowOf(byCustomer(ns, "Ann-Draenor")), "OnEnter")
+  hover(rowOf(byCustomer(ns, "Ann-Draenor")))
   Assert.same({ tip.shown, details.hoveredLink }, { false, nil })
 end
 
@@ -290,6 +311,74 @@ local function testAgeRefreshes()
   Wow.clock.time = UiFixture.T0 + 120
   ns.LeadsWindow.Refresh()
   Assert.equal(pane().age:GetText(), "2m")
+end
+
+-- Spec §5a: a row pins its lead after the cursor rests 0.2 s on it, not at once.
+local function testDwellPins()
+  local ns = load({ "Ann-Draenor", "Bob-Draenor" })
+  ns.LeadsWindow.Toggle()
+  local ann = byCustomer(ns, "Ann-Draenor")
+  local row = rowOf(ann)
+  row.mouseOver = true
+  Widgets.fire(row, "OnEnter")
+  Assert.equal(shown(ns), byCustomer(ns, "Bob-Draenor"))
+  Assert.equal(Wow.pendingTimers(0.2), 1)
+  runDwell()
+  Assert.equal(shown(ns), ann)
+end
+
+-- The cursor crossing a row on its way elsewhere pins nothing.
+local function testDiagonalKeepsLead()
+  local ns = load({ "Ann-Draenor", "Bob-Draenor" })
+  ns.LeadsWindow.Toggle()
+  local ann, bob = byCustomer(ns, "Ann-Draenor"), byCustomer(ns, "Bob-Draenor")
+  local annRow, bobRow = rowOf(ann), rowOf(bob)
+  hover(annRow)
+  Assert.equal(shown(ns), ann)
+  annRow.mouseOver = false
+  bobRow.mouseOver = true
+  Widgets.fire(bobRow, "OnEnter")
+  bobRow.mouseOver = false
+  runDwell()
+  Assert.equal(shown(ns), ann)
+end
+
+local function testDwellScrollCancels()
+  local customers = {}
+  for i = 1, 12 do
+    customers[i] = "Customer" .. i .. "-Draenor"
+  end
+  local ns = load(customers)
+  ns.LeadsWindow.Toggle()
+  local row = rowOf(byCustomer(ns, "Customer10-Draenor"))
+  row.mouseOver = true
+  Widgets.fire(row, "OnEnter")
+  window().scripts.OnMouseWheel(window(), -1)
+  runDwell()
+  Assert.equal(shown(ns), byCustomer(ns, "Customer12-Draenor"))
+end
+
+local function testDwellAfterClose()
+  local ns = load({ "Ann-Draenor", "Bob-Draenor" })
+  ns.LeadsWindow.Toggle()
+  local row = rowOf(byCustomer(ns, "Ann-Draenor"))
+  row.mouseOver = true
+  Widgets.fire(row, "OnEnter")
+  ns.LeadsWindow.Toggle()
+  runDwell()
+  ns.LeadsWindow.Toggle()
+  Assert.equal(shown(ns), byCustomer(ns, "Bob-Draenor"))
+end
+
+-- The pane and the rows redraw together, so their ages agree.
+local function testRowEnterRefreshesRows()
+  local ns = load({ "Ann-Draenor", "Bob-Draenor" })
+  ns.LeadsWindow.Toggle()
+  local row = rowOf(byCustomer(ns, "Ann-Draenor"))
+  Wow.clock.time = Wow.clock.time + 10
+  hover(row)
+  Assert.equal(row.age:GetText(), "10s")
+  Assert.equal(pane().age:GetText(), "10s")
 end
 
 return function()
@@ -308,5 +397,10 @@ return function()
   testPaneDragMovesWindow()
   testLeadChangeClearsLinkHover()
   testAgeRefreshes()
+  testDwellPins()
+  testDiagonalKeepsLead()
+  testDwellScrollCancels()
+  testDwellAfterClose()
+  testRowEnterRefreshesRows()
   Wow.reset()
 end

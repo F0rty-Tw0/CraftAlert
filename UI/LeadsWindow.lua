@@ -129,7 +129,7 @@ end
 local function onRowEnter(row)
   if row.lead then
     LeadDetails.Pin(window.frame.details, row.lead.id)
-    LeadDetails.Refresh(window.frame.details, Leads.List())
+    LeadsWindow.Refresh()
   end
 end
 
