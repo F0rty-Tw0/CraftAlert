@@ -37,10 +37,17 @@ local function testSavesClass()
   ProfessionList, Defaults = load()
   db = Defaults.Db()
   Wow.stub("UnitClass", function()
-    return "Mage", Wow.secret("MAGE")
+    return "Mage", "MAGE"
   end)
+  -- In game a secret token is still a string, so only the secret test can stop it.
+  local FlavorCompat = require("CraftAlert.Core.FlavorCompat")
+  local realSecret = FlavorCompat.issecretvalue
+  FlavorCompat.issecretvalue = function(value)
+    return value == "MAGE" or realSecret(value)
+  end
   ProfessionsRetail.install({ slots = { slot("Enchanting", ENCH) } })
   ProfessionList.Refresh(db, CHAR)
+  FlavorCompat.issecretvalue = realSecret
   Assert.equal(db.characters[CHAR].class, nil, "secret class")
 
   ProfessionList, Defaults = load()
