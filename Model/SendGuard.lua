@@ -41,6 +41,12 @@ local function sendsInWindow()
   return #sends
 end
 
+-- Rule 3, the look: whether the toast or row that appeared at `shownAt` (GetTime(), nil when none
+-- is visible) has been up 0.5 s. A dismiss by click obeys it too (ClickRouter).
+function SendGuard.Looked(shownAt)
+  return shownAt ~= nil and now() - shownAt >= LOOK_SECONDS
+end
+
 -- lead: the lead to greet; shownAt: GetTime() when the toast or row showing it appeared, nil
 -- when none is visible. → true, or false and the first rule that blocks: "afk", "rate"
 -- (6 greetings in 60 s), "greeted" (once per lead, by any route) or "look" (shown under 0.5 s).
@@ -54,7 +60,7 @@ function SendGuard.Check(lead, shownAt)
   if lead.greeted then
     return false, "greeted"
   end
-  if shownAt == nil or now() - shownAt < LOOK_SECONDS then
+  if not SendGuard.Looked(shownAt) then
     return false, "look"
   end
   return true

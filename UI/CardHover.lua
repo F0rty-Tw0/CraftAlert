@@ -4,7 +4,6 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
-local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
@@ -19,7 +18,7 @@ local BUTTON_GAP = 4
 local BUTTON_BOTTOM = 4
 
 -- Left to right: each button's key in card.buttons, its label and what it does to the card's lead,
--- read at click time.
+-- read at click time. Greet and Dismiss act as a left and a right click on the card, look rule included.
 local ACTIONS = {
   {
     key = "greet",
@@ -39,7 +38,7 @@ local ACTIONS = {
     key = "dismiss",
     label = "Dismiss",
     run = function(card)
-      Leads.Dismiss(card.lead.id)
+      ClickRouter.Handle("RightButton", card.lead, card.shownAt)
     end,
   },
 }

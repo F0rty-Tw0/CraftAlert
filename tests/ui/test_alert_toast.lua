@@ -287,7 +287,7 @@ local function testClicks()
   Assert.equal(#UiFixture.callsTo(calls, "chat"), 0)
   Assert.equal(#UiFixture.callsTo(calls, "prefill"), 1)
 
-  -- Shift prefills, ctrl opens an empty whisper, right dismisses the lead.
+  -- Shift prefills, ctrl opens an empty whisper, right dismisses the lead (once up 0.5 s).
   local keys = { shift = false, ctrl = false }
   local function withKeys()
     Wow.stub("IsShiftKeyDown", function()
@@ -311,6 +311,10 @@ local function testClicks()
   Assert.equal(#UiFixture.callsTo(calls, "chat"), 0)
   keys.ctrl = false
   ns.AlertToast.Show(lead)
+  -- Right-click obeys the look rule too: under 0.5 s it does nothing and the toast stays.
+  Widgets.click(toastFrame(), "RightButton")
+  Assert.same({ ns.Leads.IsActive(lead.id), toastFrame():IsShown() }, { true, true }, "shown under 0.5 s")
+  Wow.clock.gettime = Wow.clock.gettime + 0.5
   Widgets.click(toastFrame(), "RightButton")
   Assert.equal(ns.Leads.IsActive(lead.id), false)
   Assert.equal(toastFrame():IsShown(), false)

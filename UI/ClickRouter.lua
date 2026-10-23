@@ -5,10 +5,13 @@ end
 
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
+local SendGuard = ns.SendGuard or require("CraftAlert.Model.SendGuard")
 
 -- Spec §7.1: what a click does to a lead, the same on the toast and on leads-window rows.
--- Right dismisses whatever modifier is held; on the left button shift prefills, ctrl opens an
--- empty whisper and a plain click greets. Other buttons do nothing.
+-- Right dismisses whatever modifier is held, once the lead has been up 0.5 s (the look rule of
+-- §7.5: a list that shifted under a still cursor never drops a lead the player has not seen);
+-- on the left button shift prefills, ctrl opens an empty whisper and a plain click greets. Other
+-- buttons do nothing.
 local ClickRouter = {}
 
 local type = type
@@ -25,6 +28,9 @@ function ClickRouter.Handle(button, lead, shownAt)
     return nil
   end
   if button == "RightButton" then
+    if not SendGuard.Looked(shownAt) then
+      return nil
+    end
     Leads.Dismiss(lead.id)
     return "dismiss"
   end

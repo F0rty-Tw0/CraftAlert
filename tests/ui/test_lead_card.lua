@@ -527,15 +527,39 @@ local function testDismissButton()
   ns.LeadsWindow.Toggle()
   local card = cards()[1]
   enter(card)
+  Wow.clock.gettime = Wow.clock.gettime + 1
   Widgets.click(card.buttons.dismiss, "LeftButton")
   Assert.same(field(ns.Leads.List(), "customer"), { "Ann-Realm" })
   -- The card shows the next lead and, the cursor still on it, keeps its buttons.
   Assert.equal(card.lead.customer, "Ann-Realm")
   Assert.same(look(card), HOVERED)
+  Wow.clock.gettime = Wow.clock.gettime + 1
   Widgets.click(card.buttons.dismiss, "LeftButton")
   Assert.same(ns.Leads.List(), {})
   Assert.equal(card:IsShown(), false)
   Assert.same(look(card), IDLE)
+end
+
+-- The list shifts under a still cursor: Dismiss keeps the lead the card now shows until the look
+-- rule's 0.5 s have passed, so one click never drops a lead the player has not seen.
+local function testDismissAfterListShifts()
+  local leads = {}
+  for i = 1, 6 do
+    leads[i] = UiFixture.lead(i)
+  end
+  local ns = load(leads)
+  ns.LeadsWindow.Toggle()
+  local card = cards()[1]
+  enter(card)
+  Wow.clock.gettime = Wow.clock.gettime + 1
+  window().scripts.OnMouseWheel(window(), -1)
+  Assert.equal(card.lead.customer, "Customer5-Draenor")
+  Widgets.click(card.buttons.dismiss, "LeftButton")
+  Assert.equal(#ns.Leads.List(), 6, "shown under 0.5 s: kept")
+  Wow.clock.gettime = Wow.clock.gettime + 0.5
+  Widgets.click(card.buttons.dismiss, "LeftButton")
+  Assert.equal(ns.Leads.FindActiveByCustomer("Customer5-Draenor"), nil)
+  Assert.equal(#ns.Leads.List(), 5)
 end
 
 local function testButtonsDoNotDrag()
@@ -570,6 +594,7 @@ return function()
   testGreetAfterListShifts()
   testWhisperButton()
   testDismissButton()
+  testDismissAfterListShifts()
   testButtonsDoNotDrag()
   Wow.reset()
 end
