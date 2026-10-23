@@ -130,13 +130,15 @@ local function rowCount()
   return count
 end
 
-local function testNoRowsDrawnEnteringSettings()
+local function testModeSwitchUnderClientSizing()
   local ns = UiFixture.load({ leads = 8 })
   ns.LeadsWindow.Toggle()
   clientSizing()
   local before = rowCount()
   Widgets.click(gear())
   Assert.equal(rowCount(), before, "the resize to the settings size draws no new row")
+  Widgets.click(gear())
+  Assert.same(size(), { 460, 320 }, "the list bounds come before the size, so it can shrink")
 end
 
 local function testWheelIgnoredInSettings()
@@ -309,7 +311,7 @@ end
 return function()
   testToggleSettingsFromHidden()
   testGearSwitchesModes()
-  testNoRowsDrawnEnteringSettings()
+  testModeSwitchUnderClientSizing()
   testWheelIgnoredInSettings()
   testReopenRefreshesPage()
   testCloseReturnsToList()

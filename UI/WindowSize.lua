@@ -21,12 +21,9 @@ local function clamped(saved, default, minimum, screen)
   return max(min(value, screen), minimum)
 end
 
--- Sizes the frame to the saved size of `size.key` and sets that mode's resize bounds.
+-- Sets the resize bounds of `size.key`'s mode, then sizes the frame to its saved size: bounds
+-- first, so a client that clamps SetSize to them lets the window shrink to a smaller mode.
 function WindowSize.Apply(frame, size)
-  local saved, screen = FrameKit.Saved(size.key) or {}, _G["UIParent"]
-  local width = clamped(saved.width, size.width, size.minWidth, screen:GetWidth())
-  local height = clamped(saved.height, size.height, size.minHeight, screen:GetHeight())
-  frame:SetSize(width, height)
   frame:SetResizable(true)
   frame:SetResizeBounds(size.minWidth, size.minHeight)
   local resizeButton = frame.resizeButton
@@ -34,6 +31,10 @@ function WindowSize.Apply(frame, size)
     resizeButton:SetMinWidth(size.minWidth)
     resizeButton:SetMinHeight(size.minHeight)
   end
+  local saved, screen = FrameKit.Saved(size.key) or {}, _G["UIParent"]
+  local width = clamped(saved.width, size.width, size.minWidth, screen:GetWidth())
+  local height = clamped(saved.height, size.height, size.minHeight, screen:GetHeight())
+  frame:SetSize(width, height)
 end
 
 -- Saves the shared position under `positionKey` and the frame's size under `size.key`.
