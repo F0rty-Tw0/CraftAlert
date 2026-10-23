@@ -6,15 +6,13 @@ end
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 
 -- Native-HUD spec §7.1: the leads window keeps one size per mode, each under its own key of
--- CraftAlertDB.ui, and one position under ui.window. A size is
+-- CraftAlertDB.ui, and one position under the caller's key. A size is
 -- { key, width, height, minWidth, minHeight }: the saved key, the defaults and the bounds.
 local WindowSize = {}
 
 local max = math.max
 local min = math.min
 local type = type
-
-local POSITION_KEY = "window"
 
 -- The saved number, else the default; at least the minimum and at most the screen's (the Schema
 -- keeps any finite number).
@@ -38,9 +36,9 @@ function WindowSize.Apply(frame, size)
   end
 end
 
--- Saves the shared position and the frame's size under `size.key`.
-function WindowSize.Save(frame, size)
-  FrameKit.SavePosition(frame, POSITION_KEY)
+-- Saves the shared position under `positionKey` and the frame's size under `size.key`.
+function WindowSize.Save(frame, size, positionKey)
+  FrameKit.SavePosition(frame, positionKey)
   local saved = FrameKit.Saved(size.key)
   if saved then
     saved.width, saved.height = frame:GetWidth(), frame:GetHeight()

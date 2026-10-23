@@ -29,7 +29,7 @@ local UI_KEY = "window"
 local FALLBACK_POSITION = { "CENTER", 0, 0 }
 local LAYOUT = Theme.LAYOUT
 -- The WindowSize of each mode; the settings pane is never smaller than its default size.
-local LIST = { key = "window", width = LAYOUT.WINDOW_WIDTH, height = LAYOUT.WINDOW_HEIGHT }
+local LIST = { key = UI_KEY, width = LAYOUT.WINDOW_WIDTH, height = LAYOUT.WINDOW_HEIGHT }
 LIST.minWidth, LIST.minHeight = LAYOUT.WINDOW_MIN_WIDTH, LAYOUT.WINDOW_MIN_HEIGHT
 local SETTINGS = { key = "settings", width = LAYOUT.SETTINGS_WIDTH, height = LAYOUT.SETTINGS_HEIGHT }
 SETTINGS.minWidth, SETTINGS.minHeight = SETTINGS.width, SETTINGS.height
@@ -113,7 +113,7 @@ local function anchorInset(frame)
 end
 
 local function onResizeStopped(target)
-  WindowSize.Save(target, window.mode == "settings" and SETTINGS or LIST)
+  WindowSize.Save(target, window.mode == "settings" and SETTINGS or LIST, UI_KEY)
   LeadsWindow.Refresh()
 end
 
