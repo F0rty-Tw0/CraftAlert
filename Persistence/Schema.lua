@@ -37,7 +37,7 @@ local RECIPE_FIELDS = {
   reachConc = "number",
 }
 local CHARACTER_FIELDS =
-  { source = "string", importedAt = "number", realms = "table", professions = "table", recipes = "table", concentration = "table" }
+  { source = "string", class = "string", importedAt = "number", realms = "table", professions = "table", recipes = "table", concentration = "table" }
 local LEAD_FIELDS = {
   id = "number",
   customer = "string",

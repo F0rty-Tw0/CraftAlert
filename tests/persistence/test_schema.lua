@@ -193,6 +193,16 @@ local function testImportCharacter()
   Assert.same(alt.recipes, {})
 end
 
+-- An own character's class token is optional: kept when a string, cleared otherwise.
+local function testCharacterClass()
+  local Schema = load()
+  local db = Schema.Validate({
+    characters = { ["Mage-Realm"] = { class = "MAGE" }, ["Bad-Realm"] = { class = 7 } },
+  })
+  Assert.equal(db.characters["Mage-Realm"].class, "MAGE")
+  Assert.equal(db.characters["Bad-Realm"].class, nil)
+end
+
 local function testLedgerRecentIgnoredLeadsUi()
   local Schema = load()
   local db = Schema.Validate({
@@ -490,6 +500,7 @@ return function()
   testClampBounds()
   testCharactersUnknownKeysAndBadRecords()
   testImportCharacter()
+  testCharacterClass()
   testLedgerRecentIgnoredLeadsUi()
   testListWithHoles()
   testNewerSchemaKeepsNestedUiValues()
