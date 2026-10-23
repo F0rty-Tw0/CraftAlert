@@ -24,9 +24,14 @@ local CardTips = ns.CardTips or require("CraftAlert.UI.CardTips")
 -- carries its lead and the GetTime() at which that lead appeared in it (§7.5 rule 3).
 local LeadRow = {}
 
+local min = math.min
 local select = select
 local tostring = tostring
 local type = type
+
+-- Line 1's gaps: GAP after the icon and after the name, MARK_GAP before the greeted check and the
+-- replied tag.
+local GAP, MARK_GAP = 6, 4
 
 local function now()
   return _G["GetTime"]()
@@ -53,7 +58,7 @@ local function createMarks(card)
   local size = Theme.LAYOUT.ROW_ICON_SIZE
   local greeted = card:CreateTexture(nil, "ARTWORK")
   greeted:SetSize(size, size)
-  greeted:SetPoint("LEFT", card.age, "RIGHT", 4, 0)
+  greeted:SetPoint("LEFT", card.age, "RIGHT", MARK_GAP, 0)
   greeted:SetTexture(Theme.GREETED_ICON)
   local replied = FrameKit.Text(card, Theme.FONTS.detail, Theme.COLORS.accent)
   replied:SetText(Localization.Text("replied"))
@@ -63,7 +68,23 @@ end
 -- The replied tag follows the greeted check when it shows, else the age.
 local function placeReplied(card, greeted)
   card.repliedTag:ClearAllPoints()
-  card.repliedTag:SetPoint("LEFT", greeted and card.greetedIcon or card.age, "RIGHT", 4, 0)
+  card.repliedTag:SetPoint("LEFT", greeted and card.greetedIcon or card.age, "RIGHT", MARK_GAP, 0)
+end
+
+-- Line 1 ends PADDING short of the right column: the name truncates so the age and marks always
+-- show. The width is cleared first, as a set width bounds what GetStringWidth measures.
+local function fitName(card, lead)
+  local layout = Theme.LAYOUT
+  local nameLeft = layout.PADDING + layout.HEADER_ICON_SIZE + GAP
+  local room = layout.CARD_LEFT_WIDTH - layout.PADDING - nameLeft - GAP - card.age:GetStringWidth()
+  if lead.greeted then
+    room = room - MARK_GAP - layout.ROW_ICON_SIZE
+  end
+  if lead.replied then
+    room = room - MARK_GAP - card.repliedTag:GetStringWidth()
+  end
+  card.name:SetWidth(0)
+  card.name:SetWidth(min(card.name:GetStringWidth(), room))
 end
 
 -- A left-column line right under `above`, ending PADDING short of the right column.
@@ -87,9 +108,9 @@ function LeadRow.Create(parent, index, list)
   card.icon:SetSize(layout.HEADER_ICON_SIZE, layout.HEADER_ICON_SIZE)
   card.icon:SetPoint("TOPLEFT", card, "TOPLEFT", layout.PADDING, -4)
   card.name = FrameKit.Text(card, fonts.name)
-  card.name:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", 6, 0)
+  card.name:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", GAP, 0)
   card.age = FrameKit.Text(card, fonts.detail, colors.textTimestamp)
-  card.age:SetPoint("LEFT", card.name, "RIGHT", 6, 0)
+  card.age:SetPoint("LEFT", card.name, "RIGHT", GAP, 0)
   card.greetedIcon, card.repliedTag = createMarks(card)
   card.what = leftLine(card, card.name, fonts.name)
   card.realm = leftLine(card, card.what, fonts.body, colors.warning)
@@ -130,6 +151,7 @@ function LeadRow.Show(card, lead)
   card.greetedIcon:SetShown(lead.greeted)
   card.repliedTag:SetShown(lead.replied)
   placeReplied(card, lead.greeted)
+  fitName(card, lead)
   CardBody.Paint(card, lead)
   CardTips.Refresh(card, leadChanged)
   card:Show()

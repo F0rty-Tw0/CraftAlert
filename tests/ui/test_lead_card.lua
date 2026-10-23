@@ -245,6 +245,30 @@ local function testRealmTag()
   Assert.same(shown[2].realm.textColor, ns.Theme.COLORS.warning)
 end
 
+-- Line 1 ends at or before CARD_LEFT_WIDTH - PADDING (222): a long name truncates, and the age and
+-- marks always show. The name starts at PADDING + icon + 6 (46); the age 6 after it, each mark 4
+-- after the one before; the greeted check is 14 wide.
+local function testLongNameFits()
+  local lead = UiFixture.lead(1, string.rep("N", 28) .. "-Argent Dawn")
+  Assert.equal(#lead.customer, 40)
+  lead.greeted, lead.replied = true, true
+  local ns = load({ lead })
+  ns.LeadsWindow.Toggle()
+  local card = cards()[1]
+  local age, replied = card.age:GetStringWidth(), card.repliedTag:GetStringWidth()
+  Assert.same({ card.age:IsShown(), card.greetedIcon:IsShown(), card.repliedTag:IsShown() }, { true, true, true })
+  Assert.equal(46 + card.name.width + 6 + age + 4 + 14 + 4 + replied, 222)
+  Assert.truthy(card.name.width < 40 * Widgets.CHAR_WIDTH, "the name truncates")
+  -- Without the marks the name gets their room back.
+  card.lead.greeted, card.lead.replied = false, false
+  ns.LeadsWindow.Refresh()
+  Assert.equal(46 + card.name.width + 6 + age, 222)
+  -- A short name keeps its own width.
+  card.lead.customer = "Bo-Realm"
+  ns.LeadsWindow.Refresh()
+  Assert.equal(card.name.width, #"Bo-Realm" * Widgets.CHAR_WIDTH)
+end
+
 local function testFiveCardsFit()
   local leads = {}
   for i = 1, 6 do
@@ -531,6 +555,7 @@ return function()
   testBadCrafters()
   testNoCrafters()
   testRealmTag()
+  testLongNameFits()
   testFiveCardsFit()
   testFullWidth()
   testLinksStillHover()

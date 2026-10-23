@@ -11,7 +11,8 @@
 --   Widgets.texts(frame, frames)    the shown texts under frame (itself and its descendants
 --                                   among `frames`, usually Wow.frames), in creation order
 --   Widgets.fire(frame, name, ...)  runs the `name` script, then its HookScript hooks
---   Widgets.LINE_HEIGHT, Widgets.CHAR_WIDTH   the fake font metrics GetStringHeight wraps with
+--   Widgets.LINE_HEIGHT, Widgets.CHAR_WIDTH   the fake font metrics GetStringHeight and
+--                                   GetStringWidth measure with
 -- A frame made with a template name gets that template's fake (tests/helpers/templates.lua).
 local Templates = require("tests.helpers.templates")
 
@@ -267,6 +268,17 @@ local function newFontString(parent, layer, template)
 
   function fontString:SetMaxLines(count)
     self.maxLines = count
+  end
+
+  -- CHAR_WIDTH per visible character on one line; a set width bounds it, as the client measures
+  -- a truncated text (0: no width set).
+  function fontString:GetStringWidth()
+    local width = visibleLength(self.text or "") * Widgets.CHAR_WIDTH
+    if self.width > 0 then
+      return math.min(width, self.width)
+    end
+
+    return width
   end
 
   -- 0 for no text; one line when wrapping is off or the width is unset; else LINE_HEIGHT per
