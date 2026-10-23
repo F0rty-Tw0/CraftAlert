@@ -32,6 +32,7 @@ local UI = {
   "UI.LinkHover",
   "UI.Dock",
   "UI.CardBody",
+  "UI.CardHover",
   "UI.LeadRow",
   "UI.LeadsList",
   "UI.WindowSize",

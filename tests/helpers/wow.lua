@@ -46,6 +46,17 @@ local function fireOnShow(frame)
   end
 end
 
+-- As the client: OnHide (then its hooks) runs on a frame that stops being visible, and on each
+-- of its shown descendants, so hiding UIParent (Alt+Z) or a window reaches the addon's frames.
+local function fireOnHide(frame)
+  Widgets.fire(frame, "OnHide")
+  for _, child in ipairs(Wow.frames) do
+    if child.parent == frame and child.shown then
+      fireOnHide(child)
+    end
+  end
+end
+
 -- Frames start shown, as in the client; Widgets adds the region and child-creation methods.
 local function newFrame(frameType, name, parent, template)
   local frame = { frameType = frameType, name = name, parent = parent, template = template, events = {}, scripts = {}, hooks = {}, shown = true }
@@ -84,12 +95,13 @@ local function newFrame(frameType, name, parent, template)
     end
   end
 
-  -- As the client: OnHide (then its hooks) runs when a shown frame hides.
+  -- As the client: OnHide (then its hooks) runs when a visible frame hides, then on each shown
+  -- descendant.
   function frame:Hide()
-    local wasShown = self.shown
+    local wasVisible = self:IsVisible()
     self.shown = false
-    if wasShown then
-      Widgets.fire(self, "OnHide")
+    if wasVisible then
+      fireOnHide(self)
     end
   end
 

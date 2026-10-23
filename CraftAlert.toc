@@ -64,6 +64,7 @@ UI/ClickRouter.lua
 UI/LinkHover.lua
 UI/Dock.lua
 UI/CardBody.lua
+UI/CardHover.lua
 UI/LeadRow.lua
 UI/LeadsList.lua
 UI/WindowSize.lua

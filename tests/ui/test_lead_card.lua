@@ -1,9 +1,11 @@
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
+local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 
 -- Lead-cards spec §1, §1.1: each lead is one full-width card, its customer and what matched on the
--- left, the Request / Matched / Crafters rows on the right. No side pane, no hover delay.
+-- left, the Request / Matched / Crafters rows on the right. No side pane, no hover delay. §2, §3: the
+-- hovered card shows its Greet / Whisper / Dismiss buttons and keeps its highlight lit.
 local LINK = "item:4305"
 local LINK_TEXT = "|cffffffff|Hitem:4305|h[Bolt of Silk]|h|r"
 local ITEM_ICON = 132891
@@ -36,9 +38,9 @@ local function cards()
 end
 
 -- The window over `leads` (records, oldest first, given ids 1..n); Me-Realm smiths and is a mage.
--- The window is subscribed to lead changes as Bootstrap does it.
+-- The window is subscribed to lead changes as Bootstrap does it. → ns, the sends (UiFixture's calls).
 local function load(leads, edit)
-  local ns = UiFixture.load({
+  local ns, _, calls = UiFixture.load({
     db = function(accountDb)
       accountDb.characters["Me-Realm"] = { class = "MAGE", professions = { [164] = { name = "Blacksmithing" } } }
       for id, lead in ipairs(leads) do
@@ -63,7 +65,7 @@ local function load(leads, edit)
       end
     end,
   })
-  return ns
+  return ns, calls
 end
 
 local function itemLead()
@@ -290,6 +292,222 @@ local function testNoPaneLeft()
   Assert.equal(ns.LeadDetails, nil)
 end
 
+local HOVERED = { true, true, true, true }
+local IDLE = { false, false, false, false }
+
+-- The three buttons' shown flags, then whether the card's highlight is locked.
+local function look(card)
+  local b = card.buttons
+  return { b[1]:IsShown(), b[2]:IsShown(), b[3]:IsShown(), card.highlightLocked == true }
+end
+
+-- The cursor comes onto `frame` (a card or a child of one) of `card`.
+local function enter(card, frame)
+  card.mouseOver = true
+  Widgets.fire(frame or card, "OnEnter")
+end
+
+-- The cursor leaves `frame`; stillOver: it is still somewhere on the card (on a child or a shared edge).
+local function leave(card, frame, stillOver)
+  card.mouseOver = stillOver == true
+  Widgets.fire(frame or card, "OnLeave")
+end
+
+local function testButtonsHiddenUntilEnter()
+  local ns = load({ UiFixture.lead(1), UiFixture.lead(2) })
+  ns.LeadsWindow.Toggle()
+  local shown = cards()
+  Assert.same(look(shown[1]), IDLE)
+  Assert.same(look(shown[2]), IDLE)
+  local buttons = shown[1].buttons
+  Assert.same(field(buttons, "template"), { "UIPanelButtonTemplate", "UIPanelButtonTemplate", "UIPanelButtonTemplate" })
+  Assert.same({ buttons[1]:GetText(), buttons[2]:GetText(), buttons[3]:GetText() }, { "Greet", "Whisper", "Dismiss" })
+  enter(shown[1])
+  Assert.same(look(shown[1]), HOVERED)
+  Assert.same(look(shown[2]), IDLE)
+  -- Equal widths across the left column minus its padding, 4 apart, 20 high at the card's bottom.
+  local widths = field(buttons, "width")
+  Assert.same({ widths[1] == widths[2], widths[2] == widths[3], buttons[1].height }, { true, true, 20 })
+  Assert.equal(3 * widths[1] + 2 * 4, 230 - 2 * 8)
+  Assert.same(buttons[1].points[1], { "BOTTOMLEFT", shown[1], "BOTTOMLEFT", 8, 4 })
+  Assert.same(buttons[2].points[1], { "BOTTOMLEFT", shown[1], "BOTTOMLEFT", 8 + widths[1] + 4, 4 })
+  Assert.same(field(buttons, "clickButtons")[1], { "LeftButtonUp" })
+end
+
+local function testButtonsStayOnChild()
+  local ns = load({ UiFixture.lead(1) })
+  ns.LeadsWindow.Toggle()
+  local card = cards()[1]
+  enter(card)
+  -- The cursor moves onto the Greet button: the card is left (the cursor still on it), the button entered.
+  leave(card, card, true)
+  Assert.same(look(card), HOVERED)
+  enter(card, card.buttons[1])
+  Assert.same(look(card), HOVERED)
+  leave(card, card.buttons[1], true)
+  Assert.same(look(card), HOVERED)
+end
+
+local function testButtonsHideOnLeave()
+  local ns = load({ UiFixture.lead(1) })
+  ns.LeadsWindow.Toggle()
+  local card = cards()[1]
+  enter(card)
+  leave(card, card, false)
+  Assert.same(look(card), IDLE)
+  enter(card, card.buttons[2])
+  Assert.same(look(card), HOVERED)
+  leave(card, card.buttons[2], false)
+  Assert.same(look(card), IDLE)
+end
+
+local function testOneCardAtATime()
+  local ns = load({ UiFixture.lead(1), UiFixture.lead(2) })
+  ns.LeadsWindow.Toggle()
+  local first, second = cards()[1], cards()[2]
+  enter(first)
+  -- On the shared edge the first card still reports the cursor when the second is entered.
+  enter(second)
+  Assert.equal(first.mouseOver, true)
+  Assert.same(look(first), IDLE)
+  Assert.same(look(second), HOVERED)
+  enter(first)
+  Assert.same(look(first), HOVERED)
+  Assert.same(look(second), IDLE)
+end
+
+local function testHideClearsButtons()
+  local ns = load({ UiFixture.lead(1) })
+  ns.LeadsWindow.Toggle()
+  local card = cards()[1]
+  enter(card)
+  -- Closed with the cursor on it: nothing stale; reopened, only a card under the cursor shows them.
+  ns.LeadsWindow.Toggle()
+  Assert.same(look(card), IDLE)
+  card.mouseOver = false
+  ns.LeadsWindow.Toggle()
+  Assert.same(look(card), IDLE)
+  ns.LeadsWindow.Toggle()
+  card.mouseOver = true
+  ns.LeadsWindow.Toggle()
+  Assert.same(look(card), HOVERED)
+  -- Alt+Z hides the whole UI.
+  _G["UIParent"]:Hide()
+  Assert.same(look(card), IDLE)
+  card.mouseOver = false
+  _G["UIParent"]:Show()
+  Assert.same(look(card), IDLE)
+  _G["UIParent"]:Hide()
+  card.mouseOver = true
+  _G["UIParent"]:Show()
+  Assert.same(look(card), HOVERED)
+  -- The gear to Settings hides the cards; back, the cursor decides.
+  Widgets.click(window().gear)
+  Assert.same(look(card), IDLE)
+  card.mouseOver = false
+  Widgets.click(window().gear)
+  Assert.same(look(card), IDLE)
+  Widgets.click(window().gear)
+  card.mouseOver = true
+  Widgets.click(window().gear)
+  Assert.same(look(card), HOVERED)
+end
+
+local function testGreetButton()
+  local ns, calls = load({ UiFixture.lead(1, "Buyer-Realm") })
+  ns.LeadsWindow.Toggle()
+  local card = cards()[1]
+  enter(card)
+  Wow.clock.gettime = Wow.clock.gettime + 1
+  Widgets.click(card.buttons[1], "LeftButton")
+  local chats = UiFixture.callsTo(calls, "chat")
+  Assert.equal(#chats, 1)
+  Assert.equal(chats[1][5], "Buyer-Realm")
+  Assert.equal(ns.Leads.List()[1].greeted, true)
+  Assert.same(look(card), HOVERED)
+end
+
+local function testGreetModifiers()
+  local ns, calls = load({ UiFixture.lead(1, "Buyer-Realm") })
+  ns.LeadsWindow.Toggle()
+  local card = cards()[1]
+  enter(card)
+  Wow.clock.gettime = Wow.clock.gettime + 1
+  Wow.stub("IsShiftKeyDown", function()
+    return true
+  end)
+  Widgets.click(card.buttons[1], "LeftButton")
+  Assert.same({ #UiFixture.callsTo(calls, "prefill"), #UiFixture.callsTo(calls, "chat") }, { 1, 0 })
+  Wow.stub("IsShiftKeyDown", function()
+    return false
+  end)
+  Wow.stub("IsControlKeyDown", function()
+    return true
+  end)
+  Widgets.click(card.buttons[1], "LeftButton")
+  Assert.same({ #UiFixture.callsTo(calls, "empty"), #UiFixture.callsTo(calls, "chat") }, { 1, 0 })
+end
+
+-- A wheel step puts another lead in the hovered card; the look rule counts from then, so an at-once
+-- click only prefills, and the card keeps its buttons (the cursor is still on it).
+local function testGreetAfterListShifts()
+  local leads = {}
+  for i = 1, 6 do
+    leads[i] = UiFixture.lead(i)
+  end
+  local ns, calls = load(leads)
+  ns.LeadsWindow.Toggle()
+  local card = cards()[1]
+  enter(card)
+  Wow.clock.gettime = Wow.clock.gettime + 1
+  window().scripts.OnMouseWheel(window(), -1)
+  Assert.equal(card.lead.customer, "Customer5-Draenor")
+  Assert.same(look(card), HOVERED)
+  Widgets.click(card.buttons[1], "LeftButton")
+  local prefills = UiFixture.callsTo(calls, "prefill")
+  Assert.same({ #prefills, #UiFixture.callsTo(calls, "chat") }, { 1, 0 })
+  Assert.equal(prefills[1][2], "Customer5-Draenor")
+  Assert.same(look(card), HOVERED)
+end
+
+local function testWhisperButton()
+  local ns, calls = load({ UiFixture.lead(1, "Buyer-Realm") })
+  ns.LeadsWindow.Toggle()
+  local card = cards()[1]
+  enter(card)
+  Wow.clock.gettime = Wow.clock.gettime + 1
+  Widgets.click(card.buttons[2], "LeftButton")
+  local empties = UiFixture.callsTo(calls, "empty")
+  Assert.same({ #empties, #UiFixture.callsTo(calls, "chat") }, { 1, 0 })
+  Assert.equal(empties[1][2], "Buyer-Realm")
+end
+
+local function testDismissButton()
+  local ns = load({ UiFixture.lead(1, "Ann-Realm"), UiFixture.lead(2, "Bob-Realm") })
+  ns.LeadsWindow.Toggle()
+  local card = cards()[1]
+  enter(card)
+  Widgets.click(card.buttons[3], "LeftButton")
+  Assert.same(field(ns.Leads.List(), "customer"), { "Ann-Realm" })
+  -- The card shows the next lead and, the cursor still on it, keeps its buttons.
+  Assert.equal(card.lead.customer, "Ann-Realm")
+  Assert.same(look(card), HOVERED)
+  Widgets.click(card.buttons[3], "LeftButton")
+  Assert.same(ns.Leads.List(), {})
+  Assert.equal(card:IsShown(), false)
+  Assert.same(look(card), IDLE)
+end
+
+local function testButtonsDoNotDrag()
+  local ns = load({ UiFixture.lead(1) })
+  ns.LeadsWindow.Toggle()
+  local card = cards()[1]
+  Assert.equal(card.dragButtons, nil)
+  for _, button in ipairs(card.buttons) do
+    Assert.equal(button.dragButtons, nil)
+  end
+end
+
 return function()
   testCardContent()
   testProfessionLeadCard()
@@ -301,5 +519,16 @@ return function()
   testFullWidth()
   testLinksStillHover()
   testNoPaneLeft()
+  testButtonsHiddenUntilEnter()
+  testButtonsStayOnChild()
+  testButtonsHideOnLeave()
+  testOneCardAtATime()
+  testHideClearsButtons()
+  testGreetButton()
+  testGreetModifiers()
+  testGreetAfterListShifts()
+  testWhisperButton()
+  testDismissButton()
+  testButtonsDoNotDrag()
   Wow.reset()
 end

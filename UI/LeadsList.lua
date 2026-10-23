@@ -32,7 +32,7 @@ local function rowAt(list, index)
     return row
   end
   local layout, inset = Theme.LAYOUT, list.inset
-  row = LeadRow.Create(list.inset, index)
+  row = LeadRow.Create(list.inset, index, list)
   local top = layout.PADDING + (index - 1) * (layout.CARD_HEIGHT + layout.CARD_GAP)
   row:SetPoint("TOPLEFT", inset, "TOPLEFT", layout.PADDING, -top)
   row:SetPoint("TOPRIGHT", inset, "TOPRIGHT", -layout.PADDING, -top)
