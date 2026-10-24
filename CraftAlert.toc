@@ -67,6 +67,7 @@ UI/LinkHover.lua
 UI/Dock.lua
 UI/CardBody.lua
 UI/CardHover.lua
+UI/MainCrafterMenu.lua
 UI/CardTipText.lua
 UI/CardTips.lua
 UI/LeadRow.lua

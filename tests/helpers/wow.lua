@@ -6,6 +6,7 @@
 --   Wow.pendingTimers(d)    how many queued C_Timer.After callbacks have delay d
 --   Wow.secret(v)           wrap v so issecretvalue(wrapper) is true
 --   Wow.itemRefs            the calls to the stubbed SetItemRef: { link, text, button, frame }
+--   Wow.menu                the last MenuUtil.CreateContextMenu: { owner, entries = { { kind, text, ... } } }
 local Widgets = require("tests.helpers.widgets")
 
 local Wow = {}
@@ -19,6 +20,7 @@ Wow.frames = {}
 Wow.timers = {}
 Wow.chat = {}
 Wow.itemRefs = {}
+Wow.menu = { entries = {} }
 Wow.clock = { gettime = 0, time = 0, profile = 0 }
 Wow.combat = false -- what InCombatLockdown() returns
 
@@ -209,6 +211,32 @@ local function installTooltipHelpers()
   end)
 end
 
+-- Blizzard_Menu/MenuUtil.lua: CreateContextMenu runs the generator on a root description at once;
+-- each element the generator adds lands in Wow.menu.entries.
+local function newMenuUtil()
+  local function add(kind, text, isSelected, setSelected, data)
+    local entry = { kind = kind, text = text, isSelected = isSelected, setSelected = setSelected, data = data }
+    table.insert(Wow.menu.entries, entry)
+    return entry
+  end
+  local root = {}
+  function root:CreateTitle(text)
+    return add("title", text)
+  end
+  function root:CreateRadio(text, isSelected, setSelected, data)
+    return add("radio", text, isSelected, setSelected, data)
+  end
+  function root:CreateDivider()
+    return add("divider")
+  end
+  return {
+    CreateContextMenu = function(owner, generator)
+      Wow.menu = { owner = owner, entries = {} }
+      generator(owner, root)
+    end,
+  }
+end
+
 local timerSeq = 0
 local function installDefaults()
   Wow.stub("GameTooltip", newTooltipTrap())
@@ -242,6 +270,7 @@ local function installDefaults()
   Wow.stub("SetItemRef", function(link, text, button, frame)
     table.insert(Wow.itemRefs, { link, text, button, frame })
   end)
+  Wow.stub("MenuUtil", newMenuUtil())
   Wow.stub("C_Timer", {
     After = function(delay, fn)
       timerSeq = timerSeq + 1
@@ -314,6 +343,7 @@ function Wow.reset()
   Wow.timers = {}
   Wow.chat = {}
   Wow.itemRefs = {}
+  Wow.menu = { entries = {} }
   Wow.clock = { gettime = 0, time = 0, profile = 0 }
   Wow.combat = false
   for button in pairs(Widgets.mouse) do

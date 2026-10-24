@@ -34,6 +34,7 @@ local UI = {
   "UI.Dock",
   "UI.CardBody",
   "UI.CardHover",
+  "UI.MainCrafterMenu",
   "UI.CardTipText",
   "UI.CardTips",
   "UI.LeadRow",
