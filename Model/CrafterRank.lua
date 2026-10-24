@@ -14,9 +14,9 @@ local CrafterRank = {}
 local pairs = pairs
 local type = type
 
--- Tier, lower is better: current character, the profession's primary crafter, other
+-- Tier, lower is better: the profession's primary crafter, the current character, other
 -- characters of this account, imported characters.
-local CURRENT, PRIMARY, SAME_ACCOUNT, IMPORTED = 0, 1, 2, 3
+local PRIMARY, CURRENT, SAME_ACCOUNT, IMPORTED = 0, 1, 2, 3
 
 function CrafterRank.IsIgnored(name)
   local api = _G["C_FriendList"]
@@ -28,12 +28,12 @@ function CrafterRank.IsIgnored(name)
 end
 
 local function tierOf(character, key, prof)
-  if key == PlayerName.Own() then
-    return CURRENT
-  end
   local profession = character and character.professions and character.professions[prof]
   if profession and profession.primary == true then
     return PRIMARY
+  end
+  if key == PlayerName.Own() then
+    return CURRENT
   end
   return character and character.source == "import" and IMPORTED or SAME_ACCOUNT
 end

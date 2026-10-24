@@ -103,7 +103,7 @@ return function()
   local CrafterRank = load("retail")
   local data = db()
 
-  -- Current character > primary for the profession > same account > imported > name.
+  -- Primary for the profession > current character > same account > imported > name.
   local function pick(keys, prof)
     return (CrafterRank.Pick(result(keys, prof), CUSTOMER, data))
   end
@@ -111,7 +111,12 @@ return function()
   Assert.equal(pick({ "Zed-Realm", "Imp-Realm" }), "Zed-Realm", "same account beats imported")
   Assert.equal(pick({ "Imp-Realm" }), "Imp-Realm")
   Assert.equal(pick({ "Alt-Realm", "Prim-Realm", "Zed-Realm" }), "Prim-Realm", "the profession's primary crafter beats alts")
-  Assert.equal(pick({ "Prim-Realm", "Me-Realm", "Alt-Realm" }), "Me-Realm", "the current character comes first")
+  Assert.equal(pick({ "Prim-Realm", "Me-Realm", "Alt-Realm" }), "Prim-Realm", "the main crafter beats the current character on a tie")
+  Assert.equal(pick({ "Me-Realm", "Alt-Realm" }), "Me-Realm", "without a main the current character comes first")
+  -- Old data flagging the current character and another: both are tier 0, the name decides.
+  data.characters["Me-Realm"].professions[BS].primary = true
+  Assert.equal(pick({ "Prim-Realm", "Me-Realm" }), "Me-Realm", "a current character who is also primary stays in the primary tier")
+  data.characters["Me-Realm"].professions[BS].primary = false
   Assert.equal(pick({ "Alt-Realm", "Prim-Realm" }, ENCH), "Alt-Realm", "primary counts for its own profession only")
   Assert.equal(pick({ "Prim-Realm", "Prim-Realm", "Alt-Realm" }), "Prim-Realm", "a crafter listed twice is one candidate")
 
@@ -238,10 +243,10 @@ return function()
   Assert.equal(cannotOrder, false)
   Assert.equal((CrafterRank.Pick(result({ "Prim-Realm", "Zed-Realm" }), CUSTOMER, data)), "Zed-Realm", "can-receive beats the primary crafter")
   picked, cannotOrder = CrafterRank.Pick(result({ "Prim-Realm", "Me-Realm" }), CUSTOMER, data)
-  Assert.equal(picked, "Me-Realm", "nobody can receive: the usual order")
+  Assert.equal(picked, "Prim-Realm", "nobody can receive: the usual order")
   Assert.equal(cannotOrder, true)
   picked, cannotOrder = CrafterRank.Pick(result({ "Prim-Realm", "Me-Realm" }), "Bob-Realm", data)
-  Assert.equal(picked, "Me-Realm")
+  Assert.equal(picked, "Prim-Realm")
   Assert.equal(cannotOrder, false)
 
   -- One Pick asks about each character once, however many entries name it and for the winner too
