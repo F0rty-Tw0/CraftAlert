@@ -114,13 +114,13 @@ local function testCraftersPage()
 
   -- Primary: one crafter per profession; it is the shown character's for the shown profession.
   Assert.equal(row("Profession").input.Text:GetText(), "Blacksmithing")
-  Widgets.click(row("Primary crafter for this profession").input)
+  Widgets.click(row("Main crafter for this profession").input)
   Assert.equal(me.professions[BS].primary, true)
   Assert.equal(db.characters["Alt-Realm"].professions[BS].primary, false, "the other primary is cleared")
-  Widgets.click(row("Primary crafter for this profession").input)
+  Widgets.click(row("Main crafter for this profession").input)
   Assert.equal(me.professions[BS].primary, false, "switched off again")
   Assert.equal(db.characters["Alt-Realm"].professions[BS].primary, false, "nobody else gains it")
-  Widgets.click(row("Primary crafter for this profession").input)
+  Widgets.click(row("Main crafter for this profession").input)
   Assert.same(take(refreshes), {})
 
   -- Recipes of that profession by name, with search; mute toggles the icon and rebuilds.
@@ -220,6 +220,97 @@ local function testCraftersRecipeIcons()
   Assert.equal(iconOf(9001).desaturated, true, "muted: grey")
   Assert.equal(iconOf(9001).alpha, ns.Theme.DIM_ALPHA, "muted: dim")
   Assert.equal(iconOf(9001).texture, "item-icon", "muted keeps its icon")
+end
+
+local function mutedNames(character)
+  local names = {}
+  for _, recipe in pairs(character.recipes) do
+    if recipe.muted then
+      names[#names + 1] = recipe.name
+    end
+  end
+  table.sort(names)
+  return names
+end
+
+-- Mute all / Unmute all act on the recipes the search leaves in the list, rebuild the index once,
+-- and rebuild nothing when no recipe changes.
+local function testCraftersMuteAll()
+  local ns, db, refreshes = SettingsFixture.load({
+    db = function(accountDb)
+      crafters(accountDb)
+      accountDb.characters["Me-Realm"].recipes = {
+        [9001] = { item = 501, name = "Alpha Plate", prof = BS },
+        [9002] = { item = 502, name = "Beta Plate", prof = BS },
+        [9003] = { item = 503, name = "Gamma Sword", prof = BS },
+        [9004] = { name = "Enchant Plate", prof = ENCH },
+      }
+    end,
+  })
+  local me = db.characters["Me-Realm"]
+  open(ns, "Crafters")
+  take(refreshes)
+  local window = SettingsFixture.window()
+  local function press(label)
+    Widgets.click(SettingsFixture.button(window, label))
+  end
+
+  press("Unmute all")
+  Assert.same(take(refreshes), {}, "nothing muted: nothing to rebuild")
+  Widgets.type(row("Search recipes").input, "plate")
+  press("Mute all")
+  Assert.same(mutedNames(me), { "Alpha Plate", "Beta Plate" }, "only the listed recipes")
+  Assert.same(take(refreshes), { "rebuild:mute" }, "one request for both")
+  Assert.equal(iconOf(9001).desaturated, true, "the list repaints")
+  press("Mute all")
+  Assert.same(take(refreshes), {}, "all muted already")
+  Widgets.type(row("Search recipes").input, "beta")
+  press("Unmute all")
+  Assert.same(mutedNames(me), { "Alpha Plate" }, "only the listed recipe")
+  Assert.same(take(refreshes), { "rebuild:mute" })
+  Widgets.type(row("Search recipes").input, "")
+  press("Unmute all")
+  Assert.same(mutedNames(me), {})
+  Assert.equal(me.recipes[9001].muted, nil, "unmuted recipes keep no muted field")
+  Assert.same(take(refreshes), { "rebuild:mute" })
+  Widgets.type(row("Search recipes").input, "zzz")
+  press("Mute all")
+  Assert.same(mutedNames(me), {}, "an empty list mutes nothing")
+  Assert.same(take(refreshes), {})
+end
+
+-- A tooltip hidden by the client (no OnLeave) while a row is hovered comes back when the scroll
+-- puts an item recipe under the cursor; after OnLeave the scroll shows none.
+local function testCraftersRecipeHoverAfterHide()
+  local ns = SettingsFixture.load({
+    db = function(accountDb)
+      crafters(accountDb)
+      local recipes = { ["Old Recipe"] = { name = "A Old Recipe", prof = BS } }
+      for id = 1, 8 do
+        recipes[9100 + id] = { item = 600 + id, name = "B " .. id, prof = BS }
+      end
+      accountDb.characters["Me-Realm"].recipes = recipes
+    end,
+  })
+  open(ns, "Crafters")
+  local tooltip, first = ns.Tooltip.Get(), rowOf("Old Recipe")
+  Widgets.fire(first, "OnEnter")
+  Assert.equal(tooltip.lines[1], "A Old Recipe")
+  tooltip:Hide()
+  Widgets.fire(first.parent, "OnMouseWheel", -1)
+  Assert.equal(first.item.key, 9101)
+  Assert.same({ tooltip.shown, tooltip.owner }, { true, first }, "the hovered row shows its new recipe")
+  Assert.equal(tooltip.hyperlinks[#tooltip.hyperlinks], "item:601")
+  Widgets.fire(first, "OnLeave")
+  Widgets.fire(first.parent, "OnMouseWheel", 1)
+  Assert.equal(tooltip.shown, false, "not hovered: no tooltip")
+
+  -- A row hidden while hovered (the settings closed under the cursor) forgets the hover.
+  Widgets.fire(first, "OnEnter")
+  tooltip:Hide()
+  ns.LeadsWindow.ToggleSettings()
+  open(ns, "Crafters")
+  Assert.equal(tooltip.shown, false, "hidden while hovered: no tooltip on reopen")
 end
 
 -- Hovering a recipe row that makes an item shows the item's tooltip; one without an item shows
@@ -436,9 +527,11 @@ end
 return function()
   testKeywordsPage()
   testCraftersPage()
+  testCraftersMuteAll()
   testCraftersRecipeOrder()
   testCraftersRecipeIcons()
   testCraftersRecipeTooltip()
+  testCraftersRecipeHoverAfterHide()
   testRecipeTooltipNameKey()
   testRecipeTooltipItemLoads()
   testRemoveOwnCharacter()

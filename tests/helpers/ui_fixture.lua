@@ -53,6 +53,7 @@ local UI = {
   "UI.Settings.PageGreetings",
   "UI.Settings.PageKeywords",
   "UI.Settings.RecipeTooltip",
+  "UI.Settings.RecipeList",
   "UI.Settings.PageCrafters",
   "UI.Settings.PageTest",
   "Core.Bindings",
