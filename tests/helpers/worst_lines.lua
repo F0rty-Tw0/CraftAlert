@@ -107,6 +107,8 @@ function WorstLines.inferredEmpty(index)
   return "lf belt boots " .. misses
 end
 
+WorstLines.UNION = "lf ring neck cloak"
+
 -- → { { name, line }, ... }
 function WorstLines.cases(index)
   local fill = WorstLines.fill
@@ -135,6 +137,8 @@ function WorstLines.cases(index)
     { "back", fill("lf", "back") }, -- 4.4 only: no companion, no stat + slot word
     { "cue_break", fill("lf crafter.", "head a for my") }, -- punctuation ends the cue's reach
     { "inferred_empty", WorstLines.inferredEmpty(index) }, -- 4.4: lookup, append, empty, typo
+    -- 4.4: slot words of different slots, no armor slot (so no armor word): the union
+    { "union", WorstLines.UNION },
   }
 end
 

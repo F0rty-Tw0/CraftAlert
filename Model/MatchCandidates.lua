@@ -235,6 +235,20 @@ local function bestProfession(firstOfGroup, n, rank)
 end
 MatchCandidates.BestProfession = bestProfession
 
+-- The same tie-break over recipes already counted per profession: of profs[1..n], the one
+-- with the most (counts[prof]), then rank. → key or nil.
+function MatchCandidates.BestCounted(profs, n, counts)
+  local best, bestCount, bestRank = nil, 0, HUGE
+  for k = 1, n do
+    local prof = profs[k]
+    local seen, order = counts[prof], profRank[prof] or HUGE
+    if seen > bestCount or (seen == bestCount and order < bestRank) then
+      best, bestCount, bestRank = prof, seen, order
+    end
+  end
+  return best
+end
+
 -- One recipe → item match; several → profession match (§6.3 step 4.4). Why: the intent
 -- token, then list1[1..n1], then list2[1..n2]. → false when no candidate has a profession.
 function MatchCandidates.Decide(intentToken, list1, n1, list2, n2)
@@ -256,6 +270,17 @@ function MatchCandidates.Decide(intentToken, list1, n1, list2, n2)
   MatchCandidates.WhyList(list1, n1)
   MatchCandidates.WhyList(list2, n2)
   return true
+end
+
+-- Profession match on every candidate, all of prof, when the caller counted several recipes
+-- (WordGroups' union). Why: the intent token, then why[1..n].
+function MatchCandidates.DecideProfession(intentToken, prof, why, n)
+  begin("profession", nil, prof, intentToken)
+  for k = 1, count do
+    result.entries[k] = candidates[k]
+  end
+  entryCount = count
+  MatchCandidates.WhyList(why, n)
 end
 
 local function copyEntries(list)

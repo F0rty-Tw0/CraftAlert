@@ -4,8 +4,9 @@ local Fixture = require("tests.helpers.matcher_fixture")
 
 -- Differential check on seeded random indexes and lines: step 4.4 in WordGroups
 -- (group-level, precomputed) against an entry-level reference that follows the spec text
--- (§6.3 4.4: intersection or, for slot words of different slots, union, the 6-word cap, profession narrowing, grouping, the profession
--- tie-break; §6.4 ambiguous words and their neighbouring cue words).
+-- (§6.3 4.4: intersection or, for slot words of different slots, union without the words
+-- nobody crafts or uncued ambiguous ones, the 6-word cap, profession narrowing, grouping, the
+-- profession tie-break; §6.4 ambiguous words and their neighbouring cue words).
 
 local ENCH = 333
 local PROFS = { 164, 165, 197, ENCH }
@@ -156,33 +157,37 @@ local function reference44(ns, index, tokens, set)
     end
     table.insert(named, 1, ENCH) -- Enchanting before any other
   end
-  local lists, taken, takenCount, capped = {}, {}, 0, false
+  -- order: the counted words in line order; usable: the ones the union takes (user ruling
+  -- 2026-10-24: someone crafts it, and an ambiguous one has a cue word next to it).
+  local lists, taken, takenCount, capped, empty, order, usable = {}, {}, 0, false, false, {}, {}
   for i, t in ipairs(tokens) do
-    local partnered = set ~= nil or cuedAt(ns, tokens, i) or (first ~= nil and first ~= t) or other ~= nil
+    local cued = cuedAt(ns, tokens, i)
+    local partnered = set ~= nil or cued or (first ~= nil and first ~= t) or other ~= nil
     local counted = not Slang.ambiguous[t] or partnered
     if (wordIndex[t] or Slang.wordSet[t]) and counted then
       if not taken[t] and takenCount == 6 then
         capped = true
       else
-        if wordIndex[t] == nil then
-          return "nil", capped
-        end
         if not taken[t] then
           taken[t], takenCount = true, takenCount + 1
+          order[takenCount] = t
         end
+        usable[t] = usable[t] or (wordIndex[t] ~= nil and (cued or not Slang.ambiguous[t]))
+        empty = empty or wordIndex[t] == nil
         lists[#lists + 1] = wordIndex[t]
       end
     end
   end
+  local union = set == nil and eitherSlot(Slang, taken)
   local base = set or lists[1]
-  if base == nil then
+  if (empty and not union) or (base == nil and not union) then
     return "nil", capped
   end
-  local inAll = {}
-  local union = set == nil and eitherSlot(Slang, taken)
+  local inAll, skips = {}, false
   if union then
-    for _, list in ipairs(lists) do
-      for _, e in ipairs(list) do
+    for _, t in ipairs(order) do
+      skips = skips or not usable[t]
+      for _, e in ipairs(usable[t] and wordIndex[t] or {}) do
         if not isIn(inAll, e) then
           inAll[#inAll + 1] = e
         end
@@ -226,7 +231,7 @@ local function reference44(ns, index, tokens, set)
   if #firstOf == 0 then
     return "nil", capped
   elseif #firstOf == 1 then
-    return "item " .. tostring(firstOf[1].group) .. " " .. entryText(kept, #kept), capped, later, union
+    return "item " .. tostring(firstOf[1].group) .. " " .. entryText(kept, #kept), capped, later, union, skips
   end
   local counts, rank = {}, {}
   for i, key in ipairs(ORDER) do
@@ -248,7 +253,7 @@ local function reference44(ns, index, tokens, set)
       entries[#entries + 1] = e
     end
   end
-  return "profession " .. tostring(best) .. " " .. entryText(entries, #entries), capped, later, union
+  return "profession " .. tostring(best) .. " " .. entryText(entries, #entries), capped, later, union, skips
 end
 
 local AMBIGUOUS, CUES, GAPS = { "legs", "head", "feet", "ring", "hands" }, { "crafter", "bs", "tailor", "ench" }, { "for", "my", "x", "lf" }
@@ -297,7 +302,7 @@ end
 local function testWordGroupsDifferential()
   local ns = Fixture.load()
   local checked, cappedHits, enchantHits, namedHits, laterHits, ambiguousSetHits, ambiguousCueHits = 0, 0, 0, 0, 0, 0, 0
-  local unionHits = 0
+  local unionHits, skipHits = 0, 0
   for _ = 1, 60 do
     local db = randomItemDb(ns)
     local index = ns.Index.Build(db, db.settings, {
@@ -340,7 +345,7 @@ local function testWordGroupsDifferential()
         local r = ns.MatchCandidates.result
         got = r.kind .. " " .. tostring(r.kind == "item" and r.group or r.prof) .. " " .. entryText(r.entries, r.entryCount)
       end
-      local want, capped, later, union = reference44(ns, index, tokens, set)
+      local want, capped, later, union, skips = reference44(ns, index, tokens, set)
       Assert.equal(got, want, table.concat(tokens, " "))
       checked = checked + (got ~= "nil" and 1 or 0)
       cappedHits = cappedHits + ((capped and got ~= "nil") and 1 or 0)
@@ -356,18 +361,20 @@ local function testWordGroupsDifferential()
       namedHits = namedHits + ((named and not enchant and got ~= "nil") and 1 or 0)
       laterHits = laterHits + ((later and got ~= "nil") and 1 or 0)
       unionHits = unionHits + ((union and got ~= "nil") and 1 or 0)
+      skipHits = skipHits + ((skips and got ~= "nil") and 1 or 0)
       ambiguousSetHits = ambiguousSetHits + ((ambiguousSet and got ~= "nil") and 1 or 0)
       ambiguousCueHits = ambiguousCueHits + ((ambiguousCued and got ~= "nil") and 1 or 0)
     end
   end
-  -- Each rule decides enough matching lines (412 / 23 / 70 / 67 / 16 / 25 / 35 / 84 with this
-  -- seed).
+  -- Each rule decides enough matching lines (502 / 29 / 77 / 78 / 17 / 115 / 100 / 35 / 93 with
+  -- this seed).
   Assert.truthy(checked > 150, "lines that match: " .. checked)
   Assert.truthy(cappedHits > 10, "matching lines the 6-word cap decided: " .. cappedHits)
   Assert.truthy(enchantHits > 20, "matching lines with an Enchanting word: " .. enchantHits)
   Assert.truthy(namedHits > 20, "matching lines with another profession word: " .. namedHits)
   Assert.truthy(laterHits > 10, "matching lines a named profession after the first narrowed: " .. laterHits)
   Assert.truthy(unionHits > 10, "matching lines of slot words of different slots: " .. unionHits)
+  Assert.truthy(skipHits > 10, "matching union lines that skip a word: " .. skipHits)
   Assert.truthy(ambiguousSetHits > 8, "matching lines with a 4.2 set and an ambiguous word: " .. ambiguousSetHits)
   Assert.truthy(ambiguousCueHits > 30, "matching lines with an ambiguous word next to a cue word: " .. ambiguousCueHits)
 end

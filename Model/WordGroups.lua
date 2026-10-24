@@ -17,10 +17,11 @@ local Candidates = ns.MatchCandidates or require("CraftAlert.Model.MatchCandidat
 --     group's words come from its item, so membership is a per-group question);
 --   wordSets[word] = { set, ... }: the distinct groupWords sets holding word (a few dozen), so
 --     a line whose words no group has together is rejected without walking a list;
---   wordInfo[word] = { groupCount, prof, entries, byProf }: step 4.4's decision for that word
---     alone, and byProf[key] the same decision over one profession's entries only (absent
---     when it has none), for a line that names a profession; byProf is nil when one
---     profession has every entry (narrowedInfo).
+--   wordInfo[word] = { groupCount, prof, entries, byProf, split }: step 4.4's decision for
+--     that word alone, and byProf[key] the same decision over one profession's entries only
+--     (absent when it has none), for a line that names a profession; byProf is nil when one
+--     profession has every entry (narrowedInfo); split is true when a recipe of the word has
+--     entries of several professions (byProfession).
 -- A line that names an armor slot without an armor type takes the sender's armor word
 -- (docs/specs/2026-10-20-class-armor-design.md §4 rules 2-7), except while an Enchanting word
 -- is tried (the 2026-10-20 and 2026-10-22 rulings in the -notes.md beside it): one class
@@ -171,8 +172,11 @@ local function soleInfo(list, prof, seenIn)
 end
 
 -- info.byProf for list: the entries of each profession, then their soleInfo in place. nil when
--- one profession has every entry (most words), so the index holds no table for it.
-local function byProfession(list, seenIn)
+-- one profession has every entry (most words), so the index holds no table for it. Also →
+-- whether a recipe of list has entries of several professions (or of one and of none), so its
+-- soleInfo counts add up to more than the step 4.4 tie-break counts (firstIn[group] == list:
+-- profOf[group] is its first entry's profession, false for none).
+local function byProfession(list, seenIn, firstIn, profOf)
   local only = list[1] and list[1].prof
   for _, entry in ipairs(list) do
     if entry.prof ~= only then
@@ -181,11 +185,16 @@ local function byProfession(list, seenIn)
     end
   end
   if only ~= nil then
-    return nil
+    return nil, false
   end
-  local byProf = {}
+  local byProf, split = {}, false
   for _, entry in ipairs(list) do
-    local prof = entry.prof
+    local prof, group = entry.prof, entry.group
+    if firstIn[group] ~= list then
+      firstIn[group], profOf[group] = list, prof or false
+    elseif profOf[group] ~= (prof or false) then
+      split = true
+    end
     if prof ~= nil then
       local entries = byProf[prof] or {}
       byProf[prof] = entries
@@ -195,7 +204,7 @@ local function byProfession(list, seenIn)
   for prof, entries in pairs(byProf) do
     byProf[prof] = soleInfo(entries, prof, seenIn)
   end
-  return byProf
+  return byProf, split
 end
 
 -- A word's step 4.4 decision over profession prof's entries only, or nil when it has none.
@@ -223,14 +232,18 @@ function WordGroups.Build(index)
       index.professionKeys[word] = ProfessionWords.KeyFor(word, isClassic)
     end
   end
-  local seenIn = {}
+  local seenIn, firstIn, profOf = {}, {}, {}
   index.wordInfo = {}
   for word, list in pairs(index.wordIndex) do
-    local info, byProf = infoFor(list, rank, seenIn), byProfession(list, seenIn)
+    local info = infoFor(list, rank, seenIn)
+    local byProf, split = byProfession(list, seenIn, firstIn, profOf)
     if byProf ~= nil and info.groupCount > 1 and info.prof ~= nil then
       info.entries = byProf[info.prof].entries -- the same entries in the same order, held once
     end
     info.byProf = byProf
+    if split then
+      info.split = true
+    end
     index.wordInfo[word] = info
   end
 end
@@ -245,11 +258,13 @@ local function counts(token, first, other, hasSet, cued)
 end
 
 -- Per-line buffers: the distinct counted words (a repeated word intersects once), found
--- with stamps on the words (each wordIndex word has its own list).
-local lineWords, lineLists, lineCount = {}, {}, 0
-local unionLists = {} -- walkUnion's lists, one per word
+-- with stamps on the words (each wordIndex word has its own list; false for a recognized
+-- slang word nobody can craft, emptyCount of them). wordStamp[word]: stamp counted, skipped
+-- counted but left out of the union (walkUnion: nobody crafts it, or an ambiguous word with
+-- no cue next to it), -stamp an ambiguous word left uncounted. stamp steps by 2.
+local lineWords, lineLists, lineCount, emptyCount = {}, {}, 0, 0
 local wordStamp = {}
-local stamp = 0
+local stamp, skipped = 0, 1
 -- The profession keys the line names, in narrowing order (Enchanting first, then line order,
 -- each once: namedStamp[key] == stamp): named[1..namedCount].
 local named, namedCount, namedStamp = {}, 0, {}
@@ -258,9 +273,17 @@ local named, namedCount, namedStamp = {}, 0, {}
 -- Enchanting word (then named[1] is its key).
 local inferable, enchantingNamed = false, false
 
+-- walkUnion's buffers: the usable words, their infos and lists, why without the skipped
+-- words, and each profession's summed recipe count (profSum[key] while profStamp[key] ==
+-- unionStamp; sumProfs[1..sumCount] the keys).
+local unionWords, unionInfos, unionLists, unionWhy = {}, {}, {}, {}
+local profSum, profStamp, sumProfs, sumCount, unionStamp = {}, {}, {}, 0, 0
+
 -- New index: drop the lists the last line kept, the stamps and the set marks.
 function WordGroups.Reset()
-  lineWords, lineLists, lineCount, wordStamp, setMark, unionLists = {}, {}, 0, {}, {}, {}
+  lineWords, lineLists, lineCount, wordStamp, setMark = {}, {}, 0, {}, {}
+  unionWords, unionInfos, unionLists, unionWhy = {}, {}, {}, {}
+  profSum, profStamp, sumProfs, sumCount = {}, {}, {}, 0
 end
 
 -- The first two distinct wordIndex words of the line (§6.4: what an ambiguous word needs).
@@ -329,25 +352,32 @@ local function addNamed(key, front)
 end
 
 -- Fills lineWords/lineLists (the first MAX_WORDS distinct counted words; later new words
--- are skipped), Candidates.wordWhy, named and the inferArmor line state. → why count, or nil
--- when a known slang word nobody can craft empties the intersection.
+-- are skipped), emptyCount, Candidates.wordWhy, named and the inferArmor line state. → why
+-- count.
 -- inferable (§4 rule 2) is decided on every scanned word, counted or not: a slot without an
 -- armor type (an ambiguous slot needs a cue next to it); an Enchanting word is tried first
 -- without it (Match; user rulings 2026-10-20 and 2026-10-22). A repeat of a word already decided
--- (wordStamp: stamp counted, -stamp an ambiguous word left uncounted) takes the same decision
--- at once, since nothing it depends on changed; only a cue next to the repeat (cuedAt) can
--- count an uncounted one. The first two wordIndex words are found only when an ambiguous word
--- needs them (most lines have none).
+-- (wordStamp) takes the same decision at once, since nothing it depends on changed; only a cue
+-- next to the repeat (cuedAt) can count an uncounted one, or put a skipped one in the union.
+-- The first two wordIndex words are found only when an ambiguous word needs them (most lines
+-- have none).
 local function collect(index, tokens, count, breakBefore, hasSet)
   local wordIndex, tags, professionKeys = index.wordIndex, index.armorTags, index.professionKeys
   local first, other, scanned, enchanting = nil, nil, false, false
   local sawType, sawPlainSlot, sawCuedSlot = false, false, false
   local why, whyCount = Candidates.wordWhy, 0
-  lineCount, namedCount, stamp = 0, 0, stamp + 1
+  lineCount, namedCount, emptyCount, stamp = 0, 0, 0, stamp + 2
+  skipped = stamp + 1
   for i = 1, count do
     local token = tokens[i]
     local seen = wordStamp[token]
     if seen == stamp then
+      whyCount = whyCount + 1
+      why[whyCount] = token
+    elseif seen == skipped then
+      if wordIndex[token] and cuedAt(tokens, count, breakBefore, i) then
+        wordStamp[token] = stamp
+      end
       whyCount = whyCount + 1
       why[whyCount] = token
     elseif seen ~= -stamp or cuedAt(tokens, count, breakBefore, i) then
@@ -359,13 +389,14 @@ local function collect(index, tokens, count, breakBefore, hasSet)
       end
       local list = wordIndex[token]
       if (list or slangWords[token]) and lineCount < MAX_WORDS then
-        local tag, ambiguousSlot, cued = tags[token], false, false
+        local tag, ambiguousSlot, cued, uncued = tags[token], false, false, false
         if ambiguous[token] then
           if not scanned then
             first, other = firstWords(wordIndex, tokens, count)
             scanned = true
           end
           ambiguousSlot, cued = tag == "slot", cuedAt(tokens, count, breakBefore, i)
+          uncued = not cued
         end
         local counted = counts(token, first, other, hasSet, cued)
         sawType = sawType or tag == "type"
@@ -373,11 +404,11 @@ local function collect(index, tokens, count, breakBefore, hasSet)
         sawCuedSlot = sawCuedSlot or (ambiguousSlot and cued)
         if counted then
           if list == nil then
-            return nil
+            emptyCount = emptyCount + 1
           end
-          wordStamp[token] = stamp
+          wordStamp[token] = (list == nil or uncued) and skipped or stamp
           lineCount = lineCount + 1
-          lineWords[lineCount], lineLists[lineCount] = token, list
+          lineWords[lineCount], lineLists[lineCount] = token, list or false
           whyCount = whyCount + 1
           why[whyCount] = token
         else
@@ -491,25 +522,112 @@ local function differentSlots()
   return true
 end
 
--- Step 4.4 for differentSlots (user ruling 2026-10-24: either slot counts): the union of the
--- words' lists, narrowed as walkNamed narrows. → whether it produced a match.
-local function walkUnion(index, intentToken, why, whyCount, from, to)
-  for n = from, namedCount > 0 and to or from do
-    local prof, lists = namedCount > 0 and named[n] or nil, 0
-    for k = 1, lineCount do
-      local list = lineLists[k]
-      if prof ~= nil then
-        local info = narrowedInfo(index.wordInfo[lineWords[k]], prof)
-        list = info and info.entries
+-- Drops from unionWords[1..n] each word whose recipes all hold an earlier kept word ("finger
+-- neck necklace": every necklace is a neck), so the union and its order stay the same. → the
+-- words kept, and whether two of them still share a recipe (their recipe counts would count
+-- it twice).
+local function dropCovered(wordSets, n)
+  local kept, shared = 0, false
+  for k = 1, n do
+    local word = unionWords[k]
+    local sets, covered, overlaps = wordSets[word], false, false
+    for j = 1, kept do
+      local earlier, hits = unionWords[j], 0
+      for s = 1, #sets do
+        if sets[s][earlier] then
+          hits = hits + 1
+        end
       end
-      if list ~= nil then
+      covered, overlaps = covered or hits == #sets, overlaps or hits > 0
+    end
+    if not covered then
+      kept, shared = kept + 1, shared or overlaps
+      unionWords[kept] = word
+    end
+  end
+  return kept, shared
+end
+
+local function addSum(prof, groups)
+  if prof == nil then
+    return
+  end
+  if profStamp[prof] ~= unionStamp then
+    profStamp[prof], profSum[prof], sumCount = unionStamp, 0, sumCount + 1
+    sumProfs[sumCount] = prof
+  end
+  profSum[prof] = profSum[prof] + groups
+end
+
+-- Adds info's recipes to profSum, per profession. → their count.
+local function addSums(info)
+  local byProf = info.byProf
+  if byProf == nil then
+    addSum(info.prof, info.groupCount)
+  else
+    for prof, sub in pairs(byProf) do
+      addSum(prof, sub.groupCount)
+    end
+  end
+  return info.groupCount
+end
+
+-- Step 4.4 for differentSlots (user ruling 2026-10-24: either slot counts): the union of the
+-- lists of the words not skipped (wordStamp), narrowed as walkNamed narrows, without the
+-- skipped words in why. The profession is picked from the words' precomputed recipe counts,
+-- then only its entries are walked; a recipe counted twice (dropCovered, info.split) walks
+-- the whole union instead. → whether it produced a match.
+local function walkUnion(index, intentToken, why, whyCount, from, to)
+  local wordInfo, found, kept = index.wordInfo, 0, 0
+  for k = 1, lineCount do
+    if wordStamp[lineWords[k]] == stamp then
+      found = found + 1
+      unionWords[found] = lineWords[k]
+    end
+  end
+  for k = 1, whyCount do
+    if wordStamp[why[k]] == stamp then
+      kept = kept + 1
+      unionWhy[kept] = why[k]
+    end
+  end
+  local used, shared = dropCovered(index.wordSets, found)
+  for n = from, namedCount > 0 and to or from do
+    local prof, lists, total, whole = namedCount > 0 and named[n] or nil, 0, 0, shared
+    unionStamp, sumCount = unionStamp + 1, 0
+    for k = 1, used do
+      local info = wordInfo[unionWords[k]]
+      if prof ~= nil then
+        info = narrowedInfo(info, prof)
+      end
+      if info ~= nil then
         lists = lists + 1
-        unionLists[lists] = list
+        unionInfos[lists] = info
+        unionLists[lists] = prof and info.entries or index.wordIndex[unionWords[k]]
+        total, whole = total + addSums(info), whole or info.split == true
       end
     end
-    Candidates.FromLists(unionLists, lists)
-    if Candidates.count > 0 then
-      return Candidates.Decide(intentToken, nil, 0, why, whyCount)
+    if total == 1 then
+      return Candidates.DecideWord(intentToken, unionInfos[1], unionWhy, kept)
+    elseif total > 0 and whole then
+      Candidates.FromLists(unionLists, lists)
+      return Candidates.Decide(intentToken, nil, 0, unionWhy, kept)
+    elseif total > 0 then
+      local best = Candidates.BestCounted(sumProfs, sumCount, profSum)
+      if best == nil then
+        return false
+      end
+      local narrowed = 0
+      for k = 1, lists do
+        local info = narrowedInfo(unionInfos[k], best)
+        if info ~= nil then
+          narrowed = narrowed + 1
+          unionLists[narrowed] = info.entries
+        end
+      end
+      Candidates.FromLists(unionLists, narrowed)
+      Candidates.DecideProfession(intentToken, best, unionWhy, kept)
+      return true
     end
   end
   return false
@@ -534,6 +652,8 @@ local function walkNamed(index, intentToken, why, whyCount, from, to, mark)
   end
   if differentSlots() then
     return walkUnion(index, intentToken, why, whyCount, from, to)
+  elseif emptyCount > 0 then
+    return false -- the sender's armor word joined the slot words: an empty intersection
   end
   -- The word sets holding every word are the same whichever word's sets are walked, so they
   -- are marked once, from the first narrowed list found.
@@ -567,7 +687,9 @@ end
 function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, setWhyCount, classArmor, breakBefore)
   lineIntent = intentToken
   local whyCount = collect(index, tokens, count, breakBefore or noBreak, hasSet)
-  if whyCount == nil then
+  -- A recognized slang word nobody can craft empties the intersection; only the union of slot
+  -- words of different slots skips it (user ruling 2026-10-24).
+  if emptyCount > 0 and (hasSet or not differentSlots()) then
     return false
   end
   local why, from, inferred = Candidates.wordWhy, 1, nil
