@@ -329,7 +329,7 @@ local function testBuyerWordBeforeSlot()
   check(ns, "R3 punctuation between", "LF, legs", W, "stop:nomatch", 0)
   check(ns, "R3 buyer after an uncounted repeat", "need legs, LF legs", W, "item:502", 1)
   -- A cue word on a repeat counts the word, so no class is needed: the line keeps today's result.
-  check(ns, "R3 cued repeat", "LF legs, crafter for legs", U, outcome(ns, "LF legs, crafter for legs"), 1)
+  check(ns, "R3 cued repeat", "LF legs, crafter for legs", U, outcome(ns, "LF legs, crafter for legs"), 1, "lf+legs")
   -- An Enchanting word is tried first without the class, and a word only a buyer word counts is
   -- no word of it: the line keeps the master outcome (the Enchanting crafter by step 4.6), class
   -- known or not. A cue word ("enchanter" right after legs) counts the word, as before.

@@ -437,6 +437,16 @@ local function buyerBefore(tokens, breakBefore, i)
   return i > 1 and buyerWords[tokens[i - 1]] == true and not breakBefore(i)
 end
 
+-- Whether token was counted by a buyer word alone on this line.
+local function isBuyerOnly(token)
+  for k = 1, buyerCount do
+    if buyerOnly[k] == token then
+      return true
+    end
+  end
+  return false
+end
+
 -- Whether a word counted by a buyer word alone is still unpromoted (no cue word counted it
 -- since): it needs the sender's armor word, so it is no word of the line until that is inferred.
 local function buyerPending()
@@ -495,11 +505,16 @@ local function collect(index, tokens, count, breakBefore, hasSet)
       whyCount = whyCount + 1
       why[whyCount] = token
     elseif seen == skipped then
-      if lineCue ~= false and wordIndex[token] and cuedAt(tokens, count, breakBefore, i) then
+      local promoted = lineCue ~= false and wordIndex[token] and cuedAt(tokens, count, breakBefore, i)
+      if promoted then
         wordStamp[token] = stamp
       end
-      whyCount = whyCount + 1
-      why[whyCount] = token
+      -- A buyer-only word promoted by this cue already has its why token ("LF legs, crafter for
+      -- legs" says "legs" once, as without the buyer word).
+      if not (promoted and isBuyerOnly(token)) then
+        whyCount = whyCount + 1
+        why[whyCount] = token
+      end
     elseif seen ~= -stamp or cuedAt(tokens, count, breakBefore, i) or buyerBefore(tokens, breakBefore, i) then
       local key = professionKeys[token]
       if key ~= nil then
