@@ -219,6 +219,7 @@ local function newIndex(settings, opts)
     professionOrder = opts.professionOrder and opts.professionOrder() or {},
     professionWordAlerts = settings.professionWordAlerts == true,
     ownName = opts.ownKey,
+    extraSlang = settings.extraSlang or {}, -- WordGroups.Build reads it (R2: slot-word keys)
     armorTags = ItemKeywords.ArmorTags(settings.extraSlang), -- §4 rule 1 tags (class-armor spec), read by step 4.4
     size = 0,
     crafterCount = 0,

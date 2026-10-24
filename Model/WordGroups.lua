@@ -34,6 +34,7 @@ local WordGroups = {}
 
 local pairs = pairs
 local ipairs = ipairs
+local lower = string.lower
 local IsOffHand = Slang.IsOffHand
 local slangWords, ambiguous = Slang.wordSet, Slang.ambiguous
 local MAX_WORDS = 6 -- distinct slang words per line (§6.3 step 4.4; bounds the §4.4 max)
@@ -56,22 +57,6 @@ for _, entry in ipairs(ProfessionWords.entries) do
     if entry.englishName == "enchanting" then
       enchantingWords[word] = true
     end
-  end
-end
-
--- User ruling 2026-10-24 ("either slot counts"): slotsOf[word] = { set, ... }, the word sets
--- (as keys) of the equip slots that name word, so slot words of different slots ("neck ring")
--- are told from one slot's synonyms ("ring finger").
-local slotsOf = {}
-for _, words in pairs(Slang.slots) do
-  local set = {}
-  for _, word in ipairs(words) do
-    set[word] = true
-  end
-  for _, word in ipairs(words) do
-    local sets = slotsOf[word] or {}
-    slotsOf[word] = sets
-    sets[#sets + 1] = set
   end
 end
 
@@ -222,9 +207,40 @@ local function narrowedInfo(info, prof)
   return byProf[prof]
 end
 
--- Index build (also after a test adds wordIndex words): fills groupWords, wordInfo and the
--- profession key of every profession word (professionKeys).
+-- User ruling 2026-10-24 ("either slot counts", R2): index.slotsOf[word] = { set, ... }, the word
+-- sets (as keys) of the equip slots that name word, so slot words of different slots ("neck
+-- ring") are told from one slot's synonyms ("ring finger"). An extraSlang key whose target is a
+-- word of a slot joins that slot's set (the target is matched against the slot's own words, as
+-- ItemKeywords does); a key whose target is a type word joins none.
+local function buildSlotsOf(index)
+  local slotsOf = {}
+  for _, words in pairs(Slang.slots) do
+    local set, joined = {}, {}
+    for _, word in ipairs(words) do
+      set[word] = true
+    end
+    for key, target in pairs(index.extraSlang) do
+      key = lower(key)
+      if key ~= "" and set[lower(target)] then
+        joined[#joined + 1] = key
+      end
+    end
+    for _, key in ipairs(joined) do
+      set[key] = true
+    end
+    for word in pairs(set) do
+      local sets = slotsOf[word] or {}
+      slotsOf[word] = sets
+      sets[#sets + 1] = set
+    end
+  end
+  index.slotsOf = slotsOf
+end
+
+-- Index build (also after a test adds wordIndex words): fills slotsOf, groupWords, wordInfo and
+-- the profession key of every profession word (professionKeys).
 function WordGroups.Build(index)
+  buildSlotsOf(index)
   buildGroupWords(index)
   local rank = {}
   for i, key in ipairs(index.professionOrder or {}) do
@@ -517,7 +533,7 @@ end
 -- Whether lineWords[1..lineCount] (several) are all slot words that no one slot names
 -- together ("neck ring", not "ring finger" or "cloth hands"). The sender's inferred armor
 -- word is a type word, so a line that takes one keeps the intersection.
-local function differentSlots()
+local function differentSlots(slotsOf)
   for k = 1, lineCount do
     if slotsOf[lineWords[k]] == nil then
       return false
@@ -669,7 +685,7 @@ local function walkNamed(index, intentToken, why, whyCount, from, to, mark)
     end
     return false
   end
-  if differentSlots() then
+  if differentSlots(index.slotsOf) then
     return walkUnion(index, intentToken, why, whyCount, from, to)
   elseif emptyCount > 0 then
     return false -- the sender's armor word joined the slot words: an empty intersection
@@ -708,7 +724,7 @@ function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, set
   local whyCount = collect(index, tokens, count, breakBefore or noBreak, hasSet)
   -- A recognized slang word nobody can craft empties the intersection; only the union of slot
   -- words of different slots skips it (user ruling 2026-10-24).
-  if emptyCount > 0 and (hasSet or not differentSlots()) then
+  if emptyCount > 0 and (hasSet or not differentSlots(index.slotsOf)) then
     return false
   end
   local why, from, inferred = Candidates.wordWhy, 1, nil

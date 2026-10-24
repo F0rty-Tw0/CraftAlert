@@ -101,8 +101,8 @@ end
 
 -- Cloth, leather and ring pieces beside the smiths' plate belt and plate legs: every
 -- ambiguous slot word below has a recipe of its own, so a word that counts alerts an item.
--- withNeck: the jewelcrafter also knows a necklace.
-local function slotIndex(ns, withNeck)
+-- withNeck: the jewelcrafter also knows a necklace. extra(db): more settings or recipes.
+local function slotIndex(ns, withNeck, extra)
   Fixture.itemIndex(ns, function(db)
     db.characters["Tai-Realm"] = character({ TAILOR }, {
       [9] = { item = 606, name = "Silk Cloak", prof = TAILOR },
@@ -119,6 +119,9 @@ local function slotIndex(ns, withNeck)
       jc[16] = { item = 811, name = "Gem Choker", prof = JC }
     end
     db.characters["Jc-Realm"] = character({ JC }, jc)
+    if extra then
+      extra(db)
+    end
   end)
 end
 
@@ -132,6 +135,22 @@ local function testR1SlotWords()
   slotIndex(ns)
   expect(ns, "LF grips crafter", "item:802")
   expect(ns, "LF hood", "stop:nomatch", "an ambiguous R1 word, no partner, no class")
+end
+
+-- User ruling 2026-10-24 (R2): an extraSlang key whose target is a slot word is a slot word of that
+-- slot in the different-slots union; a key never ambiguous (today's behavior); a type key is none.
+local function testExtraSlangSlotWords()
+  local ns = Fixture.load()
+  slotIndex(ns, false, function(db)
+    db.settings.extraSlang = { footies = "boots", pl8 = "plate" }
+    db.characters["Smith-Realm"].recipes[3] = { item = 503, name = "Korvath Treads", prof = BS }
+  end)
+  local function same(line, with)
+    Assert.equal(Fixture.outcome(ns, line), Fixture.outcome(ns, with), line)
+  end
+  same("LF footies and ring", "LF boots and ring")
+  same("LF footies", "LF boots")
+  same("LF pl8 belt and ring", "LF plate belt and ring")
 end
 
 -- User ruling 2026-10-24: "hand" after off, main, one or two is no slot word anywhere: no count,
@@ -345,6 +364,7 @@ return function()
   testNamedProfessionNarrowing()
   testCueAdjacency()
   testR1SlotWords()
+  testExtraSlangSlotWords()
   testOffHandIsNoSlotWord()
   testEitherSlotCounts()
   testUnionSkipsUncuedWords()
