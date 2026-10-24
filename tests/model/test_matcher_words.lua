@@ -101,7 +101,8 @@ end
 
 -- Cloth, leather and ring pieces beside the smiths' plate belt and plate legs: every
 -- ambiguous slot word below has a recipe of its own, so a word that counts alerts an item.
-local function slotIndex(ns)
+-- withNeck: the jewelcrafter also knows a necklace.
+local function slotIndex(ns, withNeck)
   Fixture.itemIndex(ns, function(db)
     db.characters["Tai-Realm"] = character({ TAILOR }, {
       [9] = { item = 606, name = "Silk Cloak", prof = TAILOR },
@@ -113,8 +114,131 @@ local function slotIndex(ns)
       [13] = { item = 802, name = "Hide Gloves", prof = LW },
       [14] = { item = 703, name = "Hide Pants", prof = LW },
     })
-    db.characters["Jc-Realm"] = character({ JC }, { [15] = { item = 801, name = "Gem Band", prof = JC } })
+    local jc = { [15] = { item = 801, name = "Gem Band", prof = JC } }
+    if withNeck then
+      jc[16] = { item = 811, name = "Gem Choker", prof = JC }
+    end
+    db.characters["Jc-Realm"] = character({ JC }, jc)
   end)
+end
+
+-- User ruling 2026-10-24 ("either slot counts"): a line whose counted words are all slot
+-- words of different slots matches the recipes of any of them; a type word in the line, or
+-- words of one slot only, keep the intersection. An ambiguous slot word joins the union only
+-- with a cue word next to it.
+local function testEitherSlotCounts()
+  local ns = Fixture.load()
+  slotIndex(ns, true)
+  local result = assert(expect(ns, "LF neck and ring crafter", "profession:" .. JC, "ring has a cue word"))
+  Assert.equal(why(result), "lf+neck+ring")
+  Assert.equal(result.entryCount, 2, "the necklace and the ring")
+  result = assert(expect(ns, "LF craft neck ring on public rn", "item:811", "the trade line: ring has no cue word"))
+  Assert.equal(why(result), "lf+neck")
+  expect(ns, "LF neck ring", "item:811", "ring has no cue word")
+  expect(ns, "LF neck ring, need a ring crafter", "profession:" .. JC, "a cue next to a repeat")
+  expect(ns, "LF jc neck ring", "item:811", "narrowed, then the union")
+  expect(ns, "LF lw neck ring", "profession:" .. LW, "nothing narrowed: step 4.6")
+  expect(ns, "LF neck", "item:811", "one slot")
+  expect(ns, "LF craft ring", "item:801", "one slot")
+  expect(ns, "LF ring finger", "item:801", "two words of one slot")
+  expect(ns, "LF cloth hands", "stop:nomatch", "a type word keeps the intersection")
+  expect(ns, "LF lw cloth legs", "profession:" .. LW, "a type word keeps the intersection")
+end
+
+-- User ruling 2026-10-24: an ambiguous word in everyday speech counts beside a slot word
+-- (§6.4) but never widens the union of different slots.
+local function testUnionSkipsUncuedWords()
+  local ns = Fixture.load()
+  slotIndex(ns)
+  expect(ns, "LF ring, be back in 5", "stop:nomatch", "no Silk Cloak")
+  expect(ns, "WTB ring, will pay you back", "stop:nomatch", "no Silk Cloak")
+  local result = assert(expect(ns, "LF ring crafter, my hands are full", "item:801", "no Hide Gloves"))
+  Assert.equal(why(result), "lf+ring")
+  expect(ns, "LF belt, back in 5", "item:501", "the belt alone")
+  -- One belt, one cloak: ProfessionList order puts Tailoring first.
+  expect(ns, "LF belt, back crafter", "profession:" .. TAILOR, "back joins through its cue word")
+end
+
+-- User ruling 2026-10-24: the union skips a slot word nobody crafts; the intersection of one
+-- slot's words does not.
+local function testUnionSkipsEmptySlots()
+  local ns = Fixture.load()
+  slotIndex(ns)
+  local result = assert(expect(ns, "LF craft ring and boots", "item:801", "no boots recipe"))
+  Assert.equal(why(result), "lf+ring")
+  expect(ns, "LF craft boots and shield", "stop:nomatch", "nobody crafts either")
+  expect(ns, "LF craft boots and plate", "stop:nomatch", "a type word: the intersection empties")
+  expect(ns, "LF craft boots and shoes", "stop:nomatch", "one slot: the intersection empties")
+  -- A warrior's plate joins boots, a type word: the intersection again, empty without boots.
+  local warrior = "Player-1-W"
+  Fixture.stubClasses({ [warrior] = "WARRIOR" })
+  expect(ns, "LF craft ring and boots", "stop:nomatch", "the sender's plate keeps the intersection", warrior)
+end
+
+-- Words of one slot ("1h offhand": an off-hand weapon is both) keep the intersection.
+local function testOneSlotWordsIntersect()
+  local ns = Fixture.load()
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Smith-Realm"].recipes[3] = { item = 910, name = "Iron Sword", prof = BS }
+    db.characters["Smith-Realm"].recipes[4] = { item = 912, name = "Iron Dirk", prof = BS }
+    db.characters["Smith-Realm"].recipes[5] = { item = 913, name = "Iron Lantern", prof = BS }
+  end)
+  expect(ns, "LF 1h offhand", "item:912", "only the off-hand dagger has both")
+end
+
+-- The union picks its profession from each word's recipe count, which counts a recipe twice
+-- when two of the words hold it, or when two professions craft it; those lines count the
+-- recipes of the whole union, as the intersection's tie-break does.
+local function testUnionCountsRecipesOnce()
+  local ns = Fixture.load()
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Smith-Realm"].recipes[3] = { item = 910, name = "Iron Sword", prof = BS }
+    db.characters["Smith-Realm"].recipes[4] = { item = 912, name = "Iron Dirk", prof = BS }
+    db.characters["Tai-Realm"] = character({ TAILOR }, { [5] = { item = 913, name = "Silk Lantern", prof = TAILOR } })
+    local necks = { [6] = { item = 811, name = "Gem Choker", prof = JC }, [7] = { item = 814, name = "Gem Torc", prof = JC } }
+    db.characters["Jc-Realm"] = character({ JC }, necks)
+  end, { JC, BS, TAILOR })
+  -- Sword and dirk (1h), dirk and lantern (offhand): 2 smith recipes, not 3, tie the 2 necks.
+  expect(ns, "LF 1h offhand neck", "profession:" .. JC, "the dirk counts once")
+  -- offhand shares only the dirk with 1h, so its lanterns stay in the union: 2 tie the 2
+  -- smith recipes and win on order.
+  ns = Fixture.load()
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Smith-Realm"].recipes[3] = { item = 910, name = "Iron Sword", prof = BS }
+    db.characters["Smith-Realm"].recipes[4] = { item = 912, name = "Iron Dirk", prof = BS }
+    db.characters["Tai-Realm"] = character({ TAILOR }, {
+      [5] = { item = 913, name = "Silk Lantern", prof = TAILOR },
+      [8] = { item = 915, name = "Wool Lantern", prof = TAILOR },
+    })
+    db.characters["Jc-Realm"] = character({ JC }, { [6] = { item = 811, name = "Gem Choker", prof = JC } })
+  end, { TAILOR, BS, JC })
+  expect(ns, "LF 1h offhand neck", "profession:" .. TAILOR, "offhand is not covered by 1h")
+  ns = Fixture.load()
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Aa-Realm"] = character({ JC }, { [6] = { item = 811, name = "Gem Choker", prof = JC } })
+    db.characters["Zz-Realm"] = character({ BS }, { [7] = { item = 811, name = "Gem Choker", prof = BS } })
+    db.characters["Tai-Realm"] = character({ TAILOR }, {
+      [5] = { item = 601, name = "Silk Sash", prof = TAILOR },
+      [8] = { item = 605, name = "Wool Sash", prof = TAILOR },
+    })
+  end, { BS, TAILOR, JC })
+  -- The choker counts for its first crafter's profession only: Tailoring's 2 sashes beat 1
+  -- plate belt, where 2 for the smiths (belt and choker) would tie and win on order.
+  expect(ns, "LF neck and belt", "profession:" .. TAILOR, "the choker counts once")
+end
+
+-- A tie between professions outside ProfessionList order goes to the first candidate's, in
+-- the union as for one word.
+local function testUnionTieFollowsCandidates()
+  local ns = Fixture.load()
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Lw-Realm"] = character({ LW }, { [6] = { item = 811, name = "Gem Choker", prof = LW } })
+    db.characters["Tai-Realm"] = character({ TAILOR }, { [7] = { item = 814, name = "Gem Torc", prof = TAILOR } })
+    db.characters["Jc-Realm"] = character({ JC }, { [8] = { item = 815, name = "Gem Chain", prof = JC } })
+  end, {})
+  local alone = Fixture.outcome(ns, "LF neck")
+  expect(ns, "LF neck and belt", alone, "the first neck's profession")
+  expect(ns, "LF belt and neck", "profession:" .. BS, "the belt first")
 end
 
 -- §6.3 4.4: any profession word narrows the candidates to that profession, as an Enchanting
@@ -190,6 +314,12 @@ return function()
   testTrinketByNameOnly()
   testNamedProfessionNarrowing()
   testCueAdjacency()
+  testEitherSlotCounts()
+  testUnionSkipsUncuedWords()
+  testUnionSkipsEmptySlots()
+  testOneSlotWordsIntersect()
+  testUnionCountsRecipesOnce()
+  testUnionTieFollowsCandidates()
   testProfessionTieBreak()
   testSixWordCap()
   testEnchantingNarrowing()
