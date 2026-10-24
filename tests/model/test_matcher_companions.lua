@@ -39,9 +39,11 @@ local function testKindCOnSpecFixture()
   expect(ns, "lf mongoose hauberk", "profession:" .. ENCH)
   expect(ns, "lf mongose hauberk", "profession:" .. ENCH)
   expect(ns, "lf lionheart lionhaert", "stop:nomatch", "the same alias twice is one hit")
-  -- "leggings" is a slot word, no kind-c alias (user ruling 2026-10-24): "hauberk" matches alone.
-  result = expect(ns, "lf hauberk leggings enchant lionhaert", "item:green iron hauberk")
-  Assert.equal(why(result), "lf+hauberk")
+  -- User ruling 2026-10-24 (R4): "hauberk" is followed by the slot word "leggings", so step 4.2
+  -- drops it and the typo pass skips it ("enchant" empties 4.4); "leggings" is the companion
+  -- of the typo hit on "lionhaert".
+  result = expect(ns, "lf hauberk leggings enchant lionhaert", "item:lionheart helm")
+  Assert.equal(why(result), "lf+lionhaert")
   -- A token whose hits were all set aside is no why token.
   result = expect(ns, "lf lionhaert mongose", "item:enchant weapon - mongoose")
   Assert.equal(why(result), "lf+mongose")

@@ -109,6 +109,20 @@ end
 
 WorstLines.UNION = "lf ring neck cloak"
 
+-- 4.2 R4: kind-b short names ("blue iron"), each followed by a slot word of another item.
+function WorstLines.shortSlot()
+  local units = { "blue iron cloak", "imperial iron ring", "bright iron neck", "storm iron legs" }
+  local parts, length = { "lf" }, 2
+  local k = 0
+  while length + #units[k % #units + 1] + 1 <= 255 do
+    local unit = units[k % #units + 1]
+    parts[#parts + 1] = unit
+    length = length + #unit + 1
+    k = k + 1
+  end
+  return table.concat(parts, " ")
+end
+
 -- → { { name, line }, ... }
 function WorstLines.cases(index)
   local fill = WorstLines.fill
@@ -139,6 +153,8 @@ function WorstLines.cases(index)
     { "inferred_empty", WorstLines.inferredEmpty(index) }, -- 4.4: lookup, append, empty, typo
     -- 4.4: slot words of different slots, no armor slot (so no armor word): the union
     { "union", WorstLines.UNION },
+    -- 4.2 R4: short-name hits (kind b, "blue iron"), each followed by a slot word: the guard runs per hit
+    { "short_slot", WorstLines.shortSlot() },
     -- 4.4 R3: a buyer word directly before an ambiguous armor slot word, class known
     { "buyer_legs", fill("wtb", "legs wtb") },
   }

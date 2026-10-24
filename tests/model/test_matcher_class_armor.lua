@@ -229,7 +229,7 @@ end
 -- set, it is ignored and the line keeps today's item match and why line.
 local function testSetKeptOverClass()
   local ns = fullIndex({ greenIron = true })
-  local line = "LF BS with green iron chest"
+  local line = "LF BS with green iron for chest"
   local today, todayResult = outcome(ns, line)
   Assert.equal(today, "item:506", "set ruling today")
   local todayWhy = why(todayResult)
@@ -289,7 +289,7 @@ local function testPartneredWordsStay()
   local ns = fullIndex()
   check(ns, "RF2", "LF belt and head", W, "stop:nomatch", 1)
   ns = fullIndex({ greenIron = true })
-  check(ns, "RF2", "LF green iron head", W, outcome(ns, "LF green iron head"), 0)
+  check(ns, "RF2", "LF green iron for head", W, outcome(ns, "LF green iron for head"), 0)
 end
 
 -- Review Focus 3 and 5: seven buffer slots leave nothing stale; extra slang onto a slot word.

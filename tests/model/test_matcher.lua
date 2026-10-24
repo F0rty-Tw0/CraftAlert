@@ -157,6 +157,56 @@ local function testPhrases()
   expect(ns, "lf lion hearts", "stop:nomatch")
 end
 
+-- User ruling 2026-10-24 (R4, bug C26): an alias followed by a slot word keeps only the recipes
+-- of that slot; a dropped alias is gone for the typo pass and the shorter hits it displaced.
+local function testSlotNameGuard()
+  local ns = Fixture.load()
+  local db = Fixture.db(ns)
+  db.characters["Smith-Realm"].recipes = { [22] = { name = "Green Iron Hauberk", prof = BS } }
+  fixture(ns, Fixture.index(ns, db))
+  expect(ns, "LF green iron helm", "stop:nomatch")
+  local result = expect(ns, "LF green iron chest", "item:green iron hauberk")
+  Assert.equal(why(result), "lf+green iron+chest", "the slot word that filtered stays in the why")
+  expect(ns, "LF green iron", "item:green iron hauberk")
+  -- The typo pass skips the tokens of the dropped hit (it matches "thick", kind c, at distance 0).
+  Fixture.itemIndex(ns)
+  expect(ns, "LF thick plate helm", "stop:nomatch")
+  expect(ns, "LF thick plate belt", "item:501")
+  -- The displaced shorter hit ("charged", kind c) does not come back after the drop.
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Smith-Realm"].recipes[3] = { item = 802, name = "Charged Scrapmaster's Gauntlets", prof = BS }
+  end)
+  expect(ns, "LF Charged Scrapmaster's Helm", "stop:nomatch")
+  expect(ns, "LF Charged Scrapmaster's Gloves", "item:802")
+  -- Two kind-b hits on "thick plate": the belt entry goes, the treads stay (also by slang).
+  Fixture.items[508] = { "INVTYPE_CHEST", 4, 4 }
+  local function treads(db)
+    db.settings.extraSlang = { footies = "boots" }
+    db.characters["Smith-Realm"].recipes[3] = { item = 503, name = "Thick Plate Treads", prof = BS }
+    db.characters["Smith-Realm"].recipes[4] = { item = 508, name = "Green Iron Hauberk", prof = BS }
+  end
+  Fixture.itemIndex(ns, treads)
+  expect(ns, "LF thick plate boots", "item:503")
+  expect(ns, "LF thick plate footies", "item:503")
+  -- Only the hit followed by a slot word is filtered: both groups stay, a "set" (step 4.4).
+  result = expect(ns, "LF thick plate boots or green iron", "item:503")
+  Assert.equal(why(result), "lf+thick plate+green iron+plate+boots")
+  -- The set path applies R4 too: the hit "thick plate" followed by "helm" is dropped, so it is
+  -- no set member and its words are not in the why ("green iron boots" has no recipe: no match).
+  result = expect(ns, "LF thick plate helm or green iron", "item:508")
+  Assert.equal(why(result), "lf+green iron")
+  expect(ns, "LF thick plate helm or green iron boots", "stop:nomatch")
+  Fixture.items[508] = nil
+  -- Enchants have no item words: they stay under a slot word.
+  fixture(ns)
+  db = Fixture.db(ns)
+  db.characters["Ench-Realm"].recipes[15] = { name = "Enchant Boots - Minor Speed", prof = ENCH }
+  db.characters["Ench-Realm"].recipes[16] = { name = "Enchant Bracer - Sim Health", prof = ENCH }
+  fixture(ns, Fixture.index(ns, db))
+  expect(ns, "LF minor speed boots", "item:enchant boots - minor speed")
+  expect(ns, "LF sim health bracers", "item:enchant bracer - sim health")
+end
+
 -- §6.3 4.2: a phrase that is a recipe's full name matches that recipe only, even when it is
 -- also another recipe's alias; link names match full names only.
 local function testFullNameBeatsAlias()
@@ -352,6 +402,7 @@ return function()
   testItemLinks()
   testRecipeLinkIDs()
   testPhrases()
+  testSlotNameGuard()
   testFullNameBeatsAlias()
   testTypoPass()
   testProfessionWords()

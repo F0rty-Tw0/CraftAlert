@@ -82,6 +82,39 @@ function MatchCandidates.FromRecords(records, n)
   MatchCandidates.count = count
 end
 
+-- R4 (slot-words spec): whether an entry stays under a slot word. A group without word-index
+-- words (an enchant, an itemless recipe) stays; any other stays when its item has the word.
+local function entryKept(entry, slot, groupWords)
+  local words = groupWords[entry.group]
+  return words == nil or words[slot] == true
+end
+
+-- Whether any entry of a phrase record stays under the slot word.
+function MatchCandidates.AnyKept(record, slot, groupWords)
+  local entries = record.entries
+  for k = 1, #entries do
+    if entryKept(entries[k], slot, groupWords) then
+      return true
+    end
+  end
+  return false
+end
+
+-- FromRecords, but a record r with slotTokens[r] set adds only the entries that stay under it.
+function MatchCandidates.FromRecordsFiltered(records, n, slotTokens, groupWords)
+  local current = nextStamp()
+  count = 0
+  for r = 1, n do
+    local entries, slot = records[r].entries, slotTokens[r]
+    for k = 1, #entries do
+      if not slot or entryKept(entries[k], slot, groupWords) then
+        addUnique(entries[k], current)
+      end
+    end
+  end
+  MatchCandidates.count = count
+end
+
 -- The entries of lists[1..n], each once (§6.3 step 4.4: slot words of different slots).
 function MatchCandidates.FromLists(lists, n)
   local current = nextStamp()
