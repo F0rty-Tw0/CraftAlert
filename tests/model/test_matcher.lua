@@ -83,6 +83,12 @@ local function testIntentAndAds()
   expect(ns, "anyone lfc fiery weapon? /w me", "item:enchant weapon - fiery weapon", "any buyer word in the line")
   expect(ns, "WTB fiery weapon /w me", "item:enchant weapon - fiery weapon")
   expect(ns, "LF fiery weapon WTS /w me", "stop:blocker", "a blocker word still wins")
+  expect(ns, "WTC fiery weapon /w me", "item:enchant weapon - fiery weapon", "wtc is a buyer word")
+  expect(ns, "LFRC fiery weapon /w me", "item:enchant weapon - fiery weapon", "lfrc is a buyer word")
+  -- "LF work" is a crafter's ad, whatever else the line says.
+  expect(ns, "Enchanter LF work /w me", "stop:blocker")
+  expect(ns, "Max enchanter LF work, fiery weapon", "stop:blocker")
+  expect(ns, "LF fiery weapon, will work for tips", "item:enchant weapon - fiery weapon", "work not right after lf")
 end
 
 -- §6.3 4.1: the first craftable item link matches; other links and link text are ignored.
