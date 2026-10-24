@@ -296,6 +296,11 @@ local function testOlderSchemaIsRaisedAndNoWarning()
   Assert.equal(Schema.Validate({ schema = -3 }).schema, 1)
   Schema.WarnNewer()
   Assert.equal(#printedLines(), 0)
+  -- A later Validate of a current save drops the warning an earlier newer one held.
+  Schema.Validate({ schema = 2 })
+  Schema.Validate({ schema = 1 })
+  Schema.WarnNewer()
+  Assert.equal(#printedLines(), 0)
 end
 
 -- Review Focus 5: a lead the UI or the greeting would choke on is dropped (no customer, crafter

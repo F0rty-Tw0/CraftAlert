@@ -339,6 +339,13 @@ return function()
   local newer = Sim.Run({ "--db", "tests/fixtures/db_schema2.lua", "LF plate belt" })
   Assert.equal(newer[2], "db: schema=2 characters=1 recipes=2 leads=100")
   assert(string.find(newer[6], "^chat: Craft Alert: .*newer"), newer[6])
+  local warnings = 0
+  for _, line in ipairs(newer) do
+    if string.find(line, "^chat: Craft Alert: .*newer") then
+      warnings = warnings + 1
+    end
+  end
+  Assert.equal(warnings, 1, "one newer-schema warning per load")
 
   -- Run from the command line, any `error:` line makes the sim exit 1, so a Proof run notices a
   -- broken invocation: a bad flag (the only line) or a step that fails after others printed.
