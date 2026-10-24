@@ -7,7 +7,7 @@ local SlashFixture = require("tests.helpers.slash_fixture")
 
 local TOAST = "CraftAlertToast"
 local USAGE = "Usage: /ca test [as <class>] [x<N>] <a trade chat line> | /ca test reply"
-local PAUSED_RESTING = "Test: Paused — not in a city or inn, a real Trade line would be ignored too"
+local PAUSED_RESTING = "Test: Paused — no Trade chat here, a real Trade line would be ignored too"
 local MATCHED_NO_ONE = "Matched, but none of your enabled characters can answer it, or the customer is on your ignore list"
 local UPDATED = "Updated the existing test lead (same customer asked again)"
 

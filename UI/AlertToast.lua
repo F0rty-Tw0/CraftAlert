@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
@@ -233,7 +234,11 @@ local function alert()
 end
 
 -- A new lead (Leads.On("new"), wired by Bootstrap): show it, light the launcher, sound, flash.
+-- Nothing in an instance.
 function AlertToast.Show(lead)
+  if FlavorCompat.InInstance() then
+    return
+  end
   toast = toast or create()
   local replacing = toast.frame:IsShown() and current.lead ~= nil and current.lead ~= lead
   AlertToast.more = replacing and AlertToast.more + 1 or 0
@@ -242,6 +247,14 @@ function AlertToast.Show(lead)
   Launcher.ShowLead(lead)
   alert()
   startHideTimer()
+end
+
+-- ScanGate.OnChange (wired by Bootstrap): entering an instance hides a shown toast; it is not
+-- shown again on leaving. Arguments are ignored.
+function AlertToast.OnGate()
+  if toast ~= nil and toast.frame:IsShown() and FlavorCompat.InInstance() then
+    hide()
+  end
 end
 
 -- Docks the toast beside the launcher (Dock.Anchor), or at a fixed spot on UIParent before the

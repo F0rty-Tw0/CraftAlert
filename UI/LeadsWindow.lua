@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
@@ -141,7 +142,11 @@ end
 
 -- Opens the window on the list, at the top (every card counts as shown from now), or closes it in
 -- either mode. X and Esc only hide: a window closed in Settings comes back on the list here.
+-- Silent no-op in an instance.
 function LeadsWindow.Toggle()
+  if FlavorCompat.InInstance() then
+    return
+  end
   window = window or create()
   local frame = window.frame
   if frame:IsShown() then
@@ -158,8 +163,12 @@ function LeadsWindow.Toggle()
 end
 
 -- /ca config: opens the window on the settings pane (from the list too), or closes it when the
--- pane shows. Reopened, the pane shows the page last shown, read again from the db.
+-- pane shows. Reopened, the pane shows the page last shown, read again from the db. Silent no-op
+-- in an instance.
 function LeadsWindow.ToggleSettings()
+  if FlavorCompat.InInstance() then
+    return
+  end
   window = window or create()
   local frame = window.frame
   if frame:IsShown() and window.mode == "settings" then
@@ -173,6 +182,14 @@ function LeadsWindow.ToggleSettings()
   end
   frame:Show()
   LeadsWindow.Refresh()
+end
+
+-- ScanGate.OnChange (wired by Bootstrap): entering an instance closes the window in either mode;
+-- leaving does not reopen it. Arguments are ignored.
+function LeadsWindow.OnGate()
+  if window ~= nil and FlavorCompat.InInstance() then
+    window.frame:Hide()
+  end
 end
 
 -- The lead in the top row and GetTime() when it appeared there, or nil (closed, hidden by Alt+Z,

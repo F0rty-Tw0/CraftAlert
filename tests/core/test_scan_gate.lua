@@ -100,6 +100,13 @@ return function()
   Assert.equal(ChannelKey(GUILD, nil, 0), "guild")
   Assert.equal(ChannelKey(COMMUNITIES, nil, 0), "communities")
   Assert.equal(ChannelKey("CHAT_MSG_SAY", nil, 0), nil)
+  -- A secret zone channel ID (chat lockdown) is never used as a key: the line is skipped.
+  local isSecret = ns.FlavorCompat.issecretvalue
+  ns.FlavorCompat.issecretvalue = function(value)
+    return value == 2
+  end
+  Assert.equal(ChannelKey(CHANNEL, "Trade - City", 2), nil, "secret zone channel ID")
+  ns.FlavorCompat.issecretvalue = isSecret
   -- A channel the flavor does not have is ignored.
   ns = setup("tbc")
   Assert.equal(ns.ScanGate.ChannelKey(CHANNEL, "Trade - City", 2), "trade")
@@ -151,7 +158,7 @@ return function()
   resting.resting = false
   ns.ScanGate.Evaluate()
   Assert.equal(ns.ScanGate.IsActive(), false)
-  Assert.equal(ns.ScanGate.State().reason, "notResting")
+  Assert.equal(ns.ScanGate.State().reason, "noTrade")
   Assert.same(listening(), {}, "paused: no public chat event")
   db.settings.onlyResting = false
   ns.ScanGate.Evaluate()
@@ -220,7 +227,7 @@ return function()
   Wow.fireEvent("ZONE_CHANGED_NEW_AREA")
   resting.resting = true
   Wow.fireEvent(PLAYER_RESTING)
-  Assert.same(changes, { { true, nil }, { false, "notResting" }, { true, nil } })
+  Assert.same(changes, { { true, nil }, { false, "noTrade" }, { true, nil } })
   ns, db, resting = setup("retail")
   resting.resting = false
   changes = {}
@@ -228,7 +235,82 @@ return function()
     changes[#changes + 1] = { active, state.reason }
   end)
   start(ns, db)
-  Assert.same(changes, { { false, "notResting" } }, "a first evaluation that pauses is reported too")
+  Assert.same(changes, { { false, "noTrade" } }, "a first evaluation that pauses is reported too")
+
+  -- In an instance nothing is scanned, whatever else holds; PLAYER_ENTERING_WORLD re-evaluates,
+  -- and a reason change while paused is reported too.
+  ns, db, resting = setup("retail")
+  local inside = false
+  Wow.stub("IsInInstance", function()
+    return inside, inside and "party" or "none"
+  end)
+  changes = {}
+  ns.ScanGate.OnChange(function(active, state)
+    changes[#changes + 1] = { active, state.reason }
+  end)
+  start(ns, db)
+  inside = true
+  db.settings.enable = false
+  ns.ScanGate.Evaluate()
+  Assert.equal(ns.ScanGate.State().reason, "instance", "instance beats disabled")
+  Assert.same(listening(), {})
+  inside = false
+  db.settings.enable = true
+  Wow.fireEvent("PLAYER_ENTERING_WORLD")
+  Assert.equal(ns.ScanGate.IsActive(), true)
+  resting.resting = false
+  Wow.fireEvent(PLAYER_RESTING)
+  inside = true
+  Wow.fireEvent("PLAYER_ENTERING_WORLD")
+  inside = false
+  Wow.fireEvent("PLAYER_ENTERING_WORLD")
+  Assert.same(changes, {
+    { true, nil },
+    { false, "instance" },
+    { true, nil },
+    { false, "noTrade" },
+    { false, "instance" },
+    { false, "noTrade" },
+  })
+
+  -- Where a Trade channel exists: one joined, not disabled, whose zone channel ID is 2, whatever
+  -- slot it sits on. Without GetChannelList or the channel info API, IsResting decides.
+  ns, db, resting = setup("retail")
+  local channelList = { 1, "General", false, 3, "Trade", false }
+  Wow.stub("GetChannelList", function()
+    return unpack(channelList)
+  end)
+  local zoneIDs = { General = 1, Trade = 2, LocalDefense = 22 }
+  Wow.stub("C_ChatInfo", {
+    GetChannelInfoFromIdentifier = function(name)
+      return zoneIDs[name] and { zoneChannelID = zoneIDs[name] } or nil
+    end,
+  })
+  resting.resting = false
+  start(ns, db)
+  Assert.equal(ns.ScanGate.IsActive(), true, "Trade on slot 3 counts; resting is not asked")
+  channelList[6] = true
+  Wow.fireEvent("CHANNEL_UI_UPDATE")
+  Assert.equal(ns.ScanGate.State().reason, "noTrade", "Trade disabled here")
+  channelList = { 1, "General", false, 2, "LocalDefense", false }
+  Wow.fireEvent("CHANNEL_UI_UPDATE")
+  Assert.equal(ns.ScanGate.State().reason, "noTrade", "no Trade joined")
+  db.settings.onlyResting = false
+  ns.ScanGate.Evaluate()
+  Assert.equal(ns.ScanGate.IsActive(), true, "setting off: scans without Trade")
+  -- Never asked in an instance.
+  Wow.stub("GetChannelList", function()
+    error("GetChannelList called in an instance")
+  end)
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  db.settings.onlyResting = true
+  ns.ScanGate.Evaluate()
+  Assert.equal(ns.ScanGate.State().reason, "instance")
+  Wow.stub("IsInInstance", nil)
+  Wow.stub("GetChannelList", nil)
+  Wow.stub("C_ChatInfo", nil)
 
   -- The status line prints to chat once, the first time scanning activates in a session.
   ns, db, resting = setup("retail")

@@ -531,6 +531,50 @@ local function testIgnoreDropsLead(db)
   Wow.stub("C_FriendList", nil)
 end
 
+-- Entering an instance after login (PLAYER_ENTERING_WORLD) takes down the launcher, the toast and
+-- the leads window through the gate's change listeners; leaving brings back only the launcher.
+local function testInstanceHidesUi(db)
+  local session = startClient(db)
+  local ns = login(session)
+  trade("LF " .. BELT_LINK .. " crafter", "Buyer-OtherRealm")
+  ns.LeadsWindow.Toggle()
+  local launcher, toast, window = rawget(_G, "CraftAlertLauncher"), rawget(_G, "CraftAlertToast"), rawget(_G, "CraftAlertLeadsWindow")
+  Assert.equal(toast:IsShown() and window:IsShown() and launcher:IsShown(), true)
+  local inside = true
+  Wow.stub("IsInInstance", function()
+    return inside, inside and "party" or "none"
+  end)
+  Wow.fireEvent("PLAYER_ENTERING_WORLD")
+  Assert.equal(ns.ScanGate.State().reason, "instance")
+  Assert.equal(launcher:IsShown(), false, "launcher hidden")
+  Assert.equal(toast:IsShown(), false, "toast hidden")
+  Assert.equal(window:IsShown(), false, "window hidden")
+  for _, event in ipairs(WHISPER_EVENTS) do
+    Assert.falsy(isRegistered(event), event .. " dropped in an instance")
+  end
+  inside = false
+  Wow.fireEvent("PLAYER_ENTERING_WORLD")
+  Assert.equal(launcher:IsShown(), true, "launcher back")
+  for _, event in ipairs(WHISPER_EVENTS) do
+    Assert.truthy(isRegistered(event), event .. " back outside")
+  end
+  Assert.equal(toast:IsShown() or window:IsShown(), false, "toast and window stay closed")
+  Wow.stub("IsInInstance", nil)
+end
+
+-- A login or /reload inside an instance prints no chat line: an addon line taints the chat frame.
+local function testLoginInInstanceIsSilent(db)
+  local session = startClient(db)
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  local before = #Wow.chat
+  local ns = login(session)
+  Assert.equal(ns.ScanGate.State().reason, "instance")
+  Assert.same(chatSince(before), {}, "no login lines in an instance")
+  Wow.stub("IsInInstance", nil)
+end
+
 local function deepCopy(value)
   if type(value) ~= "table" then
     return value
@@ -558,5 +602,7 @@ return function()
   testRaisingPlayerName(deepCopy(saved), "Own")
   testLoginTime(deepCopy(saved))
   testIgnoreDropsLead(deepCopy(saved))
+  testInstanceHidesUi(deepCopy(saved))
+  testLoginInInstanceIsSilent(deepCopy(saved))
   Wow.reset()
 end

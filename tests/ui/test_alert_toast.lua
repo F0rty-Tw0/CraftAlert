@@ -267,6 +267,30 @@ local function testNewerLeadAndAutoHide()
   Assert.equal(ns.AlertToast.VisibleLead(), nil)
 end
 
+-- Entering an instance takes the toast down; no toast shows there; leaving brings none back.
+local function testHiddenInInstance()
+  local ns = UiFixture.load({ leads = 2 })
+  local leads = ns.Leads.List()
+  local inside = false
+  Wow.stub("IsInInstance", function()
+    return inside, inside and "party" or "none"
+  end)
+  ns.AlertToast.Show(leads[2])
+  Assert.equal(toastFrame():IsShown(), true)
+  ns.AlertToast.OnGate(false, { reason = "noTrade" })
+  Assert.equal(toastFrame():IsShown(), true, "outside an instance the gate leaves it")
+  inside = true
+  ns.AlertToast.OnGate(false, { reason = "instance" })
+  Assert.equal(toastFrame():IsShown(), false)
+  Assert.equal(ns.AlertToast.VisibleLead(), nil)
+  ns.AlertToast.Show(leads[1])
+  Assert.equal(toastFrame():IsShown(), false, "no toast in an instance")
+  inside = false
+  ns.AlertToast.OnGate(true, { active = true })
+  Assert.equal(toastFrame():IsShown(), false, "not re-shown on leaving")
+  Wow.stub("IsInInstance", nil)
+end
+
 local function testClicks()
   -- §7.1 on the toast: left greets (shown 1 s, so §7.5 rule 3 lets it send), then the toast goes.
   local ns, _, calls = UiFixture.load({ leads = 1 })
@@ -538,6 +562,7 @@ return function()
   testTooltip()
   testLinks()
   testNewerLeadAndAutoHide()
+  testHiddenInInstance()
   testClicks()
   testNoTestToast()
   testRealPathTestLead()

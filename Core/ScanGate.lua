@@ -14,10 +14,11 @@ local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local Status = ns.Status or require("CraftAlert.Core.Status")
 
--- Spec §6.1: the public chat events are registered only while scanning is active (enabled,
--- the index has entries, the player rests unless "Only while resting" is off), and this module
--- is the only owner of that rule and of the event-to-channel mapping. Chat lines enter the
--- hot path (§6.3 steps 1-4) here and, on a match, go on to Leads.
+-- Spec §6.1: the public chat events are registered only while scanning is active (not in an
+-- instance, enabled, the index has entries, a Trade channel exists here unless "Only where Trade
+-- chat exists" is off), and this module is the only owner of that rule and of the
+-- event-to-channel mapping. Chat lines enter the hot path (§6.3 steps 1-4) here and, on a match,
+-- go on to Leads.
 local ScanGate = {}
 
 local pcall = pcall
@@ -48,7 +49,8 @@ local CHANNEL_NAMES = {
   communities = "Communities",
 }
 -- CHAT_MSG_CHANNEL: the zone channel ID, never secret and the same on every client language.
-local ZONE_CHANNELS = { [1] = "general", [2] = "trade", [42] = "services", [26] = "lfg" }
+local TRADE_ZONE_CHANNEL = 2
+local ZONE_CHANNELS = { [1] = "general", [TRADE_ZONE_CHANNEL] = "trade", [42] = "services", [26] = "lfg" }
 local EVENT_CHANNELS = { [GUILD_EVENT] = "guild", [COMMUNITIES_EVENT] = "communities" }
 
 local available = Constants.flavors[FlavorCompat.flavorKey].channels
@@ -57,6 +59,7 @@ local Normalize = PlayerName.Normalize
 ---@type table
 local db = nil
 local active = nil -- nil until the first evaluation, so that one is reported too
+local lastReason = nil -- why the last evaluation paused, nil while active
 local announced = false -- whether the status line was printed this session
 local registered = {} -- event -> true while the shim below is registered for it
 local shims = {} -- event -> the function registered with EventRouter, created once
@@ -75,6 +78,11 @@ end
 function ScanGate.ChannelKey(event, _, zoneChannelID)
   local key
   if event == CHANNEL_EVENT then
+    -- Chat lockdown (an open-world boss, rated PvP) can hand over secret payloads; a secret is
+    -- never used as a table key, the line is skipped.
+    if FlavorCompat.issecretvalue(zoneChannelID) then
+      return nil
+    end
     key = ZONE_CHANNELS[zoneChannelID]
   else
     key = EVENT_CHANNELS[event]
@@ -125,11 +133,35 @@ local function isResting()
   return type(resting) == "function" and resting() == true
 end
 
+-- Whether a Trade channel exists here: a joined channel, not disabled, whose zone channel ID is 2
+-- (the slot it sits on and its localized name do not matter). Without GetChannelList or the
+-- channel info API, the old resting test decides. Both are read on each call, so tests that stub
+-- them after load still reach this code. Never called in an instance (pauseReason stops first).
+local function hasTrade()
+  local getChannelList = _G["GetChannelList"]
+  local chatInfo = _G["C_ChatInfo"]
+  local getInfo = type(chatInfo) == "table" and chatInfo.GetChannelInfoFromIdentifier or nil
+  if type(getChannelList) ~= "function" or type(getInfo) ~= "function" then
+    return isResting()
+  end
+  local list = { getChannelList() }
+  for i = 1, #list, 3 do
+    local info = not list[i + 2] and getInfo(list[i + 1]) or nil
+    if type(info) == "table" and info.zoneChannelID == TRADE_ZONE_CHANNEL then
+      return true
+    end
+  end
+  return false
+end
+
 -- Why scanning is paused, or nil while it runs. A login step that raised leaves the gate or
 -- Leads without the db: then a match would make no lead, so nothing is scanned.
 local function pauseReason()
   if db == nil or not Leads.IsBound() then
     return "notStarted"
+  end
+  if FlavorCompat.InInstance() then
+    return "instance"
   end
   if not db.settings.enable then
     return "disabled"
@@ -138,8 +170,8 @@ local function pauseReason()
   if index == nil or index.size == 0 then
     return "empty"
   end
-  if db.settings.onlyResting and not isResting() then
-    return "notResting"
+  if db.settings.onlyResting and not hasTrade() then
+    return "noTrade"
   end
   return nil
 end
@@ -211,8 +243,9 @@ local function notify(state)
   end
 end
 
--- §6.1: sets the registered chat events from the current settings, index and resting state.
--- Called on each index rebuild, on the resting and zone events, and by the settings pages.
+-- §6.1: sets the registered chat events from the current settings, index, instance and resting
+-- state. Called on each index rebuild, on the resting, zone and world events, and by the settings
+-- pages.
 function ScanGate.Evaluate()
   if db == nil then
     return
@@ -222,26 +255,32 @@ function ScanGate.Evaluate()
   for _, key in ipairs(state.active and enabledChannels() or {}) do
     wanted[CHANNEL_EVENTS[key]] = true
   end
-  local changed = state.active ~= active
+  local changed = state.active ~= active or state.reason ~= lastReason
   -- Set first: the events are registered while the gate already reports active.
   active = state.active
+  lastReason = state.reason
   applyEvents(wanted)
   if changed then
     notify(state)
   end
 end
 
--- Called with (active, state) on every active/paused transition; the first evaluation counts.
+-- Called with (active, state) whenever the gate turns active or paused or pauses for another
+-- reason (entering an instance while already paused counts); the first evaluation counts.
 function ScanGate.OnChange(fn)
   listeners[#listeners + 1] = fn
 end
 
 -- Bootstrap, after the settings are loaded: re-evaluate when the player enters or leaves a
--- city or inn, or changes zone. The db is bound last: while a registration raises, Evaluate
--- keeps returning early and no chat event is registered without the resting gate.
+-- city or inn, changes zone, joins or leaves a channel (CHANNEL_UI_UPDATE, every flavor), or
+-- enters or leaves an instance (PLAYER_ENTERING_WORLD). The db is bound last: while a
+-- registration raises, Evaluate keeps returning early and no chat event is registered without
+-- the Trade and instance gates.
 function ScanGate.Install(accountDb)
   EventRouter.On("PLAYER_UPDATE_RESTING", ScanGate.Evaluate)
   EventRouter.On("ZONE_CHANGED_NEW_AREA", ScanGate.Evaluate)
+  EventRouter.On("CHANNEL_UI_UPDATE", ScanGate.Evaluate)
+  EventRouter.On("PLAYER_ENTERING_WORLD", ScanGate.Evaluate)
   db = accountDb
 end
 

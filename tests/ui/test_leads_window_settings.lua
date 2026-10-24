@@ -356,7 +356,34 @@ local function testNoPageAtLoad()
   end
 end
 
+-- Entering an instance hides the window in either mode; Toggle and ToggleSettings stay silent
+-- there; leaving does not reopen it.
+local function testHiddenInInstance()
+  local ns = UiFixture.load({ leads = 1 })
+  local inside = false
+  Wow.stub("IsInInstance", function()
+    return inside, inside and "party" or "none"
+  end)
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(frame():IsShown(), true)
+  ns.LeadsWindow.OnGate(false, { reason = "noTrade" })
+  Assert.equal(frame():IsShown(), true, "outside an instance the gate leaves it")
+  inside = true
+  ns.LeadsWindow.OnGate(false, { reason = "instance" })
+  Assert.equal(frame():IsShown(), false)
+  local chatBefore = #Wow.chat
+  ns.LeadsWindow.Toggle()
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(frame():IsShown(), false, "no window in an instance")
+  Assert.equal(#Wow.chat, chatBefore, "silent")
+  inside = false
+  ns.LeadsWindow.OnGate(true, { active = true })
+  Assert.equal(frame():IsShown(), false, "not reopened on leaving")
+  Wow.stub("IsInInstance", nil)
+end
+
 return function()
+  testHiddenInInstance()
   testToggleSettingsFromHidden()
   testGearSwitchesModes()
   testBackButton()

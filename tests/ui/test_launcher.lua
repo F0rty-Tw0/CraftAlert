@@ -16,7 +16,7 @@ local function setScan(ns, active)
     if active then
       return { active = true, channels = { "Trade" }, recipeCount = 4, crafterCount = 2 }
     end
-    return { active = false, reason = "notResting", channels = { "Trade" }, recipeCount = 4, crafterCount = 2 }
+    return { active = false, reason = "noTrade", channels = { "Trade" }, recipeCount = 4, crafterCount = 2 }
   end
 end
 
@@ -55,7 +55,7 @@ local function testLitDimAndTooltip()
   Assert.equal(tooltip.shown, false)
   setScan(ns, false)
   frame.scripts.OnEnter(frame)
-  Assert.truthy(string.find(table.concat(tooltip.lines, " / "), "Paused — not in a city or inn", 1, true))
+  Assert.truthy(string.find(table.concat(tooltip.lines, " / "), "Paused — no Trade chat here", 1, true))
 
   -- A click toggles the leads window.
   Widgets.click(frame, "LeftButton")
@@ -96,6 +96,27 @@ local function testHideWhenNoLeads()
   db.settings.hideLauncherWhenNoLeads = true
   setScan(ns, true)
   Assert.equal(ns.Launcher.Create():IsShown(), true, "shown: a lead is listed")
+end
+
+-- In an instance the launcher is hidden, also when made there (a /reload in a key); back
+-- outside it follows its normal rules again.
+local function testHiddenInInstance()
+  local ns, db = UiFixture.load({ leads = 1 })
+  setScan(ns, false)
+  local inside = true
+  Wow.stub("IsInInstance", function()
+    return inside, inside and "party" or "none"
+  end)
+  local frame = ns.Launcher.Create()
+  Assert.equal(frame:IsShown(), false, "made in an instance: hidden")
+  inside = false
+  db.settings.hideLauncherWhenNoLeads = true
+  ns.Launcher.Refresh()
+  Assert.equal(frame:IsShown(), true, "outside, a lead listed: shown")
+  inside = true
+  ns.Launcher.Refresh()
+  Assert.equal(frame:IsShown(), false)
+  Wow.stub("IsInInstance", nil)
 end
 
 local function testSavedPosition()
@@ -247,6 +268,7 @@ return function()
   testOwnTooltip()
   testLeadExpiryWhilePaused()
   testHideWhenNoLeads()
+  testHiddenInInstance()
   testSavedPosition()
   testArt()
   testIconAndPulse()

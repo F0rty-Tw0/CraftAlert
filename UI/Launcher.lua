@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Status = ns.Status or require("CraftAlert.Core.Status")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
@@ -161,10 +162,15 @@ function Launcher.StopDrag()
   end
 end
 
--- Lit or dim from ScanGate.IsActive(), badge and visibility from the leads. Arguments are
--- ignored (Bootstrap subscribes it to ScanGate.OnChange and Leads.On("change")).
+-- Lit or dim from ScanGate.IsActive(), badge and visibility from the leads; hidden in an
+-- instance. Arguments are ignored (Bootstrap subscribes it to ScanGate.OnChange and
+-- Leads.On("change")).
 function Launcher.Refresh()
   if launcher == nil then
+    return
+  end
+  if FlavorCompat.InInstance() then
+    launcher:Hide()
     return
   end
   if not leadShown then

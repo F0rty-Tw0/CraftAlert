@@ -233,8 +233,8 @@ return function()
   -- login, Bootstrap prints the status line itself (§7.6), and the first activation again.
   Assert.same(stepLines(Sim.Run({ "--resting", "off", "LF plate belt", "--resting", "on", "--event", "PLAYER_UPDATE_RESTING", "LF plate belt" })), {
     "index: size=4",
-    "scan: paused (notResting)",
-    "chat: Craft Alert: Paused — not in a city or inn",
+    "scan: paused (noTrade)",
+    "chat: Craft Alert: Paused — no Trade chat here",
     "sender: Customer-OtherRealm",
     "stop: paused",
     "scan: active",

@@ -24,13 +24,14 @@ return function()
   Assert.equal(Status.Text(listening({ channels = { "Trade" }, recipeCount = 1, crafterCount = 1 })), "Listening in Trade — 1 recipe, 1 crafter")
   Assert.equal(Status.Text(listening({ channels = {} })), "Listening in no channel — 214 recipes, 3 crafters")
 
-  -- Paused: not resting, no profession read yet (names the one to open), and the other reasons.
-  Assert.equal(Status.Text(paused("notResting")), "Paused — not in a city or inn")
+  -- Paused: no Trade chat, no profession read yet (names the one to open), and the other reasons.
+  Assert.equal(Status.Text(paused("noTrade")), "Paused — no Trade chat here")
   Assert.equal(Status.Text(paused("empty", "Tailoring")), "Paused — no profession read yet: open Tailoring once")
   Assert.equal(Status.Text(paused("empty")), "Paused — no recipes to listen for")
   Assert.equal(Status.Text(paused("disabled")), "Paused — Craft Alert is turned off")
   Assert.equal(Status.Text(paused("notStarted")), "Paused — Craft Alert did not start; /reload to try again")
+  Assert.equal(Status.Text(paused("instance")), "Paused — off in instances")
 
   -- PausedText is the paused line on its own, for callers that already know the gate is paused.
-  Assert.equal(Status.PausedText({ reason = "notResting" }), "Paused — not in a city or inn")
+  Assert.equal(Status.PausedText({ reason = "noTrade" }), "Paused — no Trade chat here")
 end

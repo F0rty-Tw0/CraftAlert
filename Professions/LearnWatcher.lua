@@ -17,7 +17,11 @@ local EVENT = "NEW_RECIPE_LEARNED"
 -- Whether the last event stored a recipe, for the sim.
 LearnWatcher.lastStored = nil
 
+-- In an instance nothing runs: no profession API is asked and lastStored stays as it was.
 local function onLearned(recipeID)
+  if FlavorCompat.InInstance() then
+    return
+  end
   LearnWatcher.lastStored = false
   if FlavorCompat.issecretvalue(recipeID) then
     return

@@ -389,7 +389,7 @@ local function testAddonObeysTheRules()
       SettingsFixture.open(ns, title)
     end
     SettingsFixture.open(ns, "General")
-    local onlyResting = SettingsFixture.row("Only while resting (city or inn)").input
+    local onlyResting = SettingsFixture.row("Only where Trade chat exists").input
     Widgets.click(onlyResting)
     Widgets.click(onlyResting)
     local guild = SettingsFixture.row("Guild").input

@@ -77,6 +77,25 @@ return function()
   ns.WhisperTracker.Install()
   Assert.same({ registered() }, { true, true })
 
+  -- In an instance no whisper event is registered, a lead or not (also at login there); the
+  -- gate's change (Bootstrap subscribes Refresh) brings them back outside.
+  ns = setup({ "Bob-Draenor" })
+  local inside = true
+  Wow.stub("IsInInstance", function()
+    return inside, inside and "party" or "none"
+  end)
+  ns.WhisperTracker.Install()
+  Assert.same({ registered() }, { false, false }, "restored lead, logged in inside an instance")
+  Wow.fireEvent(WHISPER, "thanks", "Bob-Draenor")
+  Assert.equal(ns.Leads.List()[1].replied, false, "the event never arrives")
+  inside = false
+  ns.WhisperTracker.Refresh()
+  Assert.same({ registered() }, { true, true }, "back outside")
+  inside = true
+  ns.WhisperTracker.Refresh()
+  Assert.same({ registered() }, { false, false }, "entering drops them")
+  Wow.stub("IsInInstance", nil)
+
   -- A whisper to an active lead's customer marks it greeted once, however it was sent;
   -- the realm is added to a bare name.
   ns = setup({ "Bob-Realm", "Cy-Draenor" })

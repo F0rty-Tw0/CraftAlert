@@ -253,6 +253,22 @@ return function()
   readFlow("retail")
   readFlow("forever")
 
+  -- In an instance a profession window is never read, on show or on a list update.
+  do
+    local state, _, db, run, Slicer = setup()
+    state.recipes = { belt(1, 100) }
+    Wow.stub("IsInInstance", function()
+      return true, "party"
+    end)
+    Wow.fireEvent("TRADE_SKILL_SHOW")
+    Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+    Assert.equal(Slicer.IsRunning("read"), false, "no read job")
+    Assert.same(recipesOf(db), {})
+    Assert.equal(Wow.pendingTimers(0), 0)
+    Assert.equal(run.builds, 0)
+    Wow.stub("IsInInstance", nil)
+  end
+
   -- Guards: each one blocks the read on its own.
   for _, guard in ipairs({ "IsNPCCrafting", "IsTradeSkillGuild", "IsTradeSkillGuildMember", "IsTradeSkillLinked", "IsRuneforging" }) do
     local state, _, db, run = setup()

@@ -11,7 +11,7 @@ local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 -- Spec §7.1 and §7.2: whispers between the player and a lead's customer. Our own greeting
 -- or a prefill the player sent marks the lead greeted; the customer's answer marks it
 -- replied. The two whisper events stay registered only while an unexpired lead exists,
--- scanning or not (§4.3 rule 4). Chat lockdown makes both events' arguments secret; those
+-- scanning or not (§4.3 rule 4), and never in an instance. Chat lockdown makes both events' arguments secret; those
 -- whispers are skipped.
 local WhisperTracker = {}
 
@@ -49,9 +49,12 @@ local function onWhisper(_, sender)
   end
 end
 
--- Registers the whisper events while a lead exists, else drops them.
+-- Registers the whisper events while a lead exists outside an instance, else drops them.
+-- Bootstrap also subscribes it to ScanGate.OnChange (arguments ignored), so entering or leaving
+-- an instance re-checks.
 function WhisperTracker.Refresh()
-  local register = Leads.HasActive() and EventRouter.On or EventRouter.Off
+  local wanted = Leads.HasActive() and not FlavorCompat.InInstance()
+  local register = wanted and EventRouter.On or EventRouter.Off
   register(WHISPER_INFORM, onInform)
   register(WHISPER, onWhisper)
 end

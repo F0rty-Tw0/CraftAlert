@@ -157,8 +157,29 @@ local function testPerfAndHelp()
   Assert.equal(ns.Perf.IsRunning(), false)
 end
 
+-- In an instance every form of /ca does nothing and prints nothing (a chat line taints the frame).
+local function testOffInInstance()
+  local ns, _, _, handler = setup()
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  Wow.stub("debugprofilestop", function()
+    return 0
+  end)
+  for _, message in ipairs({ "", "config", "test LF plate belt", "perf", "nonsense" }) do
+    Wow.chat = {}
+    handler(message)
+    Assert.same(SlashFixture.chat(), {}, "/ca " .. message)
+  end
+  Assert.equal(shown(LEADS_WINDOW), false)
+  Assert.equal(#ns.Leads.List(), 0, "/ca test made no lead")
+  Assert.equal(ns.Perf.IsRunning(), false)
+  Wow.stub("IsInInstance", nil)
+end
+
 return function()
   testRegister()
+  testOffInInstance()
   testWindows()
   testTestCommand()
   testTestCommandIgnored()

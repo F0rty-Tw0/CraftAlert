@@ -10,8 +10,9 @@ local Index = ns.Index or require("CraftAlert.Model.Index")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
--- Spec §9 General: enable, only while resting, channels, profession-word alerts, include
--- unbound items, recipe markers. Enable and "Only while resting" re-evaluate the scan gate
+-- Spec §9 General: enable, only where Trade chat exists, channels, profession-word alerts,
+-- include unbound items, recipe markers. Enable and "Only where Trade chat exists" (saved as
+-- onlyResting) re-evaluate the scan gate
 -- (§6.1); channels, profession-word alerts and unbound items rebuild the index (§6.2), and a
 -- channel also re-evaluates the gate, which owns the registered chat events. A channel the
 -- flavor does not have is not shown (§6.1).
@@ -60,7 +61,7 @@ function PageGeneral.Create(parent)
   end
   Controls.Section(column, Localization.Text("Scanning"))
   toggle("Enable Craft Alert", settings, "enable", evaluate)
-  toggle("Only while resting (city or inn)", settings, "onlyResting", evaluate)
+  toggle("Only where Trade chat exists", settings, "onlyResting", evaluate)
   Controls.Section(column, Localization.Text("Channels"))
   local available = Constants.flavors[FlavorCompat.flavorKey].channels
   for _, channel in ipairs(CHANNELS) do
