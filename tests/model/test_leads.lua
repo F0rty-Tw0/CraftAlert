@@ -195,13 +195,110 @@ local function testCraftersOnLead()
   for _, candidate in ipairs(lead.crafters) do
     byKey[candidate.key] = candidate
   end
-  Assert.same(byKey["Alt-Realm"], { key = "Alt-Realm", rank = 3, byConc = false })
-  Assert.same(byKey["Smith-Realm"], { key = "Smith-Realm", rank = 1, byConc = false })
+  Assert.same(byKey["Alt-Realm"], { key = "Alt-Realm", rank = 3, byConc = false, top = 3, recipeKey = 1, prof = BS })
+  Assert.same(byKey["Smith-Realm"], { key = "Smith-Realm", rank = 1, byConc = false, top = 3, recipeKey = 1, prof = BS })
   -- Spec §4.4 rule 8: the list is live only; it leaves the saved lead at logout, the rest stays.
   Wow.fireEvent("PLAYER_LOGOUT")
   Assert.equal(db.leads[1], lead)
   Assert.equal(lead.crafters, nil)
   Assert.equal(lead.crafter, "Alt-Realm")
+end
+
+-- Leads.Repick follows a moved main crafter on a lead nobody has answered yet. "LF plate belt":
+-- Alt and Smith know it at equal rank (1 of 2, 2 of 4), so the name picks Alt until Smith is the
+-- main. Neither can receive the customer's order.
+local function testRepick()
+  local MainCrafter = require("CraftAlert.Model.MainCrafter")
+  local ns, db = setup(nil, function(data)
+    local alt, smith = data.characters["Alt-Realm"], data.characters["Smith-Realm"]
+    alt.realms, smith.realms = { "Realm" }, { "Realm" }
+    alt.recipes[1].ranks, alt.recipes[1].reachRank, alt.recipes[1].reachCost = { 1, 2 }, 1, 0
+    smith.recipes[1].ranks, smith.recipes[1].reachRank, smith.recipes[1].reachCost = { 1, 2, 3, 4 }, 2, 0
+  end)
+  local Leads = ns.Leads
+  local seen = listen(Leads)
+  local lead = newLead(ns, "LF plate belt")
+  Assert.equal(lead.crafter, "Alt-Realm")
+  Assert.same({ lead.cannotOrder, lead.rank, lead.rankConc }, { true, 1, false })
+  Assert.equal(Leads.Repick(lead.id), false, "nothing moved")
+  Assert.equal(seen.change, 1, "no event for an unchanged pick")
+
+  -- The values on the lead are Smith's after the switch, whatever it held before.
+  lead.cannotOrder, lead.rankConc = false, true
+  MainCrafter.Set(db, "Smith-Realm", BS, true)
+  Assert.equal(Leads.Repick(lead.id), true)
+  Assert.equal(lead.crafter, "Smith-Realm")
+  Assert.same({ lead.cannotOrder, lead.rank, lead.rankConc }, { true, 2, false }, "the new crafter's order and rank")
+  Assert.equal(seen.change, 2, "one change")
+  Assert.same({ lead.recipeName, lead.itemID }, { "Thick Plate Belt", 501 })
+  Assert.equal(Leads.Repick(lead.id), false, "the same call again")
+  Assert.equal(seen.change, 2, "and no second event")
+
+  -- Greeted or replied: the crafter stays.
+  MainCrafter.Set(db, "Alt-Realm", BS, true)
+  Leads.MarkGreeted(lead.id)
+  local changes = seen.change
+  Assert.equal(Leads.Repick(lead.id), false, "greeted")
+  Assert.equal(lead.crafter, "Smith-Realm")
+  Leads.MarkReplied(lead.id)
+  Assert.equal(Leads.Repick(lead.id), false, "replied")
+  Assert.equal(seen.change, changes + 1, "only the reply fired")
+  Leads.Dismiss(lead.id)
+  Assert.equal(Leads.Repick(lead.id), false, "not active")
+  Assert.equal(Leads.Repick(9999), false, "unknown id")
+
+  -- A restored lead has no crafters list.
+  ns, db = setup()
+  lead = newLead(ns, "LF plate belt")
+  lead.crafters = nil
+  MainCrafter.Set(db, "Smith-Realm", BS, true)
+  Assert.equal(ns.Leads.Repick(lead.id), false, "restored lead")
+  Assert.equal(lead.crafter, "Alt-Realm")
+
+  -- The main is not among the lead's crafters: nobody of the lead is primary, Alt still wins.
+  ns, db = setup()
+  lead = newLead(ns, "LF plate belt")
+  db.characters["Other-Realm"] = Fixture.character({ BS }, {})
+  MainCrafter.Set(db, "Other-Realm", BS, true)
+  Assert.equal(ns.Leads.Repick(lead.id), false, "main outside the lead")
+  Assert.equal(lead.crafter, "Alt-Realm")
+
+  -- A candidate disabled or removed since the lead was made is never chosen, even when it would win.
+  for _, change in ipairs({
+    function(characters)
+      characters["Alt-Realm"].enabled = false
+    end,
+    function(characters)
+      characters["Alt-Realm"] = nil
+    end,
+  }) do
+    ns, db = setup()
+    lead = newLead(ns, "LF plate belt")
+    Assert.equal(lead.crafter, "Alt-Realm")
+    MainCrafter.Set(db, "Smith-Realm", BS, true)
+    Assert.equal(ns.Leads.Repick(lead.id), true)
+    MainCrafter.Clear(db, BS)
+    change(db.characters)
+    Assert.equal(ns.Leads.Repick(lead.id), false, "Smith stays")
+    Assert.equal(lead.crafter, "Smith-Realm")
+  end
+
+  -- A profession-word lead switches too; it has no recipe or item.
+  ns, db = setup()
+  lead = newLead(ns, "LF blacksmith")
+  Assert.equal(lead.crafter, "Alt-Realm")
+  MainCrafter.Set(db, "Smith-Realm", BS, true)
+  Assert.equal(ns.Leads.Repick(lead.id), true)
+  Assert.same({ lead.crafter, lead.recipeName, lead.itemID, lead.itemLink, lead.profName }, { "Smith-Realm", nil, nil, nil, tostring(BS) })
+
+  -- Review Focus 5: the new crafter's recipe has no item, so the old item must not stay named.
+  ns, db = setup()
+  lead = newLead(ns, "LF plate belt")
+  Assert.truthy(lead.itemLink, "the first crafter's item is linked")
+  db.characters["Smith-Realm"].recipes[1].item = nil
+  MainCrafter.Set(db, "Smith-Realm", BS, true)
+  Assert.equal(ns.Leads.Repick(lead.id), true)
+  Assert.same({ lead.crafter, lead.recipeName, lead.itemID, lead.itemLink }, { "Smith-Realm", "Thick Plate Belt", nil, nil })
 end
 
 local ITEM_EVENT = "GET_ITEM_INFO_RECEIVED"
@@ -322,6 +419,7 @@ return function()
   testTestFlag()
   testTestGuards()
   testRankOnLead()
+  testRepick()
   -- A new lead copies what it keeps out of the Matcher's result (§6.3 step 7).
   local ns, db = setup()
   local Leads = ns.Leads

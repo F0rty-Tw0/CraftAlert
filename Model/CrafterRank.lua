@@ -14,9 +14,9 @@ local CrafterRank = {}
 local pairs = pairs
 local type = type
 
--- Tier, lower is better: current character, the profession's primary crafter, other
+-- Tier, lower is better: the profession's primary crafter, the current character, other
 -- characters of this account, imported characters.
-local CURRENT, PRIMARY, SAME_ACCOUNT, IMPORTED = 0, 1, 2, 3
+local PRIMARY, CURRENT, SAME_ACCOUNT, IMPORTED = 0, 1, 2, 3
 
 function CrafterRank.IsIgnored(name)
   local api = _G["C_FriendList"]
@@ -28,12 +28,12 @@ function CrafterRank.IsIgnored(name)
 end
 
 local function tierOf(character, key, prof)
-  if key == PlayerName.Own() then
-    return CURRENT
-  end
   local profession = character and character.professions and character.professions[prof]
   if profession and profession.primary == true then
     return PRIMARY
+  end
+  if key == PlayerName.Own() then
+    return CURRENT
   end
   return character and character.source == "import" and IMPORTED or SAME_ACCOUNT
 end
@@ -108,39 +108,52 @@ local function better(a, b)
   return a.key < b.key
 end
 
--- → characterKey, cannotOrder, rank, byConc, recipeKey, candidates; nil when the customer is on
--- Blizzard's ignore list (unless opts.skipIgnore, which only the Settings Test page passes) or no
--- character qualifies. Order of `better`. A character is judged by its best entry; rank, byConc
--- and recipeKey come from the winning entry (nil for a profession word). `candidates` is one
--- { key, rank, byConc } per qualifying character, its best entry, in no set order. `result` is
--- the Matcher's reused result: only read here. A match without entries (a profession word) is
--- answered by every enabled character with that profession that still listens for it.
-function CrafterRank.Pick(result, customerKey, db, opts)
-  if not (opts and opts.skipIgnore) and CrafterRank.IsIgnored(customerKey) then
-    return nil
-  end
-  -- Asked once per character: an entry per recipe names the same few characters again and again.
+-- Fills `probe` in full with one character's entry for `better`; reused, so it allocates nothing.
+local function fill(probe, db, key, prof, recipeKey, rank, top, byConc, cannot)
+  probe.key = key
+  probe.cannot = cannot and 1 or 0
+  probe.fraction = rank and rank / top or -1
+  probe.conc = byConc and 1 or 0
+  probe.tier = tierOf(db.characters[key], key, prof)
+  probe.rank = rank
+  probe.top = top
+  probe.byConc = byConc
+  probe.recipeKey = recipeKey
+  probe.prof = prof
+end
+
+-- A lookup of RealmTag.CannotOrder for one customer, asked once per character: an entry per
+-- recipe names the same few characters again and again. → function(key) → true, false or nil.
+local function cannotOrderFor(db, customerKey)
   local cannotOrderBy, asked = {}, {}
-  local function cannotOrder(key)
+  return function(key)
     if not asked[key] then
       asked[key] = true
       cannotOrderBy[key] = RealmTag.CannotOrder(db, key, customerKey)
     end
     return cannotOrderBy[key]
   end
+end
+
+-- → characterKey, cannotOrder, rank, byConc, recipeKey, candidates; nil when the customer is on
+-- Blizzard's ignore list (unless opts.skipIgnore, which only the Settings Test page passes) or no
+-- character qualifies. Order of `better`. A character is judged by its best entry; rank, byConc
+-- and recipeKey come from the winning entry (nil for a profession word). `candidates` is one
+-- { key, rank, byConc, top, recipeKey, prof } per qualifying character, its best entry, in no set
+-- order; CrafterRank.Repick judges them again. `result` is the Matcher's reused result: only read
+-- here. A match without entries (a profession word) is answered by every enabled character with
+-- that profession that still listens for it.
+function CrafterRank.Pick(result, customerKey, db, opts)
+  if not (opts and opts.skipIgnore) and CrafterRank.IsIgnored(customerKey) then
+    return nil
+  end
+  local cannotOrder = cannotOrderFor(db, customerKey)
   -- Each entry is judged in `probe`, which every call fills in full. A winner keeps its table and
   -- the one it beat becomes the next probe, so a character's many entries allocate nothing.
   local bestBy, probe = {}, {}
   local function consider(key, prof, recipeKey)
-    probe.key = key
-    probe.cannot = cannotOrder(key) == true and 1 or 0
     local rank, top, byConc = effectiveRank(db, key, recipeKey)
-    probe.fraction = rank and rank / top or -1
-    probe.conc = byConc and 1 or 0
-    probe.tier = tierOf(db.characters[key], key, prof)
-    probe.rank = rank
-    probe.byConc = byConc
-    probe.recipeKey = recipeKey
+    fill(probe, db, key, prof, recipeKey, rank, top, byConc, cannotOrder(key) == true)
     local held = bestBy[key]
     if better(probe, held) then
       bestBy[key] = probe
@@ -163,7 +176,14 @@ function CrafterRank.Pick(result, customerKey, db, opts)
   local best
   local candidates = {}
   for key, entry in pairs(bestBy) do
-    candidates[#candidates + 1] = { key = key, rank = entry.rank, byConc = entry.byConc }
+    candidates[#candidates + 1] = {
+      key = key,
+      rank = entry.rank,
+      byConc = entry.byConc,
+      top = entry.top,
+      recipeKey = entry.recipeKey,
+      prof = entry.prof,
+    }
     if better(entry, best) then
       best = entry
     end
@@ -173,6 +193,36 @@ function CrafterRank.Pick(result, customerKey, db, opts)
   end
 
   return best.key, cannotOrder(best.key), best.rank, best.byConc, best.recipeKey, candidates
+end
+
+-- Pick again over the candidates a lead kept, with the db as it is now (the main crafter may
+-- have moved). Rank, top and byConc are the ones Pick found; the tier and can-order are read
+-- anew. A candidate removed or disabled since is skipped, as Pick never offers one. →
+-- characterKey, cannotOrder, rank, byConc, recipeKey; nil without candidates. No ignore-list
+-- check: the lead exists.
+function CrafterRank.Repick(lead, db)
+  local candidates = lead.crafters
+  if type(candidates) ~= "table" then
+    return nil
+  end
+  local cannotOrder = cannotOrderFor(db, lead.customer)
+  local best, probe = nil, {}
+  for i = 1, #candidates do
+    local c = candidates[i]
+    local character = db.characters[c.key]
+    -- Pick never offers a removed or disabled character; one that became so since is skipped.
+    if character and character.enabled ~= false then
+      fill(probe, db, c.key, c.prof, c.recipeKey, c.rank, c.top, c.byConc, cannotOrder(c.key) == true)
+      if better(probe, best) then
+        best, probe = probe, best or {}
+      end
+    end
+  end
+  if best == nil then
+    return nil
+  end
+
+  return best.key, cannotOrder(best.key), best.rank, best.byConc, best.recipeKey
 end
 
 ns.CrafterRank = CrafterRank

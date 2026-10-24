@@ -387,21 +387,17 @@ local function firstKey(result, crafter)
 end
 
 -- What the chosen crafter's own record says about the match: its recipe (item results) and
--- the name of the profession. `recipeKey` is the entry Pick ranked; nil falls back to the
--- crafter's first entry.
-local function describeCrafter(lead, result, crafter, recipeKey)
+-- the name of the profession. `recipeKey` is the entry Pick ranked; nil leaves the recipe
+-- fields empty.
+local function describeCrafter(lead, kind, prof, crafter, recipeKey)
   local character = db.characters[crafter]
-  local profession = character and character.professions and character.professions[result.prof]
-  lead.profName = profession and profession.name or (type(result.prof) == "string" and result.prof or nil)
-  if result.kind ~= "item" then
+  local profession = character and character.professions and character.professions[prof]
+  lead.profName = profession and profession.name or (type(prof) == "string" and prof or nil)
+  if kind ~= "item" or recipeKey == nil then
     return
   end
-  local key = recipeKey or firstKey(result, crafter)
-  if key == nil then
-    return
-  end
-  local recipe = character and character.recipes and character.recipes[key]
-  lead.recipeName = recipe and recipe.name or (type(key) == "string" and key or nil)
+  local recipe = character and character.recipes and character.recipes[recipeKey]
+  lead.recipeName = recipe and recipe.name or (type(recipeKey) == "string" and recipeKey or nil)
   lead.itemID = recipe and recipe.item or nil
   if lead.itemID then
     fillLink(lead)
@@ -428,7 +424,11 @@ local function buildLead(result, customerKey, text, channelKey, pick)
     greeted = false,
     replied = false,
   }
-  describeCrafter(lead, result, pick.crafter, pick.recipeKey)
+  local recipeKey = pick.recipeKey
+  if recipeKey == nil and result.kind == "item" then
+    recipeKey = firstKey(result, pick.crafter)
+  end
+  describeCrafter(lead, result.kind, result.prof, pick.crafter, recipeKey)
   return lead
 end
 
@@ -506,6 +506,29 @@ function Leads.MarkGreeted(id)
     db.recentGreeted[lead.customer] = now()
   end
   fire("greeted", lead)
+  fire("change")
+  return true
+end
+
+-- The main crafter moved: pick the crafter of an unanswered lead again from the candidates it
+-- kept. → whether the crafter changed. A greeted or replied lead keeps who was greeted; a
+-- restored lead has no candidates.
+function Leads.Repick(id)
+  local lead = find(id)
+  if lead == nil or lead.greeted ~= false or lead.replied ~= false then
+    return false
+  end
+  local crafters = lead.crafters
+  if type(crafters) ~= "table" or #crafters == 0 then
+    return false
+  end
+  local crafter, cannotOrder, rank, rankConc, recipeKey = CrafterRank.Repick(lead, db)
+  if crafter == nil or crafter == lead.crafter then
+    return false
+  end
+  lead.crafter, lead.cannotOrder, lead.rank, lead.rankConc = crafter, cannotOrder, rank, rankConc
+  lead.recipeName, lead.itemID, lead.itemLink = nil, nil, nil
+  describeCrafter(lead, lead.kind, lead.prof, crafter, recipeKey)
   fire("change")
   return true
 end

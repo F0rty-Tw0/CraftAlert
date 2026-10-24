@@ -10,6 +10,7 @@ local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local CardBody = ns.CardBody or require("CraftAlert.UI.CardBody")
+local MainCrafterMenu = ns.MainCrafterMenu or require("CraftAlert.UI.MainCrafterMenu")
 
 -- Lead-cards spec §2, §2.1: what a card's tooltips say. Each builder fills a tooltip that already has
 -- its owner: a gold title, white text, green instruction lines. UI/CardTips.lua owns the zones and
@@ -106,7 +107,8 @@ function CardTipText.Matched(tip, lead)
   end
 end
 
--- Every crafter in the card's order, name in class colour and rank in grey; who was picked; a realm warning.
+-- Every crafter in the card's order, name in class colour and rank in grey; who was picked; a realm
+-- warning; what a click does when the main-crafter menu can open.
 function CardTipText.Crafters(tip, lead)
   title(tip, Localization.Text("Crafters"))
   local grey = Theme.COLORS.grey
@@ -119,6 +121,9 @@ function CardTipText.Crafters(tip, lead)
   end
   if lead.cannotOrder then
     white(tip, Localization.Text("Can't send an order (realm)"))
+  end
+  if MainCrafterMenu.CanOpen(lead) then
+    instruction(tip, Localization.Text("Click to choose the main crafter"))
   end
 end
 

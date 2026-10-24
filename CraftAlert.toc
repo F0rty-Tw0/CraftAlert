@@ -42,6 +42,7 @@ Model/WordGroups.lua
 Model/Index.lua
 Model/Matcher.lua
 Model/RealmTag.lua
+Model/MainCrafter.lua
 Model/CrafterRank.lua
 Model/Leads.lua
 Model/Greeting.lua
@@ -66,6 +67,7 @@ UI/LinkHover.lua
 UI/Dock.lua
 UI/CardBody.lua
 UI/CardHover.lua
+UI/MainCrafterMenu.lua
 UI/CardTipText.lua
 UI/CardTips.lua
 UI/LeadRow.lua

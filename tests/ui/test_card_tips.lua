@@ -178,7 +178,15 @@ local function testCraftersZone()
   local zone = card.zones.crafters
   enter(card, zone)
   Assert.equal(tip().owner, zone)
-  Assert.same(tip().lines, { "Crafters", "Me", "Alt-Other", "Bob", "Picked for this lead: Me", "Can't send an order (realm)" })
+  Assert.same(tip().lines, {
+    "Crafters",
+    "Me",
+    "Alt-Other",
+    "Bob",
+    "Picked for this lead: Me",
+    "Can't send an order (realm)",
+    "Click to choose the main crafter",
+  })
   Assert.same(tip().colors[1], GOLD)
   Assert.same(tip().colors[2], { MAGE.r, MAGE.g, MAGE.b })
   -- Alt-Other has no saved class and Bob no rank: white names, an empty right half.
@@ -191,11 +199,11 @@ local function testCraftersZone()
   -- A customer who can be ordered from: no realm line.
   card.lead.cannotOrder = nil
   enter(card, zone)
-  Assert.equal(tip().lines[#tip().lines], "Picked for this lead: Me")
+  Assert.equal(tip().lines[#tip().lines - 1], "Picked for this lead: Me")
   -- No crafter was picked: no "Picked" line.
   card.lead.crafter = nil
   enter(card, zone)
-  Assert.same(tip().lines, { "Crafters", "Alt-Other", "Bob", "Me" })
+  Assert.same(tip().lines, { "Crafters", "Alt-Other", "Bob", "Me", "Click to choose the main crafter" })
 end
 
 local function testGreetTip()
@@ -237,16 +245,86 @@ local function testZoneClicks()
   Assert.same({ #ns.Leads.List(), ns.Leads.List()[1].customer }, { 1, "Ann-Realm" })
 end
 
+-- Main-crafter spec §3: a left-click on the Crafters zone (any modifier) opens the main-crafter menu
+-- instead of greeting, while the lead's profession has a crafter to choose.
+local function testCraftersZoneOpensMenu()
+  for _, key in ipairs({ "none", "IsShiftKeyDown", "IsControlKeyDown" }) do
+    local _, calls, card = open({ UiFixture.lead(1, "Buyer-Realm") })
+    if key ~= "none" then
+      Wow.stub(key, function()
+        return true
+      end)
+    end
+    Wow.clock.gettime = Wow.clock.gettime + 1
+    Widgets.click(card.zones.crafters, "LeftButton")
+    Assert.same({ Wow.menu.owner, #UiFixture.callsTo(calls, "chat"), card.lead.greeted }, { card.zones.crafters, 0, false }, key)
+    Assert.equal(Wow.menu.entries[1].text, "Main crafter for Blacksmithing", key)
+    Wow.reset()
+  end
+end
+
+-- Classic learns a profession for the session only, so a lead may have no prof: the zone greets.
+local function testCraftersZoneGreetsWithoutProf()
+  local lead = UiFixture.lead(1, "Buyer-Realm")
+  lead.prof = nil
+  local _, calls, card = open({ lead })
+  Wow.clock.gettime = Wow.clock.gettime + 1
+  Widgets.click(card.zones.crafters, "LeftButton")
+  Assert.same({ #UiFixture.callsTo(calls, "chat"), Wow.menu.owner, card.lead.greeted }, { 1, nil, true })
+end
+
+local function testCraftersTipInstruction()
+  local _, _, card = open({ UiFixture.lead(1, "Buyer-Realm") })
+  enter(card, card.zones.crafters)
+  Assert.same({ tip().lines[#tip().lines], tip().colors[#tip().colors] }, { "Click to choose the main crafter", GREEN })
+  -- Nobody knows the profession: no menu, no line.
+  card.lead.prof = 999
+  enter(card, card.zones.crafters)
+  Assert.same(tip().lines, { "Crafters", "Me", "Picked for this lead: Me" })
+end
+
+-- No MenuUtil (a client without the Blizzard menu): the click greets and the tooltip offers nothing.
+local function testCraftersZoneWithoutMenuUtil()
+  local _, calls, card = open({ UiFixture.lead(1, "Buyer-Realm") })
+  Wow.stub("MenuUtil", nil)
+  enter(card, card.zones.crafters)
+  Assert.same(tip().lines, { "Crafters", "Me", "Picked for this lead: Me" })
+  Wow.clock.gettime = Wow.clock.gettime + 1
+  Widgets.click(card.zones.crafters, "LeftButton")
+  Assert.same({ #UiFixture.callsTo(calls, "chat"), card.lead.greeted }, { 1, true })
+end
+
+-- Choosing a main re-picks only an unanswered lead: a greeted one keeps the crafter it named.
+local function testMenuChoiceRepicks()
+  for _, greeted in ipairs({ true, false }) do
+    local lead = UiFixture.lead(1, "Buyer-Realm")
+    lead.crafters = { { key = "Me-Realm", prof = 164 }, { key = "Alt-Realm", prof = 164 } }
+    lead.greeted = greeted
+    local _, _, card = open({ lead })
+    _G["CraftAlertDB"].characters["Alt-Realm"] = { professions = { [164] = { name = "Blacksmithing" } } }
+    Widgets.click(card.zones.crafters, "LeftButton")
+    Assert.equal(Wow.menu.owner, card.zones.crafters)
+    for _, entry in ipairs(Wow.menu.entries) do
+      if entry.text == "Alt" then
+        entry.setSelected(entry.data)
+      end
+    end
+    Assert.equal(_G["CraftAlertDB"].characters["Alt-Realm"].professions[164].primary, true)
+    Assert.equal(card.lead.crafter, greeted and "Me-Realm" or "Alt-Realm", tostring(greeted))
+    Wow.reset()
+  end
+end
+
 local function testTipFollowsLead()
   local old = UiFixture.lead(1, "Ann-Realm")
   old.crafter = "Bob-Realm"
   local ns, _, card = open({ old, UiFixture.lead(2, "Buyer-Realm") })
   enter(card, card.zones.crafters)
-  Assert.same(tip().lines, { "Crafters", "Me", "Picked for this lead: Me" })
+  Assert.same(tip().lines, { "Crafters", "Me", "Picked for this lead: Me", "Click to choose the main crafter" })
   ns.Leads.Dismiss(card.lead.id)
   Assert.equal(card.lead.customer, "Ann-Realm")
   enter(card, card.zones.crafters)
-  Assert.same(tip().lines, { "Crafters", "Bob", "Picked for this lead: Bob" })
+  Assert.same(tip().lines, { "Crafters", "Bob", "Picked for this lead: Bob", "Click to choose the main crafter" })
 end
 
 local function testLeadChangeHidesZoneTip()
@@ -555,6 +633,11 @@ return function()
   testGreetTip()
   testLeaveHidesOwnedOnly()
   testZoneClicks()
+  testCraftersZoneOpensMenu()
+  testCraftersZoneGreetsWithoutProf()
+  testCraftersTipInstruction()
+  testCraftersZoneWithoutMenuUtil()
+  testMenuChoiceRepicks()
   testTipFollowsLead()
   testLeadChangeHidesZoneTip()
   testCloseHidesZoneTip()

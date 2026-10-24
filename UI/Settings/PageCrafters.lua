@@ -7,6 +7,7 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
+local MainCrafter = ns.MainCrafter or require("CraftAlert.Model.MainCrafter")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
@@ -83,16 +84,6 @@ local function recipeItems(character, prof, search)
   end
   table.sort(items, byText)
   return items
-end
-
--- Primary is one crafter per profession: setting it clears every other character's flag.
-local function setPrimary(charKey, prof, on)
-  for key, character in pairs(db().characters) do
-    local profession = character.professions[prof]
-    if profession and (key == charKey or on) then
-      profession.primary = key == charKey and on
-    end
-  end
 end
 
 local function recipeIcon(item)
@@ -189,7 +180,7 @@ local function createProfessionRows(column, page)
   end)
   page.primary = Controls.Toggle(column, Localization.Text("Primary crafter for this profession"), function(on)
     if page.profession.Value() ~= nil then
-      setPrimary(page.character.Value(), page.profession.Value(), on)
+      MainCrafter.Set(db(), page.character.Value(), page.profession.Value(), on)
     end
   end)
   page.search = Controls.Input(column, Localization.Text("Search recipes"), function()

@@ -6,13 +6,16 @@ end
 local CardTipText = ns.CardTipText or require("CraftAlert.UI.CardTipText")
 local CardHover = ns.CardHover or require("CraftAlert.UI.CardHover")
 local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
+local MainCrafterMenu = ns.MainCrafterMenu or require("CraftAlert.UI.MainCrafterMenu")
 
 -- Lead-cards spec §2, §2.1: when a card's tooltips show (UI/CardTipText.lua says what they hold).
 -- Mouse-enabled zones lie over its customer, what line, Matched row and Crafters row; the Greet button
 -- has one; the latest chat line shows while the cursor is on the bare card (ShowChat). A zone has no
 -- text of its own and forwards clicks to the card, so a click anywhere on it greets or dismisses. No
 -- zone covers the Request text or a link in the what line: LinkHover shows those item tooltips. No
--- OnUpdate: every tooltip starts from an Enter or from the cursor leaving a link.
+-- OnUpdate: every tooltip starts from an Enter or from the cursor leaving a link. One exception to
+-- the forwarding: a left-click on the Crafters zone opens the main-crafter menu when it can open
+-- (main-crafter spec §3).
 local CardTips = {}
 
 local ANCHOR = "ANCHOR_RIGHT"
@@ -113,6 +116,13 @@ function CardTips.Attach(card)
     matched = createZone(card, card.labels.matched, card.values.matched, CardTipText.Matched),
     crafters = createZone(card, card.labels.crafters, card.values.crafters, CardTipText.Crafters),
   }
+  card.zones.crafters:SetScript("OnClick", function(zone, button)
+    if button == "LeftButton" and MainCrafterMenu.CanOpen(card.lead) then
+      MainCrafterMenu.Open(zone, card.lead)
+    else
+      card:GetScript("OnClick")(card, button)
+    end
+  end)
   local greet = card.buttons.greet
   greet:HookScript("OnEnter", function()
     local tip = Tooltip.Get()
