@@ -185,5 +185,14 @@ function FlavorCompat.OwnClass()
   return token
 end
 
+-- Whether the player is in any instance (dungeon, raid, battleground, arena, delve, housing...);
+-- false when the API is missing. The one owner of the instance test: modules loaded before
+-- ScanGate read it here. The API is read on each call, so tests that stub it after load still
+-- reach this code.
+function FlavorCompat.InInstance()
+  local isInInstance = _G["IsInInstance"]
+  return type(isInInstance) == "function" and isInInstance() == true
+end
+
 ns.FlavorCompat = FlavorCompat
 return FlavorCompat

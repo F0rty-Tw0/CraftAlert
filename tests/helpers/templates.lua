@@ -360,6 +360,42 @@ function Templates.fakes.UIPanelButtonTemplate(button)
   end
 end
 
+-- Blizzard_SharedXML/SharedTooltipTemplates.xml (SharedTooltipTemplate, hidden) under
+-- GameTooltipTemplate: the addon's own tooltip (UI/Tooltip.lua). It records what it was given:
+-- lines, their colours as { r, g, b } or {}, rights[line] = { text, r, g, b } of an
+-- AddDoubleLine's right half, owner, anchor, hyperlinks; badLinks[link] makes SetHyperlink raise.
+-- Show, Hide and IsShown are the stub frame's own.
+function Templates.fakes.GameTooltipTemplate(tooltip)
+  tooltip.shown, tooltip.lines, tooltip.colors, tooltip.rights, tooltip.hyperlinks = false, {}, {}, {}, {}
+  function tooltip:SetOwner(owner, anchor)
+    self.owner, self.anchor, self.lines, self.colors, self.rights = owner, anchor, {}, {}, {}
+  end
+  function tooltip:ClearLines()
+    self.lines, self.colors, self.rights = {}, {}, {}
+  end
+  function tooltip:SetText(text, r, g, b)
+    self.lines, self.colors, self.rights = { text }, { { r, g, b } }, {}
+  end
+  function tooltip:AddLine(text, r, g, b)
+    table.insert(self.lines, text)
+    table.insert(self.colors, { r, g, b })
+  end
+  function tooltip:AddDoubleLine(left, right, lr, lg, lb, rr, rg, rb)
+    table.insert(self.lines, left)
+    table.insert(self.colors, { lr, lg, lb })
+    self.rights[#self.lines] = { right, rr, rg, rb }
+  end
+  function tooltip:SetHyperlink(link)
+    if self.badLinks and self.badLinks[link] then
+      error("bad link: " .. link)
+    end
+    table.insert(self.hyperlinks, link)
+  end
+  function tooltip:IsOwned(frame)
+    return self.owner == frame and self.shown
+  end
+end
+
 function Templates.Apply(frame, templateName)
   local fake = Templates.fakes[templateName]
   if fake == nil then

@@ -3,6 +3,7 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Index = ns.Index or require("CraftAlert.Model.Index")
@@ -261,7 +262,11 @@ end
 -- force: the window was just opened. An update starts a read only when the profession or the
 -- recipe count differs from the running job, or from the last read that stored a recipe for
 -- the window. A kept job with the same profession and count resumes instead of starting over.
+-- Nothing is read in an instance.
 local function onWindowEvent(force)
+  if FlavorCompat.InInstance() then
+    return
+  end
   local api = tradeSkillApi()
   if api == nil or db == nil or isBlocked(api) then
     return

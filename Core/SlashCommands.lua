@@ -5,6 +5,7 @@ end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Perf = ns.Perf or require("CraftAlert.Core.Perf")
 local SavedState = ns.SavedState or require("CraftAlert.Persistence.SavedState")
 local TestLine = ns.TestLine or require("CraftAlert.Core.TestLine")
@@ -12,6 +13,8 @@ local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 
 -- Spec §7.3 and §4.4: /craftalert and /ca. No argument toggles the leads window; `config` its
 -- settings pane; `test` runs a trade line through the real path (TestLine); `perf` toggles timing.
+-- In an instance every form does nothing, silently: an addon line in the chat frame taints it,
+-- and Blizzard's chat code then meets secret values in Mythic+ in tainted code.
 local SlashCommands = {}
 
 local lower = string.lower
@@ -48,6 +51,9 @@ local COMMANDS = {
 }
 
 local function onSlash(message)
+  if FlavorCompat.InInstance() then
+    return
+  end
   local name, rest = match(message or "", "^%s*(%S*)%s*(.-)%s*$")
   name = lower(name)
   if name == "" then

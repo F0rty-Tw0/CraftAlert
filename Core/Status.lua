@@ -17,8 +17,11 @@ end
 
 function Status.PausedText(state)
   local reason = state.reason
-  if reason == "notResting" then
-    return Localization.Text("Paused — not in a city or inn")
+  if reason == "noTrade" then
+    return Localization.Text("Paused — no Trade chat here")
+  end
+  if reason == "instance" then
+    return Localization.Text("Paused — off in instances")
   end
   if reason == "notStarted" then
     return Localization.Text("Paused — Craft Alert did not start; /reload to try again")

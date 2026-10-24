@@ -349,7 +349,7 @@ local function testLinksStillHover()
   end
   Assert.equal(card.icon:GetParent(), card)
   Assert.equal(card.values.request:GetText(), "LF " .. LINK_TEXT .. " crafter")
-  local tip = rawget(_G, "GameTooltip")
+  local tip = ns.Tooltip.Get()
   Assert.equal(card.hyperlinksEnabled, true)
   card.scripts.OnHyperlinkEnter(card, LINK, LINK_TEXT)
   Assert.same({ tip.hyperlinks, tip.owner, tip.shown, card.hoveredLink }, { { LINK }, card, true, LINK })

@@ -177,7 +177,7 @@ end
 local function testTooltip()
   local ns = UiFixture.load({ leads = 1 })
   ns.AlertToast.Show(ns.Leads.Latest())
-  local frame, tip = toastFrame(), rawget(_G, "GameTooltip")
+  local frame, tip = toastFrame(), ns.Tooltip.Get()
   frame.scripts.OnEnter(frame)
   Assert.same({ tip.owner, tip.anchor, tip.shown }, { frame, "ANCHOR_TOP", true })
   -- Blizzard's tooltip hierarchy: a gold title, what matched in white, a blank line, then one
@@ -198,7 +198,7 @@ end
 
 local function testLinks()
   local ns, _, calls = UiFixture.load({ leads = 2 })
-  local tip = rawget(_G, "GameTooltip")
+  local tip = ns.Tooltip.Get()
   local leads = ns.Leads.List() -- newest first
   leads[2].message = CORPUS
   ns.AlertToast.Show(leads[2])
@@ -265,6 +265,30 @@ local function testNewerLeadAndAutoHide()
   ns.Leads.Dismiss(leads[1].id)
   Assert.equal(toastFrame():IsShown(), false)
   Assert.equal(ns.AlertToast.VisibleLead(), nil)
+end
+
+-- Entering an instance takes the toast down; no toast shows there; leaving brings none back.
+local function testHiddenInInstance()
+  local ns = UiFixture.load({ leads = 2 })
+  local leads = ns.Leads.List()
+  local inside = false
+  Wow.stub("IsInInstance", function()
+    return inside, inside and "party" or "none"
+  end)
+  ns.AlertToast.Show(leads[2])
+  Assert.equal(toastFrame():IsShown(), true)
+  ns.AlertToast.OnGate(false, { reason = "noTrade" })
+  Assert.equal(toastFrame():IsShown(), true, "outside an instance the gate leaves it")
+  inside = true
+  ns.AlertToast.OnGate(false, { reason = "instance" })
+  Assert.equal(toastFrame():IsShown(), false)
+  Assert.equal(ns.AlertToast.VisibleLead(), nil)
+  ns.AlertToast.Show(leads[1])
+  Assert.equal(toastFrame():IsShown(), false, "no toast in an instance")
+  inside = false
+  ns.AlertToast.OnGate(true, { active = true })
+  Assert.equal(toastFrame():IsShown(), false, "not re-shown on leaving")
+  Wow.stub("IsInInstance", nil)
 end
 
 local function testClicks()
@@ -538,6 +562,7 @@ return function()
   testTooltip()
   testLinks()
   testNewerLeadAndAutoHide()
+  testHiddenInInstance()
   testClicks()
   testNoTestToast()
   testRealPathTestLead()

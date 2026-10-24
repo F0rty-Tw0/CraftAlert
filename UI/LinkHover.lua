@@ -3,16 +3,14 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
+
 -- Native-HUD spec §4.5: hover tooltips and clicks for hyperlinks inside a frame's own text. A frame
 -- reads its hovered link through IsOverLink so a click on a link never greets the lead.
 local LinkHover = {}
 
 local pcall = pcall
 local type = type
-
-local function tooltip()
-  return _G["GameTooltip"]
-end
 
 local function linkType(link)
   local head = link:match("^([^:]*)")
@@ -21,7 +19,7 @@ local function linkType(link)
 end
 
 local function showTooltip(frame, link)
-  local tip = tooltip()
+  local tip = Tooltip.Get()
   tip:SetOwner(frame, "ANCHOR_CURSOR")
   local ok = pcall(tip.SetHyperlink, tip, link)
   if not ok then
@@ -31,7 +29,7 @@ local function showTooltip(frame, link)
 end
 
 local function hideIfOwned(frame)
-  local tip = tooltip()
+  local tip = Tooltip.Get()
   local owned = tip:IsOwned(frame)
   if owned then
     tip:Hide()

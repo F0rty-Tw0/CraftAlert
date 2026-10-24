@@ -5,6 +5,7 @@ end
 
 local CardTipText = ns.CardTipText or require("CraftAlert.UI.CardTipText")
 local CardHover = ns.CardHover or require("CraftAlert.UI.CardHover")
+local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 
 -- Lead-cards spec §2, §2.1: when a card's tooltips show (UI/CardTipText.lua says what they hold).
 -- Mouse-enabled zones lie over its customer, what line, Matched row and Crafters row; the Greet button
@@ -16,24 +17,20 @@ local CardTips = {}
 
 local ANCHOR = "ANCHOR_RIGHT"
 
-local function tooltip()
-  return _G["GameTooltip"]
-end
-
 -- `build(tip, lead)` fills the tooltip; the lead is read when the cursor comes, not before.
 local function showZoneTip(card, zone, build)
   local lead = card.lead
   if lead == nil then
     return
   end
-  local tip = tooltip()
+  local tip = Tooltip.Get()
   tip:SetOwner(zone, ANCHOR)
   build(tip, lead)
   tip:Show()
 end
 
 local function hideIfOwned(frame)
-  local tip = tooltip()
+  local tip = Tooltip.Get()
   if tip:IsOwned(frame) then
     tip:Hide()
   end
@@ -100,7 +97,7 @@ function CardTips.ShowChat(card)
   if lead == nil or lead.message == nil or onLinkOrChild(card) then
     return
   end
-  local tip = tooltip()
+  local tip = Tooltip.Get()
   tip:SetOwner(card, ANCHOR)
   CardTipText.Chat(tip, lead)
   tip:Show()
@@ -118,7 +115,7 @@ function CardTips.Attach(card)
   }
   local greet = card.buttons.greet
   greet:HookScript("OnEnter", function()
-    local tip = tooltip()
+    local tip = Tooltip.Get()
     tip:SetOwner(greet, ANCHOR)
     CardTipText.Greet(tip)
     tip:Show()
@@ -133,7 +130,7 @@ end
 -- True while the card shows its chat tooltip (not a link's) for a line older than the lead's newest.
 local function chatTipStale(card)
   local lead, shown = card.lead, card.chatTip
-  local tip = tooltip()
+  local tip = Tooltip.Get()
   local showing = shown ~= nil and card.hoveredLink == nil and tip:IsShown() and tip:IsOwned(card)
   return showing and (shown.time ~= lead.time or shown.message ~= lead.message)
 end

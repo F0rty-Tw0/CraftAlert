@@ -61,6 +61,7 @@ UI/Theme.lua
 UI/FrameKit.lua
 UI/LeadText.lua
 UI/ClickRouter.lua
+UI/Tooltip.lua
 UI/LinkHover.lua
 UI/Dock.lua
 UI/CardBody.lua

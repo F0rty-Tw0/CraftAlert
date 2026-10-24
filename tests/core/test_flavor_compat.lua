@@ -294,8 +294,24 @@ local function testOwnClass()
   Assert.equal(FlavorCompat.OwnClass(), nil, "non-string token")
 end
 
+-- The instance test: the API is read per call; a missing API means not in an instance.
+local function testInInstance()
+  local FlavorCompat = load("retail")
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  Assert.equal(FlavorCompat.InInstance(), true, "stubbed after load: read per call")
+  Wow.stub("IsInInstance", function()
+    return false, "none"
+  end)
+  Assert.equal(FlavorCompat.InInstance(), false)
+  Wow.stub("IsInInstance", nil)
+  Assert.equal(FlavorCompat.InInstance(), false, "API missing")
+end
+
 return function()
   testOwnClass()
+  testInInstance()
   testIsTestGuid()
   testTestClasses()
   testFlavorKeys()

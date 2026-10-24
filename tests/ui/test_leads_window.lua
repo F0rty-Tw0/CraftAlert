@@ -198,7 +198,7 @@ local function testRowLinkHover()
   local ns, _, calls = load({ "Ann-Draenor", "Bob-Draenor" }, function(accountDb)
     accountDb.leads[2].kind, accountDb.leads[2].itemLink = "item", LINK_TEXT
   end)
-  local tip = rawget(_G, "GameTooltip")
+  local tip = ns.Tooltip.Get()
   ns.LeadsWindow.Toggle()
   local row = rows()[1] -- Bob, the newest lead, holds the item link
   Assert.truthy(row.scripts.OnHyperlinkEnter and row.scripts.OnHyperlinkLeave and row.scripts.OnHyperlinkClick)

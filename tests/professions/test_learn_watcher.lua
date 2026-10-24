@@ -41,6 +41,13 @@ local function recipe(id, profession)
   return { id = id, name = "Recipe " .. id, item = 1000 + id, profession = profession or { professionID = 2872, parentProfessionID = BS } }
 end
 
+-- Makes the recipe-to-profession lookup raise `message`: proves a handler stopped before it.
+local function trapProfessionApi(message)
+  _G["C_TradeSkillUI"].GetProfessionInfoByRecipeID = function()
+    error(message)
+  end
+end
+
 return function()
   for _, flavor in ipairs({ "retail", "forever" }) do
     local ns, state, LearnWatcher, db, run = setup(flavor)
@@ -73,9 +80,7 @@ return function()
   -- A secret recipe ID is ignored before anything else is called.
   local _, state, LearnWatcher, db, run = setup()
   state.recipes = { recipe(1) }
-  _G["C_TradeSkillUI"].GetProfessionInfoByRecipeID = function()
-    error("a secret recipeID reached the API")
-  end
+  trapProfessionApi("a secret recipeID reached the API")
   Wow.fireEvent(EVENT, Wow.secret(1))
   Assert.equal(LearnWatcher.lastStored, false)
   Assert.same(db.characters[CHAR].recipes, {})
@@ -96,4 +101,18 @@ return function()
   for id = 1, 30 do
     Assert.truthy(db.characters[CHAR].recipes[id], "recipe " .. id)
   end
+
+  -- In an instance a learn calls no profession API and stores nothing.
+  _, state, LearnWatcher, db, run = setup()
+  state.recipes = { recipe(1) }
+  trapProfessionApi("a learn in an instance reached the API")
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  LearnWatcher.lastStored = nil
+  Wow.fireEvent(EVENT, 1)
+  Assert.equal(LearnWatcher.lastStored, nil, "the handler stopped first")
+  Assert.same(db.characters[CHAR].recipes, {})
+  Assert.equal(run.builds, 0)
+  Wow.stub("IsInInstance", nil)
 end

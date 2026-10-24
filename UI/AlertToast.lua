@@ -4,9 +4,11 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
 local LinkHover = ns.LinkHover or require("CraftAlert.UI.LinkHover")
@@ -139,7 +141,7 @@ end
 -- (Blizzard_SharedXML/SharedTooltipTemplates.lua, every flavour): gold title, white description,
 -- a blank line, one green instruction line per click, then the drag (it moves the launcher).
 local function showTooltip(frame)
-  local tooltip = _G["GameTooltip"]
+  local tooltip = Tooltip.Get()
   local why = current.lead and current.lead.why
   tooltip:SetOwner(frame, "ANCHOR_TOP")
   _G["GameTooltip_SetTitle"](tooltip, Localization.Text("Craft Alert"), _G["NORMAL_FONT_COLOR"])
@@ -155,7 +157,7 @@ local function showTooltip(frame)
 end
 
 local function hideTooltip()
-  _G["GameTooltip"]:Hide()
+  Tooltip.Get():Hide()
 end
 
 -- A click on a link inside the message belongs to the link (LinkHover), never to the lead.
@@ -232,7 +234,11 @@ local function alert()
 end
 
 -- A new lead (Leads.On("new"), wired by Bootstrap): show it, light the launcher, sound, flash.
+-- Nothing in an instance.
 function AlertToast.Show(lead)
+  if FlavorCompat.InInstance() then
+    return
+  end
   toast = toast or create()
   local replacing = toast.frame:IsShown() and current.lead ~= nil and current.lead ~= lead
   AlertToast.more = replacing and AlertToast.more + 1 or 0
@@ -241,6 +247,14 @@ function AlertToast.Show(lead)
   Launcher.ShowLead(lead)
   alert()
   startHideTimer()
+end
+
+-- ScanGate.OnChange (wired by Bootstrap): entering an instance hides a shown toast; it is not
+-- shown again on leaving. Arguments are ignored.
+function AlertToast.OnGate()
+  if toast ~= nil and toast.frame:IsShown() and FlavorCompat.InInstance() then
+    hide()
+  end
 end
 
 -- Docks the toast beside the launcher (Dock.Anchor), or at a fixed spot on UIParent before the

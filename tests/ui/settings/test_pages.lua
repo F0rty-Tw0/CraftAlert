@@ -113,7 +113,7 @@ local function testNavHighlight()
   Assert.truthy(besideNav, "a page sits right of the nav")
 end
 
--- §6.1: enable and "Only while resting" re-evaluate the gate; §6.2: channels, profession-word
+-- §6.1: enable and "Only where Trade chat exists" re-evaluate the gate; §6.2: channels, profession-word
 -- alerts and unbound items rebuild the index (channels also re-evaluate the registered events).
 local function testGeneralPage()
   local ns, db, refreshes = SettingsFixture.load()
@@ -122,7 +122,7 @@ local function testGeneralPage()
   take(refreshes)
   local cases = {
     { "Enable Craft Alert", "enable", { "evaluate" } },
-    { "Only while resting (city or inn)", "onlyResting", { "evaluate" } },
+    { "Only where Trade chat exists", "onlyResting", { "evaluate" } },
     { "Profession-word alerts", "professionWordAlerts", { "rebuild:professionWordAlerts" } },
     { "Include unbound items", "includeUnbound", { "rebuild:includeUnbound" } },
     { "Bell markers on recipe rows", "recipeMarkers", {} },

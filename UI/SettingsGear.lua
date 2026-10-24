@@ -6,6 +6,7 @@ end
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 
 -- Native-HUD spec §7.1: the gear left of the leads window's close button. A click switches
 -- between the list and the settings pane; the gear turns into a back arrow while the pane shows.
@@ -14,7 +15,7 @@ local SettingsGear = {}
 -- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua): gold title, a
 -- blank line, one green instruction line naming what a click does now.
 local function showTooltip(gear)
-  local tooltip = _G["GameTooltip"]
+  local tooltip = Tooltip.Get()
   tooltip:SetOwner(gear, "ANCHOR_BOTTOMLEFT")
   _G["GameTooltip_SetTitle"](tooltip, Localization.Text("Settings"), _G["NORMAL_FONT_COLOR"])
   _G["GameTooltip_AddBlankLineToTooltip"](tooltip)
@@ -24,7 +25,7 @@ local function showTooltip(gear)
 end
 
 local function hideTooltip()
-  _G["GameTooltip"]:Hide()
+  Tooltip.Get():Hide()
 end
 
 -- The gear on `frame` (a ButtonFrameTemplate frame); a click runs onClick().
@@ -61,7 +62,7 @@ function SettingsGear.Paint(gear, inSettings)
   end
   FrameKit.Art(gear.normal, atlas, file)
   FrameKit.Art(gear.highlight, atlas, file, "ADD")
-  if _G["GameTooltip"]:IsOwned(gear) then
+  if Tooltip.Get():IsOwned(gear) then
     showTooltip(gear)
   end
 end

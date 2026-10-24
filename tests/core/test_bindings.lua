@@ -29,6 +29,24 @@ local function testGlobalsMatchBindingsXml()
   end
 end
 
+-- In an instance each key does nothing and prints nothing: nothing greeted, dismissed or opened.
+local function testOffInInstance()
+  local ns, _, calls = UiFixture.load({ leads = 2 })
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  for _, name in ipairs({ "CraftAlert_GreetLatest", "CraftAlert_DismissLatest", "CraftAlert_ToggleLeads" }) do
+    Wow.chat = {}
+    G(name)()
+    Assert.same(Wow.chat, {}, name)
+  end
+  Assert.same(calls, {}, "nothing sent or prefilled")
+  Assert.equal(#ns.Leads.List(), 2, "not dismissed")
+  local window = G("CraftAlertLeadsWindow")
+  Assert.equal(window ~= nil and window:IsShown(), false, "no window")
+  Wow.stub("IsInInstance", nil)
+end
+
 local function testGreetLatest()
   -- Nothing on screen: the keybind prefills the latest lead (§7.5 rule 3), never sends.
   local calls = select(3, UiFixture.load({ leads = 2 }))
@@ -165,6 +183,7 @@ end
 
 return function()
   testGlobalsMatchBindingsXml()
+  testOffInInstance()
   testGreetLatest()
   testDismissAndToggle()
   testDismissLooks()

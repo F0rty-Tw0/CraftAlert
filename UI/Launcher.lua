@@ -4,11 +4,13 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Status = ns.Status or require("CraftAlert.Core.Status")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local LauncherArt = ns.LauncherArt or require("CraftAlert.UI.LauncherArt")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
@@ -48,7 +50,7 @@ end
 -- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua, every flavour): gold
 -- title, the status in white, a blank line, one green instruction line per action.
 local function showTooltip(frame)
-  local tooltip = _G["GameTooltip"]
+  local tooltip = Tooltip.Get()
   tooltip:SetOwner(frame, "ANCHOR_LEFT")
   _G["GameTooltip_SetTitle"](tooltip, Localization.Text("Craft Alert"), _G["NORMAL_FONT_COLOR"])
   _G["GameTooltip_AddHighlightLine"](tooltip, Status.Text(ScanGate.State()))
@@ -69,7 +71,7 @@ local function onLeave(frame)
   if frame.glow then
     frame.glow:Hide()
   end
-  _G["GameTooltip"]:Hide()
+  Tooltip.Get():Hide()
 end
 
 local function createBadge(frame)
@@ -160,10 +162,15 @@ function Launcher.StopDrag()
   end
 end
 
--- Lit or dim from ScanGate.IsActive(), badge and visibility from the leads. Arguments are
--- ignored (Bootstrap subscribes it to ScanGate.OnChange and Leads.On("change")).
+-- Lit or dim from ScanGate.IsActive(), badge and visibility from the leads; hidden in an
+-- instance. Arguments are ignored (Bootstrap subscribes it to ScanGate.OnChange and
+-- Leads.On("change")).
 function Launcher.Refresh()
   if launcher == nil then
+    return
+  end
+  if FlavorCompat.InInstance() then
+    launcher:Hide()
     return
   end
   if not leadShown then

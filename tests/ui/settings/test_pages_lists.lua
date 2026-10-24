@@ -252,7 +252,7 @@ local function testCraftersRecipeTooltip()
     end,
   })
   open(ns, "Crafters")
-  local tooltip = _G["GameTooltip"]
+  local tooltip = ns.Tooltip.Get()
   local itemRow, mutedRow = rowOf(9001), rowOf(9002)
 
   Widgets.fire(itemRow, "OnEnter")
@@ -313,7 +313,7 @@ local function testRecipeTooltipNameKey()
   })
   open(ns, "Crafters")
   Widgets.fire(rowOf("Old Recipe"), "OnEnter")
-  Assert.same(_G["GameTooltip"].lines, { "C Old Recipe", "Blacksmithing", "Known by: Me" })
+  Assert.same(ns.Tooltip.Get().lines, { "C Old Recipe", "Blacksmithing", "Known by: Me" })
 end
 
 -- GameTooltip_OnUpdate (Blizzard GameTooltip.lua): the owner's UpdateTooltip when it has one;
@@ -340,7 +340,7 @@ local function testRecipeTooltipItemLoads()
     end,
   })
   open(ns, "Crafters")
-  local tooltip, itemRow = _G["GameTooltip"], rowOf(9001)
+  local tooltip, itemRow = ns.Tooltip.Get(), rowOf(9001)
   Widgets.fire(itemRow, "OnEnter")
   local ours = tooltip.lines[1]
   Assert.truthy(ours:find("^Known by: "), ours)

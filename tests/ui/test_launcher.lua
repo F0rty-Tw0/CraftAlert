@@ -16,7 +16,7 @@ local function setScan(ns, active)
     if active then
       return { active = true, channels = { "Trade" }, recipeCount = 4, crafterCount = 2 }
     end
-    return { active = false, reason = "notResting", channels = { "Trade" }, recipeCount = 4, crafterCount = 2 }
+    return { active = false, reason = "noTrade", channels = { "Trade" }, recipeCount = 4, crafterCount = 2 }
   end
 end
 
@@ -42,8 +42,8 @@ local function testLitDimAndTooltip()
   Assert.equal(frame.badge:IsShown(), true)
   Assert.equal(frame.badgeText:GetText(), "2")
 
-  -- The tooltip is the status line, on GameTooltip, and goes away on leave.
-  local tooltip = rawget(_G, "GameTooltip")
+  -- The tooltip is the status line, on the addon's own tooltip, and goes away on leave.
+  local tooltip = ns.Tooltip.Get()
   frame.scripts.OnEnter(frame)
   Assert.equal(tooltip.owner, frame)
   Assert.equal(tooltip.shown, true)
@@ -55,7 +55,7 @@ local function testLitDimAndTooltip()
   Assert.equal(tooltip.shown, false)
   setScan(ns, false)
   frame.scripts.OnEnter(frame)
-  Assert.truthy(string.find(table.concat(tooltip.lines, " / "), "Paused — not in a city or inn", 1, true))
+  Assert.truthy(string.find(table.concat(tooltip.lines, " / "), "Paused — no Trade chat here", 1, true))
 
   -- A click toggles the leads window.
   Widgets.click(frame, "LeftButton")
@@ -96,6 +96,27 @@ local function testHideWhenNoLeads()
   db.settings.hideLauncherWhenNoLeads = true
   setScan(ns, true)
   Assert.equal(ns.Launcher.Create():IsShown(), true, "shown: a lead is listed")
+end
+
+-- In an instance the launcher is hidden, also when made there (a /reload in a key); back
+-- outside it follows its normal rules again.
+local function testHiddenInInstance()
+  local ns, db = UiFixture.load({ leads = 1 })
+  setScan(ns, false)
+  local inside = true
+  Wow.stub("IsInInstance", function()
+    return inside, inside and "party" or "none"
+  end)
+  local frame = ns.Launcher.Create()
+  Assert.equal(frame:IsShown(), false, "made in an instance: hidden")
+  inside = false
+  db.settings.hideLauncherWhenNoLeads = true
+  ns.Launcher.Refresh()
+  Assert.equal(frame:IsShown(), true, "outside, a lead listed: shown")
+  inside = true
+  ns.Launcher.Refresh()
+  Assert.equal(frame:IsShown(), false)
+  Wow.stub("IsInInstance", nil)
 end
 
 local function testSavedPosition()
@@ -223,10 +244,31 @@ local function testDragApi()
   Assert.same(order, { "first", "second" }, "saved first, then each OnMoved in registration order")
 end
 
+-- 12.0: an addon call on the shared GameTooltip taints it (UI/Tooltip.lua). The launcher's tooltip is
+-- the addon's own GameTooltipTemplate frame, made once; the shared one is never read (its stub raises).
+local function testOwnTooltip()
+  local ns = UiFixture.load()
+  Assert.raises(function()
+    return rawget(_G, "GameTooltip").SetOwner
+  end, "shared GameTooltip")
+  local frame = ns.Launcher.Create()
+  frame.scripts.OnEnter(frame)
+  local tooltip = rawget(_G, "CraftAlertTooltip")
+  Assert.same(
+    { tooltip.frameType, tooltip.template, tooltip.parent, tooltip.owner, tooltip.shown },
+    { "GameTooltip", "GameTooltipTemplate", rawget(_G, "UIParent"), frame, true }
+  )
+  Assert.equal(ns.Tooltip.Get(), tooltip, "made once")
+  frame.scripts.OnLeave(frame)
+  Assert.equal(tooltip.shown, false)
+end
+
 return function()
   testLitDimAndTooltip()
+  testOwnTooltip()
   testLeadExpiryWhilePaused()
   testHideWhenNoLeads()
+  testHiddenInInstance()
   testSavedPosition()
   testArt()
   testIconAndPulse()

@@ -93,8 +93,12 @@ end
 
 -- §7.6 and §5.2: the status line, the professions not read yet, and on a fresh DB the first-run
 -- hint. The gate prints the status line on its first activation, so an active scan at login has
--- printed it already.
+-- printed it already. A login or /reload inside an instance prints nothing (no addon line in the
+-- chat frame there).
 local function printLoginLines()
+  if FlavorCompat.InInstance() then
+    return
+  end
   if not ScanGate.IsActive() then
     ChatPrint.Line(Status.Text(ScanGate.State()))
   end
@@ -125,6 +129,9 @@ local function createLauncher()
   Launcher.Create()
   Launcher.OnMoved(AlertToast.Dock)
   ScanGate.OnChange(Launcher.Refresh)
+  ScanGate.OnChange(AlertToast.OnGate)
+  ScanGate.OnChange(LeadsWindow.OnGate)
+  ScanGate.OnChange(WhisperTracker.Refresh)
 end
 
 local function buildIndex()
