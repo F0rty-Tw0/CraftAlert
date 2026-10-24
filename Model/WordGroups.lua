@@ -9,8 +9,9 @@ local Slang = ns.Slang or require("CraftAlert.Model.Slang")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
 local Candidates = ns.MatchCandidates or require("CraftAlert.Model.MatchCandidates")
 
--- Spec §6.3 step 4.4 (wordIndex intersection, distinct groups, profession tie-break) and the
--- structures it reads, built with the index from wordIndex:
+-- Spec §6.3 step 4.4 (wordIndex intersection, distinct groups, profession tie-break; the union
+-- for slot words of different slots alone, user ruling 2026-10-24) and the structures it
+-- reads, built with the index from wordIndex:
 --   groupWords[group] = { word = true, ... }: the words whose wordIndex list holds the group,
 --     one shared set per distinct word set (a list holds every entry of a group, because a
 --     group's words come from its item, so membership is a per-group question);
@@ -52,6 +53,22 @@ for _, entry in ipairs(ProfessionWords.entries) do
     if entry.englishName == "enchanting" then
       enchantingWords[word] = true
     end
+  end
+end
+
+-- User ruling 2026-10-24 ("either slot counts"): slotsOf[word] = { set, ... }, the word sets
+-- (as keys) of the equip slots that name word, so slot words of different slots ("neck ring")
+-- are told from one slot's synonyms ("ring finger").
+local slotsOf = {}
+for _, words in pairs(Slang.slots) do
+  local set = {}
+  for _, word in ipairs(words) do
+    set[word] = true
+  end
+  for _, word in ipairs(words) do
+    local sets = slotsOf[word] or {}
+    slotsOf[word] = sets
+    sets[#sets + 1] = set
   end
 end
 
@@ -230,6 +247,7 @@ end
 -- Per-line buffers: the distinct counted words (a repeated word intersects once), found
 -- with stamps on the words (each wordIndex word has its own list).
 local lineWords, lineLists, lineCount = {}, {}, 0
+local unionLists = {} -- walkUnion's lists, one per word
 local wordStamp = {}
 local stamp = 0
 -- The profession keys the line names, in narrowing order (Enchanting first, then line order,
@@ -242,7 +260,7 @@ local inferable, enchantingNamed = false, false
 
 -- New index: drop the lists the last line kept, the stamps and the set marks.
 function WordGroups.Reset()
-  lineWords, lineLists, lineCount, wordStamp, setMark = {}, {}, 0, {}, {}
+  lineWords, lineLists, lineCount, wordStamp, setMark, unionLists = {}, {}, 0, {}, {}, {}
 end
 
 -- The first two distinct wordIndex words of the line (§6.4: what an ambiguous word needs).
@@ -448,6 +466,55 @@ local function noBreak()
   return false
 end
 
+-- Whether lineWords[1..lineCount] (several) are all slot words that no one slot names
+-- together ("neck ring", not "ring finger" or "cloth hands"). The sender's inferred armor
+-- word is a type word, so a line that takes one keeps the intersection.
+local function differentSlots()
+  for k = 1, lineCount do
+    if slotsOf[lineWords[k]] == nil then
+      return false
+    end
+  end
+  local sets = slotsOf[lineWords[1]]
+  for s = 1, #sets do
+    local set, all = sets[s], true
+    for k = 2, lineCount do
+      if not set[lineWords[k]] then
+        all = false
+        break
+      end
+    end
+    if all then
+      return false
+    end
+  end
+  return true
+end
+
+-- Step 4.4 for differentSlots (user ruling 2026-10-24: either slot counts): the union of the
+-- words' lists, narrowed as walkNamed narrows. → whether it produced a match.
+local function walkUnion(index, intentToken, why, whyCount, from, to)
+  for n = from, namedCount > 0 and to or from do
+    local prof, lists = namedCount > 0 and named[n] or nil, 0
+    for k = 1, lineCount do
+      local list = lineLists[k]
+      if prof ~= nil then
+        local info = narrowedInfo(index.wordInfo[lineWords[k]], prof)
+        list = info and info.entries
+      end
+      if list ~= nil then
+        lists = lists + 1
+        unionLists[lists] = list
+      end
+    end
+    Candidates.FromLists(unionLists, lists)
+    if Candidates.count > 0 then
+      return Candidates.Decide(intentToken, nil, 0, why, whyCount)
+    end
+  end
+  return false
+end
+
 -- Step 4.4 over lineWords[1..lineCount] (at least one), narrowed to the first of
 -- named[from..to] that has a candidate, or not narrowed when the line names no profession.
 -- mark: this walk's setMark value. → whether it produced a match.
@@ -464,6 +531,9 @@ local function walkNamed(index, intentToken, why, whyCount, from, to, mark)
       end
     end
     return false
+  end
+  if differentSlots() then
+    return walkUnion(index, intentToken, why, whyCount, from, to)
   end
   -- The word sets holding every word are the same whichever word's sets are walked, so they
   -- are marked once, from the first narrowed list found.

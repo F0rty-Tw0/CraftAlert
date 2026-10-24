@@ -141,6 +141,7 @@ Fixture.items = {
   [702] = { "INVTYPE_HEAD", 4, 2 }, -- leather helm
   [703] = { "INVTYPE_LEGS", 4, 2 }, -- leather legs
   [801] = { "INVTYPE_FINGER", 4, 0 }, -- ring
+  [811] = { "INVTYPE_NECK", 4, 0 }, -- necklace
   [802] = { "INVTYPE_HAND", 4, 2 }, -- leather gloves
   [910] = { "INVTYPE_WEAPON", 2, 7 }, -- one-handed sword
   [950] = { "INVTYPE_TRINKET", 4, 0 }, -- trinket

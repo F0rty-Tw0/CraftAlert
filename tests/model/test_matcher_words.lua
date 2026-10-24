@@ -101,7 +101,8 @@ end
 
 -- Cloth, leather and ring pieces beside the smiths' plate belt and plate legs: every
 -- ambiguous slot word below has a recipe of its own, so a word that counts alerts an item.
-local function slotIndex(ns)
+-- withNeck: the jewelcrafter also knows a necklace.
+local function slotIndex(ns, withNeck)
   Fixture.itemIndex(ns, function(db)
     db.characters["Tai-Realm"] = character({ TAILOR }, {
       [9] = { item = 606, name = "Silk Cloak", prof = TAILOR },
@@ -113,8 +114,32 @@ local function slotIndex(ns)
       [13] = { item = 802, name = "Hide Gloves", prof = LW },
       [14] = { item = 703, name = "Hide Pants", prof = LW },
     })
-    db.characters["Jc-Realm"] = character({ JC }, { [15] = { item = 801, name = "Gem Band", prof = JC } })
+    local jc = { [15] = { item = 801, name = "Gem Band", prof = JC } }
+    if withNeck then
+      jc[16] = { item = 811, name = "Gem Choker", prof = JC }
+    end
+    db.characters["Jc-Realm"] = character({ JC }, jc)
   end)
+end
+
+-- User ruling 2026-10-24 ("either slot counts"): a line whose counted words are all slot
+-- words of different slots matches the recipes of any of them; a type word in the line, or
+-- words of one slot only, keep the intersection.
+local function testEitherSlotCounts()
+  local ns = Fixture.load()
+  slotIndex(ns, true)
+  local result = assert(expect(ns, "LF craft neck ring on public rn", "profession:" .. JC, "the trade line"))
+  Assert.equal(why(result), "lf+neck+ring")
+  Assert.equal(result.entryCount, 2, "the necklace and the ring")
+  expect(ns, "LF neck ring", "profession:" .. JC)
+  expect(ns, "LF neck and ring crafter", "profession:" .. JC)
+  expect(ns, "LF jc neck ring", "profession:" .. JC, "narrowed, then the union")
+  expect(ns, "LF lw neck ring", "profession:" .. LW, "nothing narrowed: step 4.6")
+  expect(ns, "LF neck", "item:811", "one slot")
+  expect(ns, "LF craft ring", "item:801", "one slot")
+  expect(ns, "LF ring finger", "item:801", "two words of one slot")
+  expect(ns, "LF cloth hands", "stop:nomatch", "a type word keeps the intersection")
+  expect(ns, "LF lw cloth legs", "profession:" .. LW, "a type word keeps the intersection")
 end
 
 -- §6.3 4.4: any profession word narrows the candidates to that profession, as an Enchanting
@@ -190,6 +215,7 @@ return function()
   testTrinketByNameOnly()
   testNamedProfessionNarrowing()
   testCueAdjacency()
+  testEitherSlotCounts()
   testProfessionTieBreak()
   testSixWordCap()
   testEnchantingNarrowing()

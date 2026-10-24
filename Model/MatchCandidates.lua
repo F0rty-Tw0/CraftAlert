@@ -82,6 +82,19 @@ function MatchCandidates.FromRecords(records, n)
   MatchCandidates.count = count
 end
 
+-- The entries of lists[1..n], each once (§6.3 step 4.4: slot words of different slots).
+function MatchCandidates.FromLists(lists, n)
+  local current = nextStamp()
+  count = 0
+  for l = 1, n do
+    local list = lists[l]
+    for k = 1, #list do
+      addUnique(list[k], current)
+    end
+  end
+  MatchCandidates.count = count
+end
+
 -- The entries of the best enchant: a statSlotIndex list is sorted best first.
 function MatchCandidates.FromBest(list)
   local group = list[1].group
