@@ -117,6 +117,16 @@ local function testChoose()
   -- None again: already selected.
   choose("None")
   Assert.equal(#repicks, 2)
+  -- Old data with two flags shows the lowest key selected; choosing it clears the other flag.
+  db.characters["Alt-Realm"].professions[BS].primary = true
+  db.characters["Zed-Realm"].professions[BS].primary = true
+  choose("Alt")
+  Assert.same(
+    { db.characters["Alt-Realm"].professions[BS].primary, db.characters["Zed-Realm"].professions[BS].primary, #repicks },
+    { true, false, 3 }
+  )
+  choose("Alt")
+  Assert.equal(#repicks, 3, "the only flag now: nothing to do")
 end
 
 -- Review Focus 2: the lead went (dismissed) while the menu was open; choosing neither errors nor revives it.
@@ -141,6 +151,9 @@ local function testCanOpen()
   local db = _G["CraftAlertDB"]
   db.characters["Ench-Realm"].enabled = false
   Assert.equal(ns.MainCrafterMenu.CanOpen({ prof = ENCH }), false)
+  -- No Blizzard menu API: nothing to open.
+  Wow.stub("MenuUtil", nil)
+  Assert.equal(ns.MainCrafterMenu.CanOpen({ prof = BS }), false)
 end
 
 local function testNoMenuUtil()
