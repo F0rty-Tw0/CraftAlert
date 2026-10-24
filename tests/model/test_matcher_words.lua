@@ -169,6 +169,10 @@ local function testUnionSkipsEmptySlots()
   expect(ns, "LF craft boots and shield", "stop:nomatch", "nobody crafts either")
   expect(ns, "LF craft boots and plate", "stop:nomatch", "a type word: the intersection empties")
   expect(ns, "LF craft boots and shoes", "stop:nomatch", "one slot: the intersection empties")
+  -- A warrior's plate joins boots, a type word: the intersection again, empty without boots.
+  local warrior = "Player-1-W"
+  Fixture.stubClasses({ [warrior] = "WARRIOR" })
+  expect(ns, "LF craft ring and boots", "stop:nomatch", "the sender's plate keeps the intersection", warrior)
 end
 
 -- Words of one slot ("1h offhand": an off-hand weapon is both) keep the intersection.
@@ -196,6 +200,19 @@ local function testUnionCountsRecipesOnce()
   end, { JC, BS, TAILOR })
   -- Sword and dirk (1h), dirk and lantern (offhand): 2 smith recipes, not 3, tie the 2 necks.
   expect(ns, "LF 1h offhand neck", "profession:" .. JC, "the dirk counts once")
+  -- offhand shares only the dirk with 1h, so its lanterns stay in the union: 2 tie the 2
+  -- smith recipes and win on order.
+  ns = Fixture.load()
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Smith-Realm"].recipes[3] = { item = 910, name = "Iron Sword", prof = BS }
+    db.characters["Smith-Realm"].recipes[4] = { item = 912, name = "Iron Dirk", prof = BS }
+    db.characters["Tai-Realm"] = character({ TAILOR }, {
+      [5] = { item = 913, name = "Silk Lantern", prof = TAILOR },
+      [8] = { item = 915, name = "Wool Lantern", prof = TAILOR },
+    })
+    db.characters["Jc-Realm"] = character({ JC }, { [6] = { item = 811, name = "Gem Choker", prof = JC } })
+  end, { TAILOR, BS, JC })
+  expect(ns, "LF 1h offhand neck", "profession:" .. TAILOR, "offhand is not covered by 1h")
   ns = Fixture.load()
   Fixture.itemIndex(ns, function(db)
     db.characters["Aa-Realm"] = character({ JC }, { [6] = { item = 811, name = "Gem Choker", prof = JC } })
@@ -208,6 +225,20 @@ local function testUnionCountsRecipesOnce()
   -- The choker counts for its first crafter's profession only: Tailoring's 2 sashes beat 1
   -- plate belt, where 2 for the smiths (belt and choker) would tie and win on order.
   expect(ns, "LF neck and belt", "profession:" .. TAILOR, "the choker counts once")
+end
+
+-- A tie between professions outside ProfessionList order goes to the first candidate's, in
+-- the union as for one word.
+local function testUnionTieFollowsCandidates()
+  local ns = Fixture.load()
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Lw-Realm"] = character({ LW }, { [6] = { item = 811, name = "Gem Choker", prof = LW } })
+    db.characters["Tai-Realm"] = character({ TAILOR }, { [7] = { item = 814, name = "Gem Torc", prof = TAILOR } })
+    db.characters["Jc-Realm"] = character({ JC }, { [8] = { item = 815, name = "Gem Chain", prof = JC } })
+  end, {})
+  local alone = Fixture.outcome(ns, "LF neck")
+  expect(ns, "LF neck and belt", alone, "the first neck's profession")
+  expect(ns, "LF belt and neck", "profession:" .. BS, "the belt first")
 end
 
 -- §6.3 4.4: any profession word narrows the candidates to that profession, as an Enchanting
@@ -288,6 +319,7 @@ return function()
   testUnionSkipsEmptySlots()
   testOneSlotWordsIntersect()
   testUnionCountsRecipesOnce()
+  testUnionTieFollowsCandidates()
   testProfessionTieBreak()
   testSixWordCap()
   testEnchantingNarrowing()

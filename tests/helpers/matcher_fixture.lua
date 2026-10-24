@@ -143,10 +143,12 @@ Fixture.items = {
   [801] = { "INVTYPE_FINGER", 4, 0 }, -- ring
   [811] = { "INVTYPE_NECK", 4, 0 }, -- necklace
   [814] = { "INVTYPE_NECK", 4, 0 },
+  [815] = { "INVTYPE_NECK", 4, 0 },
   [802] = { "INVTYPE_HAND", 4, 2 }, -- leather gloves
   [910] = { "INVTYPE_WEAPON", 2, 7 }, -- one-handed sword
   [912] = { "INVTYPE_WEAPONOFFHAND", 2, 15 }, -- off-hand dagger
   [913] = { "INVTYPE_HOLDABLE", 4, 0 }, -- held in off-hand
+  [915] = { "INVTYPE_HOLDABLE", 4, 0 },
   [950] = { "INVTYPE_TRINKET", 4, 0 }, -- trinket
 }
 

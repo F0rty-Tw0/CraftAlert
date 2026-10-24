@@ -17,11 +17,12 @@ local Candidates = ns.MatchCandidates or require("CraftAlert.Model.MatchCandidat
 --     group's words come from its item, so membership is a per-group question);
 --   wordSets[word] = { set, ... }: the distinct groupWords sets holding word (a few dozen), so
 --     a line whose words no group has together is rejected without walking a list;
---   wordInfo[word] = { groupCount, prof, entries, byProf, split }: step 4.4's decision for
---     that word alone, and byProf[key] the same decision over one profession's entries only
---     (absent when it has none), for a line that names a profession; byProf is nil when one
---     profession has every entry (narrowedInfo); split is true when a recipe of the word has
---     entries of several professions (byProfession).
+--   wordInfo[word] = { groupCount, prof, entries, byProf, profs, split }: step 4.4's decision
+--     for that word alone, and byProf[key] the same decision over one profession's entries
+--     only (absent when it has none), for a line that names a profession; byProf is nil when
+--     one profession has every entry (narrowedInfo); profs lists byProf's keys in entry order;
+--     split is true when a recipe of the word has entries of several professions
+--     (byProfession).
 -- A line that names an armor slot without an armor type takes the sender's armor word
 -- (docs/specs/2026-10-20-class-armor-design.md §4 rules 2-7), except while an Enchanting word
 -- is tried (the 2026-10-20 and 2026-10-22 rulings in the -notes.md beside it): one class
@@ -172,10 +173,11 @@ local function soleInfo(list, prof, seenIn)
 end
 
 -- info.byProf for list: the entries of each profession, then their soleInfo in place. nil when
--- one profession has every entry (most words), so the index holds no table for it. Also →
--- whether a recipe of list has entries of several professions (or of one and of none), so its
--- soleInfo counts add up to more than the step 4.4 tie-break counts (firstIn[group] == list:
--- profOf[group] is its first entry's profession, false for none).
+-- one profession has every entry (most words), so the index holds no table for it. Also → its
+-- professions in list order (info.profs: the step 4.4 tie-break order), and whether a recipe
+-- of list has entries of several professions (or of one and of none), so its soleInfo counts
+-- add up to more than the step 4.4 tie-break counts (firstIn[group] == list: profOf[group] is
+-- its first entry's profession, false for none).
 local function byProfession(list, seenIn, firstIn, profOf)
   local only = list[1] and list[1].prof
   for _, entry in ipairs(list) do
@@ -185,9 +187,9 @@ local function byProfession(list, seenIn, firstIn, profOf)
     end
   end
   if only ~= nil then
-    return nil, false
+    return nil, nil, false
   end
-  local byProf, split = {}, false
+  local byProf, profs, split = {}, {}, false
   for _, entry in ipairs(list) do
     local prof, group = entry.prof, entry.group
     if firstIn[group] ~= list then
@@ -196,15 +198,18 @@ local function byProfession(list, seenIn, firstIn, profOf)
       split = true
     end
     if prof ~= nil then
-      local entries = byProf[prof] or {}
-      byProf[prof] = entries
+      local entries = byProf[prof]
+      if entries == nil then
+        entries = {}
+        byProf[prof], profs[#profs + 1] = entries, prof
+      end
       entries[#entries + 1] = entry
     end
   end
-  for prof, entries in pairs(byProf) do
-    byProf[prof] = soleInfo(entries, prof, seenIn)
+  for _, prof in ipairs(profs) do
+    byProf[prof] = soleInfo(byProf[prof], prof, seenIn)
   end
-  return byProf, split
+  return byProf, profs, split
 end
 
 -- A word's step 4.4 decision over profession prof's entries only, or nil when it has none.
@@ -236,11 +241,11 @@ function WordGroups.Build(index)
   index.wordInfo = {}
   for word, list in pairs(index.wordIndex) do
     local info = infoFor(list, rank, seenIn)
-    local byProf, split = byProfession(list, seenIn, firstIn, profOf)
+    local byProf, profs, split = byProfession(list, seenIn, firstIn, profOf)
     if byProf ~= nil and info.groupCount > 1 and info.prof ~= nil then
       info.entries = byProf[info.prof].entries -- the same entries in the same order, held once
     end
-    info.byProf = byProf
+    info.byProf, info.profs = byProf, profs
     if split then
       info.split = true
     end
@@ -559,14 +564,16 @@ local function addSum(prof, groups)
   profSum[prof] = profSum[prof] + groups
 end
 
--- Adds info's recipes to profSum, per profession. → their count.
+-- Adds info's recipes to profSum, per profession in list order (so BestCounted breaks a tie
+-- as Decide does, on the first candidate). → their count.
 local function addSums(info)
   local byProf = info.byProf
   if byProf == nil then
     addSum(info.prof, info.groupCount)
   else
-    for prof, sub in pairs(byProf) do
-      addSum(prof, sub.groupCount)
+    local profs = info.profs
+    for k = 1, #profs do
+      addSum(profs[k], byProf[profs[k]].groupCount)
     end
   end
   return info.groupCount
