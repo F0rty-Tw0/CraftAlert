@@ -48,8 +48,30 @@ local function nameOf(key)
   return name
 end
 
+-- Whether a click can open the menu: Blizzard's menu API is there and an enabled character knows the
+-- lead's profession. Asked on every hover, so it stops at the first one and builds no list.
 function MainCrafterMenu.CanOpen(lead)
-  return lead.prof ~= nil and #craftersOf(lead.prof) > 0
+  local prof = lead.prof
+  if prof == nil or _G["MenuUtil"] == nil then
+    return false
+  end
+  for _, character in pairs(db().characters) do
+    if character.enabled ~= false and character.professions[prof] ~= nil then
+      return true
+    end
+  end
+  return false
+end
+
+-- Whether a character other than `key` carries the profession's flag; old data can flag several.
+local function flaggedBesides(key, prof)
+  for other, character in pairs(db().characters) do
+    local profession = character.professions[prof]
+    if other ~= key and profession and profession.primary == true then
+      return true
+    end
+  end
+  return false
 end
 
 -- `owner` anchors the menu. A radio's data is its character key, false for None.
@@ -63,7 +85,7 @@ function MainCrafterMenu.Open(owner, lead)
     return (MainCrafter.Of(db(), prof) or false) == key
   end
   local function setSelected(key)
-    if isSelected(key) then
+    if isSelected(key) and not flaggedBesides(key, prof) then
       return
     end
     if key then

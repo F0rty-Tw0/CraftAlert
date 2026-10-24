@@ -450,6 +450,31 @@ return function()
   Assert.equal(CrafterRank.Repick({ customer = CUSTOMER, prof = BS }, data), nil)
   Assert.equal(CrafterRank.Repick({ customer = CUSTOMER, prof = BS, crafters = {} }, data), nil)
 
+  -- Retail: Repick ranks can-receive above the main, as Pick does; nobody can receive: the main wins.
+  data = db()
+  data.characters["Prim-Realm"].realms = { "Realm" }
+  data.characters["Alt-Realm"].realms = { "Realm", "Draenor" }
+  lead = repickLead({ "Prim-Realm", "Alt-Realm" })
+  local picked2, cannotOrder2 = CrafterRank.Repick(lead, data)
+  Assert.same({ picked2, cannotOrder2 }, { "Alt-Realm", false }, "a main who cannot receive loses to a candidate who can")
+  data.characters["Alt-Realm"].realms = { "Realm" }
+  picked2, cannotOrder2 = CrafterRank.Repick(lead, data)
+  Assert.same({ picked2, cannotOrder2 }, { "Prim-Realm", true }, "nobody can receive: the main wins")
+
+  -- Repick never judges a character Pick skips: disabled or removed since the lead was made.
+  data = db()
+  data.characters["Prim-Realm"].professions[BS].primary = false
+  lead = repickLead({ "Prim-Realm", "Alt-Realm" })
+  Assert.equal((CrafterRank.Repick(lead, data)), "Alt-Realm", "no main: the name decides")
+  data.characters["Alt-Realm"].enabled = false
+  Assert.equal((CrafterRank.Repick(lead, data)), "Prim-Realm", "a disabled candidate is skipped")
+  data.characters["Alt-Realm"].enabled = nil
+  Assert.equal((CrafterRank.Repick(lead, data)), "Alt-Realm", "no enabled flag counts as enabled")
+  data.characters["Alt-Realm"] = nil
+  Assert.equal((CrafterRank.Repick(lead, data)), "Prim-Realm", "a removed candidate is skipped")
+  data.characters["Prim-Realm"] = nil
+  Assert.equal(CrafterRank.Repick(lead, data), nil, "no candidate left")
+
   -- Spec §1: the current character beats the main when the main ranks lower or cannot receive.
   data = db()
   data.characters["Me-Realm"].professions[BS].primary = true

@@ -197,8 +197,9 @@ end
 
 -- Pick again over the candidates a lead kept, with the db as it is now (the main crafter may
 -- have moved). Rank, top and byConc are the ones Pick found; the tier and can-order are read
--- anew. → characterKey, cannotOrder, rank, byConc, recipeKey; nil without candidates. No
--- ignore-list check: the lead exists.
+-- anew. A candidate removed or disabled since is skipped, as Pick never offers one. →
+-- characterKey, cannotOrder, rank, byConc, recipeKey; nil without candidates. No ignore-list
+-- check: the lead exists.
 function CrafterRank.Repick(lead, db)
   local candidates = lead.crafters
   if type(candidates) ~= "table" then
@@ -208,9 +209,13 @@ function CrafterRank.Repick(lead, db)
   local best, probe = nil, {}
   for i = 1, #candidates do
     local c = candidates[i]
-    fill(probe, db, c.key, c.prof, c.recipeKey, c.rank, c.top, c.byConc, cannotOrder(c.key) == true)
-    if better(probe, best) then
-      best, probe = probe, best or {}
+    local character = db.characters[c.key]
+    -- Pick never offers a removed or disabled character; one that became so since is skipped.
+    if character and character.enabled ~= false then
+      fill(probe, db, c.key, c.prof, c.recipeKey, c.rank, c.top, c.byConc, cannotOrder(c.key) == true)
+      if better(probe, best) then
+        best, probe = probe, best or {}
+      end
     end
   end
   if best == nil then

@@ -205,20 +205,30 @@ local function testCraftersOnLead()
 end
 
 -- Leads.Repick follows a moved main crafter on a lead nobody has answered yet. "LF plate belt":
--- Alt and Smith know it at equal rank, so the name picks Alt until Smith is the main.
+-- Alt and Smith know it at equal rank (1 of 2, 2 of 4), so the name picks Alt until Smith is the
+-- main. Neither can receive the customer's order.
 local function testRepick()
   local MainCrafter = require("CraftAlert.Model.MainCrafter")
-  local ns, db = setup()
+  local ns, db = setup(nil, function(data)
+    local alt, smith = data.characters["Alt-Realm"], data.characters["Smith-Realm"]
+    alt.realms, smith.realms = { "Realm" }, { "Realm" }
+    alt.recipes[1].ranks, alt.recipes[1].reachRank, alt.recipes[1].reachCost = { 1, 2 }, 1, 0
+    smith.recipes[1].ranks, smith.recipes[1].reachRank, smith.recipes[1].reachCost = { 1, 2, 3, 4 }, 2, 0
+  end)
   local Leads = ns.Leads
   local seen = listen(Leads)
   local lead = newLead(ns, "LF plate belt")
   Assert.equal(lead.crafter, "Alt-Realm")
+  Assert.same({ lead.cannotOrder, lead.rank, lead.rankConc }, { true, 1, false })
   Assert.equal(Leads.Repick(lead.id), false, "nothing moved")
   Assert.equal(seen.change, 1, "no event for an unchanged pick")
 
+  -- The values on the lead are Smith's after the switch, whatever it held before.
+  lead.cannotOrder, lead.rankConc = false, true
   MainCrafter.Set(db, "Smith-Realm", BS, true)
   Assert.equal(Leads.Repick(lead.id), true)
   Assert.equal(lead.crafter, "Smith-Realm")
+  Assert.same({ lead.cannotOrder, lead.rank, lead.rankConc }, { true, 2, false }, "the new crafter's order and rank")
   Assert.equal(seen.change, 2, "one change")
   Assert.same({ lead.recipeName, lead.itemID }, { "Thick Plate Belt", 501 })
   Assert.equal(Leads.Repick(lead.id), false, "the same call again")
@@ -252,6 +262,26 @@ local function testRepick()
   MainCrafter.Set(db, "Other-Realm", BS, true)
   Assert.equal(ns.Leads.Repick(lead.id), false, "main outside the lead")
   Assert.equal(lead.crafter, "Alt-Realm")
+
+  -- A candidate disabled or removed since the lead was made is never chosen, even when it would win.
+  for _, change in ipairs({
+    function(characters)
+      characters["Alt-Realm"].enabled = false
+    end,
+    function(characters)
+      characters["Alt-Realm"] = nil
+    end,
+  }) do
+    ns, db = setup()
+    lead = newLead(ns, "LF plate belt")
+    Assert.equal(lead.crafter, "Alt-Realm")
+    MainCrafter.Set(db, "Smith-Realm", BS, true)
+    Assert.equal(ns.Leads.Repick(lead.id), true)
+    MainCrafter.Clear(db, BS)
+    change(db.characters)
+    Assert.equal(ns.Leads.Repick(lead.id), false, "Smith stays")
+    Assert.equal(lead.crafter, "Smith-Realm")
+  end
 
   -- A profession-word lead switches too; it has no recipe or item.
   ns, db = setup()

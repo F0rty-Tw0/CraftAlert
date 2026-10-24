@@ -283,6 +283,17 @@ local function testCraftersTipInstruction()
   Assert.same(tip().lines, { "Crafters", "Me", "Picked for this lead: Me" })
 end
 
+-- No MenuUtil (a client without the Blizzard menu): the click greets and the tooltip offers nothing.
+local function testCraftersZoneWithoutMenuUtil()
+  local _, calls, card = open({ UiFixture.lead(1, "Buyer-Realm") })
+  Wow.stub("MenuUtil", nil)
+  enter(card, card.zones.crafters)
+  Assert.same(tip().lines, { "Crafters", "Me", "Picked for this lead: Me" })
+  Wow.clock.gettime = Wow.clock.gettime + 1
+  Widgets.click(card.zones.crafters, "LeftButton")
+  Assert.same({ #UiFixture.callsTo(calls, "chat"), card.lead.greeted }, { 1, true })
+end
+
 -- Choosing a main re-picks only an unanswered lead: a greeted one keeps the crafter it named.
 local function testMenuChoiceRepicks()
   for _, greeted in ipairs({ true, false }) do
@@ -625,6 +636,7 @@ return function()
   testCraftersZoneOpensMenu()
   testCraftersZoneGreetsWithoutProf()
   testCraftersTipInstruction()
+  testCraftersZoneWithoutMenuUtil()
   testMenuChoiceRepicks()
   testTipFollowsLead()
   testLeadChangeHidesZoneTip()
