@@ -7,6 +7,7 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
 local LinkHover = ns.LinkHover or require("CraftAlert.UI.LinkHover")
@@ -139,7 +140,7 @@ end
 -- (Blizzard_SharedXML/SharedTooltipTemplates.lua, every flavour): gold title, white description,
 -- a blank line, one green instruction line per click, then the drag (it moves the launcher).
 local function showTooltip(frame)
-  local tooltip = _G["GameTooltip"]
+  local tooltip = Tooltip.Get()
   local why = current.lead and current.lead.why
   tooltip:SetOwner(frame, "ANCHOR_TOP")
   _G["GameTooltip_SetTitle"](tooltip, Localization.Text("Craft Alert"), _G["NORMAL_FONT_COLOR"])
@@ -155,7 +156,7 @@ local function showTooltip(frame)
 end
 
 local function hideTooltip()
-  _G["GameTooltip"]:Hide()
+  Tooltip.Get():Hide()
 end
 
 -- A click on a link inside the message belongs to the link (LinkHover), never to the lead.

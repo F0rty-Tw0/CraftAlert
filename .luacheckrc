@@ -67,7 +67,6 @@ read_globals = {
   -- Frames and UI
   "CreateFrame",
   "UIParent",
-  "GameTooltip",
   "UISpecialFrames",
   "DEFAULT_CHAT_FRAME",
   "Settings",

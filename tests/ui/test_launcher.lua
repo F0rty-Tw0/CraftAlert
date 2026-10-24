@@ -42,8 +42,8 @@ local function testLitDimAndTooltip()
   Assert.equal(frame.badge:IsShown(), true)
   Assert.equal(frame.badgeText:GetText(), "2")
 
-  -- The tooltip is the status line, on GameTooltip, and goes away on leave.
-  local tooltip = rawget(_G, "GameTooltip")
+  -- The tooltip is the status line, on the addon's own tooltip, and goes away on leave.
+  local tooltip = ns.Tooltip.Get()
   frame.scripts.OnEnter(frame)
   Assert.equal(tooltip.owner, frame)
   Assert.equal(tooltip.shown, true)
@@ -223,8 +223,28 @@ local function testDragApi()
   Assert.same(order, { "first", "second" }, "saved first, then each OnMoved in registration order")
 end
 
+-- 12.0: an addon call on the shared GameTooltip taints it (UI/Tooltip.lua). The launcher's tooltip is
+-- the addon's own GameTooltipTemplate frame, made once; the shared one is never read (its stub raises).
+local function testOwnTooltip()
+  local ns = UiFixture.load()
+  Assert.raises(function()
+    return rawget(_G, "GameTooltip").SetOwner
+  end, "shared GameTooltip")
+  local frame = ns.Launcher.Create()
+  frame.scripts.OnEnter(frame)
+  local tooltip = rawget(_G, "CraftAlertTooltip")
+  Assert.same(
+    { tooltip.frameType, tooltip.template, tooltip.parent, tooltip.owner, tooltip.shown },
+    { "GameTooltip", "GameTooltipTemplate", rawget(_G, "UIParent"), frame, true }
+  )
+  Assert.equal(ns.Tooltip.Get(), tooltip, "made once")
+  frame.scripts.OnLeave(frame)
+  Assert.equal(tooltip.shown, false)
+end
+
 return function()
   testLitDimAndTooltip()
+  testOwnTooltip()
   testLeadExpiryWhilePaused()
   testHideWhenNoLeads()
   testSavedPosition()

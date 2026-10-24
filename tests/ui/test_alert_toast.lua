@@ -177,7 +177,7 @@ end
 local function testTooltip()
   local ns = UiFixture.load({ leads = 1 })
   ns.AlertToast.Show(ns.Leads.Latest())
-  local frame, tip = toastFrame(), rawget(_G, "GameTooltip")
+  local frame, tip = toastFrame(), ns.Tooltip.Get()
   frame.scripts.OnEnter(frame)
   Assert.same({ tip.owner, tip.anchor, tip.shown }, { frame, "ANCHOR_TOP", true })
   -- Blizzard's tooltip hierarchy: a gold title, what matched in white, a blank line, then one
@@ -198,7 +198,7 @@ end
 
 local function testLinks()
   local ns, _, calls = UiFixture.load({ leads = 2 })
-  local tip = rawget(_G, "GameTooltip")
+  local tip = ns.Tooltip.Get()
   local leads = ns.Leads.List() -- newest first
   leads[2].message = CORPUS
   ns.AlertToast.Show(leads[2])

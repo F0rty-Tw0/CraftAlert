@@ -300,7 +300,7 @@ end
 local function testGearTooltip()
   local ns = UiFixture.load()
   ns.LeadsWindow.Toggle()
-  local tooltip = rawget(_G, "GameTooltip")
+  local tooltip = ns.Tooltip.Get()
   Widgets.fire(gear(), "OnEnter")
   Assert.equal(tooltip.owner, gear())
   Assert.equal(tooltip.anchor, "ANCHOR_BOTTOMLEFT")

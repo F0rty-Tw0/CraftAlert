@@ -15,7 +15,7 @@ local GREEN = { 0.1, 1, 0.1 }
 local GREY = { 0.5, 0.5, 0.5 }
 
 local function tip()
-  return rawget(_G, "GameTooltip")
+  return rawget(_G, "CraftAlertTooltip")
 end
 
 -- The shown card frames of the window, top to bottom.

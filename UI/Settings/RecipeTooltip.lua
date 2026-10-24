@@ -5,6 +5,7 @@ end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
+local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 
 -- The Crafters page's recipe tooltip: Blizzard's own recipe lists show none, and the item
 -- tooltip says nothing about who here can craft it. A recipe that makes an item shows the
@@ -36,7 +37,7 @@ end
 -- Reads row.item at hover time (scrolls reuse rows); `character` is the shown db.characters record.
 function RecipeTooltip.Show(row, character)
   local key, recipe = row.item.key, row.item.recipe
-  local tooltip = _G["GameTooltip"]
+  local tooltip = Tooltip.Get()
   tooltip:SetOwner(row, "ANCHOR_RIGHT")
   if recipe.item == nil or not showItem(tooltip, recipe.item) then
     _G["GameTooltip_SetTitle"](tooltip, recipe.name or tostring(key), _G["NORMAL_FONT_COLOR"])

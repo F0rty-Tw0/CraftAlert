@@ -9,6 +9,7 @@ local Status = ns.Status or require("CraftAlert.Core.Status")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local LauncherArt = ns.LauncherArt or require("CraftAlert.UI.LauncherArt")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
@@ -48,7 +49,7 @@ end
 -- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua, every flavour): gold
 -- title, the status in white, a blank line, one green instruction line per action.
 local function showTooltip(frame)
-  local tooltip = _G["GameTooltip"]
+  local tooltip = Tooltip.Get()
   tooltip:SetOwner(frame, "ANCHOR_LEFT")
   _G["GameTooltip_SetTitle"](tooltip, Localization.Text("Craft Alert"), _G["NORMAL_FONT_COLOR"])
   _G["GameTooltip_AddHighlightLine"](tooltip, Status.Text(ScanGate.State()))
@@ -69,7 +70,7 @@ local function onLeave(frame)
   if frame.glow then
     frame.glow:Hide()
   end
-  _G["GameTooltip"]:Hide()
+  Tooltip.Get():Hide()
 end
 
 local function createBadge(frame)

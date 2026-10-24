@@ -29,6 +29,7 @@ local UI = {
   "UI.FrameKit",
   "UI.LeadText",
   "UI.ClickRouter",
+  "UI.Tooltip",
   "UI.LinkHover",
   "UI.Dock",
   "UI.CardBody",
@@ -114,50 +115,11 @@ local function stubSends(calls)
   Wow.stub("FlashClientIcon", record("flash"))
 end
 
--- The Blizzard UI tables the window and launcher touch: UISpecialFrames, and a GameTooltip
--- that records what it was given (lines, their colours as { r, g, b } or {}, rights[line] =
--- { text, r, g, b } of an AddDoubleLine's right half, owner, shown, hyperlinks; badLinks[link]
--- makes SetHyperlink raise).
+-- The Blizzard UI table the window touches. The UI's tooltip is its own GameTooltipTemplate frame
+-- (ns.Tooltip.Get(), faked in tests/helpers/templates.lua); the shared GameTooltip stays the
+-- trap tests/helpers/wow.lua installs.
 local function stubBlizzardUi()
   Wow.stub("UISpecialFrames", {})
-  local tooltip = { lines = {}, colors = {}, rights = {}, shown = false, hyperlinks = {} }
-  function tooltip:SetOwner(owner, anchor)
-    self.owner, self.anchor, self.lines, self.colors, self.rights = owner, anchor, {}, {}, {}
-  end
-  function tooltip:ClearLines()
-    self.lines, self.colors, self.rights = {}, {}, {}
-  end
-  function tooltip:SetText(text, r, g, b)
-    self.lines, self.colors, self.rights = { text }, { { r, g, b } }, {}
-  end
-  function tooltip:AddLine(text, r, g, b)
-    table.insert(self.lines, text)
-    table.insert(self.colors, { r, g, b })
-  end
-  function tooltip:AddDoubleLine(left, right, lr, lg, lb, rr, rg, rb)
-    table.insert(self.lines, left)
-    table.insert(self.colors, { lr, lg, lb })
-    self.rights[#self.lines] = { right, rr, rg, rb }
-  end
-  function tooltip:Show()
-    self.shown = true
-  end
-  function tooltip:Hide()
-    self.shown = false
-  end
-  function tooltip:IsShown()
-    return self.shown
-  end
-  function tooltip:SetHyperlink(link)
-    if self.badLinks and self.badLinks[link] then
-      error("bad link: " .. link)
-    end
-    table.insert(self.hyperlinks, link)
-  end
-  function tooltip:IsOwned(frame)
-    return self.owner == frame and self.shown
-  end
-  Wow.stub("GameTooltip", tooltip)
 end
 
 -- opts.leads: how many lead records db.leads starts with; opts.db(db): edits before Restore;

@@ -14,7 +14,7 @@ local function setup(withBody)
   end
   ns.LinkHover.Attach(frame, withBody and record or nil)
 
-  return ns, frame, rawget(_G, "GameTooltip"), body
+  return ns, frame, ns.Tooltip.Get(), body
 end
 
 local function enter(frame, link)

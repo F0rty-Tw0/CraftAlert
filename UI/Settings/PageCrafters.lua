@@ -11,6 +11,7 @@ local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.Prof
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 local RecipeTooltip = ns.RecipeTooltip or require("CraftAlert.UI.Settings.RecipeTooltip")
 
@@ -124,11 +125,11 @@ local function createRecipeRow(row)
   end)
   row.mute:SetPoint("RIGHT", row, "RIGHT", 0, 0)
   row:SetScript("OnEnter", showTooltip)
-  -- GameTooltip's own update (every 0.2 s while shown) calls this instead of rebuilding from the
-  -- item data, which would drop our lines once an uncached item loads.
+  -- The tooltip's own update (GameTooltipTemplate's, every 0.2 s while shown) calls this instead of
+  -- rebuilding from the item data, which would drop our lines once an uncached item loads.
   row.UpdateTooltip = showTooltip
   row:SetScript("OnLeave", function()
-    _G["GameTooltip"]:Hide()
+    Tooltip.Get():Hide()
   end)
 end
 
@@ -140,7 +141,7 @@ local function showRecipe(row, item)
   row.icon:SetDesaturated(muted)
   row.icon:SetAlpha(muted and Theme.DIM_ALPHA or 1)
   row.mute.label:SetText(muted and Localization.Text("Unmute") or Localization.Text("Mute"))
-  if _G["GameTooltip"]:IsOwned(row) then
+  if Tooltip.Get():IsOwned(row) then
     showTooltip(row)
   end
 end
