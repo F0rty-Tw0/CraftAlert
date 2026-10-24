@@ -92,6 +92,30 @@ local function testItemLinks()
   expect(ns, "LF |cffffd000|Henchant:1|h[Mongoose]|h|r", "stop:nomatch", "link names match full names only")
 end
 
+-- §6.3 4.2: a recipe link's ID names a stored recipe whatever its text; else the text after a
+-- "Profession:" prefix matches when the whole text does not.
+local function testRecipeLinkIDs()
+  local ns = Fixture.load()
+  local db = Fixture.db(ns)
+  db.characters["Tailor-Realm"].recipes[1228943] = { name = "Martyr's Gloves", prof = TAILOR }
+  db.characters["Tailor-Realm"].recipes[17187] = { name = "Transmute: Arcanite", prof = TAILOR }
+  db.characters["Tailor-Realm"].recipes[17188] = { name = "Arcanite", prof = TAILOR }
+  db.characters["Tailor-Realm"].recipes["Bolt of Silk"] = { name = "Bolt of Silk", prof = TAILOR }
+  fixture(ns, Fixture.index(ns, db))
+  local result = expect(ns, "LF |cnIQ4:|Henchant:1228943|h[Midnight Tailoring: Martyr's Gloves]|h|r craftere", "item:martyr's gloves")
+  Assert.equal(assert(result).entries[1].character, "Tailor-Realm")
+  expect(ns, "LF |Henchant:12|h[Enchanting: Renamed]|h", "item:enchant weapon - mongoose", "the ID wins over the text")
+  expect(ns, "LF |Henchant:9|h[Enchanting: Enchant Weapon - Mongoose]|h", "item:enchant weapon - mongoose", "prefix stripped")
+  expect(ns, "LF |Henchant:9|h[Transmute: Arcanite]|h", "item:transmute: arcanite", "a colon in the name itself")
+  expect(ns, "LF |Henchant:9|h[Tailoring: Bolt of Silk]|h", "item:bolt of silk", "name-keyed recipe")
+  expect(ns, "LF |Henchant:9|h[Tailoring: Mongoose]|h", "stop:nomatch", "the stripped text matches full names only")
+  -- Only enchant links carry IDs: an item ID equal to a recipe key is not that recipe.
+  expect(ns, "LF |Hitem:12|h[Something]|h", "stop:nomatch")
+  db.characters["Ench-Realm"].recipes[12].muted = true
+  fixture(ns, Fixture.index(ns, db))
+  expect(ns, "LF |Henchant:12|h[Enchanting: Renamed]|h", "stop:nomatch", "a muted recipe")
+end
+
 -- §6.3 4.2: longest phrase wins, so a full name beats its own alias; several -> 4.4 set.
 local function testPhrases()
   local ns = Fixture.load()
@@ -310,6 +334,7 @@ return function()
   testGate()
   testIntentAndAds()
   testItemLinks()
+  testRecipeLinkIDs()
   testPhrases()
   testFullNameBeatsAlias()
   testTypoPass()

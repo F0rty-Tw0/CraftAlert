@@ -245,11 +245,11 @@ local function markKind(needsSecondWord, notKindC, record, isKindC)
 end
 
 -- names = { { name = lowercase recipe name, entry = entry, pending = true|nil }, ... } in
--- build order. Fills index.nameIndex, phraseSet, needsSecondWord, phraseIds, phraseKeys,
+-- build order. Fills index.nameIndex, phraseSet, recipeRecords, needsSecondWord, phraseIds, phraseKeys,
 -- phraseWordRange, joinIndex, statSlotIndex and enchantSlotWords; intentSet and blockerSet
 -- must already be set.
 function Aliases.Build(index, names)
-  index.phraseSet, index.needsSecondWord, index.joinIndex = {}, {}, {}
+  index.phraseSet, index.recipeRecords, index.needsSecondWord, index.joinIndex = {}, {}, {}, {}
   local notKindC = {}
   PhraseMatch.Begin(index)
   StatSlot.Begin(index)
@@ -271,6 +271,9 @@ function Aliases.Build(index, names)
       local words, entry = info.words, item.entry
       local full = recordFor(index, records, info.phrase, words[1], #words, true)
       addEntry(full, entry)
+      if type(entry.recipeKey) == "number" then -- a recipe link's spell ID (Tokenizer.linkIDs)
+        index.recipeRecords[entry.recipeKey] = full
+      end
       if #words == 1 then
         index.needsSecondWord[full] = true -- a one-word full name ("Shadowfang")
       end

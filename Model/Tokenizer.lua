@@ -7,7 +7,9 @@ end
 -- No table or closure is created per line: results go into the module buffers below,
 -- valid until the next Tokenize call, and the string is walked with string.find (never gmatch).
 -- Item links (`|Hitem:<id>...|h[Name]|h`) give their ID and normalized name; enchant links
--- (`|Henchant:<spellID>|h[Name]|h`, Classic/TBC) give only the name. Link data and link text
+-- (`|Henchant:<spellID>|h[Name]|h`: Classic enchants, and every recipe link on Retail and
+-- Forever, named "[Profession: Name]") give their normalized name plus, per link name, the
+-- spell ID (linkIDs) and the text after the first colon (linkTails). Link data and link text
 -- never become tokens, so a linked "[Thunderbrow Ring]" does not read as "ring". Other link
 -- types (battle pets, spells, ...) and other escapes leave nothing behind.
 local Tokenizer = {}
@@ -25,7 +27,7 @@ local type = type
 local WORD = "[%w'\128-\255]+"
 local SPACES = "^%s*" -- anchored, so BreakBefore reads only the gap between two tokens
 local ITEM_LINK = "^|hitem:(%d+)"
-local ENCHANT_LINK = "^|henchant:"
+local ENCHANT_LINK = "^|henchant:(%d*)"
 local ANY_LINK = "^|h%a+:"
 local MAX_TOKENS = 64 -- word tokens kept per line (§6.3 step 2; bounds the §4.4 per-line max)
 
@@ -43,10 +45,14 @@ local tokens = {}
 local starts = {} -- starts[k]: where token k begins in the line (BreakBefore)
 local itemIDs = {}
 local linkNames = {}
+local linkIDs = {} -- linkIDs[k]: the enchant link's spell ID, or false
+local linkTails = {} -- linkTails[k]: an enchant link name's words after its first colon, or false
 Tokenizer.WORD = WORD -- Index normalizes recipe phrases with the same word class
 Tokenizer.tokens = tokens
 Tokenizer.itemIDs = itemIDs
 Tokenizer.linkNames = linkNames
+Tokenizer.linkIDs = linkIDs
+Tokenizer.linkTails = linkTails
 Tokenizer.itemCount = 0
 Tokenizer.linkNameCount = 0
 Tokenizer.normalized = ""
@@ -56,6 +62,9 @@ local count, items, names = 0, 0, 0
 local lastCount, lastItems, lastNames = 0, 0, 0
 local linkEnd = nil -- position of the open named link's closing `|h`
 local linkFirst = 0 -- first token index of the open named link's text
+---@type number|false
+local linkID = false -- the open enchant link's spell ID
+local linkColon = nil -- position of the first colon in the open enchant link's text
 local line = "" -- the lowercase text of the last Tokenize call (BreakBefore)
 
 -- Replaces the intent list (lowercased here, once, so Scan never lowercases a word).
@@ -84,11 +93,25 @@ function Tokenizer.Scan(text)
   return nil
 end
 
+-- The open link's words after linkColon ("[Tailoring: Silk Bag]" -> "silk bag"), or false.
+local function tail()
+  if linkColon then
+    for k = linkFirst, count do
+      if starts[k] > linkColon then
+        return k > linkFirst and concat(tokens, " ", k, count)
+      end
+    end
+  end
+  return false
+end
+
 -- The named link's text tokens become one normalized link name and leave the token buffer.
 local function closeLink(p)
   if count >= linkFirst then
     names = names + 1
     linkNames[names] = concat(tokens, " ", linkFirst, count)
+    linkIDs[names] = linkID
+    linkTails[names] = tail()
     for k = linkFirst, count do
       tokens[k] = nil
     end
@@ -113,11 +136,18 @@ local function link(s, p)
   end
   local textEnd = find(s, "|h", dataEnd + 2, true) or #s + 1
   local _, _, id = find(s, ITEM_LINK, p)
+  linkID, linkColon = false, nil
   if id then
     items = items + 1
     itemIDs[items] = tonumber(id)
-  elseif not find(s, ENCHANT_LINK, p) then
-    return textEnd + 2
+  else
+    local _, _, spellID = find(s, ENCHANT_LINK, p)
+    if not spellID then
+      return textEnd + 2
+    end
+    linkID = tonumber(spellID) or false
+    local colon = find(s, ":", dataEnd + 2, true)
+    linkColon = colon and colon < textEnd and colon or nil
   end
   linkEnd = textEnd
   linkFirst = count + 1
@@ -153,7 +183,7 @@ local function finish()
     itemIDs[k] = nil
   end
   for k = names + 1, lastNames do
-    linkNames[k] = nil
+    linkNames[k], linkIDs[k], linkTails[k] = nil, nil, nil
   end
   lastCount, lastItems, lastNames = count, items, names
   Tokenizer.itemCount = items

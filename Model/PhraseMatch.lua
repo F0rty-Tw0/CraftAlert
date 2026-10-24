@@ -31,6 +31,7 @@ local LENGTH_UNIT = KEY_WORDS * WORDS_UNIT
 local ID_UNIT = KEY_LENGTHS * LENGTH_UNIT
 
 local tokens, linkNames = Tokenizer.tokens, Tokenizer.linkNames
+local linkIDs, linkTails = Tokenizer.linkIDs, Tokenizer.linkTails
 local wordGroupsOnly = Slang.wordGroupsOnly
 ---@type table
 local index = nil
@@ -240,9 +241,12 @@ function PhraseMatch.Run(newIndex, count, intentToken)
       phrasesAt(i, token, id, found)
     end
   end
+  -- A link name hits by its recipe's spell ID, else as a full name, else by the text after a
+  -- "Profession:" prefix; the whole text goes first, so "[Transmute: Arcanite]" keeps its name.
   local linked = false
+  local phraseSet, recipeRecords = index.phraseSet, index.recipeRecords
   for k = 1, Tokenizer.linkNameCount do
-    local record = index.phraseSet[linkNames[k]]
+    local record = recipeRecords[linkIDs[k]] or phraseSet[linkNames[k]] or phraseSet[linkTails[k]]
     if record then
       addHit(record, record.wordCount, record.phrase, nil)
       linked = true

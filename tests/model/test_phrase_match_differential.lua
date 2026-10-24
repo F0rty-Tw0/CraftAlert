@@ -70,7 +70,7 @@ local function randomLine(records, vocab)
     line = line .. (k > 1 and pick(seps) or "") .. part
   end
   if rand(1, 6) == 1 then
-    line = line .. " |cff00ff00|Henchant:1|h[" .. pick(records).phrase .. "]|h|r"
+    line = line .. " |cff00ff00|Henchant:0|h[" .. pick(records).phrase .. "]|h|r" -- ID 0: no stored recipe
   end
   return line
 end
