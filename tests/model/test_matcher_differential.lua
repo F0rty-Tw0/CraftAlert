@@ -44,7 +44,7 @@ local WORDS = {
   "for",
   "my",
 }
-local rand, pick = require("tests.helpers.lcg")(1)
+local rand, pick = require("tests.helpers.lcg")(4)
 
 local function entryText(entries, n)
   local parts = {}
@@ -323,7 +323,7 @@ local function testWordGroupsDifferential()
       ambiguousCueHits = ambiguousCueHits + ((ambiguousCued and got ~= "nil") and 1 or 0)
     end
   end
-  -- Each rule decides enough matching lines (317 / 16 / 58 / 54 / 19 / 29 / 56 with this seed).
+  -- Each rule decides enough matching lines (387 / 23 / 65 / 64 / 16 / 35 / 80 with this seed).
   Assert.truthy(checked > 150, "lines that match: " .. checked)
   Assert.truthy(cappedHits > 10, "matching lines the 6-word cap decided: " .. cappedHits)
   Assert.truthy(enchantHits > 20, "matching lines with an Enchanting word: " .. enchantHits)

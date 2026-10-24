@@ -69,12 +69,20 @@ local function testIntentAndAds()
   expect(ns, "I can craft fiery weapon if you need, pst", "stop:blocker", "can craft + pst")
   expect(ns, "can craft fiery weapon if you need", "item:enchant weapon - fiery weapon", "can craft without pst")
   expect(ns, "LF fiery weapon PST", "item:enchant weapon - fiery weapon", "pst alone")
+  expect(ns, "WTC fiery weapon", "item:enchant weapon - fiery weapon", "wtc is a default intent word")
+  expect(ns, "LFRC fiery weapon", "item:enchant weapon - fiery weapon", "lfrc is a default intent word")
+  expect(ns, "TANK LF FOR ENCHS ORG", "profession:" .. ENCH, "enchs is an Enchanting word")
   expect(ns, "pst crafting need fiery weapon", "item:enchant weapon - fiery weapon", "pst before crafting")
   -- "/w me" is an ad only as a whole word: not "/w meow" or "/w melissa".
   expect(ns, "LF enchanter /w meow", "profession:" .. ENCH, "/w meow")
   expect(ns, "lf fiery weapon /w melissa", "item:enchant weapon - fiery weapon", "/w melissa")
-  expect(ns, "lf fiery weapon /w me.", "stop:blocker", "/w me then punctuation")
-  expect(ns, "lf fiery weapon /w melissa or /w me", "stop:blocker", "a later whole /w me")
+  expect(ns, "need fiery weapon /w me.", "stop:blocker", "/w me then punctuation")
+  expect(ns, "need fiery weapon /w melissa or /w me", "stop:blocker", "a later whole /w me")
+  -- A buyer's word (lf, lfc, lfrc, wtb, wtc) makes "/w me" a request, not an ad.
+  expect(ns, "lf fiery weapon /w me.", "item:enchant weapon - fiery weapon", "lf + /w me")
+  expect(ns, "anyone lfc fiery weapon? /w me", "item:enchant weapon - fiery weapon", "any buyer word in the line")
+  expect(ns, "WTB fiery weapon /w me", "item:enchant weapon - fiery weapon")
+  expect(ns, "LF fiery weapon WTS /w me", "stop:blocker", "a blocker word still wins")
 end
 
 -- §6.3 4.1: the first craftable item link matches; other links and link text are ignored.

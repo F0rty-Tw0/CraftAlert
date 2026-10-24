@@ -55,6 +55,8 @@ end
 
 local WHISPER_ME = "/w me"
 local WHISPER_ME_END = #WHISPER_ME
+-- Words only a buyer writes, so "/w me" beside one is no ad. Fixed, not the editable intent list.
+local buyerWords = { lf = true, lfc = true, lfrc = true, wtb = true, wtc = true }
 
 -- A byte of Tokenizer.WORD (letters, digits, apostrophe, bytes 128-255) in lowercase text.
 local function isWordByte(b)
@@ -74,16 +76,18 @@ local function whisperMe(lower)
   return false
 end
 
--- Step 3: an intent token, then no blocker token and no ad shape. → stop reason or nil.
+-- Step 3: an intent token, then no blocker token and no ad shape. "/w me" is an ad shape
+-- unless a buyer's word asks (user ruling 2026-10-24: "lfc [item] /w me" is a request).
 local function intentStop(lower)
   local intentSet, blockerSet = index.intentSet, index.blockerSet
-  local blocked, crafting, pst, ad, canCraft = false, false, false, false, false
+  local blocked, crafting, pst, ad, canCraft, buyer = false, false, false, false, false, false
   intentToken = nil
   for i = 1, tokenCount do
     local token = tokens[i]
     if intentToken == nil and intentSet[token] then
       intentToken = token
     end
+    buyer = buyer or buyerWords[token] == true
     if blockerSet[token] then
       blocked = true
     elseif token == "crafting" then
@@ -98,7 +102,7 @@ local function intentStop(lower)
   if intentToken == nil then
     return "intent"
   end
-  if blocked or ad or (canCraft and pst) or whisperMe(lower) then
+  if blocked or ad or (canCraft and pst) or (not buyer and whisperMe(lower)) then
     return "blocker"
   end
   return nil

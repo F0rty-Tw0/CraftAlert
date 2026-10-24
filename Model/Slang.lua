@@ -16,7 +16,9 @@ Slang.CLASS_WEAPON = 2
 Slang.CLASS_ARMOR = 4
 
 -- itemEquipLoc -> words. Slots with no words (shirt, tabard, thrown, ammo, quiver, relic,
--- profession gear) are left out on purpose: nobody asks for them by slot.
+-- profession gear) are left out on purpose: nobody asks for them by slot. Trinkets too (user
+-- ruling 2026-10-24): "LF trinket" picked whichever profession knows the most trinkets (old
+-- alchemist stones over PvP trinkets), so only a trinket's name matches.
 local CHEST = { "chest", "robe" }
 local ONE_HAND = { "1h" }
 Slang.slots = {
@@ -31,8 +33,7 @@ Slang.slots = {
   INVTYPE_CLOAK = { "cloak", "cape", "back" },
   INVTYPE_CHEST = CHEST,
   INVTYPE_ROBE = CHEST,
-  INVTYPE_LEGS = { "legs", "pants" },
-  INVTYPE_TRINKET = { "trinket" },
+  INVTYPE_LEGS = { "legs", "leg", "pants" },
   INVTYPE_SHIELD = { "shield" },
   INVTYPE_HOLDABLE = { "offhand" },
   INVTYPE_BAG = { "bag" },

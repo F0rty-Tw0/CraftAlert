@@ -157,15 +157,35 @@ local function testCueAdjacency()
   expect(ns, "LF scribe, ring me when ready", "stop:nomatch")
   expect(ns, "LF crafter, hands down best tip", "stop:nomatch", "punctuation ends the neighbourhood")
   expect(ns, "LF legs, crafter for legs", "profession:" .. TAILOR, "an uncued word counts where it is cued")
+  -- Corpus misses (2026-10-23): recraft cue words, singular "leg".
+  expect(ns, "lf recraft ring", "item:801")
+  expect(ns, "LF recrafter hands", "item:802")
+  expect(ns, "lf recrafting for my legs", "profession:" .. TAILOR)
+  expect(ns, "lf CRAFTER LEG", "profession:" .. TAILOR, "leg is legs")
+  expect(ns, "LF bs leg", "item:502")
+  expect(ns, "LF tank, break a leg", "stop:nomatch", "leg is ambiguous like legs")
   local result = expect(ns, "LF tailor, will pay you back", "profession:" .. TAILOR)
   Assert.equal(why(result), "lf+tailor", "the profession word alone")
   result = expect(ns, "LF bs crafter, back from afk", "profession:" .. BS)
   Assert.equal(why(result), "lf+bs", "the profession word alone")
 end
 
+-- User ruling 2026-10-24: "trinket" is no slot word (old alchemist stones outvoted PvP
+-- trinkets); a trinket matches by its name only.
+local function testTrinketByNameOnly()
+  local ns = Fixture.load()
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Tai-Realm"] = character({ TAILOR }, { [9] = { item = 950, name = "Silk Charm", prof = TAILOR } })
+  end)
+  expect(ns, "LF trinket crafter", "stop:nomatch")
+  expect(ns, "LF tailor trinket", "profession:" .. TAILOR, "the profession word alone")
+  expect(ns, "LF silk charm", "item:950")
+end
+
 return function()
   testWordIndex()
   testBackIsCloak()
+  testTrinketByNameOnly()
   testNamedProfessionNarrowing()
   testCueAdjacency()
   testProfessionTieBreak()
