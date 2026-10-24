@@ -9,12 +9,13 @@ local Fixture = require("tests.helpers.matcher_fixture")
 local BS, TAILOR, LW, ENCH = Fixture.BS, Fixture.TAILOR, Fixture.LW, Fixture.ENCH
 local expect, outcome, why = Fixture.expect, Fixture.outcome, Fixture.why
 
-local W, M, P, U = "Player-1-W", "Player-1-M", "Player-1-P", "Player-1-U"
+local W, M, P, U, R = "Player-1-W", "Player-1-M", "Player-1-P", "Player-1-U", "Player-1-O"
 local RAISES, SECRET_CLASS, ADVENTURER = "Player-1-R", "Player-1-S", "Player-1-A"
 local CLASSES = {
   [W] = "WARRIOR",
   [M] = "MAGE",
   [P] = "PALADIN",
+  [R] = "ROGUE",
   [U] = function()
     return "Localized", nil
   end,
@@ -27,8 +28,9 @@ local CLASSES = {
   [ADVENTURER] = "ADVENTURER",
 }
 
--- { itemID, recipe name, only with opts.greenIron }. No name holds a slot, armor or profession
--- word, or a word of any test line, so step 4.2 matches nothing but row 18's "green iron" set.
+-- { itemID, recipe name, only with opts.greenIron }. Names hold slot nouns (Greaves, Treads, Cowl,
+-- Hood, Drape, Girdle, Fists, Doublet) but no armor or profession word, or a word of any test
+-- line, so step 4.2 matches nothing but row 18's "green iron" set.
 local REALMS = {
   {
     key = "Smith-Realm",
@@ -40,9 +42,15 @@ local REALMS = {
       { 503, "Korvath Treads" },
       { 505, "Green Iron Girdle", true },
       { 506, "Green Iron Hauberk", true },
+      { 507, "Korvath Fists" },
     },
   },
-  { key = "Lw-Realm", prof = LW, recipes = { { 701, "Hidemaw Strap" }, { 702, "Hidemaw Cowl" }, { 703, "Hidemaw Breeches" } } },
+  {
+    key = "Lw-Realm",
+    prof = LW,
+    recipes = { { 701, "Hidemaw Strap" }, { 702, "Hidemaw Cowl" }, { 703, "Hidemaw Breeches" }, { 704, "Hidemaw Doublet" } },
+  },
+  { key = "Ench-Realm", prof = ENCH, optional = "ench", recipes = { { 510, "Runed Sigil" } } },
   {
     key = "Tai-Realm",
     prof = TAILOR,
@@ -77,14 +85,15 @@ end
 
 -- Plate, leather and cloth pieces from enabled crafters, profession order BS, LW, Tailoring.
 -- opts: only (realm keys kept), disable (realm keys disabled), drop (item IDs left out),
--- extraSlang, greenIron (adds Green Iron Girdle and Green Iron Cord). Set on the Matcher.
+-- extraSlang, greenIron (adds Green Iron Girdle and Green Iron Cord), ench (adds an Enchanting
+-- crafter whose recipe lists legs). Set on the Matcher.
 local function armorIndex(ns, opts)
   opts = opts or {}
   Fixture.stubItems()
   local db = ns.Defaults.Db()
   local kept, disabled, dropped = setOf(opts.only), setOf(opts.disable), setOf(opts.drop)
   for _, realm in ipairs(REALMS) do
-    if opts.only == nil or kept[realm.key] then
+    if (opts.only == nil or kept[realm.key]) and (realm.optional == nil or opts[realm.optional]) then
       local character = Fixture.character({ realm.prof }, recipesOf(realm, opts, dropped))
       character.enabled = not disabled[realm.key]
       db.characters[realm.key] = character
@@ -94,7 +103,7 @@ local function armorIndex(ns, opts)
   local index = ns.Index.Build(db, db.settings, {
     ownKey = "Me-Realm",
     professionOrder = function()
-      return { BS, LW, TAILOR }
+      return { BS, LW, TAILOR, ENCH }
     end,
   })
   ns.Matcher.SetIndex(index)
@@ -292,6 +301,62 @@ local function testSevenWordsAndExtraSlang()
   check(ns, "RF5", "LF britches", W, "item:502", 1)
 end
 
+-- R3, user ruling 2026-10-24 ("LF legs from a warrior means he is looking for a blacksmith with
+-- legs"): a buyer word directly before head legs leg hands hand feet hood vest counts it through
+-- the sender's armor word; an unknown class stays silent and nothing else changes.
+local function testBuyerWordBeforeSlot()
+  local ns = fullIndex()
+  -- The rows that take the armorInfo fast path (WordGroups.Match), run again below on the general walk.
+  local fastRows = {
+    { "R3", "LF legs", W, "item:502", 1, "lf+legs+plate (warrior)" },
+    { "R3 wtb", "WTB legs", W, "item:502", 1 },
+    { "R3 hood", "LF hood", M, "item:603", 1 },
+    { "R3 vest", "LF vest", R, "item:704", 1 },
+    { "R3 hand", "LF hand", W, "item:507", 1 },
+  }
+  for _, row in ipairs(fastRows) do
+    check(ns, unpack(row))
+  end
+  check(ns, "R3 unknown class", "LF legs", U, "stop:nomatch", 1)
+  check(ns, "R3 no GUID", "LF legs", nil, "stop:nomatch", 0)
+  check(ns, "R3 need is no buyer word", "need legs", W, "stop:nomatch", 0)
+  check(ns, "R3 head not next to the buyer word", "LF healer, head to Deadmines", P, "stop:nomatch", 0)
+  check(ns, "R3 cued as today", "LF legs crafter", W, "item:502", 1)
+  check(ns, "R3 ring has no armor type", "LF ring", W, "stop:nomatch", 0)
+  check(ns, "R3 off hand", "LF off hand crafter", W, "stop:nomatch", 0)
+  check(ns, "R3 off-hand", "LF off-hand crafter", W, "stop:nomatch", 0)
+  check(ns, "R3 filler between", "LF some legs", W, "stop:nomatch", 0)
+  check(ns, "R3 punctuation between", "LF, legs", W, "stop:nomatch", 0)
+  check(ns, "R3 buyer after an uncounted repeat", "need legs, LF legs", W, "item:502", 1)
+  -- A cue word on a repeat counts the word, so no class is needed: the line keeps today's result.
+  check(ns, "R3 cued repeat", "LF legs, crafter for legs", U, outcome(ns, "LF legs, crafter for legs"), 1)
+  -- An Enchanting word is tried first without the class, and a word only a buyer word counts is
+  -- no word of it: the line keeps the master outcome (the Enchanting crafter by step 4.6), class
+  -- known or not. A cue word ("enchanter" right after legs) counts the word, as before.
+  ns = fullIndex({ ench = true })
+  for _, guid in ipairs({ U, W }) do
+    check(ns, "R3 enchant", "LF legs, ench", guid, "profession:" .. ENCH, 0)
+    check(ns, "R3 enchant", "LF legs, enchanter", guid, "profession:" .. ENCH, 0)
+    check(ns, "R3 enchant cued", "LF legs enchanter", guid, "item:510", 0)
+  end
+  -- Naming a profession after Enchanting asks the class (the buyer word may need it), so one lookup.
+  check(ns, "R3 enchant, then a profession", "LF legs, ench or bs", U, "profession:" .. ENCH, 1)
+  -- The "<armor> <word>" decision is built with the index, only for words a buyer word counts.
+  local index = armorIndex(ns)
+  Assert.equal(index.armorInfo.plate.legs.entries[1].group, 502, "armorInfo: plate legs")
+  Assert.equal(index.armorInfo.cloth.hood.entries[1].group, 603, "armorInfo: cloth hood")
+  Assert.equal(index.armorInfo.plate.ring, nil, "armorInfo: ring has no armor type")
+  Assert.equal(index.armorInfo.cloth.hand, nil, "armorInfo: no cloth gloves indexed")
+  -- An armorInfo without the pair makes Match walk the word's list: the same outcome and why.
+  index.armorInfo = { plate = {}, mail = {}, leather = {}, cloth = {} }
+  for _, row in ipairs(fastRows) do
+    check(ns, row[1] .. " (walk)", unpack(row, 2))
+  end
+  -- Review Focus 3: no plate legs indexed → silent after one class lookup, no profession fallback.
+  ns = fullIndex({ drop = { 502 } })
+  check(ns, "RF3 no plate legs", "LF legs", W, "stop:nomatch", 1)
+end
+
 return function()
   testBaselines()
   testRows1To3()
@@ -305,5 +370,6 @@ return function()
   testEnchantingLines()
   testPartneredWordsStay()
   testSevenWordsAndExtraSlang()
+  testBuyerWordBeforeSlot()
   Wow.reset()
 end

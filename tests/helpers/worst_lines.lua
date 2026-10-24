@@ -139,6 +139,8 @@ function WorstLines.cases(index)
     { "inferred_empty", WorstLines.inferredEmpty(index) }, -- 4.4: lookup, append, empty, typo
     -- 4.4: slot words of different slots, no armor slot (so no armor word): the union
     { "union", WorstLines.UNION },
+    -- 4.4 R3: a buyer word directly before an ambiguous armor slot word, class known
+    { "buyer_legs", fill("wtb", "legs wtb") },
   }
 end
 

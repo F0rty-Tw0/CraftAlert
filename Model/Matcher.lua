@@ -5,6 +5,7 @@ end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
+local Constants = ns.Constants or require("CraftAlert.Core.Constants")
 local ClassArmor = ns.ClassArmor or require("CraftAlert.Model.ClassArmor")
 local Tokenizer = ns.Tokenizer or require("CraftAlert.Model.Tokenizer")
 local PhraseMatch = ns.PhraseMatch or require("CraftAlert.Model.PhraseMatch")
@@ -55,8 +56,8 @@ end
 
 local WHISPER_ME = "/w me"
 local WHISPER_ME_END = #WHISPER_ME
--- Words only a buyer writes, so "/w me" beside one is no ad. Fixed, not the editable intent list.
-local buyerWords = { lf = true, lfc = true, lfrc = true, wtb = true, wtc = true }
+-- Words only a buyer writes, so "/w me" beside one is no ad.
+local buyerWords = Constants.buyerWords
 
 -- A byte of Tokenizer.WORD (letters, digits, apostrophe, bytes 128-255) in lowercase text.
 local function isWordByte(b)

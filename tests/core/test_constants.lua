@@ -59,6 +59,7 @@ return function()
   Assert.same(Constants.intentWords, { "lf", "lfc", "lfrc", "wtb", "wtc", "need", "needs", "looking", "any", "any1", "anyone", "who", "recraft" })
   Assert.same(Constants.blockerWords, { "wts", "lfw", "selling" })
   Assert.same(Constants.ambiguousWords, { "legs", "leg", "head", "hands", "feet", "ring", "back", "hand", "band", "hood", "vest" })
+  Assert.same(Constants.buyerWords, { lf = true, lfc = true, lfrc = true, wtb = true, wtc = true })
   Assert.same(Constants.craftCueWords, { "crafter", "craft", "crafted", "maker", "recraft", "recrafter", "recrafting" })
 
   -- §6.2 item 2: an alias made only of these words is never created.
