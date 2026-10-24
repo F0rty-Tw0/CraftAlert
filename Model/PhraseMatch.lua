@@ -33,6 +33,15 @@ local ID_UNIT = KEY_LENGTHS * LENGTH_UNIT
 local tokens, linkNames = Tokenizer.tokens, Tokenizer.linkNames
 local linkIDs, linkTails = Tokenizer.linkIDs, Tokenizer.linkTails
 local wordGroupsOnly = Slang.wordGroupsOnly
+local BreakBefore = Tokenizer.BreakBefore
+
+-- User ruling 2026-10-25: the slot words that are everyday chat ("back in 5", "hand over", "ring me")
+-- never filter an alias hit: Slang.wordGroupsOnly plus ring and head. Not Slang.ambiguous: legs,
+-- leg, hands and feet still filter. "hand" is here, so "off hand" needs no Slang.IsOffHand check.
+local everydaySlot = { ring = true, head = true }
+for word in pairs(wordGroupsOnly) do
+  everydaySlot[word] = true
+end
 ---@type table
 local index = nil
 local tokenCount = 0
@@ -43,6 +52,14 @@ local tokenAt = {} -- tokenAt[i]: position of token i in padded; [tokenCount + 1
 local hits, hitCount, hitLength = {}, 0, 0
 local hitWhy, hitWhyCount = {}, 0
 PhraseMatch.why, PhraseMatch.whyCount = hitWhy, 0
+-- R4 (slot-words spec), per hit h: hitSlot[h] = the slot word right after an alias hit's span,
+-- else false; hitAt[h] = the hit's first token; hitWhyFrom[h] = the hitWhy index of its first
+-- why token (the filter compacts a dropped hit's why tokens out).
+local hitSlot, hitAt, hitWhyFrom = {}, {}, {}
+-- dropped[i] == dropRun: token i lies in a hit R4 dropped, which the typo pass must not revive.
+-- The run counter is bumped per Run, so nothing needs clearing.
+local dropped, dropRun = {}, 0
+PhraseMatch.dropped, PhraseMatch.dropRun = dropped, 0
 -- hitStamp[record] == hitRun: the record is in hits (a new run starts with each line and
 -- with each longer hit), so a repeated hit costs one lookup, not a scan of hits.
 local hitStamp, hitRun = {}, 0
@@ -98,7 +115,8 @@ function PhraseMatch.Add(built, record, firstWord)
   end
 end
 
-local function addHit(record, length, why1, why2)
+-- i: the hit's first token, nil for a link name. length: its span in tokens (2 for a join pair).
+local function addHit(record, length, why1, why2, i)
   if length < hitLength then
     return
   end
@@ -111,6 +129,16 @@ local function addHit(record, length, why1, why2)
   hitStamp[record] = hitRun
   hitCount = hitCount + 1
   hits[hitCount] = record
+  hitAt[hitCount], hitWhyFrom[hitCount], hitSlot[hitCount] = i, hitWhyCount + 1, false
+  -- User ruling 2026-10-24 (R4, bug C26): an alias followed by a slot word is filtered by it.
+  -- User ruling 2026-10-25: not by an everyday word ("sim plate back") or across punctuation
+  -- ("LF sim plate, back in 5"), which chat does not read as naming the piece.
+  if i and not record.full and i + length <= tokenCount then
+    local slot = tokens[i + length]
+    if index.slotsOf[slot] and not everydaySlot[slot] and not BreakBefore(i + length) then
+      hitSlot[hitCount] = slot
+    end
+  end
   hitWhyCount = hitWhyCount + 1
   hitWhy[hitWhyCount] = why1
   if why2 then
@@ -133,10 +161,10 @@ end
 
 -- A record found by its shape when its other bytes match too. One plain find (C) costs less
 -- than a byte loop in Lua; a miss scans at most the rest of the line.
-local function tryRecord(record, at, wordCount)
+local function tryRecord(record, at, wordCount, i)
   local phrase = record.phrase
   if find(padded, phrase, at, true) == at then
-    addHit(record, wordCount, phrase, nil)
+    addHit(record, wordCount, phrase, nil, i)
   end
 end
 
@@ -145,7 +173,7 @@ end
 local function tryJoin(record, i, token, right)
   local from = #token + 1
   if phraseAt(record.phrase, tokenAt[i + 1] - from + 1, from) then
-    addHit(record, 2, token, right)
+    addHit(record, 2, token, right, i)
   end
 end
 
@@ -176,10 +204,10 @@ local function phrasesAt(i, token, id, found)
       local keyed = phraseKeys[base + stop * LENGTH_UNIT + wordCount * WORDS_UNIT + byte(padded, stop)]
       base = moreWords -- only the first span can be one word
       if keyed and keyed.phrase then
-        tryRecord(keyed, at, wordCount)
+        tryRecord(keyed, at, wordCount, i)
       elseif keyed then
         for k = 1, #keyed do
-          tryRecord(keyed[k], at, wordCount)
+          tryRecord(keyed[k], at, wordCount, i)
         end
       end
     end
@@ -220,13 +248,54 @@ function PhraseMatch.HasCompanionWord()
   return false
 end
 
+-- R4: drops every hit whose slot word (hitSlot) leaves its record no entry, and compacts hits,
+-- hitSlot and hitWhy. A dropped hit's tokens are stamped for the typo pass. The hits all span
+-- hitLength tokens (a longer hit resets the list), and only hits from the token loop have a slot.
+local function dropFiltered()
+  local groupWords = index.groupWords
+  local kept, keptWhy = 0, 0
+  for h = 1, hitCount do
+    local slot = hitSlot[h]
+    if slot and not Candidates.AnyKept(hits[h], slot, groupWords) then
+      for k = hitAt[h], hitAt[h] + hitLength - 1 do
+        dropped[k] = dropRun
+      end
+    else
+      kept = kept + 1
+      hits[kept], hitSlot[kept] = hits[h], slot
+      local last = (h < hitCount and hitWhyFrom[h + 1] or hitWhyCount + 1) - 1
+      for k = hitWhyFrom[h], last do
+        keptWhy = keptWhy + 1
+        hitWhy[keptWhy] = hitWhy[k]
+      end
+    end
+  end
+  hitCount, hitWhyCount = kept, keptWhy
+end
+
+-- A "match" keeps the slot word that filtered a kept hit in its why tokens, once each.
+local function addSlotWhy()
+  for h = 1, hitCount do
+    local slot = hitSlot[h]
+    local seen = false
+    for g = 1, h - 1 do
+      seen = seen or hitSlot[g] == slot
+    end
+    if slot and not seen then
+      hitWhyCount = hitWhyCount + 1
+      hitWhy[hitWhyCount] = slot
+    end
+  end
+end
+
 -- Step 4.2 on the tokenized line (Tokenizer buffers). → "match", "set" (several recipes,
 -- left in Candidates; PhraseMatch.why[1..whyCount] holds their why tokens) or nil.
 function PhraseMatch.Run(newIndex, count, intentToken)
   index, tokenCount = newIndex, count
   padded = " " .. Tokenizer.normalized .. " "
   hitCount, hitLength, hitWhyCount, hitRun = 0, 0, 0, hitRun + 1
-  PhraseMatch.setAside = nil
+  dropRun = dropRun + 1
+  PhraseMatch.dropRun, PhraseMatch.setAside = dropRun, nil
   local at = 2 -- position of token 1 in padded
   for i = 1, tokenCount do
     tokenAt[i] = at
@@ -248,10 +317,11 @@ function PhraseMatch.Run(newIndex, count, intentToken)
   for k = 1, Tokenizer.linkNameCount do
     local record = recipeRecords[linkIDs[k]] or phraseSet[linkNames[k]] or phraseSet[linkTails[k]]
     if record then
-      addHit(record, record.wordCount, record.phrase, nil)
+      addHit(record, record.wordCount, record.phrase, nil, nil)
       linked = true
     end
   end
+  dropFiltered()
   -- §6.2 item 1: a kind-c alias or a one-word full name matched by one token, alone among the
   -- hits, needs a wordIndex or enchant slot word in the line; otherwise it is set aside (the
   -- typo pass may still pair with it). A join pair covers 2 tokens, and a line with a link-name
@@ -264,10 +334,11 @@ function PhraseMatch.Run(newIndex, count, intentToken)
   if hitCount == 0 then
     return nil
   end
-  Candidates.FromRecords(hits, hitCount)
+  Candidates.FromRecordsFiltered(hits, hitCount, hitSlot, index.groupWords)
   if Candidates.GroupCount() > 1 then
     return "set"
   end
+  addSlotWhy()
   Candidates.Item(intentToken)
   Candidates.WhyList(hitWhy, hitWhyCount)
   return "match"

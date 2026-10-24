@@ -27,18 +27,18 @@ end
 -- Words come slot first, then type; subclass numbers are the Enum.Item*Subclass values.
 local CASES = {
   -- Slots (armor class, subclass 0 = misc unless it is the real armor type)
-  { "INVTYPE_FINGER", CLASS_ARMOR, 0, { "ring", "finger" } },
-  { "INVTYPE_NECK", CLASS_ARMOR, 0, { "neck", "necklace", "amulet" } },
-  { "INVTYPE_WAIST", CLASS_ARMOR, 4, { "belt", "waist", "plate" } },
-  { "INVTYPE_FEET", CLASS_ARMOR, 2, { "boots", "boot", "feet", "shoes", "leather" } },
-  { "INVTYPE_HAND", CLASS_ARMOR, 3, { "gloves", "glove", "hands", "gauntlets", "mail" } },
-  { "INVTYPE_WRIST", CLASS_ARMOR, 1, { "bracers", "bracer", "wrist", "cloth" } },
-  { "INVTYPE_HEAD", CLASS_ARMOR, 4, { "helm", "helmet", "head", "plate" } },
-  { "INVTYPE_SHOULDER", CLASS_ARMOR, 2, { "shoulders", "shoulder", "pauldrons", "leather" } },
-  { "INVTYPE_CLOAK", CLASS_ARMOR, 1, { "cloak", "cape", "back", "cloth" } },
-  { "INVTYPE_CHEST", CLASS_ARMOR, 3, { "chest", "robe", "mail" } },
-  { "INVTYPE_ROBE", CLASS_ARMOR, 1, { "chest", "robe", "cloth" } },
-  { "INVTYPE_LEGS", CLASS_ARMOR, 4, { "legs", "leg", "pants", "plate" } },
+  { "INVTYPE_FINGER", CLASS_ARMOR, 0, { "ring", "finger", "band", "signet" } },
+  { "INVTYPE_NECK", CLASS_ARMOR, 0, { "neck", "necklace", "amulet", "choker", "pendant" } },
+  { "INVTYPE_WAIST", CLASS_ARMOR, 4, { "belt", "waist", "girdle", "waistband", "plate" } },
+  { "INVTYPE_FEET", CLASS_ARMOR, 2, { "boots", "boot", "feet", "shoes", "sabatons", "treads", "leather" } },
+  { "INVTYPE_HAND", CLASS_ARMOR, 3, { "gloves", "glove", "hands", "gauntlets", "hand", "grips", "handguards", "mail" } },
+  { "INVTYPE_WRIST", CLASS_ARMOR, 1, { "bracers", "bracer", "wrist", "bindings", "vambraces", "cuffs", "cloth" } },
+  { "INVTYPE_HEAD", CLASS_ARMOR, 4, { "helm", "helmet", "head", "hood", "cowl", "plate" } },
+  { "INVTYPE_SHOULDER", CLASS_ARMOR, 2, { "shoulders", "shoulder", "pauldrons", "mantle", "spaulders", "leather" } },
+  { "INVTYPE_CLOAK", CLASS_ARMOR, 1, { "cloak", "cape", "back", "drape", "cloth" } },
+  { "INVTYPE_CHEST", CLASS_ARMOR, 3, { "chest", "robe", "chestguard", "breastplate", "tunic", "jerkin", "vest", "mail" } },
+  { "INVTYPE_ROBE", CLASS_ARMOR, 1, { "chest", "robe", "chestguard", "breastplate", "tunic", "jerkin", "vest", "cloth" } },
+  { "INVTYPE_LEGS", CLASS_ARMOR, 4, { "legs", "leg", "pants", "leggings", "legguards", "legplates", "greaves", "plate" } },
   { "INVTYPE_SHIELD", CLASS_ARMOR, 6, { "shield" } },
   { "INVTYPE_HOLDABLE", CLASS_ARMOR, 0, { "offhand" } },
   -- Weapons: hand count comes from the equip location, the kind from the subclass
@@ -106,13 +106,16 @@ local function testExtraSlang()
     [1] = { "INVTYPE_WRIST", CLASS_ARMOR, 2 },
     [2] = { "INVTYPE_HEAD", CLASS_ARMOR, 4 },
   })
-  local extra = { cuffs = "bracers", hat = "head", Lid = "HELM", nothing = "wand", [""] = "head" }
-  Assert.same(ItemKeywords.WordsFor(1, extra), { "bracers", "bracer", "wrist", "leather", "cuffs" })
-  Assert.same(ItemKeywords.WordsFor(2, extra), { "helm", "helmet", "head", "plate", "hat", "lid" })
+  local extra = { wristies = "bracers", hat = "head", Lid = "HELM", nothing = "wand", [""] = "head" }
+  Assert.same(ItemKeywords.WordsFor(1, extra), { "bracers", "bracer", "wrist", "bindings", "vambraces", "cuffs", "leather", "wristies" })
+  Assert.same(ItemKeywords.WordsFor(2, extra), { "helm", "helmet", "head", "hood", "cowl", "plate", "hat", "lid" })
   -- Several matches come out in sorted order; a word already present is not repeated.
-  Assert.same(ItemKeywords.WordsFor(1, { zz = "wrist", aa = "wrist", wrist = "bracers" }), { "bracers", "bracer", "wrist", "leather", "aa", "zz" })
+  Assert.same(
+    ItemKeywords.WordsFor(1, { zz = "wrist", aa = "wrist", wrist = "bracers" }),
+    { "bracers", "bracer", "wrist", "bindings", "vambraces", "cuffs", "leather", "aa", "zz" }
+  )
   -- Without extras, and with an empty table, nothing is added.
-  Assert.same(ItemKeywords.WordsFor(1, {}), { "bracers", "bracer", "wrist", "leather" })
+  Assert.same(ItemKeywords.WordsFor(1, {}), { "bracers", "bracer", "wrist", "bindings", "vambraces", "cuffs", "leather" })
 end
 
 -- The extra table is read per call and never stored: a later call without it is unchanged.
@@ -132,7 +135,7 @@ end
 local function testAmbiguousFlags()
   load({})
   local Slang = Fresh.require("Model.Slang")
-  for _, word in ipairs({ "legs", "leg", "head", "hands", "feet" }) do
+  for _, word in ipairs({ "legs", "leg", "head", "hands", "feet", "hand", "band", "hood", "vest" }) do
     Assert.truthy(Slang.ambiguous[word], word)
   end
   Assert.falsy(Slang.ambiguous.belt)
@@ -146,7 +149,7 @@ local function testWordSet()
   for _, word in ipairs({ "belt", "plate", "legs", "2h", "wand", "bag", "offhand" }) do
     Assert.truthy(Slang.wordSet[word], word)
   end
-  Assert.falsy(Slang.wordSet.cuffs)
+  Assert.falsy(Slang.wordSet.wristies)
   -- Every ambiguous word is also a slang word.
   for word in pairs(Slang.ambiguous) do
     Assert.truthy(Slang.wordSet[word], word)
@@ -184,6 +187,29 @@ local function testArmorTags()
     "legs",
     "leg",
     "pants",
+    "hand",
+    "grips",
+    "handguards",
+    "leggings",
+    "legguards",
+    "legplates",
+    "greaves",
+    "sabatons",
+    "treads",
+    "girdle",
+    "waistband",
+    "bindings",
+    "vambraces",
+    "cuffs",
+    "mantle",
+    "spaulders",
+    "hood",
+    "cowl",
+    "chestguard",
+    "breastplate",
+    "tunic",
+    "jerkin",
+    "vest",
   }
   local expected = { cloth = "type", leather = "type", mail = "type", plate = "type" }
   for _, word in ipairs(slots) do

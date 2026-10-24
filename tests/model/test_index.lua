@@ -204,6 +204,25 @@ local function testIndexes()
   Assert.equal(index.professionWords.alch, nil)
 end
 
+-- User ruling 2026-10-24 ("Share synonym lists"): words whose lists hold the same entries in
+-- the same order (slot synonyms, an extraSlang key and its target) are one table, and so is
+-- their derived step 4.4 info; a word with other entries keeps its own.
+local function testSynonymListsShared()
+  local Index, Defaults = load()
+  local db = fixtureDb(Defaults)
+  db.settings.extraSlang = { wristies = "bracers" }
+  local index = build(Index, db)
+  local words, info = index.wordIndex, index.wordInfo
+  Assert.truthy(rawequal(words.bracers, words.bracer), "slot synonyms share one list")
+  Assert.truthy(rawequal(words.bracers, words.wristies), "an extraSlang key shares its target's list")
+  Assert.truthy(rawequal(words.belt, words.waist), "another slot's synonyms share theirs")
+  Assert.truthy(rawequal(info.bracers, info.wristies), "and one wordInfo")
+  Assert.falsy(rawequal(words.bracers, words.belt), "other entries, another list")
+  Assert.falsy(rawequal(words.plate, words.belt), "a type word with more entries, another list")
+  Assert.falsy(rawequal(info.plate, info.belt), "and another wordInfo")
+  Assert.same(characters(words.wristies), { "Smith-Realm" })
+end
+
 local function testSettingsCopies()
   local Index, Defaults = load()
   local db = fixtureDb(Defaults)
@@ -423,6 +442,7 @@ return function()
   testMutedProfessions()
   testSharedEntry()
   testIndexes()
+  testSynonymListsShared()
   testSettingsCopies()
   testBuildIsPure()
   testClassicProfessionKeys()

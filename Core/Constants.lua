@@ -81,8 +81,14 @@ Constants.aliasStopWords = {
 
 -- §6.4: slot words that count only next to another slot/type word, a phrase or a crafting cue
 -- word: body parts, "ring" ("ring me when ready", "ring of blood"; user ruling 2026-10-20)
--- and "back" ("be back in 5", "pay you back"; user ruling 2026-10-21).
-Constants.ambiguousWords = { "legs", "leg", "head", "hands", "feet", "ring", "back" }
+-- and "back" ("be back in 5", "pay you back"; user ruling 2026-10-21). "hand", "band", "hood" and
+-- "vest" ("need a hand", "band together") join them (user ruling 2026-10-24).
+Constants.ambiguousWords = { "legs", "leg", "head", "hands", "feet", "ring", "back", "hand", "band", "hood", "vest" }
+
+-- Words only a buyer writes: "/w me" beside one is no ad (Matcher), and one directly before an
+-- ambiguous armor slot word counts it when the sender's class is known (WordGroups; user ruling
+-- 2026-10-24). Fixed, not the editable intent list.
+Constants.buyerWords = { lf = true, lfc = true, lfrc = true, wtb = true, wtc = true }
 
 -- Class-armor spec §5: words that mark a line as asking for crafting, so an ambiguous slot word
 -- counts (§6.4) and may take the sender's armor type. Every profession word counts too. Fixed,

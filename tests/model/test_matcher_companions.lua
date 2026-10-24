@@ -19,7 +19,7 @@ local function testKindCOnSpecFixture()
   expect(ns, "lf lion heart", "item:lionheart helm", "a join pair")
   local result = expect(ns, "lf lionheart plate", "item:lionheart helm", "a wordIndex word")
   Assert.equal(why(result), "lf+lionheart")
-  expect(ns, "lf hauberk or leggings", "profession:" .. BS, "two kind-c hits count for each other")
+  expect(ns, "lf hauberk or leggings", "item:green iron hauberk") -- leggings is a slot word, no kind-c alias (user ruling 2026-10-24)
   expect(ns, "lf mongoose", "item:enchant weapon - mongoose", "kind a (also kind c) needs nothing")
   -- Step 4.5: the same rule for a kind-c alias hit by the typo pass ("leather" empties 4.4,
   -- so the typo pass runs with "boots" in the line).
@@ -39,9 +39,11 @@ local function testKindCOnSpecFixture()
   expect(ns, "lf mongoose hauberk", "profession:" .. ENCH)
   expect(ns, "lf mongose hauberk", "profession:" .. ENCH)
   expect(ns, "lf lionheart lionhaert", "stop:nomatch", "the same alias twice is one hit")
-  -- A step 4.2 set still standing at step 4.5 ("enchant" empties 4.4) is the companion.
-  result = expect(ns, "lf hauberk leggings enchant lionhaert", "profession:" .. BS)
-  Assert.equal(why(result), "lf+hauberk+leggings+lionhaert")
+  -- User ruling 2026-10-24 (R4): "hauberk" is followed by the slot word "leggings", so step 4.2
+  -- drops it and the typo pass skips it ("enchant" empties 4.4); "leggings" is the companion
+  -- of the typo hit on "lionhaert".
+  result = expect(ns, "lf hauberk leggings enchant lionhaert", "item:lionheart helm")
+  Assert.equal(why(result), "lf+lionhaert")
   -- A token whose hits were all set aside is no why token.
   result = expect(ns, "lf lionhaert mongose", "item:enchant weapon - mongoose")
   Assert.equal(why(result), "lf+mongose")
@@ -130,6 +132,7 @@ local function testBackIsNoCompanion()
     db.characters["Smith2-Realm"] = character({ BS }, {
       [4] = { item = 910, name = "Shadowfang", prof = BS },
       [5] = { name = "Heavy Copper Maul", prof = BS },
+      [6] = { item = 802, name = "Hide Gloves", prof = BS },
     })
     db.characters["Ench-Realm"] = character({ ENCH }, {
       [11] = { name = "Enchant Cloak - Greater Agility", prof = ENCH },
@@ -147,6 +150,7 @@ local function testBackIsNoCompanion()
   expect(ns, "LF agi cloak enchant", "item:enchant cloak - greater agility", "cloak is a stat + slot word")
   expect(ns, "LF shadowfang cloak", "item:910", "cloak is a companion")
   expect(ns, "LF shadowfang legs", "item:910", "another ambiguous word is a companion")
+  expect(ns, "LF shadowfang, need a hand", "stop:nomatch", "hand is no companion (user ruling 2026-10-24)")
   expect(ns, "LF tailor back", "item:606", "step 4.4 still reads back")
 end
 

@@ -34,7 +34,10 @@ local WordGroups = {}
 
 local pairs = pairs
 local ipairs = ipairs
+local lower = string.lower
+local IsOffHand = Slang.IsOffHand
 local slangWords, ambiguous = Slang.wordSet, Slang.ambiguous
+local buyerWords = Constants.buyerWords
 local MAX_WORDS = 6 -- distinct slang words per line (§6.3 step 4.4; bounds the §4.4 max)
 
 -- §6.4 profession words: a line holding one narrows step 4.4 to that profession (user ruling
@@ -55,22 +58,6 @@ for _, entry in ipairs(ProfessionWords.entries) do
     if entry.englishName == "enchanting" then
       enchantingWords[word] = true
     end
-  end
-end
-
--- User ruling 2026-10-24 ("either slot counts"): slotsOf[word] = { set, ... }, the word sets
--- (as keys) of the equip slots that name word, so slot words of different slots ("neck ring")
--- are told from one slot's synonyms ("ring finger").
-local slotsOf = {}
-for _, words in pairs(Slang.slots) do
-  local set = {}
-  for _, word in ipairs(words) do
-    set[word] = true
-  end
-  for _, word in ipairs(words) do
-    local sets = slotsOf[word] or {}
-    slotsOf[word] = sets
-    sets[#sets + 1] = set
   end
 end
 
@@ -221,9 +208,84 @@ local function narrowedInfo(info, prof)
   return byProf[prof]
 end
 
--- Index build (also after a test adds wordIndex words): fills groupWords, wordInfo and the
--- profession key of every profession word (professionKeys).
+-- User ruling 2026-10-24 ("either slot counts", R2): index.slotsOf[word] = { set, ... }, the word
+-- sets (as keys) of the equip slots that name word, so slot words of different slots ("neck
+-- ring") are told from one slot's synonyms ("ring finger"). An extraSlang key whose target is a
+-- word of a slot joins that slot's set (the target is matched against the slot's own words, as
+-- ItemKeywords does); a key whose target is a type word joins none.
+local function buildSlotsOf(index)
+  local slotsOf = {}
+  for _, words in pairs(Slang.slots) do
+    local set, joined = {}, {}
+    for _, word in ipairs(words) do
+      set[word] = true
+    end
+    for key, target in pairs(index.extraSlang) do
+      key = lower(key)
+      if key ~= "" and set[lower(target)] then
+        joined[#joined + 1] = key
+      end
+    end
+    for _, key in ipairs(joined) do
+      set[key] = true
+    end
+    for word in pairs(set) do
+      local sets = slotsOf[word] or {}
+      slotsOf[word] = sets
+      sets[#sets + 1] = set
+    end
+  end
+  index.slotsOf = slotsOf
+end
+
+-- The ambiguous words whose slot takes an armor type, so "LF legs" can become "<armor> legs";
+-- ring, band and back have none.
+local buyerSlotWords = {}
+for _, word in ipairs({ "head", "legs", "leg", "hands", "hand", "feet", "hood", "vest" }) do
+  buyerSlotWords[word] = true
+end
+
+-- User ruling 2026-10-24 ("LF legs from a warrior means he is looking for a blacksmith with
+-- legs"): armorInfo[armor][word] = the step 4.4 decision (an info, as wordInfo) for the two-word
+-- line "<armor> <word>", for each buyerSlotWords word and armor word with a recipe. A known class
+-- turns "LF legs" into exactly that line, so Match answers it from here, not by walking the
+-- word's list on every such line.
+-- A pair with no recipe has no info (the walk then finds nothing, as before).
+local ARMOR_WORDS = {}
+for subclass = 1, #Slang.armor do
+  ARMOR_WORDS[subclass] = Slang.armor[subclass][1]
+end
+
+local function buildArmorInfo(index, rank, seenIn)
+  local wordIndex, groupWords, armorInfo = index.wordIndex, index.groupWords, {}
+  for _, armor in ipairs(ARMOR_WORDS) do
+    local byWord, infoOf = {}, {}
+    for word in pairs(buyerSlotWords) do
+      local list = wordIndex[word]
+      if list ~= nil and wordIndex[armor] ~= nil then
+        local info = infoOf[list] -- synonyms share a list, so one info
+        if info == nil then
+          local both = {}
+          for _, entry in ipairs(list) do
+            if groupWords[entry.group][armor] then
+              both[#both + 1] = entry
+            end
+          end
+          info = #both > 0 and infoFor(both, rank, seenIn) or false
+          infoOf[list] = info
+        end
+        byWord[word] = info or nil
+      end
+    end
+    armorInfo[armor] = byWord
+  end
+  index.armorInfo = armorInfo
+end
+
+-- Index build (also after a test adds wordIndex words): fills slotsOf, groupWords, wordInfo and
+-- the profession key of every profession word (professionKeys).
 function WordGroups.Build(index)
+  buildSlotsOf(index)
   buildGroupWords(index)
   local rank = {}
   for i, key in ipairs(index.professionOrder or {}) do
@@ -237,24 +299,34 @@ function WordGroups.Build(index)
       index.professionKeys[word] = ProfessionWords.KeyFor(word, isClassic)
     end
   end
-  local seenIn, firstIn, profOf = {}, {}, {}
+  -- A word's info depends on its list alone, so words that share a list (Index.Build, user
+  -- ruling 2026-10-24 "Share synonym lists") share its info, built once.
+  local seenIn, firstIn, profOf, infoOf = {}, {}, {}, {}
   index.wordInfo = {}
   for word, list in pairs(index.wordIndex) do
-    local info = infoFor(list, rank, seenIn)
-    local byProf, profs, split = byProfession(list, seenIn, firstIn, profOf)
-    if byProf ~= nil and info.groupCount > 1 and info.prof ~= nil then
-      info.entries = byProf[info.prof].entries -- the same entries in the same order, held once
-    end
-    info.byProf, info.profs = byProf, profs
-    if split then
-      info.split = true
+    local info = infoOf[list]
+    if info == nil then
+      info = infoFor(list, rank, seenIn)
+      local byProf, profs, split = byProfession(list, seenIn, firstIn, profOf)
+      if byProf ~= nil and info.groupCount > 1 and info.prof ~= nil then
+        info.entries = byProf[info.prof].entries -- the same entries in the same order, held once
+      end
+      info.byProf, info.profs = byProf, profs
+      if split then
+        info.split = true
+      end
+      infoOf[list] = info
     end
     index.wordInfo[word] = info
   end
+  buildArmorInfo(index, rank, seenIn)
 end
 
 -- §6.4: an ambiguous word counts only when another wordIndex word or a step 4.2 phrase match
--- (hasSet) is in the line, or a crafting cue word is next to it (cued, cuedAt).
+-- (hasSet) is in the line, or a crafting cue word is next to it (cued, cuedAt). One more way,
+-- for the armor slot words below (buyerBefore): a buyer word next to it, counted only through
+-- the sender's armor word (user ruling 2026-10-24, "LF legs from a warrior means he is looking for a
+-- blacksmith with legs").
 local function counts(token, first, other, hasSet, cued)
   if not ambiguous[token] then
     return true
@@ -263,12 +335,16 @@ local function counts(token, first, other, hasSet, cued)
 end
 
 -- Per-line buffers: the distinct counted words (a repeated word intersects once), found
--- with stamps on the words (each wordIndex word has its own list; false for a recognized
--- slang word nobody can craft, emptyCount of them). wordStamp[word]: stamp counted, skipped
+-- with stamps on the words (stamped per word, though synonyms share a list). lineLists[k] is the
+-- list of lineWords[k], false for a recognized slang word nobody can craft (emptyCount of them).
+-- wordStamp[word]: stamp counted, skipped
 -- counted but left out of the union (walkUnion: nobody crafts it, or an ambiguous word with
 -- no cue next to it), -stamp an ambiguous word left uncounted. stamp steps by 2.
+-- buyerOnly[1..buyerCount]: the words counted by a buyer word alone (Match drops the line
+-- unless the sender's armor word is inferred or a later cue promotes them to stamp).
 local lineWords, lineLists, lineCount, emptyCount = {}, {}, 0, 0
 local wordStamp = {}
+local buyerOnly, buyerCount = {}, 0
 local stamp, skipped = 0, 1
 -- The profession keys the line names, in narrowing order (Enchanting first, then line order,
 -- each once: namedStamp[key] == stamp): named[1..namedCount].
@@ -296,9 +372,11 @@ local function firstWords(wordIndex, tokens, count)
   local first, other = nil, nil
   for i = 1, count do
     local token = tokens[i]
-    if wordIndex[token] and first == nil then
+    -- No partner: an off-hand hand is no slot word (user ruling 2026-10-24).
+    local word = wordIndex[token] and not (token == "hand" and IsOffHand(tokens, i))
+    if word and first == nil then
       first = token
-    elseif wordIndex[token] and other == nil and token ~= first then
+    elseif word and other == nil and token ~= first then
       other = token
     end
   end
@@ -334,9 +412,50 @@ local function cuedFrom(tokens, count, breakBefore, i, step)
 end
 
 -- §6.4, user ruling 2026-10-21: whether a crafting cue word is the token right before or
--- after tokens[i], past filler words but never past punctuation.
+-- after tokens[i], past filler words but never past punctuation. lineCue: whether the line
+-- holds a cue word at all (nil until the first ask, collect resets it); a line without one
+-- answers false at once, so a long run of one uncounted word with filler between costs one
+-- scan, not a walk per repeat.
+local lineCue = nil
+
 local function cuedAt(tokens, count, breakBefore, i)
-  return cuedFrom(tokens, count, breakBefore, i, -1) or cuedFrom(tokens, count, breakBefore, i, 1)
+  if lineCue == nil then
+    lineCue = false
+    for k = 1, count do
+      if cueWords[tokens[k]] then
+        lineCue = true
+        break
+      end
+    end
+  end
+  return lineCue and (cuedFrom(tokens, count, breakBefore, i, -1) or cuedFrom(tokens, count, breakBefore, i, 1))
+end
+
+-- Whether the token right before tokens[i] is a buyer word with nothing between them (no
+-- filler word, no punctuation or link: breakBefore).
+local function buyerBefore(tokens, breakBefore, i)
+  return i > 1 and buyerWords[tokens[i - 1]] == true and not breakBefore(i)
+end
+
+-- Whether token was counted by a buyer word alone on this line.
+local function isBuyerOnly(token)
+  for k = 1, buyerCount do
+    if buyerOnly[k] == token then
+      return true
+    end
+  end
+  return false
+end
+
+-- Whether a word counted by a buyer word alone is still unpromoted (no cue word counted it
+-- since): it needs the sender's armor word, so it is no word of the line until that is inferred.
+local function buyerPending()
+  for k = 1, buyerCount do
+    if wordStamp[buyerOnly[k]] ~= stamp then
+      return true
+    end
+  end
+  return false
 end
 
 -- Adds a profession key the line names to named once: an Enchanting key in front, any other
@@ -360,64 +479,84 @@ end
 -- are skipped), emptyCount, Candidates.wordWhy, named and the inferArmor line state. → why
 -- count.
 -- inferable (§4 rule 2) is decided on every scanned word, counted or not: a slot without an
--- armor type (an ambiguous slot needs a cue next to it); an Enchanting word is tried first
--- without it (Match; user rulings 2026-10-20 and 2026-10-22). A repeat of a word already decided
--- (wordStamp) takes the same decision at once, since nothing it depends on changed; only a cue
--- next to the repeat (cuedAt) can count an uncounted one, or put a skipped one in the union.
+-- armor type (an ambiguous slot needs a cue next to it, or for buyerSlotWords a buyer word); an
+-- Enchanting word is tried first without it (Match; user rulings 2026-10-20 and 2026-10-22). A
+-- repeat of a word already decided (wordStamp) takes the same decision at once, since nothing it
+-- depends on changed; only a cue (cuedAt) or buyer word (buyerBefore) next to the repeat can
+-- count an uncounted one, or a cue put a skipped one in the union.
 -- The first two wordIndex words are found only when an ambiguous word needs them (most lines
 -- have none).
+-- A buyer word directly before an armor slot word (buyerSlotWords) that counts no other way
+-- counts it too, but "skipped" and in buyerOnly: it sets sawCuedSlot, so the sender's armor
+-- word may be inferred, and Match drops the line when none is (user ruling 2026-10-24).
 local function collect(index, tokens, count, breakBefore, hasSet)
   local wordIndex, tags, professionKeys = index.wordIndex, index.armorTags, index.professionKeys
   local first, other, scanned, enchanting = nil, nil, false, false
   local sawType, sawPlainSlot, sawCuedSlot = false, false, false
   local why, whyCount = Candidates.wordWhy, 0
-  lineCount, namedCount, emptyCount, stamp = 0, 0, 0, stamp + 2
-  skipped = stamp + 1
+  lineCount, namedCount, emptyCount, buyerCount, stamp = 0, 0, 0, 0, stamp + 2
+  skipped, lineCue = stamp + 1, nil
   for i = 1, count do
     local token = tokens[i]
     local seen = wordStamp[token]
-    if seen == stamp then
-      whyCount = whyCount + 1
-      why[whyCount] = token
-    elseif seen == skipped then
-      if wordIndex[token] and cuedAt(tokens, count, breakBefore, i) then
-        wordStamp[token] = stamp
-      end
-      whyCount = whyCount + 1
-      why[whyCount] = token
-    elseif seen ~= -stamp or cuedAt(tokens, count, breakBefore, i) then
-      local key = professionKeys[token]
-      if key ~= nil then
-        local isEnchanting = enchantingWords[token] == true
-        enchanting = enchanting or isEnchanting
-        addNamed(key, isEnchanting)
-      end
-      local list = wordIndex[token]
-      if (list or slangWords[token]) and lineCount < MAX_WORDS then
-        local tag, ambiguousSlot, cued, uncued = tags[token], false, false, false
-        if ambiguous[token] then
-          if not scanned then
-            first, other = firstWords(wordIndex, tokens, count)
-            scanned = true
-          end
-          ambiguousSlot, cued = tag == "slot", cuedAt(tokens, count, breakBefore, i)
-          uncued = not cued
+    -- An off-hand hand: no count, no why, no inference flag (user ruling 2026-10-24).
+    if not (token == "hand" and IsOffHand(tokens, i)) then
+      if seen == stamp then
+        whyCount = whyCount + 1
+        why[whyCount] = token
+      elseif seen == skipped then
+        local promoted = lineCue ~= false and wordIndex[token] and cuedAt(tokens, count, breakBefore, i)
+        if promoted then
+          wordStamp[token] = stamp
         end
-        local counted = counts(token, first, other, hasSet, cued)
-        sawType = sawType or tag == "type"
-        sawPlainSlot = sawPlainSlot or (tag == "slot" and not ambiguousSlot)
-        sawCuedSlot = sawCuedSlot or (ambiguousSlot and cued)
-        if counted then
-          if list == nil then
-            emptyCount = emptyCount + 1
-          end
-          wordStamp[token] = (list == nil or uncued) and skipped or stamp
-          lineCount = lineCount + 1
-          lineWords[lineCount], lineLists[lineCount] = token, list or false
+        -- A buyer-only word promoted by this cue already has its why token ("LF legs, crafter for
+        -- legs" says "legs" once, as without the buyer word).
+        if not (promoted and isBuyerOnly(token)) then
           whyCount = whyCount + 1
           why[whyCount] = token
-        else
-          wordStamp[token] = -stamp
+        end
+      elseif seen ~= -stamp or cuedAt(tokens, count, breakBefore, i) or buyerBefore(tokens, breakBefore, i) then
+        local key = professionKeys[token]
+        if key ~= nil then
+          local isEnchanting = enchantingWords[token] == true
+          enchanting = enchanting or isEnchanting
+          addNamed(key, isEnchanting)
+        end
+        local list = wordIndex[token]
+        if (list or slangWords[token]) and lineCount < MAX_WORDS then
+          local tag, ambiguousSlot, cued, uncued, buyer = tags[token], false, false, false, false
+          if ambiguous[token] then
+            if not scanned then
+              first, other = firstWords(wordIndex, tokens, count)
+              scanned = true
+            end
+            ambiguousSlot, cued = tag == "slot", cuedAt(tokens, count, breakBefore, i)
+            uncued = not cued
+          end
+          local counted = counts(token, first, other, hasSet, cued)
+          if not counted and ambiguousSlot and buyerSlotWords[token] then
+            buyer = buyerBefore(tokens, breakBefore, i)
+            counted = buyer
+          end
+          sawType = sawType or tag == "type"
+          sawPlainSlot = sawPlainSlot or (tag == "slot" and not ambiguousSlot)
+          sawCuedSlot = sawCuedSlot or (ambiguousSlot and (cued or buyer))
+          if counted then
+            if list == nil then
+              emptyCount = emptyCount + 1
+            end
+            wordStamp[token] = (list == nil or uncued) and skipped or stamp
+            if buyer then
+              buyerCount = buyerCount + 1
+              buyerOnly[buyerCount] = token
+            end
+            lineCount = lineCount + 1
+            lineWords[lineCount], lineLists[lineCount] = token, list or false
+            whyCount = whyCount + 1
+            why[whyCount] = token
+          else
+            wordStamp[token] = -stamp
+          end
         end
       end
     end
@@ -505,7 +644,7 @@ end
 -- Whether lineWords[1..lineCount] (several) are all slot words that no one slot names
 -- together ("neck ring", not "ring finger" or "cloth hands"). The sender's inferred armor
 -- word is a type word, so a line that takes one keeps the intersection.
-local function differentSlots()
+local function differentSlots(slotsOf)
   for k = 1, lineCount do
     if slotsOf[lineWords[k]] == nil then
       return false
@@ -657,7 +796,7 @@ local function walkNamed(index, intentToken, why, whyCount, from, to, mark)
     end
     return false
   end
-  if differentSlots() then
+  if differentSlots(index.slotsOf) then
     return walkUnion(index, intentToken, why, whyCount, from, to)
   elseif emptyCount > 0 then
     return false -- the sender's armor word joined the slot words: an empty intersection
@@ -696,21 +835,22 @@ function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, set
   local whyCount = collect(index, tokens, count, breakBefore or noBreak, hasSet)
   -- A recognized slang word nobody can craft empties the intersection; only the union of slot
   -- words of different slots skips it (user ruling 2026-10-24).
-  if emptyCount > 0 and (hasSet or not differentSlots()) then
+  if emptyCount > 0 and (hasSet or not differentSlots(index.slotsOf)) then
     return false
   end
   local why, from, inferred = Candidates.wordWhy, 1, nil
   if inferable and classArmor ~= nil then
     -- An Enchanting word is tried first, without the sender's armor and before the class
-    -- lookup: an enchant ignores the asker's armor (user ruling 2026-10-20). Only the
-    -- professions named after it get the armor word (user ruling 2026-10-22).
+    -- lookup: an enchant ignores the asker's armor (user ruling 2026-10-20), so a word only a
+    -- buyer word counts is no word of it (buyerPending). Only the professions named after it get
+    -- the armor word (user ruling 2026-10-22).
     if enchantingNamed then
       if hasSet then
         keepOwnWords(index, lineCount)
         if Candidates.KeepProf(named[1], true) then
           return Candidates.Decide(intentToken, setWhy, setWhyCount, why, whyCount)
         end
-      elseif lineCount > 0 and walkNamed(index, intentToken, why, whyCount, 1, 1, -stamp) then
+      elseif lineCount > 0 and not buyerPending() and walkNamed(index, intentToken, why, whyCount, 1, 1, -stamp) then
         return true
       end
       if namedCount == 1 then
@@ -721,6 +861,18 @@ function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, set
     whyCount, inferred = inferArmor(index, hasSet, classArmor, whyCount)
     if whyCount == nil then
       return false
+    end
+  end
+  -- A word only a buyer word counts needs the sender's armor word: no class, no match.
+  if inferred ~= true and buyerPending() then
+    return false
+  end
+  if inferred == true and not hasSet and namedCount == 0 and lineCount == 2 and emptyCount == 0 then
+    -- "LF legs" from a known class: the line is the pair (word, armor word), decided at build.
+    local byWord = index.armorInfo[lineWords[2]]
+    local pair = byWord and byWord[lineWords[1]]
+    if pair ~= nil then
+      return Candidates.DecideWord(intentToken, pair, why, whyCount)
     end
   end
   if hasSet then

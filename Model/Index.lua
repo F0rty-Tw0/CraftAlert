@@ -56,6 +56,45 @@ local function addItem(index, ctx, itemID, entry)
   end
 end
 
+local function sameEntries(a, b)
+  if #a ~= #b then
+    return false
+  end
+  for i = 1, #a do
+    if a[i] ~= b[i] then
+      return false
+    end
+  end
+  return true
+end
+
+-- User ruling 2026-10-24 ("Share synonym lists"): words whose lists hold the same entries in
+-- the same order (a slot's synonyms, an extraSlang key and its target) become one table, so
+-- the index and WordGroups' per-list data are held once. A hash of the entries finds the
+-- candidates; a collision just leaves a list unshared. Lists are read-only after the build.
+local function shareLists(wordIndex)
+  local ids, count, shared = {}, 0, {}
+  for word, list in pairs(wordIndex) do
+    local hash = #list
+    for i = 1, #list do
+      local entry = list[i]
+      local id = ids[entry]
+      if id == nil then
+        count = count + 1
+        id = count
+        ids[entry] = id
+      end
+      hash = (hash * 31 + id) % 2147483647
+    end
+    local first = shared[hash]
+    if first == nil then
+      shared[hash] = list
+    elseif first ~= list and sameEntries(first, list) then
+      wordIndex[word] = first
+    end
+  end
+end
+
 local function indexed(recipe, includeUnbound)
   if recipe.muted then
     return false
@@ -180,6 +219,7 @@ local function newIndex(settings, opts)
     professionOrder = opts.professionOrder and opts.professionOrder() or {},
     professionWordAlerts = settings.professionWordAlerts == true,
     ownName = opts.ownKey,
+    extraSlang = settings.extraSlang or {}, -- WordGroups.Build reads it (R2: slot-word keys)
     armorTags = ItemKeywords.ArmorTags(settings.extraSlang), -- §4 rule 1 tags (class-armor spec), read by step 4.4
     size = 0,
     crafterCount = 0,
@@ -217,6 +257,7 @@ function Index.Build(db, settings, opts)
   if ownKey and ownEnabled and addPending(index, ctx, own, opts.pending or {}) and not crafters[ownKey] then
     index.crafterCount = index.crafterCount + 1
   end
+  shareLists(index.wordIndex)
   addProfessionWords(index, ctx.professions)
   Aliases.Build(index, ctx.names)
   TypoPass.Build(index)

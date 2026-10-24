@@ -6,6 +6,7 @@ end
 local Slang = ns.Slang or require("CraftAlert.Model.Slang")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
 local StatSlot = ns.StatSlot or require("CraftAlert.Model.StatSlot")
+local PhraseMatch = ns.PhraseMatch or require("CraftAlert.Model.PhraseMatch")
 
 -- Spec §6.2 item 5 and §6.3 step 4.5: typo targets (typoBuckets, built with the index) and
 -- the per-line search. Targets are one-word phrase records and profession words of 5+
@@ -170,15 +171,20 @@ end
 -- at its smallest distance count. companion: the line has a wordIndex or enchant slot word or
 -- a step 4.2 hit, so kind-c aliases and one-word full names count. aside: the lone step 4.2
 -- hit the second-word rule set aside, or nil; it counts once a record is kept (§6.2 item 1).
+-- Precondition: PhraseMatch.Run ran on this same line (it sets PhraseMatch.dropped and dropRun;
+-- a stale dropRun would skip tokens).
 -- → the number of records hit.
 function TypoPass.Run(index, tokens, count, companion, aside)
   TypoPass.recordCount, TypoPass.profCount, TypoPass.whyCount = 0, 0, 0
   local typoBuckets = index.typoBuckets
   local tried = 0
+  local dropped, dropRun = PhraseMatch.dropped, PhraseMatch.dropRun
   for i = 1, count do
     local token = tokens[i]
     local length = #token
-    if tried < MAX_TOKENS and eligible(index, token, length) then
+    -- User ruling 2026-10-24 (R4): the tokens of a hit step 4.2 dropped are not typo targets,
+    -- tested before eligible so such a token does not count toward MAX_TOKENS.
+    if tried < MAX_TOKENS and dropped[i] ~= dropRun and eligible(index, token, length) then
       tried = tried + 1
       local byLength = typoBuckets[byte(token, 1)]
       if byLength and nearest(token, length, byLength) > 0 then

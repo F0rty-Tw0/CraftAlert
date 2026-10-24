@@ -108,19 +108,35 @@ local function cuedAt(ns, tokens, i)
   return false
 end
 
--- User ruling 2026-10-24 ("either slot counts"): whether the counted words (taken) are all
--- Slang.slots words and no one slot lists them all, so step 4.4 takes the union of their lists.
-local function eitherSlot(Slang, taken)
+-- User ruling 2026-10-24 ("either slot counts"): the word lists of the equip slots, each plus the
+-- extraSlang keys whose target it lists (R2).
+local function slotLists(Slang, extraSlang)
+  local lists = {}
+  for _, words in pairs(Slang.slots) do
+    local list = { unpack(words) }
+    for key, target in pairs(extraSlang) do
+      if isIn(words, target) then
+        list[#list + 1] = key
+      end
+    end
+    lists[#lists + 1] = list
+  end
+  return lists
+end
+
+-- Whether the counted words (taken) are all slot words and no one slot lists them all, so step
+-- 4.4 takes the union of their lists.
+local function eitherSlot(lists, taken)
   for word in pairs(taken) do
     local any = false
-    for _, words in pairs(Slang.slots) do
+    for _, words in ipairs(lists) do
       any = any or isIn(words, word)
     end
     if not any then
       return false
     end
   end
-  for _, words in pairs(Slang.slots) do
+  for _, words in ipairs(lists) do
     local all = true
     for word in pairs(taken) do
       all = all and isIn(words, word)
@@ -178,7 +194,7 @@ local function reference44(ns, index, tokens, set)
       end
     end
   end
-  local union = set == nil and eitherSlot(Slang, taken)
+  local union = set == nil and eitherSlot(slotLists(Slang, index.extraSlang), taken)
   local base = set or lists[1]
   if (empty and not union) or (base == nil and not union) then
     return "nil", capped

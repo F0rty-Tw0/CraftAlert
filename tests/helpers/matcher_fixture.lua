@@ -39,10 +39,10 @@ local MODULES = {
 
 -- Item words of the four Blacksmithing recipes (what ItemKeywords gives the real items).
 Fixture.itemWords = {
-  ["lionheart helm"] = { "helm", "helmet", "head", "plate" },
-  ["green iron hauberk"] = { "chest", "robe", "mail" },
-  ["green iron leggings"] = { "legs", "leg", "pants", "mail" },
-  ["green iron boots"] = { "boots", "boot", "feet", "shoes", "mail" },
+  ["lionheart helm"] = { "helm", "helmet", "head", "hood", "cowl", "plate" },
+  ["green iron hauberk"] = { "chest", "robe", "chestguard", "breastplate", "tunic", "jerkin", "vest", "mail" },
+  ["green iron leggings"] = { "legs", "leg", "pants", "leggings", "legguards", "legplates", "greaves", "mail" },
+  ["green iron boots"] = { "boots", "boot", "feet", "shoes", "sabatons", "treads", "mail" },
 }
 
 -- Fresh copies of every module the matcher needs, loaded after Wow.reset (and flavor stubs).
@@ -100,6 +100,11 @@ function Fixture.index(ns, db)
       return { Fixture.ENCH, Fixture.BS, Fixture.TAILOR, Fixture.LW }
     end,
   })
+  -- Index.Build shares one list between words with the same entries (user ruling 2026-10-24);
+  -- unshare, so appending to one word's list leaves its synonyms' alone.
+  for word, list in pairs(index.wordIndex) do
+    index.wordIndex[word] = { unpack(list) }
+  end
   for phrase, words in pairs(Fixture.itemWords) do
     local record = index.phraseSet[phrase]
     if record then
@@ -131,6 +136,8 @@ Fixture.items = {
   [504] = { "INVTYPE_HEAD", 4, 4 }, -- plate helm
   [505] = { "INVTYPE_WAIST", 4, 4 }, -- plate belt
   [506] = { "INVTYPE_CHEST", 4, 3 }, -- mail chest
+  [507] = { "INVTYPE_HAND", 4, 4 }, -- plate gloves
+  [510] = { "INVTYPE_LEGS", 4, 4 }, -- legs an Enchanting recipe lists
   [601] = { "INVTYPE_WAIST", 4, 1 }, -- cloth belt
   [602] = { "INVTYPE_WAIST", 4, 1 },
   [603] = { "INVTYPE_HEAD", 4, 1 }, -- cloth helm
@@ -140,6 +147,7 @@ Fixture.items = {
   [701] = { "INVTYPE_WAIST", 4, 2 }, -- leather belt
   [702] = { "INVTYPE_HEAD", 4, 2 }, -- leather helm
   [703] = { "INVTYPE_LEGS", 4, 2 }, -- leather legs
+  [704] = { "INVTYPE_CHEST", 4, 2 }, -- leather chest
   [801] = { "INVTYPE_FINGER", 4, 0 }, -- ring
   [811] = { "INVTYPE_NECK", 4, 0 }, -- necklace
   [814] = { "INVTYPE_NECK", 4, 0 },
