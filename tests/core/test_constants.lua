@@ -56,10 +56,10 @@ return function()
   end
 
   -- §6.3 default word lists and §6.4 ambiguous slot words.
-  Assert.same(Constants.intentWords, { "lf", "lfc", "wtb", "need", "needs", "looking", "any", "any1", "anyone", "who", "recraft" })
+  Assert.same(Constants.intentWords, { "lf", "lfc", "lfrc", "wtb", "wtc", "need", "needs", "looking", "any", "any1", "anyone", "who", "recraft" })
   Assert.same(Constants.blockerWords, { "wts", "lfw", "selling" })
-  Assert.same(Constants.ambiguousWords, { "legs", "head", "hands", "feet", "ring", "back" })
-  Assert.same(Constants.craftCueWords, { "crafter", "craft", "crafted", "maker" })
+  Assert.same(Constants.ambiguousWords, { "legs", "leg", "head", "hands", "feet", "ring", "back" })
+  Assert.same(Constants.craftCueWords, { "crafter", "craft", "crafted", "maker", "recraft", "recrafter", "recrafting" })
 
   -- §6.2 item 2: an alias made only of these words is never created.
   Assert.same(Constants.aliasStopWords, {

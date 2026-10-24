@@ -57,7 +57,7 @@ Constants.flavors = {
 }
 
 -- §6.3: defaults for the editable intent and blocker lists.
-Constants.intentWords = { "lf", "lfc", "wtb", "need", "needs", "looking", "any", "any1", "anyone", "who", "recraft" }
+Constants.intentWords = { "lf", "lfc", "lfrc", "wtb", "wtc", "need", "needs", "looking", "any", "any1", "anyone", "who", "recraft" }
 Constants.blockerWords = { "wts", "lfw", "selling" }
 
 -- §6.2 item 2: filler and tier words. An alias made only of these (or of slang, stat,
@@ -82,12 +82,12 @@ Constants.aliasStopWords = {
 -- §6.4: slot words that count only next to another slot/type word, a phrase or a crafting cue
 -- word: body parts, "ring" ("ring me when ready", "ring of blood"; user ruling 2026-10-20)
 -- and "back" ("be back in 5", "pay you back"; user ruling 2026-10-21).
-Constants.ambiguousWords = { "legs", "head", "hands", "feet", "ring", "back" }
+Constants.ambiguousWords = { "legs", "leg", "head", "hands", "feet", "ring", "back" }
 
 -- Class-armor spec §5: words that mark a line as asking for crafting, so an ambiguous slot word
 -- counts (§6.4) and may take the sender's armor type. Every profession word counts too. Fixed,
 -- not user-editable.
-Constants.craftCueWords = { "crafter", "craft", "crafted", "maker" }
+Constants.craftCueWords = { "crafter", "craft", "crafted", "maker", "recraft", "recrafter", "recrafting" }
 
 -- §6.4: words skipped between a cue word and the ambiguous word it partners, which must
 -- otherwise be next to each other ("LF crafter for my legs"; user ruling 2026-10-21).

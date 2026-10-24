@@ -78,6 +78,23 @@ local function testEnchantLinks()
   Assert.same({ unpack(Tokenizer.linkNames, 1, Tokenizer.linkNameCount) }, { "enchant bracer minor health" })
 end
 
+-- Retail and Forever recipe links: `|Henchant:<recipeID>|h[Profession: Name]|h`. The ID and
+-- the text after the first colon are kept per link name; item links and colonless names get false.
+local function testRecipeLinks()
+  local Tokenizer = load()
+  local line = "LF |cnIQ4:|Henchant:1228943|h[Midnight Tailoring: Martyr's Gloves]|h|r craftere "
+    .. "|Hitem:2575|h[Red: Shirt]|h |Henchant:7418|h[Enchant Bracer - Minor Health]|h"
+  local count = Tokenizer.Tokenize(Tokenizer.Scan(line))
+  Assert.same(tokensOf(Tokenizer, count), { "lf", "craftere" })
+  Assert.same({ unpack(Tokenizer.linkNames, 1, 3) }, { "midnight tailoring martyr's gloves", "red shirt", "enchant bracer minor health" })
+  Assert.same({ unpack(Tokenizer.linkIDs, 1, 3) }, { 1228943, false, 7418 })
+  Assert.same({ unpack(Tokenizer.linkTails, 1, 3) }, { "martyr's gloves", false, false })
+  -- A colon with nothing after it, and the buffers of the longer line cleared.
+  Tokenizer.Tokenize("lf |henchant:5|h[tailoring:]|h")
+  Assert.equal(Tokenizer.linkNameCount, 1)
+  Assert.same({ Tokenizer.linkIDs[1], Tokenizer.linkTails[1], Tokenizer.linkIDs[2], Tokenizer.linkTails[2] }, { 5, false, nil, nil })
+end
+
 -- A link with no color code, and a crafted world drop typed next to a link: the typed name stays text.
 local function testBareLinkAndText()
   local Tokenizer = load()
@@ -195,6 +212,7 @@ return function()
   testTypedBrackets()
   testLinkShapes()
   testEnchantLinks()
+  testRecipeLinks()
   testBareLinkAndText()
   testNonAscii()
   testOtherEscapes()

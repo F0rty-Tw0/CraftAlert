@@ -263,12 +263,16 @@ end
 -- word with nothing but spaces between (breakBefore: Tokenizer.BreakBefore). The words are
 -- read first and breakBefore, a string search, is asked only when a cue word was reached, so
 -- an uncued repeat of an ambiguous word costs table lookups alone.
+-- The line's intent token (Match sets it): a word that is both ("recraft") is never also its
+-- own cue, so "will recraft legs for tips" stays silent (user ruling 2026-10-24).
+local lineIntent = nil
+
 local function cuedFrom(tokens, count, breakBefore, i, step)
   local k = i + step
   while k >= 1 and k <= count and fillerWords[tokens[k]] do
     k = k + step
   end
-  if k < 1 or k > count or not cueWords[tokens[k]] then
+  if k < 1 or k > count or not cueWords[tokens[k]] or tokens[k] == lineIntent then
     return false
   end
   local low, high = i, k
@@ -491,6 +495,7 @@ end
 -- and 4.6 follow (4.6: the first profession word in the line). → whether it produced a match
 -- (left in Candidates' result).
 function WordGroups.Match(index, tokens, count, intentToken, hasSet, setWhy, setWhyCount, classArmor, breakBefore)
+  lineIntent = intentToken
   local whyCount = collect(index, tokens, count, breakBefore or noBreak, hasSet)
   if whyCount == nil then
     return false

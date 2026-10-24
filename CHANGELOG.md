@@ -25,3 +25,8 @@ Player-friendly release notes for Craft Alert.
 - Craft Alert turns itself off in any instance (dungeons, raids, battlegrounds, arenas, delves): no scanning, no alerts, the launcher, toast and leads window are hidden, and `/ca` and the key bindings do nothing there. It comes back when you leave.
 - The "Only while resting" setting is now "Only where Trade chat exists": Craft Alert listens wherever you have the Trade channel, not just in cities and inns.
 - Fixed: Blizzard errors in Mythic+ blamed on Craft Alert ("execution tainted by 'CraftAlert'"). Craft Alert now uses its own tooltip and stays out of Blizzard's.
+- Fixed: a linked recipe ("LF [Tailoring: Martyr's Gloves] crafter") did not alert on Retail or Forever. Recipe links now match the recipe they point to.
+- "WTC" and "LFRC" are now request words by default, next to "LF", "LFC" and "WTB". Saved word lists are kept as they are; add them in Settings → Keywords if yours lacks them.
+- More requests alert: "recraft", "recrafter" and "recrafting" work like "crafter" ("LF recraft ring"), "leg" works like "legs", and "enchs" names Enchanting.
+- "/w me" no longer hides a request that says LF, LFC, LFRC, WTB or WTC ("LFC [Spellbreaker's Bracers] /w me"). Lines without one of those still count as ads, and so does "LF work" (but not "LF work order").
+- "Trinket" no longer picks a profession on its own: it chose whoever knew the most trinkets, often old alchemist stones over PvP trinkets. Name the trinket instead.

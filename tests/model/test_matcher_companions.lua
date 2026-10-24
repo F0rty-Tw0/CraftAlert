@@ -87,7 +87,7 @@ local function testKindCOnTradeWords()
   expect(ns, "lf shadowfnag", "stop:nomatch", "by typo")
   local result = expect(ns, "lf shadowfang sword", "item:910", "a wordIndex word")
   Assert.equal(why(result), "lf+shadowfang")
-  expect(ns, "lf |cffffd000|Henchant:1|h[Shadowfang]|h|r", "item:910", "a link name")
+  expect(ns, "lf |cffffd000|Henchant:0|h[Shadowfang]|h|r", "item:910", "a link name") -- ID 0: no stored recipe
   expect(ns, "LF |cff0070dd|Hitem:910::::::::60:::::|h[Shadowfang]|h|r", "item:910", "an item link")
 end
 

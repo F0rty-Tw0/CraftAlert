@@ -77,7 +77,7 @@ function Synthetic.db(ns)
     local recipes = {}
     for k = 1, 200 do
       local n = (c - 1) * 200 + k
-      recipes[n] = recipeAt(n, prof, items)
+      recipes[200000 + n * 131] = recipeAt(n, prof, items) -- sparse, like real recipe spell IDs
     end
     db.characters["Char" .. c .. "-Realm"] = {
       source = "local",

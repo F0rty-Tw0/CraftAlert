@@ -41,7 +41,7 @@ local MODULES = {
 Fixture.itemWords = {
   ["lionheart helm"] = { "helm", "helmet", "head", "plate" },
   ["green iron hauberk"] = { "chest", "robe", "mail" },
-  ["green iron leggings"] = { "legs", "pants", "mail" },
+  ["green iron leggings"] = { "legs", "leg", "pants", "mail" },
   ["green iron boots"] = { "boots", "boot", "feet", "shoes", "mail" },
 }
 
@@ -143,6 +143,7 @@ Fixture.items = {
   [801] = { "INVTYPE_FINGER", 4, 0 }, -- ring
   [802] = { "INVTYPE_HAND", 4, 2 }, -- leather gloves
   [910] = { "INVTYPE_WEAPON", 2, 7 }, -- one-handed sword
+  [950] = { "INVTYPE_TRINKET", 4, 0 }, -- trinket
 }
 
 function Fixture.stubItems()

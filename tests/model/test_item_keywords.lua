@@ -38,8 +38,7 @@ local CASES = {
   { "INVTYPE_CLOAK", CLASS_ARMOR, 1, { "cloak", "cape", "back", "cloth" } },
   { "INVTYPE_CHEST", CLASS_ARMOR, 3, { "chest", "robe", "mail" } },
   { "INVTYPE_ROBE", CLASS_ARMOR, 1, { "chest", "robe", "cloth" } },
-  { "INVTYPE_LEGS", CLASS_ARMOR, 4, { "legs", "pants", "plate" } },
-  { "INVTYPE_TRINKET", CLASS_ARMOR, 0, { "trinket" } },
+  { "INVTYPE_LEGS", CLASS_ARMOR, 4, { "legs", "leg", "pants", "plate" } },
   { "INVTYPE_SHIELD", CLASS_ARMOR, 6, { "shield" } },
   { "INVTYPE_HOLDABLE", CLASS_ARMOR, 0, { "offhand" } },
   -- Weapons: hand count comes from the equip location, the kind from the subclass
@@ -60,13 +59,14 @@ local CASES = {
   -- Containers: any container subclass is a bag
   { "INVTYPE_BAG", CLASS_CONTAINER, 0, { "bag" } },
   { "", CLASS_CONTAINER, 3, { "bag" } },
-  -- No words: shirt, tabard, thrown, ammo, quiver, relic, profession gear, non-equipment
+  -- No words: shirt, tabard, thrown, ammo, quiver, relic, trinket, profession gear, non-equipment
   { "INVTYPE_BODY", CLASS_ARMOR, 0, {} },
   { "INVTYPE_TABARD", CLASS_ARMOR, 0, {} },
   { "INVTYPE_THROWN", CLASS_WEAPON, 16, {} },
   { "INVTYPE_AMMO", 6, 2, {} },
   { "INVTYPE_QUIVER", 11, 2, {} },
   { "INVTYPE_RELIC", CLASS_ARMOR, 7, {} },
+  { "INVTYPE_TRINKET", CLASS_ARMOR, 0, {} },
   { "INVTYPE_PROFESSION_TOOL", 19, 0, {} },
   { "INVTYPE_PROFESSION_GEAR", 19, 0, {} },
   { "", 0, 1, {} },
@@ -117,22 +117,22 @@ end
 
 -- The extra table is read per call and never stored: a later call without it is unchanged.
 local function testExtraSlangNotRemembered()
-  local ItemKeywords = load({ [1] = { "INVTYPE_TRINKET", CLASS_ARMOR, 0 } })
-  Assert.same(ItemKeywords.WordsFor(1, { bauble = "trinket" }), { "trinket", "bauble" })
-  Assert.same(ItemKeywords.WordsFor(1), { "trinket" })
+  local ItemKeywords = load({ [1] = { "INVTYPE_SHIELD", CLASS_ARMOR, 6 } })
+  Assert.same(ItemKeywords.WordsFor(1, { buckler = "shield" }), { "shield", "buckler" })
+  Assert.same(ItemKeywords.WordsFor(1), { "shield" })
 end
 
 local function testResultIsFresh()
-  local ItemKeywords = load({ [1] = { "INVTYPE_TRINKET", CLASS_ARMOR, 0 } })
+  local ItemKeywords = load({ [1] = { "INVTYPE_SHIELD", CLASS_ARMOR, 6 } })
   local first = ItemKeywords.WordsFor(1)
   first[#first + 1] = "mutated"
-  Assert.same(ItemKeywords.WordsFor(1), { "trinket" })
+  Assert.same(ItemKeywords.WordsFor(1), { "shield" })
 end
 
 local function testAmbiguousFlags()
   load({})
   local Slang = Fresh.require("Model.Slang")
-  for _, word in ipairs({ "legs", "head", "hands", "feet" }) do
+  for _, word in ipairs({ "legs", "leg", "head", "hands", "feet" }) do
     Assert.truthy(Slang.ambiguous[word], word)
   end
   Assert.falsy(Slang.ambiguous.belt)
@@ -182,6 +182,7 @@ local function testArmorTags()
     "chest",
     "robe",
     "legs",
+    "leg",
     "pants",
   }
   local expected = { cloth = "type", leather = "type", mail = "type", plate = "type" }

@@ -69,12 +69,28 @@ local function testIntentAndAds()
   expect(ns, "I can craft fiery weapon if you need, pst", "stop:blocker", "can craft + pst")
   expect(ns, "can craft fiery weapon if you need", "item:enchant weapon - fiery weapon", "can craft without pst")
   expect(ns, "LF fiery weapon PST", "item:enchant weapon - fiery weapon", "pst alone")
+  expect(ns, "WTC fiery weapon", "item:enchant weapon - fiery weapon", "wtc is a default intent word")
+  expect(ns, "LFRC fiery weapon", "item:enchant weapon - fiery weapon", "lfrc is a default intent word")
+  expect(ns, "TANK LF FOR ENCHS ORG", "profession:" .. ENCH, "enchs is an Enchanting word")
   expect(ns, "pst crafting need fiery weapon", "item:enchant weapon - fiery weapon", "pst before crafting")
   -- "/w me" is an ad only as a whole word: not "/w meow" or "/w melissa".
   expect(ns, "LF enchanter /w meow", "profession:" .. ENCH, "/w meow")
   expect(ns, "lf fiery weapon /w melissa", "item:enchant weapon - fiery weapon", "/w melissa")
-  expect(ns, "lf fiery weapon /w me.", "stop:blocker", "/w me then punctuation")
-  expect(ns, "lf fiery weapon /w melissa or /w me", "stop:blocker", "a later whole /w me")
+  expect(ns, "need fiery weapon /w me.", "stop:blocker", "/w me then punctuation")
+  expect(ns, "need fiery weapon /w melissa or /w me", "stop:blocker", "a later whole /w me")
+  -- A buyer's word (lf, lfc, lfrc, wtb, wtc) makes "/w me" a request, not an ad.
+  expect(ns, "lf fiery weapon /w me.", "item:enchant weapon - fiery weapon", "lf + /w me")
+  expect(ns, "anyone lfc fiery weapon? /w me", "item:enchant weapon - fiery weapon", "any buyer word in the line")
+  expect(ns, "WTB fiery weapon /w me", "item:enchant weapon - fiery weapon")
+  expect(ns, "LF fiery weapon WTS /w me", "stop:blocker", "a blocker word still wins")
+  expect(ns, "WTC fiery weapon /w me", "item:enchant weapon - fiery weapon", "wtc is a buyer word")
+  expect(ns, "LFRC fiery weapon /w me", "item:enchant weapon - fiery weapon", "lfrc is a buyer word")
+  -- "LF work" is a crafter's ad, whatever else the line says.
+  expect(ns, "Enchanter LF work /w me", "stop:blocker")
+  expect(ns, "Max enchanter LF work, fiery weapon", "stop:blocker")
+  expect(ns, "LF fiery weapon, will work for tips", "item:enchant weapon - fiery weapon", "work not right after lf")
+  expect(ns, "LF work order fiery weapon", "item:enchant weapon - fiery weapon", "a work order is a buyer's request")
+  expect(ns, "LF Work-Order fiery weapon", "item:enchant weapon - fiery weapon", "hyphenated work order")
 end
 
 -- §6.3 4.1: the first craftable item link matches; other links and link text are ignored.
@@ -90,6 +106,30 @@ local function testItemLinks()
   fixture(ns)
   expect(ns, "LF |cffffd000|Henchant:23800|h[Enchant Weapon - Mongoose]|h|r", "item:enchant weapon - mongoose")
   expect(ns, "LF |cffffd000|Henchant:1|h[Mongoose]|h|r", "stop:nomatch", "link names match full names only")
+end
+
+-- §6.3 4.2: a recipe link's ID names a stored recipe whatever its text; else the text after a
+-- "Profession:" prefix matches when the whole text does not.
+local function testRecipeLinkIDs()
+  local ns = Fixture.load()
+  local db = Fixture.db(ns)
+  db.characters["Tailor-Realm"].recipes[1228943] = { name = "Martyr's Gloves", prof = TAILOR }
+  db.characters["Tailor-Realm"].recipes[17187] = { name = "Transmute: Arcanite", prof = TAILOR }
+  db.characters["Tailor-Realm"].recipes[17188] = { name = "Arcanite", prof = TAILOR }
+  db.characters["Tailor-Realm"].recipes["Bolt of Silk"] = { name = "Bolt of Silk", prof = TAILOR }
+  fixture(ns, Fixture.index(ns, db))
+  local result = expect(ns, "LF |cnIQ4:|Henchant:1228943|h[Midnight Tailoring: Martyr's Gloves]|h|r craftere", "item:martyr's gloves")
+  Assert.equal(assert(result).entries[1].character, "Tailor-Realm")
+  expect(ns, "LF |Henchant:12|h[Enchanting: Renamed]|h", "item:enchant weapon - mongoose", "the ID wins over the text")
+  expect(ns, "LF |Henchant:9|h[Enchanting: Enchant Weapon - Mongoose]|h", "item:enchant weapon - mongoose", "prefix stripped")
+  expect(ns, "LF |Henchant:9|h[Transmute: Arcanite]|h", "item:transmute: arcanite", "a colon in the name itself")
+  expect(ns, "LF |Henchant:9|h[Tailoring: Bolt of Silk]|h", "item:bolt of silk", "name-keyed recipe")
+  expect(ns, "LF |Henchant:9|h[Tailoring: Mongoose]|h", "stop:nomatch", "the stripped text matches full names only")
+  -- Only enchant links carry IDs: an item ID equal to a recipe key is not that recipe.
+  expect(ns, "LF |Hitem:12|h[Something]|h", "stop:nomatch")
+  db.characters["Ench-Realm"].recipes[12].muted = true
+  fixture(ns, Fixture.index(ns, db))
+  expect(ns, "LF |Henchant:12|h[Enchanting: Renamed]|h", "stop:nomatch", "a muted recipe")
 end
 
 -- §6.3 4.2: longest phrase wins, so a full name beats its own alias; several -> 4.4 set.
@@ -310,6 +350,7 @@ return function()
   testGate()
   testIntentAndAds()
   testItemLinks()
+  testRecipeLinkIDs()
   testPhrases()
   testFullNameBeatsAlias()
   testTypoPass()
