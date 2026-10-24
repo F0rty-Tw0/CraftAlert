@@ -372,11 +372,11 @@ local function firstWords(wordIndex, tokens, count)
   local first, other = nil, nil
   for i = 1, count do
     local token = tokens[i]
-    if token == "hand" and IsOffHand(tokens, i) then
-      -- no partner: an off-hand hand is no slot word (user ruling 2026-10-24)
-    elseif wordIndex[token] and first == nil then
+    -- No partner: an off-hand hand is no slot word (user ruling 2026-10-24).
+    local word = wordIndex[token] and not (token == "hand" and IsOffHand(tokens, i))
+    if word and first == nil then
       first = token
-    elseif wordIndex[token] and other == nil and token ~= first then
+    elseif word and other == nil and token ~= first then
       other = token
     end
   end
@@ -499,63 +499,64 @@ local function collect(index, tokens, count, breakBefore, hasSet)
   for i = 1, count do
     local token = tokens[i]
     local seen = wordStamp[token]
-    if token == "hand" and IsOffHand(tokens, i) then
-      -- no count, no why, no inference flag (user ruling 2026-10-24)
-    elseif seen == stamp then
-      whyCount = whyCount + 1
-      why[whyCount] = token
-    elseif seen == skipped then
-      local promoted = lineCue ~= false and wordIndex[token] and cuedAt(tokens, count, breakBefore, i)
-      if promoted then
-        wordStamp[token] = stamp
-      end
-      -- A buyer-only word promoted by this cue already has its why token ("LF legs, crafter for
-      -- legs" says "legs" once, as without the buyer word).
-      if not (promoted and isBuyerOnly(token)) then
+    -- An off-hand hand: no count, no why, no inference flag (user ruling 2026-10-24).
+    if not (token == "hand" and IsOffHand(tokens, i)) then
+      if seen == stamp then
         whyCount = whyCount + 1
         why[whyCount] = token
-      end
-    elseif seen ~= -stamp or cuedAt(tokens, count, breakBefore, i) or buyerBefore(tokens, breakBefore, i) then
-      local key = professionKeys[token]
-      if key ~= nil then
-        local isEnchanting = enchantingWords[token] == true
-        enchanting = enchanting or isEnchanting
-        addNamed(key, isEnchanting)
-      end
-      local list = wordIndex[token]
-      if (list or slangWords[token]) and lineCount < MAX_WORDS then
-        local tag, ambiguousSlot, cued, uncued, buyer = tags[token], false, false, false, false
-        if ambiguous[token] then
-          if not scanned then
-            first, other = firstWords(wordIndex, tokens, count)
-            scanned = true
-          end
-          ambiguousSlot, cued = tag == "slot", cuedAt(tokens, count, breakBefore, i)
-          uncued = not cued
+      elseif seen == skipped then
+        local promoted = lineCue ~= false and wordIndex[token] and cuedAt(tokens, count, breakBefore, i)
+        if promoted then
+          wordStamp[token] = stamp
         end
-        local counted = counts(token, first, other, hasSet, cued)
-        if not counted and ambiguousSlot and buyerSlotWords[token] then
-          buyer = buyerBefore(tokens, breakBefore, i)
-          counted = buyer
-        end
-        sawType = sawType or tag == "type"
-        sawPlainSlot = sawPlainSlot or (tag == "slot" and not ambiguousSlot)
-        sawCuedSlot = sawCuedSlot or (ambiguousSlot and (cued or buyer))
-        if counted then
-          if list == nil then
-            emptyCount = emptyCount + 1
-          end
-          wordStamp[token] = (list == nil or uncued) and skipped or stamp
-          if buyer then
-            buyerCount = buyerCount + 1
-            buyerOnly[buyerCount] = token
-          end
-          lineCount = lineCount + 1
-          lineWords[lineCount], lineLists[lineCount] = token, list or false
+        -- A buyer-only word promoted by this cue already has its why token ("LF legs, crafter for
+        -- legs" says "legs" once, as without the buyer word).
+        if not (promoted and isBuyerOnly(token)) then
           whyCount = whyCount + 1
           why[whyCount] = token
-        else
-          wordStamp[token] = -stamp
+        end
+      elseif seen ~= -stamp or cuedAt(tokens, count, breakBefore, i) or buyerBefore(tokens, breakBefore, i) then
+        local key = professionKeys[token]
+        if key ~= nil then
+          local isEnchanting = enchantingWords[token] == true
+          enchanting = enchanting or isEnchanting
+          addNamed(key, isEnchanting)
+        end
+        local list = wordIndex[token]
+        if (list or slangWords[token]) and lineCount < MAX_WORDS then
+          local tag, ambiguousSlot, cued, uncued, buyer = tags[token], false, false, false, false
+          if ambiguous[token] then
+            if not scanned then
+              first, other = firstWords(wordIndex, tokens, count)
+              scanned = true
+            end
+            ambiguousSlot, cued = tag == "slot", cuedAt(tokens, count, breakBefore, i)
+            uncued = not cued
+          end
+          local counted = counts(token, first, other, hasSet, cued)
+          if not counted and ambiguousSlot and buyerSlotWords[token] then
+            buyer = buyerBefore(tokens, breakBefore, i)
+            counted = buyer
+          end
+          sawType = sawType or tag == "type"
+          sawPlainSlot = sawPlainSlot or (tag == "slot" and not ambiguousSlot)
+          sawCuedSlot = sawCuedSlot or (ambiguousSlot and (cued or buyer))
+          if counted then
+            if list == nil then
+              emptyCount = emptyCount + 1
+            end
+            wordStamp[token] = (list == nil or uncued) and skipped or stamp
+            if buyer then
+              buyerCount = buyerCount + 1
+              buyerOnly[buyerCount] = token
+            end
+            lineCount = lineCount + 1
+            lineWords[lineCount], lineLists[lineCount] = token, list or false
+            whyCount = whyCount + 1
+            why[whyCount] = token
+          else
+            wordStamp[token] = -stamp
+          end
         end
       end
     end
