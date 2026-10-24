@@ -4,6 +4,9 @@ Player-friendly release notes for Craft Alert.
 
 ## [Unreleased]
 
+- Your main crafter for a profession now wins ties over the character you're playing.
+- Choose the main crafter from a lead card: left-click its Crafters row.
+
 - A toast pops up beside the launcher, on the side facing the middle of the screen, when someone in Trade asks for something you can craft. It shows a plain headline ("Wants … — you can craft it"), their whole Trade message with item and recipe links you can hover, and what matched in its tooltip. Left-click to greet them, shift-click to edit the greeting first, ctrl-click for an empty whisper, right-click to dismiss; a click on a link only opens the link. Dragging the toast moves the launcher.
 - A leads window lists every open request, newest first, with the same clicks as the toast. Drag it, resize it, close it with Escape.
 - Each lead is a card with its details beside it: the customer in their class colour, how long ago they asked, what they want, then their message with hoverable links, what matched, and which of your characters can craft it.
