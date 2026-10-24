@@ -415,8 +415,54 @@ return function()
   for _, candidate in ipairs(candidates) do
     byKey[candidate.key] = candidate
   end
-  Assert.same(byKey["Alt-Realm"], { key = "Alt-Realm", rank = 3, byConc = false }, "Alt's best entry")
-  Assert.same(byKey["Zed-Realm"], { key = "Zed-Realm", rank = 1, byConc = false })
+  Assert.same(byKey["Alt-Realm"], { key = "Alt-Realm", rank = 3, byConc = false, top = 3, recipeKey = 10, prof = BS }, "Alt's best entry")
+  Assert.same(byKey["Zed-Realm"], { key = "Zed-Realm", rank = 1, byConc = false, top = 3, recipeKey = 10, prof = BS })
+
+  -- Repick judges the candidates the way Pick judged the entries, from what they carry.
+  local MainCrafter = require("CraftAlert.Model.MainCrafter")
+  data = db()
+  local function repickLead(keys, prof)
+    local list = select(6, CrafterRank.Pick(result(keys, prof), CUSTOMER, data))
+    return { customer = CUSTOMER, prof = BS, crafters = list }, list
+  end
+  local lead, list = repickLead({ "Prim-Realm", "Alt-Realm" })
+  for _, candidate in ipairs(list) do
+    Assert.truthy(candidate.prof ~= nil and candidate.recipeKey ~= nil, candidate.key .. " carries prof and recipeKey")
+  end
+  Assert.equal(
+    (CrafterRank.Repick(lead, data)),
+    (CrafterRank.Pick(result({ "Prim-Realm", "Alt-Realm" }), CUSTOMER, data)),
+    "nothing changed: Repick is Pick"
+  )
+  MainCrafter.Set(data, "Alt-Realm", BS, true)
+  Assert.equal((CrafterRank.Repick(lead, data)), "Alt-Realm", "the main moved: Repick follows on a tie")
+  -- A higher rank still wins over the main.
+  for _, candidate in ipairs(list) do
+    candidate.rank, candidate.top, candidate.byConc = candidate.key == "Prim-Realm" and 3 or 2, 3, false
+  end
+  local repicked, _, repickedRank, repickedConc, repickedKey = CrafterRank.Repick(lead, data)
+  Assert.same({ repicked, repickedRank, repickedConc, repickedKey }, { "Prim-Realm", 3, false, 1 }, "rank 3 of 3 beats the main at 2 of 3")
+  -- Primary is judged by the profession each candidate was judged under.
+  data = db()
+  lead = repickLead({ "Prim-Realm", "Alt-Realm" }, ENCH)
+  Assert.equal((CrafterRank.Repick(lead, data)), "Alt-Realm", "a candidate judged under ENCH is not the BS main")
+  -- No candidates, no crafter.
+  Assert.equal(CrafterRank.Repick({ customer = CUSTOMER, prof = BS }, data), nil)
+  Assert.equal(CrafterRank.Repick({ customer = CUSTOMER, prof = BS, crafters = {} }, data), nil)
+
+  -- Spec §1: the current character beats the main when the main ranks lower or cannot receive.
+  data = db()
+  data.characters["Me-Realm"].professions[BS].primary = true
+  data.characters["Prim-Realm"].professions[BS].primary = false
+  Assert.equal(pick({ "Alt-Realm", "Me-Realm" }), "Me-Realm", "the current character is the main")
+  data = db()
+  learn("Me-Realm", 1, { ranks = { 1, 2, 3 }, reachRank = 2, reachCost = 0 })
+  learn("Prim-Realm", 1, { ranks = { 1, 2, 3 }, reachRank = 1, reachCost = 0 })
+  Assert.equal(pick({ "Prim-Realm", "Me-Realm" }), "Me-Realm", "the main at a lower rank loses to the current character")
+  data = db()
+  data.characters["Me-Realm"].realms = { "Realm", "Draenor" }
+  data.characters["Prim-Realm"].realms = { "Realm" }
+  Assert.equal(pick({ "Prim-Realm", "Me-Realm" }), "Me-Realm", "a main who cannot receive loses to the current character")
 
   -- The highest rank wins even when it costs concentration; at the same rank, the crafter who
   -- reaches it without concentration wins (user ruling 2026-10-22).
