@@ -97,8 +97,8 @@ local function intentStop(lower)
       ad = ad or crafting -- "crafting ... pst"
     elseif token == "craft" and tokens[i - 1] == "can" then
       canCraft = true
-    elseif token == "work" and tokens[i - 1] == "lf" then
-      ad = true -- "Enchanter LF work /w me" (user ruling 2026-10-24)
+    elseif token == "work" and tokens[i - 1] == "lf" and tokens[i + 1] ~= "order" then
+      ad = true -- "Enchanter LF work /w me" (user ruling 2026-10-24); "LF work order" is a buyer
     end
   end
   if intentToken == nil then

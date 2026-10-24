@@ -89,6 +89,8 @@ local function testIntentAndAds()
   expect(ns, "Enchanter LF work /w me", "stop:blocker")
   expect(ns, "Max enchanter LF work, fiery weapon", "stop:blocker")
   expect(ns, "LF fiery weapon, will work for tips", "item:enchant weapon - fiery weapon", "work not right after lf")
+  expect(ns, "LF work order fiery weapon", "item:enchant weapon - fiery weapon", "a work order is a buyer's request")
+  expect(ns, "LF Work-Order fiery weapon", "item:enchant weapon - fiery weapon", "hyphenated work order")
 end
 
 -- §6.3 4.1: the first craftable item link matches; other links and link text are ignored.

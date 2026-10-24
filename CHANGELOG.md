@@ -28,5 +28,5 @@ Player-friendly release notes for Craft Alert.
 - Fixed: a linked recipe ("LF [Tailoring: Martyr's Gloves] crafter") did not alert on Retail or Forever. Recipe links now match the recipe they point to.
 - "WTC" and "LFRC" are now request words by default, next to "LF", "LFC" and "WTB". Saved word lists are kept as they are; add them in Settings → Keywords if yours lacks them.
 - More requests alert: "recraft", "recrafter" and "recrafting" work like "crafter" ("LF recraft ring"), "leg" works like "legs", and "enchs" names Enchanting.
-- "/w me" no longer hides a request that says LF, LFC, LFRC, WTB or WTC ("LFC [Spellbreaker's Bracers] /w me"). Lines without one of those still count as ads, and so does "LF work".
+- "/w me" no longer hides a request that says LF, LFC, LFRC, WTB or WTC ("LFC [Spellbreaker's Bracers] /w me"). Lines without one of those still count as ads, and so does "LF work" (but not "LF work order").
 - "Trinket" no longer picks a profession on its own: it chose whoever knew the most trinkets, often old alchemist stones over PvP trinkets. Name the trinket instead.
