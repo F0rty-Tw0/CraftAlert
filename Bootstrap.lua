@@ -9,6 +9,7 @@ local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
 local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local SavedState = ns.SavedState or require("CraftAlert.Persistence.SavedState")
+local Schema = ns.Schema or require("CraftAlert.Persistence.Schema")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
@@ -91,14 +92,15 @@ local function wireLeads()
   TestLine.Install()
 end
 
--- §7.6 and §5.2: the status line, the professions not read yet, and on a fresh DB the first-run
--- hint. The gate prints the status line on its first activation, so an active scan at login has
--- printed it already. A login or /reload inside an instance prints nothing (no addon line in the
--- chat frame there).
+-- §7.6 and §5.2: the newer-schema warning of the load, the status line, the professions not read
+-- yet, and on a fresh DB the first-run hint. The gate prints the status line on its first
+-- activation, so an active scan at login has printed it already. A login or /reload inside an
+-- instance prints nothing (no addon line in the chat frame there).
 local function printLoginLines()
   if FlavorCompat.InInstance() then
     return
   end
+  Schema.WarnNewer()
   if not ScanGate.IsActive() then
     ChatPrint.Line(Status.Text(ScanGate.State()))
   end

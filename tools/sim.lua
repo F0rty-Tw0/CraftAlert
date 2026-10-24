@@ -354,8 +354,8 @@ local function count(map)
   return total
 end
 
--- ADDON_LOADED: Bootstrap loads the account DB through SavedState.Load; Schema warnings
--- arrive as `chat:` lines just before the summary.
+-- ADDON_LOADED: Bootstrap loads the account DB through SavedState.Load; a newer-schema warning
+-- arrives later, as a `chat:` line among the login lines.
 local function bindDb(ctx)
   Wow.fireEvent("ADDON_LOADED", "CraftAlert")
   local db = rawget(_G, "CraftAlertDB")

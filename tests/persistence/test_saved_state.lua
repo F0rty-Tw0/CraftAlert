@@ -117,7 +117,8 @@ local function testNewerHandEditedDb()
   Assert.equal(#db.leads, 100)
   Assert.equal(db.leads[1].id, 4901)
   Assert.equal(db.leads[100].id, 5000)
-  Assert.equal(#Wow.chat, 1)
+  -- The newer-schema warning waits for the login lines (Bootstrap).
+  Assert.equal(#Wow.chat, 0)
 end
 
 local function testLeadCapKeepsNewest()

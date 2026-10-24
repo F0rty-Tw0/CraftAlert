@@ -271,6 +271,9 @@ local function testNewerSchema()
   Assert.equal(db.futureTopLevel.a, 1)
   Assert.equal(db.characters["Bob-Realm"].futureField, 7)
   Assert.equal(db.characters["Bob-Realm"].recipes[1].futureRecipeField, true)
+  -- Validate only holds the warning; Bootstrap prints it with the login lines.
+  Assert.equal(#printedLines(), 0)
+  Schema.WarnNewer()
   Assert.equal(#printedLines(), 1)
   Assert.truthy(string.find(printedLines()[1], "newer", 1, true))
   Assert.truthy(string.find(printedLines()[1], "2", 1, true))
@@ -291,6 +294,12 @@ local function testOlderSchemaIsRaisedAndNoWarning()
   local Schema = load()
   Assert.equal(Schema.Validate({ schema = 0 }).schema, 1)
   Assert.equal(Schema.Validate({ schema = -3 }).schema, 1)
+  Schema.WarnNewer()
+  Assert.equal(#printedLines(), 0)
+  -- A later Validate of a current save drops the warning an earlier newer one held.
+  Schema.Validate({ schema = 2 })
+  Schema.Validate({ schema = 1 })
+  Schema.WarnNewer()
   Assert.equal(#printedLines(), 0)
 end
 
