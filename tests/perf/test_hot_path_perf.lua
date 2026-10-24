@@ -181,6 +181,9 @@ return function()
   Assert.truthy(#worst > 240 and #worst <= 255, "worst line length " .. #worst)
   Assert.truthy(Matcher.Match("trade", mixed[10], SENDER, GUID), "requests in the mix do match")
   Assert.truthy(index.joinIndex.ca and not index.joinIndex.ca.phrase, "join_ca hits a shared join left side")
+  -- The intersection of neck and cloak is empty: a match means the union decided it.
+  local union = Matcher.Match("trade", WorstLines.UNION, SENDER, GUID)
+  Assert.equal(union and union.kind, "profession", "the union line matches")
   local worstCases = WorstLines.cases(index)
   local worstLines, worstText = {}, {}
   local worstMean = 0

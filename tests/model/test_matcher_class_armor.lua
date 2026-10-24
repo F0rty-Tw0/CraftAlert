@@ -127,7 +127,14 @@ local function testBaselines()
   -- §6.4, user ruling 2026-10-21: a crafting cue word partners an ambiguous word.
   Assert.equal(outcome(ns, "LF head crafter"), "profession:" .. BS, "baseline: head counts through the cue word")
   Assert.equal(outcome(ns, "LF bs for legs"), "item:502", "baseline: legs counts through bs, narrowed to Blacksmithing")
-  Assert.equal(outcome(ns, "LF belt and head"), "stop:nomatch", "baseline: head counts through belt")
+  -- User ruling 2026-10-24: slot words of different slots match either slot's recipes; an
+  -- ambiguous one joins them only through a cue word.
+  local got, result = outcome(ns, "LF belt and head")
+  Assert.equal(got, "profession:" .. BS, "baseline: the belts alone")
+  Assert.equal(why(result), "lf+belt", "baseline: head has no cue word")
+  got, result = outcome(ns, "LF belt and head crafter")
+  Assert.equal(got, "profession:" .. BS, "baseline: head joins through the cue word")
+  Assert.equal(why(result), "lf+belt+head", "baseline: head joins through the cue word")
 end
 
 local function testRows1To3()
