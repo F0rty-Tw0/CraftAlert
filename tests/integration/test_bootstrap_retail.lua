@@ -563,7 +563,9 @@ local function testInstanceHidesUi(db)
 end
 
 -- A login or /reload inside an instance prints no chat line: an addon line taints the chat frame.
+-- The db comes from a newer schema, so its load warning is held too.
 local function testLoginInInstanceIsSilent(db)
+  db.schema = 2
   local session = startClient(db)
   Wow.stub("IsInInstance", function()
     return true, "party"

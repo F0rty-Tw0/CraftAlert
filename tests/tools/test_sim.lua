@@ -332,13 +332,13 @@ return function()
     "chat: Craft Alert: Commands: /ca (leads window), /ca config, /ca test <line>, /ca perf"
   )
 
-  -- The account DB goes through SavedState.Load first: one `db:` line, preceded by one
-  -- `chat:` line per Schema warning.
+  -- The account DB goes through SavedState.Load first: one `db:` line. A newer schema's warning
+  -- waits for the login lines (silent in an instance), after the gate's status line.
   Assert.equal(Sim.Run({})[2], "db: schema=1 characters=2 recipes=6 leads=0")
-  local newer = Sim.Run({ "--db", "tests/fixtures/db_schema2.lua" })
-  Assert.equal(#newer, 3)
-  assert(string.find(newer[2], "^chat: Craft Alert: .*newer"), newer[2])
-  Assert.equal(newer[3], "db: schema=2 characters=1 recipes=2 leads=100")
+  Assert.equal(#Sim.Run({ "--db", "tests/fixtures/db_schema2.lua" }), 2)
+  local newer = Sim.Run({ "--db", "tests/fixtures/db_schema2.lua", "LF plate belt" })
+  Assert.equal(newer[2], "db: schema=2 characters=1 recipes=2 leads=100")
+  assert(string.find(newer[6], "^chat: Craft Alert: .*newer"), newer[6])
 
   -- Run from the command line, any `error:` line makes the sim exit 1, so a Proof run notices a
   -- broken invocation: a bad flag (the only line) or a step that fails after others printed.

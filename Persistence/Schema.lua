@@ -329,17 +329,25 @@ local function fixUi(ui)
   return ui
 end
 
-local function warnNewer(version)
+-- The newer schema the last Validate kept, or nil. Bootstrap prints the warning with the login
+-- lines, so a load inside an instance prints nothing (an addon line taints the chat frame).
+Schema.newerVersion = nil
+
+function Schema.WarnNewer()
+  if Schema.newerVersion == nil then
+    return
+  end
   ChatPrint.Line(
     Localization.Text(
       "Your saved data comes from a newer Craft Alert (schema %s). Fields this version does not know are kept; update Craft Alert to use them.",
-      tostring(version)
+      tostring(Schema.newerVersion)
     )
   )
 end
 
 -- Repairs `db` in place and returns it; anything that is not a table becomes a fresh db.
 function Schema.Validate(db)
+  Schema.newerVersion = nil
   if type(db) ~= "table" then
     return Defaults.Db()
   end
@@ -347,7 +355,7 @@ function Schema.Validate(db)
   db.schema = version
   keepUnknown = version > Defaults.schemaVersion
   if keepUnknown then
-    warnNewer(version)
+    Schema.newerVersion = version
   end
   db.settings = fixSettings(db.settings)
   db.characters = fixRecords(db.characters, isName, fixCharacter)
