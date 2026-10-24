@@ -100,6 +100,11 @@ function Fixture.index(ns, db)
       return { Fixture.ENCH, Fixture.BS, Fixture.TAILOR, Fixture.LW }
     end,
   })
+  -- Index.Build shares one list between words with the same entries (user ruling 2026-10-24);
+  -- unshare, so appending to one word's list leaves its synonyms' alone.
+  for word, list in pairs(index.wordIndex) do
+    index.wordIndex[word] = { unpack(list) }
+  end
   for phrase, words in pairs(Fixture.itemWords) do
     local record = index.phraseSet[phrase]
     if record then

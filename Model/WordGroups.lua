@@ -237,17 +237,23 @@ function WordGroups.Build(index)
       index.professionKeys[word] = ProfessionWords.KeyFor(word, isClassic)
     end
   end
-  local seenIn, firstIn, profOf = {}, {}, {}
+  -- A word's info depends on its list alone, so words that share a list (Index.Build, user
+  -- ruling 2026-10-24 "Share synonym lists") share its info, built once.
+  local seenIn, firstIn, profOf, infoOf = {}, {}, {}, {}
   index.wordInfo = {}
   for word, list in pairs(index.wordIndex) do
-    local info = infoFor(list, rank, seenIn)
-    local byProf, profs, split = byProfession(list, seenIn, firstIn, profOf)
-    if byProf ~= nil and info.groupCount > 1 and info.prof ~= nil then
-      info.entries = byProf[info.prof].entries -- the same entries in the same order, held once
-    end
-    info.byProf, info.profs = byProf, profs
-    if split then
-      info.split = true
+    local info = infoOf[list]
+    if info == nil then
+      info = infoFor(list, rank, seenIn)
+      local byProf, profs, split = byProfession(list, seenIn, firstIn, profOf)
+      if byProf ~= nil and info.groupCount > 1 and info.prof ~= nil then
+        info.entries = byProf[info.prof].entries -- the same entries in the same order, held once
+      end
+      info.byProf, info.profs = byProf, profs
+      if split then
+        info.split = true
+      end
+      infoOf[list] = info
     end
     index.wordInfo[word] = info
   end
@@ -263,8 +269,9 @@ local function counts(token, first, other, hasSet, cued)
 end
 
 -- Per-line buffers: the distinct counted words (a repeated word intersects once), found
--- with stamps on the words (each wordIndex word has its own list; false for a recognized
--- slang word nobody can craft, emptyCount of them). wordStamp[word]: stamp counted, skipped
+-- with stamps on the words (stamped per word, though synonyms share a list). lineLists[k] is the
+-- list of lineWords[k], false for a recognized slang word nobody can craft (emptyCount of them).
+-- wordStamp[word]: stamp counted, skipped
 -- counted but left out of the union (walkUnion: nobody crafts it, or an ambiguous word with
 -- no cue next to it), -stamp an ambiguous word left uncounted. stamp steps by 2.
 local lineWords, lineLists, lineCount, emptyCount = {}, {}, 0, 0
