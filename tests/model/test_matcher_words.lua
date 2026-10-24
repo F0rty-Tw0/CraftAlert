@@ -122,6 +122,36 @@ local function slotIndex(ns, withNeck)
   end)
 end
 
+-- User ruling 2026-10-24: the R1 nouns (leggings, grips, hood, ...) are slot words of their slot.
+-- An ambiguous one (hand, band, hood, vest) needs a partner, like legs.
+local function testR1SlotWords()
+  local ns = Fixture.load()
+  ns.Matcher.SetIndex(Fixture.index(ns))
+  expect(ns, "lf green iron mail leggings", "item:green iron leggings", "the noun narrows like legs")
+  ns = Fixture.load()
+  slotIndex(ns)
+  expect(ns, "LF grips crafter", "item:802")
+  expect(ns, "LF hood", "stop:nomatch", "an ambiguous R1 word, no partner, no class")
+end
+
+-- User ruling 2026-10-24: "hand" after off, main, one or two is no slot word anywhere: no count,
+-- no partner for another ambiguous word; a plain "hand" is the glove slot.
+local function testOffHandIsNoSlotWord()
+  local ns = Fixture.load()
+  slotIndex(ns, true)
+  expect(ns, "LF off hand crafter", "stop:nomatch", "hand after off: no slot word, no cue partner")
+  expect(ns, "LF off-hand crafter", "stop:nomatch", "a hyphen splits tokens")
+  expect(ns, "LF main hand crafter", "stop:nomatch")
+  expect(ns, "LF two hand crafter", "stop:nomatch")
+  Assert.truthy(ns.Slang.IsOffHand({ "one", "hand" }, 2))
+  Assert.falsy(ns.Slang.IsOffHand({ "hand" }, 1), "no token before")
+  Assert.falsy(ns.Slang.IsOffHand({ "off", "hands" }, 2), "only singular hand")
+  expect(ns, "LF hand crafter", "item:802", "a plain hand is gloves")
+  Assert.equal(Fixture.outcome(ns, "LF hand crafter"), Fixture.outcome(ns, "LF gloves crafter"))
+  -- firstWords skips an off-hand hand, so it never partners another ambiguous word.
+  Assert.equal(Fixture.outcome(ns, "LF off hand legs"), Fixture.outcome(ns, "LF legs"), "off hand does not count legs")
+end
+
 -- User ruling 2026-10-24 ("either slot counts"): a line whose counted words are all slot
 -- words of different slots matches the recipes of any of them; a type word in the line, or
 -- words of one slot only, keep the intersection. An ambiguous slot word joins the union only
@@ -314,6 +344,8 @@ return function()
   testTrinketByNameOnly()
   testNamedProfessionNarrowing()
   testCueAdjacency()
+  testR1SlotWords()
+  testOffHandIsNoSlotWord()
   testEitherSlotCounts()
   testUnionSkipsUncuedWords()
   testUnionSkipsEmptySlots()

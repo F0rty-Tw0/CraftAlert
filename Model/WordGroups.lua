@@ -34,6 +34,7 @@ local WordGroups = {}
 
 local pairs = pairs
 local ipairs = ipairs
+local IsOffHand = Slang.IsOffHand
 local slangWords, ambiguous = Slang.wordSet, Slang.ambiguous
 local MAX_WORDS = 6 -- distinct slang words per line (§6.3 step 4.4; bounds the §4.4 max)
 
@@ -303,7 +304,9 @@ local function firstWords(wordIndex, tokens, count)
   local first, other = nil, nil
   for i = 1, count do
     local token = tokens[i]
-    if wordIndex[token] and first == nil then
+    if token == "hand" and IsOffHand(tokens, i) then
+      -- no partner: an off-hand hand is no slot word (user ruling 2026-10-24)
+    elseif wordIndex[token] and first == nil then
       first = token
     elseif wordIndex[token] and other == nil and token ~= first then
       other = token
@@ -383,7 +386,9 @@ local function collect(index, tokens, count, breakBefore, hasSet)
   for i = 1, count do
     local token = tokens[i]
     local seen = wordStamp[token]
-    if seen == stamp then
+    if token == "hand" and IsOffHand(tokens, i) then
+      -- no count, no why, no inference flag (user ruling 2026-10-24)
+    elseif seen == stamp then
       whyCount = whyCount + 1
       why[whyCount] = token
     elseif seen == skipped then

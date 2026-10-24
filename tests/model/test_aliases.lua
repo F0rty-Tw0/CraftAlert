@@ -51,7 +51,6 @@ local function testAliasKinds()
     ["iron boots"] = false,
     ["lionheart"] = false, -- c
     ["hauberk"] = false,
-    ["leggings"] = false,
   }
   for phrase, full in pairs(expected) do
     Assert.truthy(byPhrase[phrase], "missing " .. phrase)
@@ -70,7 +69,7 @@ local function testAliasKinds()
     needsSecondWord[#needsSecondWord + 1] = record.phrase
   end
   table.sort(needsSecondWord)
-  Assert.same(needsSecondWord, { "fiery", "hauberk", "leggings", "lionheart" })
+  Assert.same(needsSecondWord, { "fiery", "hauberk", "lionheart" })
 end
 
 -- A phrase that one name makes as kind c and another (same group) as kind a is not kind c,

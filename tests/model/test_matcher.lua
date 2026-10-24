@@ -144,7 +144,7 @@ local function testPhrases()
   expect(ns, "lf green iron mail legs", "item:green iron leggings")
   expect(ns, "lf mongoose", "item:enchant weapon - mongoose")
   expect(ns, "lf greenironhauberk", "stop:nomatch", "only one-word records join")
-  expect(ns, "lf hauberk or leggings", "profession:" .. BS)
+  expect(ns, "lf hauberk or leggings", "item:green iron hauberk") -- leggings is a slot word, no kind-c alias (user ruling 2026-10-24)
   -- Keywords with + ( [ % are plain text: no pattern errors, no false hits.
   expect(ns, "LF [Green Iron Hauberk] (+5%) [%s", "item:green iron hauberk")
   expect(ns, "LF %a+ (.*) [green", "stop:nomatch")

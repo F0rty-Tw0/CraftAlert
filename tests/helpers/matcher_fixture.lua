@@ -39,10 +39,10 @@ local MODULES = {
 
 -- Item words of the four Blacksmithing recipes (what ItemKeywords gives the real items).
 Fixture.itemWords = {
-  ["lionheart helm"] = { "helm", "helmet", "head", "plate" },
-  ["green iron hauberk"] = { "chest", "robe", "mail" },
-  ["green iron leggings"] = { "legs", "leg", "pants", "mail" },
-  ["green iron boots"] = { "boots", "boot", "feet", "shoes", "mail" },
+  ["lionheart helm"] = { "helm", "helmet", "head", "hood", "cowl", "plate" },
+  ["green iron hauberk"] = { "chest", "robe", "chestguard", "breastplate", "tunic", "jerkin", "vest", "mail" },
+  ["green iron leggings"] = { "legs", "leg", "pants", "leggings", "legguards", "legplates", "greaves", "mail" },
+  ["green iron boots"] = { "boots", "boot", "feet", "shoes", "sabatons", "treads", "mail" },
 }
 
 -- Fresh copies of every module the matcher needs, loaded after Wow.reset (and flavor stubs).

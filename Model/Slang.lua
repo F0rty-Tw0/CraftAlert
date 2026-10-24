@@ -19,21 +19,21 @@ Slang.CLASS_ARMOR = 4
 -- profession gear) are left out on purpose: nobody asks for them by slot. Trinkets too (user
 -- ruling 2026-10-24): "LF trinket" picked whichever profession knows the most trinkets (old
 -- alchemist stones over PvP trinkets), so only a trinket's name matches.
-local CHEST = { "chest", "robe" }
+local CHEST = { "chest", "robe", "chestguard", "breastplate", "tunic", "jerkin", "vest" }
 local ONE_HAND = { "1h" }
 Slang.slots = {
-  INVTYPE_FINGER = { "ring", "finger" },
-  INVTYPE_NECK = { "neck", "necklace", "amulet" },
-  INVTYPE_WAIST = { "belt", "waist" },
-  INVTYPE_FEET = { "boots", "boot", "feet", "shoes" },
-  INVTYPE_HAND = { "gloves", "glove", "hands", "gauntlets" },
-  INVTYPE_WRIST = { "bracers", "bracer", "wrist" },
-  INVTYPE_HEAD = { "helm", "helmet", "head" },
-  INVTYPE_SHOULDER = { "shoulders", "shoulder", "pauldrons" },
-  INVTYPE_CLOAK = { "cloak", "cape", "back" },
+  INVTYPE_FINGER = { "ring", "finger", "band", "signet" },
+  INVTYPE_NECK = { "neck", "necklace", "amulet", "choker", "pendant" },
+  INVTYPE_WAIST = { "belt", "waist", "girdle", "waistband" },
+  INVTYPE_FEET = { "boots", "boot", "feet", "shoes", "sabatons", "treads" },
+  INVTYPE_HAND = { "gloves", "glove", "hands", "gauntlets", "hand", "grips", "handguards" },
+  INVTYPE_WRIST = { "bracers", "bracer", "wrist", "bindings", "vambraces", "cuffs" },
+  INVTYPE_HEAD = { "helm", "helmet", "head", "hood", "cowl" },
+  INVTYPE_SHOULDER = { "shoulders", "shoulder", "pauldrons", "mantle", "spaulders" },
+  INVTYPE_CLOAK = { "cloak", "cape", "back", "drape" },
   INVTYPE_CHEST = CHEST,
   INVTYPE_ROBE = CHEST,
-  INVTYPE_LEGS = { "legs", "leg", "pants" },
+  INVTYPE_LEGS = { "legs", "leg", "pants", "leggings", "legguards", "legplates", "greaves" },
   INVTYPE_SHIELD = { "shield" },
   INVTYPE_HOLDABLE = { "offhand" },
   INVTYPE_BAG = { "bag" },
@@ -83,7 +83,19 @@ end
 -- User ruling 2026-10-22: slot words only step 4.4 (WordGroups) reads. They are no companion
 -- word (§6.2 item 1, steps 4.2 and 4.5) and no stat + slot slot word (§6.3 step 4.3), so "be
 -- back in 5" never completes an alias or a stat. The other ambiguous words stay companions.
-Slang.wordGroupsOnly = { back = true }
+-- User ruling 2026-10-24: "hand", "band", "hood" and "vest" join them, so "need a hand" and
+-- "LF hood" never complete an alias or a stat.
+Slang.wordGroupsOnly = { back = true, hand = true, band = true, hood = true, vest = true }
+
+-- User ruling 2026-10-24 (R1): "hand" directly after "off", "main", "one" or "two" ("off hand",
+-- "off-hand": a hyphen splits tokens) is no slot word anywhere, so no glove crafter hears of a
+-- weapon hand. Only singular "hand": "off hands" is no gear term, and "hands" keeps its meaning.
+local OFF_HAND_PREFIX = { off = true, main = true, one = true, two = true }
+
+-- → whether tokens[i] is such a "hand". Hot path: no allocation.
+function Slang.IsOffHand(tokens, i)
+  return tokens[i] == "hand" and i > 1 and OFF_HAND_PREFIX[tokens[i - 1]] == true
+end
 
 -- Class-armor spec §4 rule 1: armor slot words -> "slot", armor type words -> "type". Step 4.4
 -- reads them (through index.armorTags) to see a slot named without an armor type.
