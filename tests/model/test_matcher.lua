@@ -168,16 +168,45 @@ local function testSlotNameGuard()
   local result = expect(ns, "LF green iron chest", "item:green iron hauberk")
   Assert.equal(why(result), "lf+green iron+chest", "the slot word that filtered stays in the why")
   expect(ns, "LF green iron", "item:green iron hauberk")
+  -- "hand" is an everyday word too (2026-10-25), so the off-hand guard in PhraseMatch.addHit is
+  -- belt and braces: no row can tell a line with it from one without.
+  expect(ns, "LF green iron off hand", "item:green iron hauberk", "off hand is no glove slot")
   -- The typo pass skips the tokens of the dropped hit (it matches "thick", kind c, at distance 0).
   Fixture.itemIndex(ns)
   expect(ns, "LF thick plate helm", "stop:nomatch")
   expect(ns, "LF thick plate belt", "item:501")
+  -- User ruling 2026-10-25: an everyday slot word (back, hand, ring, head, band, hood, vest) or
+  -- punctuation before the slot word leaves the alias hit alone, as before R4.
+  for _, word in ipairs({ "back", "hand", "ring", "head", "band", "hood", "vest" }) do
+    expect(ns, "LF thick plate " .. word, "item:501", "everyday word: " .. word)
+  end
+  expect(ns, "LF thick plate, back in 5", "item:501", "punctuation, then back")
+  expect(ns, "LF thick plate - hand over", "item:501", "dash, then hand")
+  -- Punctuation alone also frees a slot word that is no everyday word ("helm" drops the hit when adjacent).
+  expect(ns, "LF thick plate, helm", "item:501", "punctuation, then helm")
+  expect(ns, "LF thick plate legs", "item:502", "legs is no everyday word: the belt is dropped")
+  expect(ns, "LF thick plate hands", "stop:nomatch", "hands is no everyday word")
   -- The displaced shorter hit ("charged", kind c) does not come back after the drop.
   Fixture.itemIndex(ns, function(db)
     db.characters["Smith-Realm"].recipes[3] = { item = 802, name = "Charged Scrapmaster's Gauntlets", prof = BS }
   end)
   expect(ns, "LF Charged Scrapmaster's Helm", "stop:nomatch")
   expect(ns, "LF Charged Scrapmaster's Gloves", "item:802")
+  -- The typo pass skips every token of a dropped multi-token hit, not only its first: "frostmourne"
+  -- (the 2nd token, a kind c alias) is not revived as a typo target of itself.
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Smith-Realm"].recipes[3] = { item = 802, name = "Zorgblade Frostmourne Gloves", prof = BS }
+  end)
+  expect(ns, "LF zorgblade frostmourne legs", "stop:nomatch")
+  expect(ns, "LF zorgblade frostmourne gloves", "item:802")
+  -- Two kept alias hits followed by the same slot word put it in the why once.
+  Fixture.items[505] = { "INVTYPE_WAIST", 4, 4 }
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Smith-Realm"].recipes[3] = { item = 505, name = "Alpha Beta Gamma Delta", prof = BS }
+  end)
+  result = expect(ns, "LF alpha beta belt gamma delta belt", "item:505")
+  Assert.equal(why(result), "lf+alpha beta+gamma delta+belt", "the slot word once")
+  Fixture.items[505] = nil
   -- Two kind-b hits on "thick plate": the belt entry goes, the treads stay (also by slang).
   Fixture.items[508] = { "INVTYPE_CHEST", 4, 4 }
   local function treads(db)

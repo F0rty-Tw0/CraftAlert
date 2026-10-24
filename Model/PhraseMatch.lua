@@ -33,7 +33,15 @@ local ID_UNIT = KEY_LENGTHS * LENGTH_UNIT
 local tokens, linkNames = Tokenizer.tokens, Tokenizer.linkNames
 local linkIDs, linkTails = Tokenizer.linkIDs, Tokenizer.linkTails
 local wordGroupsOnly = Slang.wordGroupsOnly
-local IsOffHand = Slang.IsOffHand
+local BreakBefore = Tokenizer.BreakBefore
+
+-- User ruling 2026-10-25: the slot words that are everyday chat ("back in 5", "hand over", "ring me")
+-- never filter an alias hit: Slang.wordGroupsOnly plus ring and head. Not Slang.ambiguous: legs,
+-- leg, hands and feet still filter. "hand" is here, so "off hand" needs no Slang.IsOffHand check.
+local everydaySlot = { ring = true, head = true }
+for word in pairs(wordGroupsOnly) do
+  everydaySlot[word] = true
+end
 ---@type table
 local index = nil
 local tokenCount = 0
@@ -123,9 +131,11 @@ local function addHit(record, length, why1, why2, i)
   hits[hitCount] = record
   hitAt[hitCount], hitWhyFrom[hitCount], hitSlot[hitCount] = i, hitWhyCount + 1, false
   -- User ruling 2026-10-24 (R4, bug C26): an alias followed by a slot word is filtered by it.
+  -- User ruling 2026-10-25: not by an everyday word ("sim plate back") or across punctuation
+  -- ("LF sim plate, back in 5"), which chat does not read as naming the piece.
   if i and not record.full and i + length <= tokenCount then
     local slot = tokens[i + length]
-    if index.slotsOf[slot] and not IsOffHand(tokens, i + length) then
+    if index.slotsOf[slot] and not everydaySlot[slot] and not BreakBefore(i + length) then
       hitSlot[hitCount] = slot
     end
   end
