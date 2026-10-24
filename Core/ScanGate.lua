@@ -137,6 +137,8 @@ end
 -- (the slot it sits on and its localized name do not matter). Without GetChannelList or the
 -- channel info API, the old resting test decides. Both are read on each call, so tests that stub
 -- them after load still reach this code. Never called in an instance (pauseReason stops first).
+-- A secret name, disabled flag or zone channel ID (chat lockdown) skips that channel: a secret is
+-- never tested or compared.
 local function hasTrade()
   local getChannelList = _G["GetChannelList"]
   local chatInfo = _G["C_ChatInfo"]
@@ -144,10 +146,13 @@ local function hasTrade()
   if type(getChannelList) ~= "function" or type(getInfo) ~= "function" then
     return isResting()
   end
+  local isSecret = FlavorCompat.issecretvalue
   local list = { getChannelList() }
   for i = 1, #list, 3 do
-    local info = not list[i + 2] and getInfo(list[i + 1]) or nil
-    if type(info) == "table" and info.zoneChannelID == TRADE_ZONE_CHANNEL then
+    local name, disabled = list[i + 1], list[i + 2]
+    local info = not isSecret(name) and not isSecret(disabled) and not disabled and getInfo(name) or nil
+    local zoneID = type(info) == "table" and info.zoneChannelID or nil
+    if not isSecret(zoneID) and zoneID == TRADE_ZONE_CHANNEL then
       return true
     end
   end

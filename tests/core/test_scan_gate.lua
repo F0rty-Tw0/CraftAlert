@@ -84,6 +84,22 @@ local function fireChannel(text, sender, zoneChannelID, guid)
   Wow.fireEvent(CHANNEL, text, sender, "", "2. Trade - City", sender, "", zoneChannelID, 2, "Trade - City", 0, 1, guid)
 end
 
+-- Makes FlavorCompat.issecretvalue (read on each call by ScanGate) true for `secret` only, as a
+-- chat lockdown would for one payload value. → a function that puts the real one back.
+local function secretOnly(ns, secret)
+  local compat = ns.FlavorCompat
+  local real = compat.issecretvalue
+  local function set(fn)
+    compat.issecretvalue = fn
+  end
+  set(function(value)
+    return value == secret
+  end)
+  return function()
+    set(real)
+  end
+end
+
 return function()
   -- ChannelKey owns the event-to-channel mapping: zone channel IDs for CHAT_MSG_CHANNEL (never
   -- the base name), one event each for guild and communities, nil for anything else.
@@ -101,12 +117,9 @@ return function()
   Assert.equal(ChannelKey(COMMUNITIES, nil, 0), "communities")
   Assert.equal(ChannelKey("CHAT_MSG_SAY", nil, 0), nil)
   -- A secret zone channel ID (chat lockdown) is never used as a key: the line is skipped.
-  local isSecret = ns.FlavorCompat.issecretvalue
-  ns.FlavorCompat.issecretvalue = function(value)
-    return value == 2
-  end
+  local restoreSecret = secretOnly(ns, 2)
   Assert.equal(ChannelKey(CHANNEL, "Trade - City", 2), nil, "secret zone channel ID")
-  ns.FlavorCompat.issecretvalue = isSecret
+  restoreSecret()
   -- A channel the flavor does not have is ignored.
   ns = setup("tbc")
   Assert.equal(ns.ScanGate.ChannelKey(CHANNEL, "Trade - City", 2), "trade")
@@ -289,12 +302,29 @@ return function()
   resting.resting = false
   start(ns, db)
   Assert.equal(ns.ScanGate.IsActive(), true, "Trade on slot 3 counts; resting is not asked")
+  -- CHANNEL_UI_UPDATE re-evaluates: IsActive is the stored result, State() would recompute.
   channelList[6] = true
   Wow.fireEvent("CHANNEL_UI_UPDATE")
-  Assert.equal(ns.ScanGate.State().reason, "noTrade", "Trade disabled here")
+  Assert.equal(ns.ScanGate.IsActive(), false, "Trade disabled here")
+  Assert.equal(ns.ScanGate.State().reason, "noTrade")
+  channelList[6] = false
+  Wow.fireEvent("CHANNEL_UI_UPDATE")
+  Assert.equal(ns.ScanGate.IsActive(), true, "Trade joined again (late join at login)")
   channelList = { 1, "General", false, 2, "LocalDefense", false }
   Wow.fireEvent("CHANNEL_UI_UPDATE")
-  Assert.equal(ns.ScanGate.State().reason, "noTrade", "no Trade joined")
+  Assert.equal(ns.ScanGate.IsActive(), false, "no Trade joined")
+  Assert.equal(ns.ScanGate.State().reason, "noTrade")
+  -- Secret channel values (chat lockdown) are skipped, never tested: issecretvalue marks the
+  -- name, the disabled flag, then the zone channel ID of a joined Trade.
+  channelList = { 1, "General", false, 3, "Trade", false }
+  for label, secret in pairs({ name = "Trade", disabled = false, zoneChannelID = 2 }) do
+    local restore = secretOnly(ns, secret)
+    Wow.fireEvent("CHANNEL_UI_UPDATE")
+    Assert.equal(ns.ScanGate.IsActive(), false, "secret " .. label .. " skipped")
+    restore()
+    Wow.fireEvent("CHANNEL_UI_UPDATE")
+    Assert.equal(ns.ScanGate.IsActive(), true, "plain Trade counts")
+  end
   db.settings.onlyResting = false
   ns.ScanGate.Evaluate()
   Assert.equal(ns.ScanGate.IsActive(), true, "setting off: scans without Trade")
