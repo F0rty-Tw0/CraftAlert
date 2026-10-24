@@ -113,6 +113,10 @@ function RecipeList.Create(column)
       row.hovered = nil
       Tooltip.Get():Hide()
     end)
+    -- Closing the settings under the cursor hides the row without an OnLeave.
+    row:HookScript("OnHide", function()
+      row.hovered = nil
+    end)
   end
 
   -- A row the pointer is on repaints its tooltip. The client can hide the tooltip without an

@@ -11,7 +11,7 @@ local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 -- tooltip says nothing about who here can craft it. A recipe that makes an item shows the
 -- client's tooltip of that item; one without (enchants, Classic name keys, or a link the client
 -- rejects) a gold title and its profession in white. Under either: who knows it, and a grey note
--- when it is muted. The rows' UpdateTooltip shows it again while hovered (PageCrafters), so an
+-- when it is muted. The rows' UpdateTooltip shows it again while hovered (RecipeList), so an
 -- item that loads late gets its lines without the client's rebuild dropping ours.
 local RecipeTooltip = {}
 

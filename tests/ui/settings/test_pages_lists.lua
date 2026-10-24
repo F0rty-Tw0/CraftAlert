@@ -271,6 +271,7 @@ local function testCraftersMuteAll()
   Widgets.type(row("Search recipes").input, "")
   press("Unmute all")
   Assert.same(mutedNames(me), {})
+  Assert.equal(me.recipes[9001].muted, nil, "unmuted recipes keep no muted field")
   Assert.same(take(refreshes), { "rebuild:mute" })
   Widgets.type(row("Search recipes").input, "zzz")
   press("Mute all")
@@ -303,6 +304,13 @@ local function testCraftersRecipeHoverAfterHide()
   Widgets.fire(first, "OnLeave")
   Widgets.fire(first.parent, "OnMouseWheel", 1)
   Assert.equal(tooltip.shown, false, "not hovered: no tooltip")
+
+  -- A row hidden while hovered (the settings closed under the cursor) forgets the hover.
+  Widgets.fire(first, "OnEnter")
+  tooltip:Hide()
+  ns.LeadsWindow.ToggleSettings()
+  open(ns, "Crafters")
+  Assert.equal(tooltip.shown, false, "hidden while hovered: no tooltip on reopen")
 end
 
 -- Hovering a recipe row that makes an item shows the item's tooltip; one without an item shows
