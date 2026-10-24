@@ -168,8 +168,8 @@ local function testSlotNameGuard()
   local result = expect(ns, "LF green iron chest", "item:green iron hauberk")
   Assert.equal(why(result), "lf+green iron+chest", "the slot word that filtered stays in the why")
   expect(ns, "LF green iron", "item:green iron hauberk")
-  -- "hand" is an everyday word too (2026-10-25), so the off-hand guard in PhraseMatch.addHit is
-  -- belt and braces: no row can tell a line with it from one without.
+  -- "hand" is an everyday word (2026-10-25), so "off hand" never filters a hit: PhraseMatch.addHit
+  -- needs no off-hand check of its own.
   expect(ns, "LF green iron off hand", "item:green iron hauberk", "off hand is no glove slot")
   -- The typo pass skips the tokens of the dropped hit (it matches "thick", kind c, at distance 0).
   Fixture.itemIndex(ns)
