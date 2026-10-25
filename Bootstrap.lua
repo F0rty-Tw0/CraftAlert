@@ -22,6 +22,7 @@ local LearnWatcher = ns.LearnWatcher or require("CraftAlert.Professions.LearnWat
 local Status = ns.Status or require("CraftAlert.Core.Status")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
+local WhisperBridge = ns.WhisperBridge or require("CraftAlert.UI.WhisperBridge")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
 local Perf = ns.Perf or require("CraftAlert.Core.Perf")
@@ -45,6 +46,7 @@ local SKILL_LINES_CHANGED = "SKILL_LINES_CHANGED"
 ---@type table
 local db = nil
 local ownKey = nil
+local bridged = false -- WhisperMessenger's API is there (WhisperBridge.Activate)
 local loadMs = 0 -- SavedState.Load at ADDON_LOADED, added into Perf.loginMs
 
 -- At login the profession slots may not have loaded yet (ProfessionList keeps what is stored
@@ -81,11 +83,16 @@ local function installQualityReach()
   QualityReach.Install(db)
 end
 
+-- Before wireLeads, which picks the "new" subscriber by the answer.
+local function activateBridge()
+  bridged = WhisperBridge.Activate()
+end
+
 -- AlertToast and WhisperTracker subscribe themselves to "change", TestReport to "new" and "change".
 local function wireLeads()
   Leads.Restore(db)
   EventRouter.On("IGNORELIST_UPDATE", Leads.DismissIgnored)
-  Leads.On("new", AlertToast.Show)
+  Leads.On("new", bridged and WhisperBridge.ShowLead or AlertToast.Show)
   Leads.On("change", Launcher.Refresh)
   Leads.On("change", LeadsWindow.Refresh)
   WhisperTracker.Install()
@@ -132,6 +139,7 @@ local function createLauncher()
   Launcher.OnMoved(AlertToast.Dock)
   ScanGate.OnChange(Launcher.Refresh)
   ScanGate.OnChange(AlertToast.OnGate)
+  ScanGate.OnChange(WhisperBridge.OnGate)
   ScanGate.OnChange(LeadsWindow.OnGate)
   ScanGate.OnChange(WhisperTracker.Refresh)
 end
@@ -148,7 +156,9 @@ local LOGIN_STEPS = {
   installProfessions,
   storeRealms,
   wireIndex,
+  activateBridge,
   wireLeads,
+  WhisperBridge.SyncInfo,
   installReaders,
   installQualityReach,
   installScanGate,

@@ -554,6 +554,14 @@ local function testLinkArrivesLater()
   Assert.equal(toastFrame():GetHeight(), height + Widgets.LINE_HEIGHT)
 end
 
+local function testAlertExport()
+  local ns, db, calls = UiFixture.load({ leads = 1 })
+  ns.AlertToast.Alert(ns.Leads.Latest())
+  Assert.same(UiFixture.callsTo(calls, "sound"), { { "sound", db.settings.sound, "Master" } })
+  Assert.equal(#UiFixture.callsTo(calls, "flash"), 1)
+  Assert.equal(rawget(_G, "CraftAlertToast"), nil, "Alert shows no toast")
+end
+
 return function()
   testLinkArrivesLater()
   testLazyFrameAndContent()
@@ -569,5 +577,6 @@ return function()
   testClassColor()
   testDock()
   testHiddenLauncherAndPulse()
+  testAlertExport()
   Wow.reset()
 end

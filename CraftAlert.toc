@@ -91,6 +91,8 @@ UI/Settings/RecipeTooltip.lua
 UI/Settings/RecipeList.lua
 UI/Settings/PageCrafters.lua
 UI/Settings/PageTest.lua
+UI/BridgePanel.lua
+UI/WhisperBridge.lua
 Core/Bindings.lua
 Core/Perf.lua
 Core/TestReport.lua

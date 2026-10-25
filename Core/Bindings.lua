@@ -8,7 +8,7 @@ local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
 local SendGuard = ns.SendGuard or require("CraftAlert.Model.SendGuard")
-local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
+local WhisperBridge = ns.WhisperBridge or require("CraftAlert.UI.WhisperBridge")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local SavedState = ns.SavedState or require("CraftAlert.Persistence.SavedState")
 
@@ -17,11 +17,12 @@ local SavedState = ns.SavedState or require("CraftAlert.Persistence.SavedState")
 -- 3 own globals). In an instance every key does nothing, silently (see SlashCommands).
 local Bindings = {}
 
--- GetTime() since when the lead has been on screen: the earlier of its toast and its top row
--- in the leads window; nil when neither shows it.
+-- GetTime() since when the lead has been on screen: the earlier of its toast (WhisperMessenger's
+-- preview when bridged) and its top row in the leads window (or WM's panel); nil when neither
+-- shows it.
 local function shownAt(lead)
   local since
-  local toastLead, toastShownAt = AlertToast.VisibleLead()
+  local toastLead, toastShownAt = WhisperBridge.VisibleLead()
   if toastLead and toastLead.id == lead.id then
     since = toastShownAt
   end

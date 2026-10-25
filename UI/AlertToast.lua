@@ -233,6 +233,10 @@ local function alert()
   end
 end
 
+-- The sound and taskbar flash alone, for a lead shown elsewhere (WhisperMessenger's preview).
+-- The lead argument is ignored.
+AlertToast.Alert = alert
+
 -- A new lead (Leads.On("new"), wired by Bootstrap): show it, light the launcher, sound, flash.
 -- Nothing in an instance.
 function AlertToast.Show(lead)

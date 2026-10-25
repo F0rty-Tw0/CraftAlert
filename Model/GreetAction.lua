@@ -32,6 +32,18 @@ local function targetOf(lead)
   return lead.customer
 end
 
+-- Opens a whisper box to `target`, with `text` as the draft when given. Blizzard's edit box
+-- unless SetOpener swaps it (WhisperMessenger's conversation).
+local function defaultOpener(target, text)
+  if text then
+    FlavorCompat.SendTellWithMessage(target, text)
+  else
+    FlavorCompat.SendTell(target)
+  end
+end
+
+local opener = defaultOpener
+
 -- A test lead (`/ca test`) never reaches a send API: the send it would make prints in chat
 -- instead. → whether it did.
 local function dryRun(lead, text, ...)
@@ -70,13 +82,13 @@ function GreetAction.Greet(lead, shownAt)
   local target = targetOf(lead)
   if not find(greeting, "%S") then
     if not dryRun(lead, "Test, would open an empty whisper to %s", target) then
-      FlavorCompat.SendTell(target)
+      opener(target)
     end
     return
   end
   if not Leads.IsActive(lead.id) or not SendGuard.Check(lead, shownAt) then
     if not dryRun(lead, "Test, would open a whisper to %s with: %s", target, greeting) then
-      FlavorCompat.SendTellWithMessage(target, greeting)
+      opener(target, greeting)
     end
     return
   end
@@ -92,7 +104,7 @@ end
 function GreetAction.Prefill(lead)
   local target, greeting = targetOf(lead), greetingFor(lead)
   if not dryRun(lead, "Test, would open a whisper to %s with: %s", target, greeting) then
-    FlavorCompat.SendTellWithMessage(target, greeting)
+    opener(target, greeting)
   end
 end
 
@@ -100,9 +112,17 @@ end
 function GreetAction.Empty(lead)
   local target = targetOf(lead)
   if not dryRun(lead, "Test, would open an empty whisper to %s", target) then
-    FlavorCompat.SendTell(target)
+    opener(target)
   end
 end
+
+-- `fn(target, text|nil)` opens the whisper box in place of Blizzard's; nil restores it.
+function GreetAction.SetOpener(fn)
+  opener = fn or defaultOpener
+end
+
+-- The name the whisper goes to (the Forever form drops the realm).
+GreetAction.Target = targetOf
 
 ns.GreetAction = GreetAction
 return GreetAction
