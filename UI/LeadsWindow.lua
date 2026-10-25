@@ -10,6 +10,7 @@ local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadsView = ns.LeadsView or require("CraftAlert.UI.LeadsView")
 local WindowSize = ns.WindowSize or require("CraftAlert.UI.WindowSize")
+local GhostResize = ns.GhostResize or require("CraftAlert.UI.GhostResize")
 local SettingsGear = ns.SettingsGear or require("CraftAlert.UI.SettingsGear")
 local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.SettingsPane")
 
@@ -47,7 +48,10 @@ function LeadsWindow.Refresh()
     return
   end
   local frame = window.frame
-  frame:SetAlpha(settings().opacity or 1)
+  -- Mid-drag the window stays faded behind the ghost; the release restores the opacity.
+  if not GhostResize.IsResizing() then
+    frame:SetAlpha(settings().opacity or 1)
+  end
   if window.mode == "settings" then
     frame.status:SetText("")
     return
@@ -106,17 +110,6 @@ local function onResizeStopped(target)
   LeadsWindow.Refresh()
 end
 
-local function createResizeButton(frame)
-  local button = _G["CreateFrame"]("Button", nil, frame, "PanelResizeButtonTemplate")
-  button:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 4)
-  button:SetFrameLevel(frame.TitleContainer:GetFrameLevel()) -- above the NineSlice border's corner
-  -- Init wraps the frame's OnSizeChanged as it is now, so the refresh must already be set.
-  frame:SetScript("OnSizeChanged", LeadsWindow.Refresh)
-  button:Init(frame, SIZE.minWidth, SIZE.minHeight, _G["UIParent"]:GetWidth(), _G["UIParent"]:GetHeight())
-  button:SetOnResizeStoppedCallback(onResizeStopped)
-  frame.resizeButton = button
-end
-
 -- The template's close button runs UIPanelCloseButton_OnClick
 -- (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.lua:144-155): this callback first, and
 -- HideUIPanel only when it returns truthy. HideUIPanel
@@ -168,7 +161,9 @@ local function create()
   WindowSize.Apply(frame, SIZE)
   FrameKit.Draggable(frame, UI_KEY)
   FrameKit.Place(frame, UI_KEY, FALLBACK_POSITION)
-  createResizeButton(frame)
+  -- The grip sets the size once per drag; the client's OnSizeChanged then refits the rows.
+  frame:SetScript("OnSizeChanged", LeadsWindow.Refresh)
+  GhostResize.Attach(frame, SIZE, onResizeStopped)
   frame.gear = SettingsGear.Create(frame, onGearClick)
   local view = createView(frame)
   frame:Hide()

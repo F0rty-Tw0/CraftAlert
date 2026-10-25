@@ -41,6 +41,7 @@ local UI = {
   "UI.LeadsList",
   "UI.LeadsView",
   "UI.WindowSize",
+  "UI.GhostResize",
   "UI.SettingsGear",
   "UI.Settings.SettingsPane",
   "UI.LeadsWindow",
