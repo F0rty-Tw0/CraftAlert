@@ -213,6 +213,11 @@ local function testSlotNameGuard()
     expect(ns, "LF zorgblade frostmourne boots", "item:804", "not worn: " .. equipLoc)
   end
   Fixture.items[804] = nil
+  -- An item the API does not know (no equip location) stays too: nothing says it is worn.
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Smith-Realm"].recipes[3] = { item = 804, name = "Zorgblade Frostmourne Scroll", prof = BS }
+  end)
+  expect(ns, "LF zorgblade frostmourne boots", "item:804", "unknown item")
   -- The typo pass skips every token of a dropped multi-token hit, not only its first: "frostmourne"
   -- (the 2nd token, a kind c alias) is not revived as a typo target of itself.
   Fixture.itemIndex(ns, function(db)
