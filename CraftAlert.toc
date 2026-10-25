@@ -75,6 +75,8 @@ UI/CardList.lua
 UI/LeadRow.lua
 UI/DetailsBody.lua
 UI/LeadDetails.lua
+UI/LeadsList.lua
+UI/LeadsView.lua
 UI/WindowSize.lua
 UI/SettingsGear.lua
 UI/Settings/SettingsPane.lua

@@ -42,6 +42,8 @@ local UI = {
   "UI.LeadRow",
   "UI.DetailsBody",
   "UI.LeadDetails",
+  "UI.LeadsList",
+  "UI.LeadsView",
   "UI.WindowSize",
   "UI.SettingsGear",
   "UI.Settings.SettingsPane",
