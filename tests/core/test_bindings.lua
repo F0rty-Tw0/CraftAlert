@@ -1,6 +1,7 @@
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local UiFixture = require("tests.helpers.ui_fixture")
+local FakeWm = require("tests.helpers.fake_wm_api")
 
 local function G(name)
   return rawget(_G, name)
@@ -181,12 +182,31 @@ local function testDismissLooks()
   end
 end
 
+-- Bridged (spec C.2): WhisperMessenger's preview is the toast, so the keys count it as on screen;
+-- the full state rows are in tests/ui/test_whisper_bridge_states.lua.
+local function testBridgedKeybinds()
+  local ns, _, calls = UiFixture.load({ leads = 2 })
+  local _, wm = FakeWm.install()
+  ns.WhisperBridge.Activate()
+  ns.WhisperBridge.ShowLead(ns.Leads.Latest())
+  Wow.clock.gettime = 50.2
+  G("CraftAlert_DismissLatest")()
+  Assert.equal(ns.Leads.Latest().id, 2, "preview up 0.2 s: the lead stays")
+  G("CraftAlert_GreetLatest")()
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 0)
+  Assert.equal(#wm.callsTo("OpenConversation"), 1, "under 0.5 s: the greeting is a draft in WM")
+  Wow.clock.gettime = 51
+  G("CraftAlert_GreetLatest")()
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 1, "the preview counts as shown")
+end
+
 return function()
   testGlobalsMatchBindingsXml()
   testOffInInstance()
   testGreetLatest()
   testDismissAndToggle()
   testDismissLooks()
+  testBridgedKeybinds()
   Wow.reset()
   Assert.equal(G("CraftAlert_GreetLatest"), nil, "the stubs are removed again")
 end
