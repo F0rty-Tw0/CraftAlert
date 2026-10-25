@@ -3,62 +3,22 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
-local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 
--- Lead-cards spec §1, right column: a card's Request, Matched and Crafters rows, each a gold label
--- and its value. Every text is a region of the card itself: LinkHover sees only those, so the
--- request's links hover. The rows keep fixed places; a row the lead has nothing for is hidden and
--- leaves its space empty. §1.1: the crafters in order, the picked one first, in class colours.
+-- What a lead's Matched and Crafters show, as data: the details pane (UI/DetailsBody.lua) and the
+-- tooltips (UI/CardTipText.lua) read both. Lead-cards spec §1.1: the crafters in order, the
+-- picked one first, in class colours.
 local CardBody = {}
 
 local sort = table.sort
 local type = type
 
--- Each row's key in card.labels and card.values, its label, and its top below the card's top: the
--- request takes two lines, the others one.
-local ROWS = {
-  { key = "request", label = "Request", top = -4 },
-  { key = "matched", label = "Matched", top = -32 },
-  { key = "crafters", label = "Crafters", top = -50 },
-}
-
 -- `text` in a Theme colour ({ r, g, b, a }).
 local function themed(text, color)
   return FrameKit.ColorCode(text, color[1], color[2], color[3])
-end
-
--- The request wraps to two lines at most; a client without SetMaxLines clips it at two lines'
--- height instead.
-local function wrapTwoLines(value)
-  value:SetWordWrap(true)
-  value:SetJustifyV("TOP")
-  if value.SetMaxLines then
-    value:SetMaxLines(2)
-  else
-    value:SetHeight(ROWS[1].top - ROWS[2].top)
-  end
-end
-
--- The labels and values on `card`: card.labels and card.values, each keyed request, matched, crafters.
-function CardBody.Create(card)
-  local layout, fonts = Theme.LAYOUT, Theme.FONTS
-  local valueLeft = layout.CARD_LEFT_WIDTH + layout.CARD_LABEL_WIDTH
-  card.labels, card.values = {}, {}
-  for _, row in ipairs(ROWS) do
-    local title = FrameKit.Text(card, fonts.name)
-    title:SetPoint("TOPLEFT", card, "TOPLEFT", layout.CARD_LEFT_WIDTH, row.top)
-    title:SetWidth(layout.CARD_LABEL_WIDTH)
-    title:SetText(Localization.Text(row.label))
-    local value = FrameKit.Text(card, row.key == "request" and fonts.title or fonts.body)
-    value:SetPoint("TOPLEFT", card, "TOPLEFT", valueLeft, row.top)
-    value:SetPoint("RIGHT", card, "RIGHT", -layout.PADDING, 0)
-    card.labels[row.key], card.values[row.key] = title, value
-  end
-  wrapTwoLines(card.values.request)
 end
 
 -- A { key = string, rank = number or nil } entry.
@@ -128,45 +88,6 @@ function CardBody.MatchedText(lead)
     return why .. " · " .. profession
   end
   return why or profession
-end
-
--- The first crafter in its class colour (white unknown), then in grey its rank and how many more.
-local function craftersText(lead)
-  local colors = Theme.COLORS
-  local entries = CardBody.Crafters(lead)
-  local first = entries[1]
-  if first == nil then
-    return themed(Localization.Text("None known"), colors.grey)
-  end
-  local color = first.color
-  local text = color and FrameKit.ColorCode(first.name, color.r, color.g, color.b) or themed(first.name, colors.white)
-  local tail = first.rank and (" " .. first.rank) or ""
-  if #entries > 1 then
-    tail = tail .. " " .. Localization.Text("+%d more", #entries - 1)
-  end
-  if tail == "" then
-    return text
-  end
-  return text .. themed(tail, colors.grey)
-end
-
--- Shows `text` in the value of the row `key`, or hides the label and value when it is nil.
-local function setRow(card, key, text)
-  local label, value = card.labels[key], card.values[key]
-  if text == nil then
-    label:Hide()
-    value:Hide()
-    return
-  end
-  value:SetText(text)
-  label:Show()
-  value:Show()
-end
-
-function CardBody.Paint(card, lead)
-  setRow(card, "request", lead.message)
-  setRow(card, "matched", CardBody.MatchedText(lead))
-  setRow(card, "crafters", craftersText(lead))
 end
 
 ns.CardBody = CardBody

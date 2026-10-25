@@ -9,7 +9,7 @@ local MainCrafter = ns.MainCrafter or require("CraftAlert.Model.MainCrafter")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 
--- Main-crafter spec §3: the menu a lead card's Crafters zone opens (UI/CardTips.lua). Blizzard's
+-- Main-crafter spec §3: the menu the details pane's Crafters zone opens (UI/LeadDetails.lua). Blizzard's
 -- context menu: a title, one radio per enabled character that knows the lead's profession, then
 -- None. Choosing writes the flag (MainCrafter) and re-picks this lead only (Leads.Repick).
 local MainCrafterMenu = {}
