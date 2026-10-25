@@ -97,7 +97,7 @@ function SettingsPane.AddPage(page)
   addNavButton(page, #pages)
 end
 
--- Makes the pane in `host` (the leads window's inset), hidden. Runs once; later calls return.
+-- Makes the pane in `host` (the leads window's content frame), hidden. Runs once; later calls return.
 -- `onBack` runs when the Back button at the bottom of the nav is clicked.
 function SettingsPane.Build(host, onBack)
   if pane then
