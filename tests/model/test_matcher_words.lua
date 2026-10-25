@@ -169,6 +169,16 @@ local function testOffHandIsNoSlotWord()
   Assert.equal(Fixture.outcome(ns, "LF hand crafter"), Fixture.outcome(ns, "LF gloves crafter"))
   -- firstWords skips an off-hand hand, so it never partners another ambiguous word.
   Assert.equal(Fixture.outcome(ns, "LF off hand legs"), Fixture.outcome(ns, "LF legs"), "off hand does not count legs")
+  -- User ruling 2026-10-25: "off hand" and "off-hand" are the off-hand slot word, as "offhand".
+  slotIndex(ns, true, function(db)
+    db.characters["Ins-Realm"] = character({ TAILOR }, { [20] = { item = 913, name = "Silk Tome", prof = TAILOR } })
+  end)
+  expect(ns, "LF offhand crafter", "item:913")
+  expect(ns, "LF off hand crafter", "item:913", "off hand is offhand")
+  expect(ns, "LF off-hand crafter", "item:913", "off-hand is offhand")
+  expect(ns, "WTB off hand", "item:913", "no cue needed: offhand is no ambiguous word")
+  expect(ns, "LF main hand crafter", "stop:nomatch", "main hand stays no slot word")
+  expect(ns, "LF hand crafter", "item:802", "a plain hand is still gloves")
 end
 
 -- User ruling 2026-10-24 ("either slot counts"): a line whose counted words are all slot

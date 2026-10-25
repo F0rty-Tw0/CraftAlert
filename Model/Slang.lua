@@ -97,6 +97,17 @@ function Slang.IsOffHand(tokens, i)
   return tokens[i] == "hand" and i > 1 and OFF_HAND_PREFIX[tokens[i - 1]] == true
 end
 
+-- tokens[i] is "hand" → the word it stands for: "offhand" after "off" ("off hand", "off-hand";
+-- user ruling 2026-10-25: the off-hand slot, as "offhand"), nil after "main", "one" or "two"
+-- (no slot word), else "hand". Callers check for "hand" first, so other tokens pay no call.
+function Slang.HandWord(tokens, i)
+  local before = i > 1 and tokens[i - 1]
+  if before == "off" then
+    return "offhand"
+  end
+  return not OFF_HAND_PREFIX[before] and "hand" or nil
+end
+
 -- Class-armor spec §4 rule 1: armor slot words -> "slot", armor type words -> "type". Step 4.4
 -- reads them (through index.armorTags) to see a slot named without an armor type.
 local ARMOR_SLOTS = {
