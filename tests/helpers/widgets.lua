@@ -66,6 +66,8 @@ local function newAnimationGroup()
     self.scripts[scriptName] = fn
   end
 
+  function group:SetToFinalAlpha() end
+
   function group:Play()
     self.playing = true
     runGroupScript(self, "OnPlay")
@@ -96,7 +98,14 @@ local function addRegion(region)
   region.alpha = 1
   region.width, region.height = 0, 0
 
+  -- As the client: setting a point the region already has moves that anchor.
   function region:SetPoint(point, relativeTo, relativePoint, x, y)
+    for index, anchor in ipairs(self.points) do
+      if anchor[1] == point then
+        self.points[index] = { point, relativeTo, relativePoint, x, y }
+        return
+      end
+    end
     table.insert(self.points, { point, relativeTo, relativePoint, x, y })
   end
 
@@ -145,6 +154,10 @@ local function addRegion(region)
     return self.alpha
   end
 
+  function region:SetParent(parent)
+    self.parent = parent
+  end
+
   function region:GetParent()
     return self.parent
   end
@@ -187,6 +200,10 @@ local function newTexture(parent, layer)
   function texture:AddMaskTexture(mask)
     self.masks = self.masks or {}
     table.insert(self.masks, mask)
+  end
+
+  function texture:SetMask(path)
+    self.mask = path
   end
 
   function texture:SetTexCoord(...)
@@ -250,6 +267,15 @@ local function newFontString(parent, layer, template)
     self.font = font
   end
 
+  -- The fake has no font files: GetFont gives back only what SetFont was given (nil before).
+  function fontString:SetFont(file, size, flags)
+    self.fontFile, self.fontSize, self.fontFlags = file, size, flags
+  end
+
+  function fontString:GetFont()
+    return self.fontFile, self.fontSize, self.fontFlags
+  end
+
   function fontString:SetJustifyH(justify)
     self.justifyH = justify
   end
@@ -281,22 +307,27 @@ local function newFontString(parent, layer, template)
     return width
   end
 
-  -- 0 for no text; one line when wrapping is off or the width is unset; else LINE_HEIGHT per
-  -- row of CHAR_WIDTH-wide characters the visible text fills, at most maxLines rows (0: no cap).
-  function fontString:GetStringHeight()
+  -- 0 for no text; one line when wrapping is off or the width is unset; else one row per width of
+  -- CHAR_WIDTH-wide characters the visible text fills, at most maxLines rows (0: no cap).
+  function fontString:GetNumLines()
     local text = self.text
     if text == nil or text == "" then
       return 0
     end
     if not self.wordWrap or self.width == 0 then
-      return Widgets.LINE_HEIGHT
+      return 1
     end
     local rows = math.max(ceil(visibleLength(text) * Widgets.CHAR_WIDTH / self.width), 1)
     if self.maxLines and self.maxLines > 0 then
       rows = math.min(rows, self.maxLines)
     end
 
-    return Widgets.LINE_HEIGHT * rows
+    return rows
+  end
+
+  -- LINE_HEIGHT per line (GetNumLines).
+  function fontString:GetStringHeight()
+    return Widgets.LINE_HEIGHT * self:GetNumLines()
   end
 
   function fontString:Show()
@@ -468,8 +499,11 @@ local function addSlider(slider)
     self.obeyStep = obey
   end
 
+  -- As the client: the thumb is placed on the slider (at the top here; the value is not modelled).
   function slider:SetThumbTexture(texture)
     self.thumb = texture
+    texture:ClearAllPoints()
+    texture:SetPoint("TOP", self, "TOP", 0, 0)
   end
 
   function slider:SetValue(value)
@@ -487,6 +521,37 @@ local function addSlider(slider)
   end
 end
 
+-- A plain ScrollFrame's own methods. SetScrollChild records the child's anchors and size at that
+-- moment in `childAtScrollChild`. Not modelled: the client's own range or clamping of the offset.
+local function addScrollFrame(scroll)
+  scroll.verticalScroll = 0
+
+  function scroll:SetScrollChild(child)
+    self.scrollChild = child
+    local points = {}
+    for index, anchor in ipairs(child.points) do
+      points[index] = { unpack(anchor) }
+    end
+    self.childAtScrollChild = { points = points, width = child.width, height = child.height }
+  end
+
+  function scroll:GetScrollChild()
+    return self.scrollChild
+  end
+
+  function scroll:SetVerticalScroll(offset)
+    self.verticalScroll = offset
+  end
+
+  function scroll:GetVerticalScroll()
+    return self.verticalScroll
+  end
+
+  function scroll:UpdateScrollChildRect()
+    self.childRectUpdates = (self.childRectUpdates or 0) + 1
+  end
+end
+
 -- What the box keeps of `text`: the first maxLetters bytes, all when 0. The client counts
 -- characters, so this matches it for ASCII text only.
 local function capped(editBox, text)
@@ -497,7 +562,8 @@ local function capped(editBox, text)
 end
 
 -- As the client: SetText fires OnTextChanged(self, false); ClearFocus fires OnEditFocusLost
--- only when the box had the focus; SetMaxLetters cuts what is set or typed (0: no limit).
+-- only when the box had the focus; each script's HookScript hooks run after it; SetMaxLetters
+-- cuts what is set or typed (0: no limit).
 local function addEditBox(editBox)
   editBox.text, editBox.focused, editBox.maxLetters = "", false, 0
 
@@ -507,10 +573,7 @@ local function addEditBox(editBox)
 
   function editBox:SetText(text)
     self.text = capped(self, text)
-    local onTextChanged = self.scripts.OnTextChanged
-    if onTextChanged then
-      onTextChanged(self, false)
-    end
+    Widgets.fire(self, "OnTextChanged", false)
   end
 
   function editBox:GetText()
@@ -528,9 +591,8 @@ local function addEditBox(editBox)
   function editBox:ClearFocus()
     local hadFocus = self.focused
     self.focused = false
-    local onFocusLost = self.scripts.OnEditFocusLost
-    if hadFocus and onFocusLost then
-      onFocusLost(self)
+    if hadFocus then
+      Widgets.fire(self, "OnEditFocusLost")
     end
   end
 
@@ -549,10 +611,13 @@ function Widgets.extend(frame)
     addSlider(frame)
   elseif frame.frameType == "EditBox" then
     addEditBox(frame)
+  elseif frame.frameType == "ScrollFrame" then
+    addScrollFrame(frame)
   end
 
-  function frame:CreateTexture(_, layer)
+  function frame:CreateTexture(_, layer, _, sublevel)
     local texture = newTexture(self, layer)
+    texture.sublevel = sublevel
     table.insert(self.regions, texture)
     return texture
   end

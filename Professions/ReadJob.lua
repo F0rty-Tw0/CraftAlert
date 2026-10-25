@@ -48,12 +48,12 @@ local function readRecipe(job, api, character)
   if not info then
     return
   end
-  local professionKey, ownNamed = ops.storeKey(job.charKey, recipeID, job.key)
+  local professionKey, ownNamed, profInfo = ops.storeKey(job.charKey, recipeID, job.key)
   job.named = job.named or ownNamed
   if not professionKey then
     return
   end
-  local changed, unknownBind = ops.store(character.recipes, recipeID, ops.readFields(api, recipeID, info), professionKey)
+  local changed, unknownBind = ops.store(character.recipes, recipeID, ops.readFields(api, recipeID, info, profInfo), professionKey)
   job.stored = job.stored + 1
   job.anyChanged = job.anyChanged or changed
   job.pendingBind = job.pendingBind + (unknownBind and 1 or 0)

@@ -2,32 +2,32 @@ local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
+local DetailsFixture = require("tests.helpers.details_fixture")
 
--- Spec A.4: the split view's details pane. A 56 px header (icon, customer, what, status), the
--- Request / Matched / Crafters / Channel sections in a clipping body, tooltip zones over the
--- header's name and what line and the Matched and Crafters sections, and the Greet / Whisper /
--- Dismiss action bar, which acts on the shown lead with the look rule (details.shownAt).
-local LINK = "item:4305"
-local LINK_TEXT = "|cffffffff|Hitem:4305|h[Bolt of Silk]|h|r"
-local ITEM_ICON = 132891
-local MAGE = { r = 0.25, g = 0.78, b = 0.92 }
-local WARRIOR = { r = 0.78, g = 0.61, b = 0.43 }
--- MAGE as a colour code, format("|cff%02x%02x%02x", r * 255, g * 255, b * 255).
-local MAGE_CODE = "|cff3fc6ea"
+-- Spec A.4 and details spec A.3-A.5: the split view's details pane below its header (the header
+-- and the strip: tests/ui/test_details_header.lua). A clipping body (the Request bubble, the
+-- Matched / Crafters / Quality / Realm grid, the Greet sends bubble, as tall as what shows),
+-- tooltip zones over the name, the strip and the Matched and Crafters rows, and the Greet /
+-- Whisper / Dismiss action bar, which acts on the shown lead with the look rule (details.shownAt).
+local LINK, LINK_TEXT = DetailsFixture.LINK, DetailsFixture.LINK_TEXT
+local MAGE, WARRIOR, MAGE_CODE = DetailsFixture.MAGE, DetailsFixture.WARRIOR, DetailsFixture.MAGE_CODE
 local GOLD = { 1, 0.82, 0 }
 local WHITE = { 1, 1, 1 }
 local GREEN = { 0.1, 1, 0.1 }
 local GREY = { 0.5, 0.5, 0.5 }
--- The spec's numbers: 16 px padding, 12 px from the header to the first label and between
--- sections, labels 14 high, a 56 px header 2 below the pane top, a 44 px action bar.
-local PAD, GAP = 16, 12
+-- The spec's numbers: 16 px padding. The body (details spec A.3): 18 between blocks, labels 14
+-- high and 5 above their bubble, bubbles 10 / 12 padding, an 84 px grid label column and 12 to
+-- its values, 14 a grid line, 9 between rows, a 12 px hint line.
+local PAD = DetailsFixture.PAD
+local BLOCK, LABEL, LABEL_GAP, PAD_Y, PAD_X = 18, 14, 5, 10, 12
+local VALUE_LEFT, LINE, ROW_GAP, HINT = PAD + 84 + 12, 14, 9, 12
+local REQUEST_CENTER, REQUEST_BORDER = { 0.17, 0.14, 0.09, 0.9 }, { 0.35, 0.29, 0.19, 1 }
+local GREET_CENTER, GREET_BORDER = { 0.14, 0.13, 0.11, 0.9 }, { 0.24, 0.22, 0.19, 1 }
+local open, leadOf, gold = DetailsFixture.open, DetailsFixture.leadOf, DetailsFixture.gold
+local itemLead, recipeLead = DetailsFixture.itemLead, DetailsFixture.recipeLead
 
 local function tip()
   return rawget(_G, "CraftAlertTooltip")
-end
-
-local function strip(text)
-  return (text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
 end
 
 local function has(list, value)
@@ -39,169 +39,263 @@ local function has(list, value)
   return false
 end
 
--- The fixture over `leads` (records, oldest first, given ids 1..n); Me-Realm smiths and is a
--- mage; every customer is a warrior. → ns, the sends (UiFixture's calls).
-local function load(leads)
-  local ns, _, calls = UiFixture.load({
-    db = function(accountDb)
-      accountDb.characters["Me-Realm"] = { class = "MAGE", professions = { [164] = { name = "Blacksmithing" } } }
-      for id, lead in ipairs(leads) do
-        lead.id = id
-        accountDb.leads[id] = lead
-      end
-    end,
-  })
-  Wow.stub("RAID_CLASS_COLORS", { MAGE = MAGE, WARRIOR = WARRIOR })
-  Wow.stub("LOCALIZED_CLASS_NAMES_MALE", { MAGE = "Mage", WARRIOR = "Warrior" })
-  Wow.stub("GetPlayerInfoByGUID", function()
-    return "Warrior", "WARRIOR"
-  end)
-  Wow.stub("C_Item", {
-    GetItemInfoInstant = function(itemID)
-      if itemID == 4305 then
-        return 4305, "Tradeskill", "Cloth", "", ITEM_ICON
-      end
-    end,
-  })
-  return ns, calls
+-- A bubble's height: its text's, wrapped to at most 4 lines, and PAD_Y above and below.
+local function bubbleHeight(text)
+  return text:GetStringHeight() + 2 * PAD_Y
 end
 
-local function leadOf(ns, id)
-  for _, lead in ipairs(ns.Leads.List()) do
-    if lead.id == id then
-      return lead
-    end
-  end
-  error("no lead " .. tostring(id))
+-- The body's width in a `width` (default 449) wide pane: less the box's 4 px right inset and the
+-- scroll bar.
+local function bodyWidth(d, width)
+  return (width or 449) - 4 - d.scroll.bar:GetWidth()
 end
 
--- A details pane in a bare host, laid out at the default size (840 wide: 840 - 4 - 6 - 260 - 1
--- = 569; any width over 348 gives full buttons), showing lead `id` (default 1).
--- → ns, the details, the sends, the lead.
-local function open(leads, id)
-  local ns, calls = load(leads)
-  local d = ns.LeadDetails.New(_G["CreateFrame"]("Frame"))
-  ns.LeadDetails.Layout(d, 449)
-  local lead = leadOf(ns, id or 1)
-  ns.LeadDetails.Show(d, lead)
-  return ns, d, calls, lead
-end
-
-local function itemLead()
-  local lead = UiFixture.lead(1, "Buyer-Realm")
-  lead.kind, lead.itemID, lead.itemLink = "item", 4305, LINK_TEXT
-  lead.why, lead.profName, lead.message = "lf + bolt", "Tailoring", "LF bolt of silk"
-  lead.guid = "Player-1-0001"
-  lead.crafters = {
-    { key = "Me-Realm", rank = 3, byConc = true },
-    { key = "Bob-Realm" },
-    { key = "Alt-Other", rank = 2 },
-  }
-  lead.time = UiFixture.T0 - 30
-  return lead
-end
-
--- A recipe lead: no link in its what line.
-local function recipeLead()
-  local lead = itemLead()
-  lead.itemLink, lead.recipeName = nil, "Bolt of Silk"
-  return lead
-end
-
-local function gold(text)
-  return "|cffffd100" .. text .. "|r"
-end
-
-local function testHeader()
-  local ns, d, _, lead = open({ itemLead() })
-  local header = d.header
-  Assert.equal(header:GetHeight(), 56)
-  Assert.same(header.points, { { "TOPLEFT", d.frame, "TOPLEFT", 0, -2 }, { "TOPRIGHT", d.frame, "TOPRIGHT", 0, -2 } })
-  Assert.same({ d.fill.layer, d.fill.color }, { "BACKGROUND", ns.Theme.COLORS.headerFill })
-  Assert.same({ d.icon.width, d.icon.height }, { 32, 32 })
-  Assert.same(d.icon.points[1], { "LEFT", header, "LEFT", PAD, 0 })
-  -- Icon: the profession's, else the item's, else the bell.
-  Assert.equal(d.icon.texture, ITEM_ICON, "no profession icon: the item's")
-  Wow.stub("C_TradeSkillUI", {
-    GetTradeSkillTexture = function()
-      return 777
-    end,
-  })
-  ns.LeadDetails.Show(d, lead)
-  Assert.equal(d.icon.texture, 777)
-  Wow.stub("C_TradeSkillUI", nil)
-  lead.itemID = nil
-  ns.LeadDetails.Show(d, lead)
-  Assert.equal(d.icon.texture, ns.Theme.ICON)
-  -- Line 1: the customer in class colour, then the age.
-  Assert.same({ d.name:GetText(), d.name.textColor, d.name.font }, { "Buyer-Realm", { WARRIOR.r, WARRIOR.g, WARRIOR.b, 1 }, "GameFontNormal" })
-  Assert.same({ d.age:GetText(), d.age.textColor }, { "30s", ns.Theme.COLORS.textTimestamp })
-  Assert.same(d.age.points[1], { "LEFT", d.name, "RIGHT", 6, 0 })
-  Wow.stub("GameFontNormalLarge", {})
-  Assert.equal(ns.LeadDetails.New(_G["CreateFrame"]("Frame")).name.font, "GameFontNormalLarge")
-  -- Line 2: the link (or recipe), then the profession in gold; a profession lead says it once.
-  Assert.same({ d.what:GetText(), d.what.font }, { LINK_TEXT .. " · " .. gold("Tailoring"), "GameFontHighlightSmall" })
-  lead.itemLink, lead.recipeName = nil, "Bolt of Silk"
-  ns.LeadDetails.Show(d, lead)
-  Assert.equal(d.what:GetText(), "Bolt of Silk · " .. gold("Tailoring"))
-  lead.recipeName, lead.profName = nil, "Tailoring"
-  ns.LeadDetails.Show(d, lead)
-  Assert.equal(d.what:GetText(), "Tailoring")
-  -- Line 3: greeted (green, with the check), replied (accent), the realm warning; else empty.
-  Assert.equal(d.status:GetText(), "")
-  lead.greeted = true
-  ns.LeadDetails.Show(d, lead)
-  Assert.equal(d.status:GetText(), "|TInterface\\RaidFrame\\ReadyCheck-Ready:14|t |cff4cd166Greeted|r")
-  lead.greeted, lead.replied, lead.cannotOrder = false, true, true
-  ns.LeadDetails.Show(d, lead)
-  Assert.equal(d.status:GetText(), "|cff1eb7f4Replied|r  |cffe5b733can't order (realm)|r")
-  Assert.same(d.status.points[1], { "TOPLEFT", d.what, "BOTTOMLEFT", 0, -3 })
-  for _, text in ipairs({ d.name, d.age, d.what, d.status }) do
-    Assert.equal(text.parent, header, "header texts are the header's regions")
-  end
+-- The vertical distance of `region`'s first anchor below the body's top.
+local function top(region)
+  return -region.points[1][5]
 end
 
 local function testBodySections()
   local ns, d, _, lead = open({ UiFixture.lead(1, "Buyer-Realm") })
-  local sections, body = d.sections, d.body
-  Assert.same(body.points, { { "TOPLEFT", d.header, "BOTTOMLEFT", 0, 0 }, { "BOTTOMRIGHT", d.bar, "TOPRIGHT", 0, 0 } })
+  local s, body = d.sections, d.body
+  Assert.same(body.points, { { "TOPLEFT", d.scroll.frame, "TOPLEFT", 0, 0 } }, "the body scrolls in the details' view")
   Assert.same(
     { d.bar:GetHeight(), d.bar.points[1], d.bar.points[2] },
     { 44, { "BOTTOMLEFT", d.frame, "BOTTOMLEFT", 0, 0 }, { "BOTTOMRIGHT", d.frame, "BOTTOMRIGHT", 0, 0 } }
   )
   Assert.equal(body.clipsChildren, true)
-  Assert.truthy(ns.DetailsBody.HEIGHT <= 242, "the body fits the 420 px window: " .. ns.DetailsBody.HEIGHT)
+  -- The labels in gold on the body; no Channel section (the header's line 2 carries it).
   local texts = Widgets.texts(body, Wow.frames)
-  for _, label in ipairs({ "Request", "Matched", "Crafters", "Channel" }) do
+  for key, label in pairs({ request = "Request", matched = "Matched", crafters = "Crafters", greet = "Greet sends" }) do
     Assert.truthy(has(texts, label), label)
-    Assert.same({ sections.labels[string.lower(label)].font, sections.labels[string.lower(label)].parent }, { "GameFontNormal", body }, label)
+    Assert.same({ s.labels[key].font, s.labels[key].parent }, { "GameFontNormal", body }, label)
   end
-  Assert.same(sections.labels.request.points[1], { "TOPLEFT", body, "TOPLEFT", PAD, -GAP })
-  local request = sections.values.request
-  Assert.same(request.points, { { "TOPLEFT", body, "TOPLEFT", PAD, -GAP - 14 }, { "RIGHT", body, "RIGHT", -PAD, 0 } })
-  Assert.same({ request:GetText(), request.font, request.wordWrap, request.maxLines }, { "  LF plate belt  ", "GameFontHighlight", true, 4 })
-  -- The next label 4 lines and a gap further down.
-  Assert.same(sections.labels.matched.points[1], { "TOPLEFT", body, "TOPLEFT", PAD, -GAP - 14 - 56 - GAP })
-  Assert.equal(sections.values.matched:GetText(), "|cfffffffflf + blacksmith|r · " .. gold("Blacksmithing"))
-  local channel = sections.values.channel
-  Assert.same({ channel:GetText(), channel.textColor }, { "Trade · " .. os.date("%H:%M", UiFixture.T0), ns.Theme.COLORS.textSecondary })
-  -- A lead without a message: the Request section hides and leaves its space.
+  Assert.falsy(has(texts, "Channel"), "no Channel section")
+  -- The Request: its label at the padding, the bubble 5 under it; the text is the bubble's region.
+  local bubble, request = s.bubbles.request, s.texts.request
+  Assert.same(s.labels.request.points[1], { "TOPLEFT", body, "TOPLEFT", PAD, -PAD })
+  Assert.same(bubble.points[1], { "TOPLEFT", body, "TOPLEFT", PAD, -PAD - LABEL - LABEL_GAP })
+  Assert.same({ bubble.frameType, bubble.template, bubble.parent, bubble.mouseEnabled }, { "Button", "TooltipBackdropTemplate", body, true })
+  Assert.same({ bubble.NineSlice.centerColor, bubble.NineSlice.borderColor }, { REQUEST_CENTER, REQUEST_BORDER })
+  Assert.same(
+    { request.parent, request:GetText(), request.font, request.wordWrap, request.maxLines },
+    { bubble, "  LF plate belt  ", "GameFontHighlight", true, 4 }
+  )
+  Assert.same(request.points[1], { "TOPLEFT", bubble, "TOPLEFT", PAD_X, -PAD_Y })
+  local width = bodyWidth(d)
+  Assert.same({ bubble:GetWidth(), request:GetWidth(), bubble:GetHeight() }, { width - 2 * PAD, width - 2 * PAD - 2 * PAD_X, bubbleHeight(request) })
+  -- The grid a block gap under the bubble: labels at the padding, values 84 + 12 further right.
+  local gridTop = PAD + LABEL + LABEL_GAP + bubble:GetHeight() + BLOCK
+  Assert.same(s.labels.matched.points[1], { "TOPLEFT", body, "TOPLEFT", PAD, -gridTop })
+  local matched = s.lines.matched[1]
+  Assert.same(matched.points, { { "TOPLEFT", body, "TOPLEFT", VALUE_LEFT, -gridTop }, { "RIGHT", body, "RIGHT", -PAD, 0 } })
+  Assert.same({ matched:GetText(), matched.font }, { "|cfffffffflf + blacksmith|r · " .. gold("Blacksmithing"), "GameFontHighlight" })
+  Assert.equal(top(s.labels.crafters), gridTop + LINE + ROW_GAP)
+  Assert.equal(top(s.lines.crafters[1]), gridTop + LINE + ROW_GAP)
+  -- A lead without a message: the Request block hides and the grid moves up to the padding.
   lead.message = nil
   ns.LeadDetails.Show(d, lead)
-  Assert.same({ sections.labels.request:IsShown(), request:IsShown(), sections.labels.matched.points[1][5] }, { false, false, -GAP - 14 - 56 - GAP })
+  Assert.same({ s.labels.request:IsShown(), bubble:IsShown(), top(s.labels.matched) }, { false, false, PAD })
+end
+
+-- Details spec A.3-A.4: a grid row shows only when the lead has a value for it, and a hidden row
+-- takes no space. Quality: LeadText.Quality's 1-2 lines; Realm: only for a cannotOrder lead.
+local function testGrid()
+  local lead = itemLead()
+  lead.recipeKey = 9001
+  local ns, d = open({ lead })
+  local s, db = d.sections, _G["CraftAlertDB"]
+  Assert.same({ s.labels.quality:IsShown(), s.labels.realm:IsShown(), s.lines.realm[1]:IsShown() }, { false, false, false })
+  local greetTop = top(s.labels.greet)
+  db.characters["Me-Realm"].recipes = {
+    [9001] = { name = "Bolt", prof = 197, ranks = { 1, 2, 3 }, reachRank = 2, reachCost = 120, reachConc = 3168 },
+  }
+  db.characters["Me-Realm"].concentration = { [3168] = { amount = 960, at = 0, cycleMs = 345600, perCycle = 1, max = 1000 } }
+  ns.LeadDetails.Show(d, lead)
+  local quality = ns.LeadText.Quality(lead, db)
+  Assert.equal(#quality, 2)
+  Assert.same(
+    { s.labels.quality:GetText(), s.lines.quality[1]:GetText(), s.lines.quality[2]:GetText(), s.lines.quality[1].font },
+    { "Quality", quality[1], quality[2], "GameFontHighlight" }
+  )
+  Assert.equal(top(s.labels.quality), top(s.labels.crafters) + 3 * LINE + ROW_GAP, "under the three crafter lines")
+  Assert.same({ top(s.lines.quality[1]), top(s.lines.quality[2]) }, { top(s.labels.quality), top(s.labels.quality) + LINE })
+  Assert.equal(top(s.labels.greet), greetTop + 2 * LINE + ROW_GAP, "the blocks below move down")
+  -- An order can't go to the customer's realm: the Realm row under Quality, in the warning colour.
+  lead.cannotOrder = true
+  ns.LeadDetails.Show(d, lead)
+  local realm = s.lines.realm[1]
+  Assert.same(
+    { s.labels.realm:GetText(), realm:GetText(), realm.textColor, realm:IsShown() },
+    { "Realm", "Can't send an order (other realm)", ns.Theme.COLORS.warning, true }
+  )
+  Assert.equal(top(s.labels.realm), top(s.labels.quality) + 2 * LINE + ROW_GAP)
+  Assert.equal(top(s.labels.greet), greetTop + 2 * LINE + ROW_GAP + LINE + ROW_GAP)
+  -- The top rank reached: one Quality line, the Realm row a line further up.
+  db.characters["Me-Realm"].recipes[9001].reachRank = 3
+  ns.LeadDetails.Show(d, lead)
+  Assert.same({ s.lines.quality[1]:GetText(), s.lines.quality[2]:IsShown() }, { ns.LeadText.Quality(lead, db)[1], false })
+  Assert.equal(top(s.labels.realm), top(s.labels.quality) + LINE + ROW_GAP)
+  -- Neither: both rows hide and the blocks below move back up.
+  lead.cannotOrder, lead.recipeKey = nil, nil
+  ns.LeadDetails.Show(d, lead)
+  Assert.same({ s.labels.quality:IsShown(), s.lines.quality[1]:IsShown(), s.labels.realm:IsShown(), realm:IsShown() }, { false, false, false, false })
+  Assert.equal(top(s.labels.greet), greetTop)
+end
+
+-- Details spec A.5: what Greet would send to an ungreeted lead. The label, "to" the whisper target
+-- on its right (55 % white folded opaque, so a class colour code keeps its own), the greeting in
+-- its own bubble, and the green Shift-click hint under it; built on each paint; hidden once
+-- greeted or when the template is empty.
+local function testGreetSends()
+  local ns, d, _, lead = open({ UiFixture.lead(1, "Buyer-Realm") })
+  local s, db = d.sections, _G["CraftAlertDB"]
+  local bubble, text, target, hint = s.bubbles.greet, s.texts.greet, s.texts.target, s.texts.hint
+  local greeting = ns.Greeting.Build(lead, db.settings)
+  Assert.truthy(greeting ~= "", "the default template says something")
+  Assert.same({ text:GetText(), text.parent, text.font, text.wordWrap, text.maxLines }, { greeting, bubble, "GameFontHighlight", true, 4 })
+  Assert.same({ bubble.frameType, bubble.template, bubble.parent, bubble.mouseEnabled }, { "Button", "TooltipBackdropTemplate", d.body, true })
+  Assert.same({ bubble.NineSlice.centerColor, bubble.NineSlice.borderColor }, { GREET_CENTER, GREET_BORDER })
+  Assert.same(bubble.points[1], { "TOPLEFT", d.body, "TOPLEFT", PAD, -(top(s.labels.greet) + LABEL + LABEL_GAP) })
+  Assert.same(
+    { s.labels.greet:GetText(), target:GetText(), target.font, target.textColor, target:IsShown() },
+    { "Greet sends", "to Buyer-Realm", "GameFontHighlightSmall", ns.FrameKit.Opaque(ns.Theme.COLORS.textSecondary), true }
+  )
+  Assert.same(target.points, { { "TOP", s.labels.greet, "TOP", 0, 0 }, { "RIGHT", d.body, "RIGHT", -PAD, 0 } })
+  Assert.same(
+    { hint:GetText(), hint.font, hint.textColor, hint.parent, hint:IsShown() },
+    { "Shift-click Greet to edit first", "GameFontHighlightSmall", { GREEN[1], GREEN[2], GREEN[3], 1 }, d.body, true }
+  )
+  Assert.same(hint.points[1], { "TOPLEFT", bubble, "BOTTOMLEFT", 0, -LABEL_GAP })
+  -- A template edit shows on the next paint.
+  db.settings.templates.profession = "hi {customer}"
+  ns.LeadDetails.Show(d, lead)
+  Assert.equal(text:GetText(), ns.Greeting.Build(lead, db.settings))
+  -- No whisper target: no "to …"; the block stays.
+  local targetOf = ns.GreetAction.Target
+  ns.GreetAction.Target = function() end
+  ns.LeadDetails.Show(d, lead)
+  Assert.same({ target:IsShown(), s.labels.greet:IsShown(), bubble:IsShown(), hint:IsShown() }, { false, true, true, true })
+  ns.GreetAction.Target = targetOf
+  -- An empty template: the whole block hides.
+  db.settings.templates.profession = ""
+  ns.LeadDetails.Show(d, lead)
+  Assert.same({ s.labels.greet:IsShown(), target:IsShown(), bubble:IsShown(), hint:IsShown() }, { false, false, false, false })
+  -- Greeted: hidden too, whatever the template says.
+  db.settings.templates.profession = "hi"
+  lead.greeted = true
+  ns.LeadDetails.Show(d, lead)
+  Assert.same({ s.labels.greet:IsShown(), target:IsShown(), bubble:IsShown(), hint:IsShown() }, { false, false, false, false })
+end
+
+-- The target's name in the customer's class colour (the header name's source, image 46); "to" and
+-- a customer of unknown class keep the label's own colour.
+local function testGreetTargetClassColour()
+  local lead = UiFixture.lead(1, "Buyer-Realm")
+  lead.guid = "Player-1-0001"
+  local ns, d = open({ lead })
+  local target = d.sections.texts.target
+  Assert.equal(target:GetText(), "to " .. ns.FrameKit.ColorCode("Buyer-Realm", WARRIOR.r, WARRIOR.g, WARRIOR.b))
+  lead.guid = nil
+  ns.LeadDetails.Show(d, lead)
+  Assert.equal(target:GetText(), "to Buyer-Realm", "unknown class: plain")
+end
+
+-- A chat line of only spaces leaves the Request bubble nothing to show: it hides with its label.
+local function testRequestHidesBlankMessage()
+  local lead = UiFixture.lead(1, "Buyer-Realm")
+  lead.message = "  "
+  local _, d = open({ lead })
+  local s = d.sections
+  Assert.same({ s.labels.request:IsShown(), s.bubbles.request:IsShown() }, { false, false })
+end
+
+-- A greeting of only spaces is nothing to say (GreetAction opens an empty whisper): the block hides.
+local function testGreetSendsHidesBlankGreeting()
+  local ns, d, _, lead = open({ UiFixture.lead(1, "Buyer-Realm") })
+  local s = d.sections
+  _G["CraftAlertDB"].settings.templates.profession = "   "
+  ns.LeadDetails.Show(d, lead)
+  Assert.same(
+    { s.labels.greet:IsShown(), s.texts.target:IsShown(), s.bubbles.greet:IsShown(), s.texts.hint:IsShown() },
+    { false, false, false, false }
+  )
+end
+
+-- Details spec A.3: the body is as tall as what it shows (the padding, the blocks, the gaps
+-- between them), re-measured on each paint and on each Layout, where a narrower pane wraps the
+-- bubbles to more lines; the scroll range follows.
+local function testBodyHeight()
+  local ns, d, _, lead = open({ UiFixture.lead(1, "Buyer-Realm") })
+  local s, body, scroll = d.sections, d.body, d.scroll
+  local function greetBlock()
+    return BLOCK + LABEL + LABEL_GAP + bubbleHeight(s.texts.greet) + LABEL_GAP + HINT
+  end
+  -- Request, the grid (Matched, one crafter), then Greet sends while it shows.
+  local function expected()
+    local height = PAD + LABEL + LABEL_GAP + bubbleHeight(s.texts.request) + BLOCK + LINE + ROW_GAP + LINE
+    if s.bubbles.greet:IsShown() then
+      height = height + greetBlock()
+    end
+    return height + PAD
+  end
+  Assert.equal(body:GetHeight(), expected())
+  local full, greet = body:GetHeight(), greetBlock()
+  lead.greeted = true
+  ns.LeadDetails.Show(d, lead)
+  Assert.equal(body:GetHeight(), full - greet, "Greet sends hidden: its block and gap go")
+  lead.greeted, lead.message = false, string.rep("long words ", 12)
+  ns.LeadDetails.Show(d, lead)
+  scroll.box:SetSize(300, 100)
+  Widgets.fire(scroll.box, "OnSizeChanged", 300, 100)
+  local wide, lines = body:GetHeight(), s.texts.request:GetStringHeight()
+  Assert.equal(wide, expected())
+  ns.LeadDetails.Layout(d, 250)
+  Assert.same(
+    { s.bubbles.request:GetWidth(), s.texts.request:GetWidth(), s.texts.greet:GetWidth() },
+    { bodyWidth(d, 250) - 2 * PAD, bodyWidth(d, 250) - 2 * PAD - 2 * PAD_X, bodyWidth(d, 250) - 2 * PAD - 2 * PAD_X }
+  )
+  Assert.truthy(s.texts.request:GetStringHeight() > lines, "narrower: the request wraps to more lines")
+  Assert.same({ body:GetHeight(), select(2, scroll.bar:GetMinMaxValues()) }, { expected(), expected() - 100 })
+  Assert.truthy(body:GetHeight() > wide)
+end
+
+-- Scroll bars spec §4: the body scrolls in a box between the fixed header and action bar, its
+-- height the blocks', the bar PANE_PADDING in from the pane's right; the bar shows and the view
+-- takes the wheel only while the box is shorter than the body. Another lead starts at the top, the
+-- same lead repainted keeps its place. The fakes do not lay out: the test sizes the box.
+local function testBodyScrolls()
+  local ns, d = open({ UiFixture.lead(1, "Ann-Realm"), UiFixture.lead(2, "Bob-Realm") })
+  local scroll, body = d.scroll, d.body
+  local height = body:GetHeight()
+  local function size(boxHeight)
+    scroll.box:SetSize(300, boxHeight)
+    Widgets.fire(scroll.box, "OnSizeChanged", 300, boxHeight)
+  end
+  Assert.same({ scroll.content, body:GetParent() }, { body, scroll.frame })
+  Assert.same(scroll.box.points, { { "TOPLEFT", d.strip, "BOTTOMLEFT", 0, 0 }, { "BOTTOMRIGHT", d.bar, "TOPRIGHT", -4, 0 } })
+  size(height + 50)
+  Assert.same({ scroll.bar:IsShown(), scroll.frame.mouseWheelEnabled }, { false, false }, "a body that fits: the wheel falls through")
+  size(height - 60)
+  Assert.same({ scroll.bar:IsShown(), scroll.frame.mouseWheelEnabled, select(2, scroll.bar:GetMinMaxValues()) }, { true, true, 60 })
+  ns.ScrollView.ScrollTo(scroll, 40)
+  ns.LeadDetails.Show(d, leadOf(ns, 1))
+  Assert.equal(scroll.frame:GetVerticalScroll(), 40, "the same lead repainted keeps its place")
+  ns.LeadDetails.Show(d, leadOf(ns, 2))
+  Assert.same({ scroll.frame:GetVerticalScroll(), scroll.bar:GetValue() }, { 0, 0 }, "another lead starts at the top")
 end
 
 local function testCrafters()
   local lead = itemLead()
   lead.crafters[4], lead.crafters[5] = { key = "Cat-Realm" }, { key = "Dan-Realm", rank = 1 }
   local ns, d = open({ lead })
-  local lines = d.sections.crafters
+  local lines = d.sections.lines.crafters
   Assert.equal(#lines, 3)
   -- Picked first in its own class colour (not the customer's), then by name; ranks in grey.
   Assert.equal(lines[1]:GetText(), MAGE_CODE .. "Me|r|cff7f7f7f R3 (conc)|r")
   Assert.equal(lines[2]:GetText(), "|cffffffffAlt-Other|r|cff7f7f7f R2|r")
   Assert.equal(lines[3]:GetText(), "|cffffffffBob|r|cff7f7f7f +2 more|r")
-  Assert.same({ lines[2].points[1][5] - lines[3].points[1][5], lines[1].font }, { 12, "GameFontHighlightSmall" })
+  Assert.same({ lines[2].points[1][5] - lines[3].points[1][5], lines[1].font }, { LINE, "GameFontHighlight" })
   -- Three or fewer: no "more".
   lead.crafters[4], lead.crafters[5] = nil, nil
   ns.LeadDetails.Show(d, lead)
@@ -223,7 +317,7 @@ local function testBadCrafters()
     local lead = UiFixture.lead(1, "Buyer-Realm")
     lead.rank, lead.crafters = 2, bad
     local _, d = open({ lead })
-    local lines = d.sections.crafters
+    local lines = d.sections.lines.crafters
     Assert.same({ lines[1]:GetText(), lines[2]:IsShown() }, { MAGE_CODE .. "Me|r|cff7f7f7f R2|r", false })
     Wow.reset()
   end
@@ -233,7 +327,9 @@ local function testLinks()
   local lead = itemLead()
   lead.message = "LF " .. LINK_TEXT .. " crafter"
   local _, d = open({ lead })
-  for _, frame in ipairs({ d.header, d.body }) do
+  local bubbles = d.sections.bubbles
+  -- The strip, the body (its grid texts) and both bubbles, each hovering its own texts' links.
+  for _, frame in ipairs({ d.strip, d.body, bubbles.request, bubbles.greet }) do
     Assert.same({ frame.frameType, frame.hyperlinksEnabled }, { "Button", true })
     for _, script in ipairs({ "OnHyperlinkEnter", "OnHyperlinkLeave", "OnHyperlinkClick" }) do
       Assert.truthy(frame.scripts[script], script)
@@ -244,18 +340,19 @@ local function testLinks()
     Assert.equal(tip().shown, false)
     tip().hyperlinks = {}
   end
-  -- No zone over the Request: its links hover through the body.
-  local request = { d.sections.labels.request, d.sections.values.request }
+  -- No zone over the Request: its links hover through its bubble.
+  local request = { d.sections.labels.request, bubbles.request, d.sections.texts.request }
   for name, zone in pairs(d.zones) do
     Assert.same({ zone.frameType, zone.mouseEnabled, #zone.regions }, { "Button", true, 0 }, name)
     for _, point in ipairs(zone.points) do
       Assert.falsy(has(request, point[2]), name .. " is anchored over the Request")
     end
   end
-  Assert.same({ d.zones.name.parent, d.zones.what.parent, d.zones.matched.parent, d.zones.crafters.parent }, { d.header, d.header, d.body, d.body })
-  Assert.same({ d.zones.name.points[1][2], d.zones.what.points[1][2] }, { d.name, d.what })
-  Assert.same({ d.zones.matched.points[1][2], d.zones.matched.points[2][2] }, { d.sections.labels.matched, d.sections.values.matched })
-  Assert.same({ d.zones.crafters.points[1][2], d.zones.crafters.points[2][2] }, { d.sections.labels.crafters, d.sections.crafters[3] })
+  Assert.same({ d.zones.name.parent, d.zones.what.parent, d.zones.matched.parent, d.zones.crafters.parent }, { d.header, d.strip, d.body, d.body })
+  Assert.same({ d.zones.name.points[1][2], d.zones.name.points[2][2] }, { d.name, d.name })
+  local lines = d.sections.lines
+  Assert.same({ d.zones.matched.points[1][2], d.zones.matched.points[2][2] }, { d.sections.labels.matched, lines.matched[1] })
+  Assert.same({ d.zones.crafters.points[1][2], d.zones.crafters.points[2][2] }, { d.sections.labels.crafters, lines.crafters[3] })
 end
 
 local function testCustomerZone()
@@ -280,8 +377,10 @@ local function testCustomerZone()
   Assert.equal(tip().shown, true)
 end
 
+-- The What zone covers the whole strip, shown only while the strip holds no link to hover.
 local function testWhatZone()
   local ns, d = open({ UiFixture.lead(1, "Buyer-Realm") })
+  Assert.same(d.zones.what.points, { { "TOPLEFT", d.strip, "TOPLEFT", 0, 0 }, { "BOTTOMRIGHT", d.strip, "BOTTOMRIGHT", 0, 0 } })
   Assert.equal(d.zones.what:IsShown(), true)
   Widgets.fire(d.zones.what, "OnEnter")
   Assert.same({ tip().owner, tip().lines, tip().colors }, { d.zones.what, { "Blacksmithing", "Profession request" }, { GOLD, WHITE } })
@@ -423,10 +522,13 @@ local function testTipsFollowAndClose()
   d.frame:Hide()
   Assert.equal(tip().shown, false)
   d.frame:Show()
-  Widgets.fire(d.body, "OnHyperlinkEnter", LINK, LINK_TEXT)
-  Assert.equal(d.body.hoveredLink, LINK)
-  ns.LeadDetails.Show(d, leadOf(ns, 2))
-  Assert.same({ d.body.hoveredLink, tip().shown }, { nil, false })
+  local bubbles = d.sections.bubbles
+  for index, host in ipairs({ d.body, d.strip, bubbles.request, bubbles.greet }) do
+    Widgets.fire(host, "OnHyperlinkEnter", LINK, LINK_TEXT)
+    Assert.equal(host.hoveredLink, LINK)
+    ns.LeadDetails.Show(d, leadOf(ns, index % 4 + 1))
+    Assert.same({ host.hoveredLink, tip().shown }, { nil, false }, index)
+  end
 end
 
 local function testButtons()
@@ -439,7 +541,7 @@ local function testButtons()
   )
   Assert.same(b.greet.points[1], { "LEFT", d.bar, "LEFT", PAD, 0 })
   Assert.same(b.whisper.points[1], { "LEFT", b.greet, "RIGHT", 8, 0 })
-  Assert.same(b.dismiss.points[1], { "LEFT", b.whisper, "RIGHT", 8, 0 })
+  Assert.same(b.dismiss.points[1], { "RIGHT", d.bar, "RIGHT", -PAD, 0 })
   for width, expected in pairs({ [449] = 100, [300] = 84, [0] = 100 }) do
     ns.LeadDetails.Layout(d, width)
     Assert.same({ b.greet:GetWidth(), b.whisper:GetWidth(), b.dismiss:GetWidth() }, { expected, expected, expected }, width)
@@ -530,8 +632,14 @@ local function testNoOnUpdate()
 end
 
 return function()
-  testHeader()
   testBodySections()
+  testGrid()
+  testGreetSends()
+  testGreetTargetClassColour()
+  testGreetSendsHidesBlankGreeting()
+  testRequestHidesBlankMessage()
+  testBodyHeight()
+  testBodyScrolls()
   testCrafters()
   testBadCrafters()
   testLinks()

@@ -35,12 +35,11 @@ local function descendantOf(frame, host)
   return false
 end
 
--- The embedded view's settings gear: the one Button under the host anchored to its TOPRIGHT.
+-- The embedded view's settings gear: the one Button under the host with the gear's art (.normal).
 local function gearOf(host)
   local found
   for _, frame in ipairs(Wow.frames) do
-    local point = frame.points and frame.points[1]
-    if frame.frameType == "Button" and frame.scripts.OnClick and point and point[1] == "TOPRIGHT" and descendantOf(frame, host) then
+    if frame.frameType == "Button" and frame.normal and descendantOf(frame, host) then
       Assert.equal(found, nil, "exactly one gear")
       found = frame
     end
@@ -91,8 +90,8 @@ local function testActivationPlugsIn()
   ns.Launcher.Create()
   ns.Launcher.Refresh()
   Assert.equal(ns.Launcher.Frame(), nil, "launcher suppressed")
-  ns.LeadsWindow.Toggle() -- router -> TogglePanel
-  Assert.same(wm.calls[#wm.calls], { "TogglePanel", "CraftAlert" })
+  ns.LeadsWindow.Toggle() -- router -> TogglePanel (the shown newest lead is seen: RefreshPanelBadge)
+  Assert.same(wm.callsTo("TogglePanel"), { { "TogglePanel", "CraftAlert" } })
   Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil)
   wm.refuse.TogglePanel = true
   ns.LeadsWindow.Toggle() -- false -> own window
@@ -118,6 +117,7 @@ local function testShowLeadPreview()
   ns.WhisperBridge.ShowLead(lead)
   local preview = wm.preview.CraftAlert
   Assert.same({ preview.sender, preview.text, preview.classTag }, { lead.customer, "Blacksmithing", nil })
+  Assert.equal(preview.pulse, true, "a new lead pulses WM's widget (spec 7)")
   Assert.equal(#UiFixture.callsTo(calls, "sound"), 1)
   Assert.equal(#UiFixture.callsTo(calls, "flash"), 1)
   Assert.equal(rawget(_G, "CraftAlertToast"), nil, "no own toast")
@@ -232,6 +232,120 @@ local function testInfoStripNamesTheWhat()
   Assert.equal(wm.info.CraftAlert[ns.Leads.Latest().customer], "|cffffd100Craft Alert:|r Plate Belt · Blacksmithing · Me")
 end
 
+local MAGE = { r = 1, g = 0.5, b = 0 }
+
+-- The crafter's name in the info line wears the class colour; an unknown class stays plain.
+local function testInfoStripColoursTheCrafter()
+  local ns, _, _, _, wm = boot({
+    leads = 1,
+    db = function(db)
+      db.characters = { ["Me-Realm"] = { class = "MAGE" } }
+    end,
+  })
+  Wow.stub("RAID_CLASS_COLORS", { MAGE = MAGE })
+  ns.WhisperBridge.Activate()
+  local lead = ns.Leads.Latest()
+  ns.Leads.MarkGreeted(lead.id)
+  Assert.equal(wm.info.CraftAlert[lead.customer], "|cffffd100Craft Alert:|r Blacksmithing · |cffff7f00Me|r")
+end
+
+-- A lead with why, profession, two crafters (Me: class, rank) and a channel; the tooltip lines
+-- WM shows on hovering the info line.
+local function tooltipLead(db)
+  db.characters = { ["Me-Realm"] = { class = "MAGE" } }
+  db.leads[1].message = "LF plate belt"
+  db.leads[1].crafters = { { key = "Me-Realm", rank = 2, byConc = true }, { key = "Bob-Realm" } }
+end
+
+local function tooltipFixture()
+  local ns, _, _, _, wm = boot({ leads = 1, db = tooltipLead })
+  Wow.stub("RAID_CLASS_COLORS", { MAGE = MAGE })
+  Wow.stub("date", function()
+    return "12:34"
+  end)
+  return ns, wm
+end
+
+local function testInfoLines()
+  local ns = tooltipFixture()
+  local customer = ns.Leads.Latest().customer
+  Assert.same(ns.CardTipText.InfoLines(ns.Leads.Latest()), {
+    "|cffffd100Wants Blacksmithing — you have it|r",
+    "Matched: |cfffffffflf + blacksmith|r · |cffffd100Blacksmithing|r",
+    "|cffff7f00Me|r |cff7f7f7fR2 (conc)|r",
+    "Bob",
+    "[12:34] [Trade] [|cffffffff" .. customer .. "|r]: LF plate belt",
+  })
+end
+
+-- At most 7 crafter lines, so the 10 WM accepts are never passed; no why and no profession, no Matched.
+local function testInfoLinesCapAndMatched()
+  local ns = tooltipFixture()
+  local lead = ns.Leads.Latest()
+  lead.crafters = {}
+  for index = 1, 9 do
+    lead.crafters[index] = { key = "Alt" .. index .. "-Realm" }
+  end
+  Assert.equal(#ns.CardTipText.InfoLines(lead), 10, "headline, matched, 7 crafters, chat")
+  lead.why, lead.profName = nil, nil
+  local lines = ns.CardTipText.InfoLines(lead)
+  Assert.equal(#lines, 9, "no Matched line")
+  for _, line in ipairs(lines) do
+    Assert.equal(string.find(line, "Matched", 1, true), nil, line)
+  end
+  lead.message = nil
+  Assert.equal(#ns.CardTipText.InfoLines(lead), 8, "a saved lead whose message the schema dropped: no chat line")
+end
+
+-- The sync sends the lines with the text, and again only when text or lines changed.
+local function testSyncSendsTooltipLines()
+  local ns, wm = tooltipFixture()
+  ns.WhisperBridge.Activate()
+  local lead = ns.Leads.Latest()
+  ns.Leads.MarkGreeted(lead.id)
+  local call = wm.callsTo("SetContactInfo")[1]
+  Assert.same({ call[2], call[3], call[4] }, { "CraftAlert", lead.customer, wm.info.CraftAlert[lead.customer] })
+  Assert.same(call[5], ns.CardTipText.InfoLines(lead))
+  Assert.same(wm.tips.CraftAlert[lead.customer], ns.CardTipText.InfoLines(lead))
+  ns.WhisperBridge.SyncInfo()
+  Assert.equal(#wm.callsTo("SetContactInfo"), 1, "nothing changed: nothing sent")
+  lead.message = "LF plate belt, thanks"
+  ns.WhisperBridge.SyncInfo()
+  Assert.equal(#wm.callsTo("SetContactInfo"), 2, "a new chat message goes out again")
+  Assert.equal(wm.tips.CraftAlert[lead.customer][5], "[12:34] [Trade] [|cffffffff" .. lead.customer .. "|r]: LF plate belt, thanks")
+  ns.Leads.Dismiss(lead.id)
+  Assert.equal(wm.tips.CraftAlert[lead.customer], nil, "removal clears the tooltip")
+end
+
+-- The fake guards WM's cap: 11 lines, an empty line or a hole is refused and changes nothing.
+local function testFakeRefusesBadTooltips()
+  local api, wm = FakeWm.install()
+  local eleven = {}
+  for index = 1, 11 do
+    eleven[index] = "line"
+  end
+  Assert.equal(api.SetContactInfo("K", "N", "text", eleven), false, "11 lines")
+  Assert.equal(api.SetContactInfo("K", "N", "text", { "a", "" }), false, "empty line")
+  Assert.equal(api.SetContactInfo("K", "N", "text", {}), false, "no line")
+  Assert.same({ wm.info.K, wm.tips.K }, {}, "nothing changed")
+  Assert.equal(api.SetContactInfo("K", "N", "text", { "a" }), true)
+end
+
+-- The preview carries the customer's class token when the guid's class is known.
+local function testPreviewCarriesClassTag()
+  local guid = "Player-0-CRAFTALERTTEST1"
+  local ns, _, _, _, wm = boot()
+  ns.WhisperBridge.Activate()
+  local lead = ns.Leads.Latest()
+  lead.guid = guid
+  ns.FlavorCompat.SetTestClass(guid, "SHAMAN")
+  ns.WhisperBridge.ShowLead(lead)
+  Assert.equal(wm.preview.CraftAlert.classTag, "SHAMAN")
+  ns.FlavorCompat.SetTestClass(guid, nil)
+  ns.WhisperBridge.ShowLead(lead)
+  Assert.equal(wm.preview.CraftAlert.classTag, nil, "unknown class")
+end
+
 local function testPanel()
   local ns, _, _, _, wm = boot({ leads = 3 })
   ns.WhisperBridge.Activate()
@@ -255,13 +369,16 @@ local function testPanel()
   Assert.equal(ns.WhisperBridge.VisibleLead(), nil, "hidden panel shows nothing")
   -- width clamp: 480 - 340 = 140 -> 180; 700 - 340 = 360 -> 260
   Assert.same({ listWidthFor(480), listWidthFor(700) }, { 180, 260 })
-  -- the gear opens the own window on Settings
-  local gear = gearOf(host)
+  -- the gear opens Settings inside the panel's host, not the own window
+  local current = newHost(600)
+  wm.showPanel("CraftAlert", current)
+  local gear = gearOf(current)
   Widgets.fire(gear, "OnEnter")
   local tooltip = ns.Tooltip.Get()
   Assert.same(tooltip.lines, { "Settings", " ", "Click: open settings" })
   Widgets.click(gear)
-  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"):IsShown(), true)
+  Assert.equal(ns.BridgePanel.InSettings(), true)
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil, "no own window")
 end
 
 local function testPanelRefreshesOnlyWhileShown()
@@ -332,7 +449,7 @@ local function testPanelEmptyInInstance()
   Assert.equal(ns.Leads.Latest() ~= nil, true, "Leads keeps its leads in an instance")
   Assert.equal(ns.WhisperBridge.VisibleLead(), nil, "the view shows no rows there")
   inInstance(false)
-  Assert.equal(wm.panels.CraftAlert.badge(), 2, "badge counts the leads outside")
+  Assert.equal(wm.panels.CraftAlert.badge(), 1, "badge counts the leads outside, less the newest the first show saw")
   ns.Leads.Dismiss(ns.Leads.Latest().id)
   Assert.equal(ns.WhisperBridge.VisibleLead() ~= nil, true, "rows are back outside")
 end
@@ -469,13 +586,52 @@ local function testNoOnUpdateAnywhere()
   end
 end
 
+-- /ca config with the bridge on: WM's panel on settings; shown in settings closes it; refused or
+-- raising WM falls back to the own window; nothing in an instance.
+local function testConfigRoutesToPanel()
+  local ns, _, _, _, wm = boot()
+  ns.WhisperBridge.Activate()
+  ns.LeadsWindow.ToggleSettings()
+  Assert.same(wm.callsTo("ShowPanel"), { { "ShowPanel", "CraftAlert" } })
+  Assert.equal(wm.shown.CraftAlert, true, "hidden: the panel opens")
+  Assert.equal(ns.BridgePanel.InSettings(), true, "on settings")
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil, "no own window")
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(wm.shown.CraftAlert, false, "shown in settings: closes")
+  wm.showPanel("CraftAlert")
+  Assert.equal(ns.BridgePanel.InSettings(), false, "reopened on the leads")
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(ns.BridgePanel.InSettings(), true, "shown on leads: switches to settings")
+  Assert.equal(wm.shown.CraftAlert, true)
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil)
+  wm.hidePanel("CraftAlert")
+  wm.refuse.ShowPanel = true
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"):IsShown(), true, "refused: the own window opens")
+  rawget(_G, "CraftAlertLeadsWindow"):Hide()
+  inInstance(true)
+  wm.refuse.ShowPanel = false
+  local calls = #wm.calls
+  ns.LeadsWindow.ToggleSettings()
+  Assert.equal(#wm.calls, calls, "instance: WM not asked")
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"):IsShown(), false, "nothing opens")
+  Assert.equal(wm.shown.CraftAlert, false)
+end
+
 return function()
+  testConfigRoutesToPanel()
   testStandaloneWhenApiMissingOrIncomplete()
   testNoApiCallBeforeActivate()
   testActivationPlugsIn()
   testOpenerGoesToWm()
   testShowLeadPreview()
   testShowPreviewRefusedFallsBackToToast()
+  testInfoStripColoursTheCrafter()
+  testInfoLines()
+  testInfoLinesCapAndMatched()
+  testSyncSendsTooltipLines()
+  testFakeRefusesBadTooltips()
+  testPreviewCarriesClassTag()
   testPreviewClick()
   testTimerAndLeadGone()
   testNoShowInInstance()

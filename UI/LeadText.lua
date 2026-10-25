@@ -6,8 +6,12 @@ end
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
+local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
+local Theme = ns.Theme or require("CraftAlert.UI.Theme")
+local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 
--- The words the toast and the leads-window rows show for a lead.
+-- The words a lead shows as: the toast, the leads list rows, the details pane (header, Quality
+-- row), the tooltips and WhisperMessenger's info lines.
 local LeadText = {}
 
 local floor = math.floor
@@ -73,6 +77,44 @@ function LeadText.ClickLines()
   }
 end
 
+-- Details spec A.4: the rank this lead's crafter reaches with the best reagents, and what the
+-- next one costs in concentration. → nil, or 1-2 lines with colour codes: nil for a profession
+-- lead, or when the crafter's recipe has no reach data or no `ranks`.
+function LeadText.Quality(lead, db)
+  local character = db.characters[lead.crafter]
+  local recipes = lead.kind == "item" and lead.recipeKey ~= nil and character and character.recipes
+  local recipe = recipes and recipes[lead.recipeKey]
+  local top = recipe and recipe.ranks and #recipe.ranks
+  if not (recipe and recipe.reachRank and top and top > 0) then
+    return nil
+  end
+  local reached = recipe.reachRank
+  local colors = Theme.COLORS
+  local rank = FrameKit.ThemeCode(Localization.Text("R%d", reached), colors.white)
+  local lines = { rank .. " " .. FrameKit.ThemeCode(Localization.Text("with the best reagents"), colors.textSecondary) }
+  local cost = recipe.reachCost or 0
+  if reached >= top or cost <= 0 then
+    return lines
+  end
+  rank = FrameKit.ThemeCode(Localization.Text("R%d", reached + 1), colors.white)
+  local have = CrafterRank.Available(db, lead.crafter, recipe.reachConc)
+  if have >= cost then
+    lines[2] = rank
+      .. " "
+      .. FrameKit.ThemeCode(Localization.Text("with %d concentration", cost), colors.textSecondary)
+      .. " "
+      .. FrameKit.ThemeCode(Localization.Text("(%d left)", have - cost), colors.grey)
+  else
+    lines[2] = rank
+      .. " "
+      .. FrameKit.ThemeCode(Localization.Text("needs %d concentration", cost), colors.textSecondary)
+      .. " "
+      .. FrameKit.ThemeCode(Localization.Text("(you have %d)", have), colors.grey)
+  end
+
+  return lines
+end
+
 -- "35s" under a minute, else whole minutes ("2m"); leads expire within the hour.
 function LeadText.Age(seconds)
   if seconds < 60 then
@@ -89,6 +131,19 @@ function LeadText.Channel(lead)
   end
   local name = CHANNEL_NAMES[key]
   return name and Localization.Text(name) or tostring(key)
+end
+
+-- The lead's status word (unlocalized) and its dot colour, for the details header and the list
+-- rows: grey new, green greeted, accent replied. A replied lead was greeted (Leads.MarkReplied).
+function LeadText.State(lead)
+  local colors = Theme.COLORS
+  if lead.replied then
+    return "Greeted, replied", colors.accent
+  end
+  if lead.greeted then
+    return "Greeted", colors.greeted
+  end
+  return "New lead", colors.grey
 end
 
 ns.LeadText = LeadText

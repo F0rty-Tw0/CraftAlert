@@ -93,7 +93,7 @@ local function createNotes(column, state, repaint)
 end
 
 function PageGreetings.Create(parent)
-  local column = Controls.Column(parent)
+  local column = Controls.Column(parent, Theme.LAYOUT.PAGE_PADDING)
   local add, refresh = Controls.Refresher()
   local state = { options = {} }
   local lines

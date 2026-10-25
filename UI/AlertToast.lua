@@ -156,10 +156,6 @@ local function showTooltip(frame)
   tooltip:Show()
 end
 
-local function hideTooltip()
-  Tooltip.Get():Hide()
-end
-
 -- A click on a link inside the message belongs to the link (LinkHover), never to the lead.
 local function onClick(frame, button)
   local overLink = LinkHover.IsOverLink(frame)
@@ -207,7 +203,7 @@ local function create()
   frame:RegisterForDrag("LeftButton")
   frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   frame:SetScript("OnEnter", showTooltip)
-  frame:SetScript("OnLeave", hideTooltip)
+  frame:SetScript("OnLeave", Tooltip.HideIfOwned)
   frame:SetScript("OnClick", onClick)
   frame:SetScript("OnShow", onShow)
   frame:SetScript("OnDragStart", Launcher.StartDrag)

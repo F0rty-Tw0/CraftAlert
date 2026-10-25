@@ -24,7 +24,7 @@ local type = type
 local MAX_LEADS = 100
 -- A lead whose guid starts with this is a synthetic `/ca test` lead: flagged `test`, never saved.
 Leads.TEST_GUID_PREFIX = FlavorCompat.TEST_GUID_PREFIX
-local EVENTS = { new = true, change = true, greeted = true, replied = true }
+local EVENTS = { new = true, change = true, greeted = true, replied = true, seen = true }
 local ITEM_EVENT = "GET_ITEM_INFO_RECEIVED"
 
 ---@type table
@@ -64,7 +64,7 @@ local function pruneAwaited()
   stopIfIdle()
 end
 
-local listeners = { new = {}, change = { pruneAwaited }, greeted = {}, replied = {} }
+local listeners = { new = {}, change = { pruneAwaited }, greeted = {}, replied = {}, seen = {} }
 
 local function now()
   return _G["time"]()
@@ -98,7 +98,7 @@ local function fire(name, lead)
 end
 
 -- "new" (lead: the first alert), "change" (no arguments: any add, update, dismiss, expiry),
--- "greeted" and "replied" (lead).
+-- "greeted", "replied" and "seen" (lead; none after Mark all read).
 function Leads.On(name, fn)
   if not EVENTS[name] then
     error("Leads.On: unknown event " .. tostring(name), 2)
@@ -390,6 +390,7 @@ end
 -- the name of the profession. `recipeKey` is the entry Pick ranked; nil leaves the recipe
 -- fields empty.
 local function describeCrafter(lead, kind, prof, crafter, recipeKey)
+  lead.recipeKey = recipeKey
   local character = db.characters[crafter]
   local profession = character and character.professions and character.professions[prof]
   lead.profName = profession and profession.name or (type(prof) == "string" and prof or nil)
@@ -423,6 +424,7 @@ local function buildLead(result, customerKey, text, channelKey, pick)
     time = now(),
     greeted = false,
     replied = false,
+    seen = false,
   }
   local recipeKey = pick.recipeKey
   if recipeKey == nil and result.kind == "item" then
@@ -543,6 +545,39 @@ function Leads.MarkReplied(id)
   fire("replied", lead)
   fire("change")
   return true
+end
+
+-- The first time a lead is shown in the details. "seen", not "change": the details mark it while
+-- UI/LeadsView.lua refreshes, which a "change" would re-enter; that refresh repaints the row's
+-- dot itself. → whether this was the first.
+function Leads.MarkSeen(id)
+  local lead = find(id)
+  if lead == nil or lead.seen then
+    return false
+  end
+  lead.seen = true
+  fire("seen", lead)
+  return true
+end
+
+-- WhisperMessenger's Mark all read: every listed lead of `ids` is seen, with one "seen" (no lead)
+-- when any was not, so the badge refreshes once.
+function Leads.MarkAllSeen(ids)
+  local changed = false
+  for _, id in ipairs(ids) do
+    local lead = find(id)
+    if lead and not lead.seen then
+      lead.seen, changed = true, true
+    end
+  end
+  if changed then
+    fire("seen")
+  end
+end
+
+-- Neither greeted nor seen: the badge counts it and its row shows the unseen dot (spec B).
+function Leads.IsUnseen(lead)
+  return not lead.greeted and not lead.seen
 end
 
 -- The customer's newest lead.

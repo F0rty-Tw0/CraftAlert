@@ -58,7 +58,7 @@ end
 
 -- Counts every event the module can fire.
 local function listen(Leads)
-  local seen = { new = {}, change = 0, greeted = {}, replied = {}, order = {} }
+  local seen = { new = {}, change = 0, greeted = {}, replied = {}, seen = {}, order = {} }
   Leads.On("new", function(lead)
     seen.new[#seen.new + 1] = lead
     seen.order[#seen.order + 1] = "new"
@@ -74,6 +74,9 @@ local function listen(Leads)
   Leads.On("replied", function(lead)
     seen.replied[#seen.replied + 1] = lead
   end)
+  Leads.On("seen", function(lead)
+    seen.seen[#seen.seen + 1] = lead
+  end)
   return seen
 end
 
@@ -81,6 +84,28 @@ end
 local function fireTimer()
   Assert.equal(#Wow.timers, 1, "exactly one pending timer")
   table.remove(Wow.timers, 1).fn()
+end
+
+-- Mark all read: every listed lead of the ids is seen with one "seen" (no lead) and no "change";
+-- nothing new to mark fires nothing. IsUnseen: neither greeted nor seen.
+local function testMarkAllSeen()
+  local ns = setup()
+  local Leads = ns.Leads
+  local first, second = newLead(ns, "LF plate belt"), newLead(ns, "LF plate greaves", "Other-Draenor")
+  Assert.same({ Leads.IsUnseen(first), Leads.IsUnseen(second) }, { true, true })
+  local seen, events = listen(Leads), {}
+  Leads.On("seen", function(...)
+    events[#events + 1] = select("#", ...)
+  end)
+  Leads.MarkAllSeen({ first.id, second.id, 9999 })
+  Assert.same({ first.seen, second.seen }, { true, true })
+  Assert.same({ events, seen.change }, { { 0 }, 0 }, "one seen without a lead, no change")
+  Leads.MarkAllSeen({ first.id, second.id })
+  Assert.equal(#events, 1, "all seen already: no event")
+  Assert.equal(Leads.IsUnseen(first), false, "seen")
+  second.seen = false
+  Leads.MarkGreeted(second.id)
+  Assert.equal(Leads.IsUnseen(second), false, "greeted")
 end
 
 -- Blizzard's ignore list: an ignored customer makes and refreshes no lead, and IGNORELIST_UPDATE
@@ -171,6 +196,7 @@ local function testRankOnLead()
   end
   local lead = newLead(ns, "LF plate belt")
   Assert.same({ lead.crafter, lead.rank, lead.rankConc, lead.recipeName }, { "Alt-Realm", 2, true, "Other Belt" })
+  Assert.equal(lead.recipeKey, 7, "the lead keeps the key of the entry that won")
   Assert.same(db.leads, { lead })
 
   ns.CrafterRank.Pick = function()
@@ -178,6 +204,7 @@ local function testRankOnLead()
   end
   local plain = newLead(ns, "LF plate belt", "Other-Realm")
   Assert.same({ plain.rank, plain.rankConc }, { nil, nil }, "no rank, no fields")
+  Assert.equal(plain.recipeKey, 1, "Pick named none: the first entry's key")
   ns.CrafterRank.Pick = pick
 end
 
@@ -299,6 +326,16 @@ local function testRepick()
   MainCrafter.Set(db, "Smith-Realm", BS, true)
   Assert.equal(ns.Leads.Repick(lead.id), true)
   Assert.same({ lead.crafter, lead.recipeName, lead.itemID, lead.itemLink }, { "Smith-Realm", "Thick Plate Belt", nil, nil })
+
+  -- A Repick whose new pick has no recipe key clears the old key.
+  ns = setup()
+  lead = newLead(ns, "LF plate belt")
+  Assert.equal(lead.recipeKey, 1, "the first pick names its recipe")
+  ns.CrafterRank.Repick = function()
+    return "Smith-Realm", false, nil, nil, nil
+  end
+  Assert.equal(ns.Leads.Repick(lead.id), true)
+  Assert.same({ lead.crafter, lead.recipeKey, lead.recipeName }, { "Smith-Realm", nil, nil })
 end
 
 local ITEM_EVENT = "GET_ITEM_INFO_RECEIVED"
@@ -415,6 +452,7 @@ return function()
   testLinkWaitEndsWithLead()
   testRestoreAsksForLinks()
   testIgnoreList()
+  testMarkAllSeen()
   testCraftersOnLead()
   testTestFlag()
   testTestGuards()
@@ -547,6 +585,17 @@ return function()
   Assert.equal(#seen.replied, 1)
   Assert.equal(Leads.MarkGreeted(9999), false, "unknown id")
   Assert.equal(Leads.MarkReplied(9999), false, "unknown id")
+
+  -- Seen fires once, without a change (the leads view marks it while it refreshes); a new lead
+  -- starts unseen.
+  Assert.equal(lead.seen, false)
+  changes = seen.change
+  Assert.equal(Leads.MarkSeen(lead.id), true)
+  Assert.equal(Leads.MarkSeen(lead.id), false)
+  Assert.equal(lead.seen, true)
+  Assert.same(seen.seen, { lead })
+  Assert.equal(seen.change, changes, "no change event")
+  Assert.equal(Leads.MarkSeen(9999), false, "unknown id")
 
   -- FindActiveByCustomer: the customer's newest lead.
   local newer = newLead(ns, "LF plate greaves")

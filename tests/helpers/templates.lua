@@ -378,6 +378,39 @@ function Templates.fakes.UIPanelButtonTemplate(button)
   end
 end
 
+-- Blizzard_SharedXML/Shared/InputBox/InputBoxTemplates.xml:177-254 (SearchBoxTemplate on
+-- InputBoxInstructionsTemplate: the placeholder `Instructions`, the magnifier `searchIcon`, the
+-- hidden `clearButton`) and InputBoxTemplates.lua:131-133, :175-211 (the placeholder shows while
+-- the box is empty; the clear button shows while it has text or the focus, and its click empties
+-- the box, then clears the focus; Enter and Escape clear the focus). Not modelled: the icon's
+-- vertex colour, the clear button's hover art and OnEditFocusGained (the fake SetFocus fires none).
+function Templates.fakes.SearchBoxTemplate(box)
+  box.Instructions = box:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+  box.Instructions:SetText("Search")
+  box.searchIcon = box:CreateTexture(nil, "OVERLAY")
+  box.searchIcon:SetAtlas("common-search-magnifyingglass")
+  local clear = _G["CreateFrame"]("Button", nil, box)
+  clear.shown = false -- hidden="true"; Hide would ask `box`, not yet complete, whether it shows
+  clear:SetScript("OnClick", function()
+    box:SetText("")
+    box:ClearFocus()
+  end)
+  box.clearButton = clear
+  box.scripts.OnTextChanged = function(self)
+    self.clearButton:SetShown(self:HasFocus() or self:GetText() ~= "")
+    self.Instructions:SetShown(self:GetText() == "")
+  end
+  box.scripts.OnEditFocusLost = function(self)
+    if self:GetText() == "" then
+      self.clearButton:Hide()
+    end
+  end
+  box.scripts.OnEnterPressed = function(self)
+    self:ClearFocus()
+  end
+  box.scripts.OnEscapePressed = box.scripts.OnEnterPressed
+end
+
 -- Blizzard_SharedXML/SharedTooltipTemplates.xml (SharedTooltipTemplate, hidden) under
 -- GameTooltipTemplate: the addon's own tooltip (UI/Tooltip.lua). It records what it was given:
 -- lines, their colours as { r, g, b } or {}, rights[line] = { text, r, g, b } of an
@@ -411,6 +444,9 @@ function Templates.fakes.GameTooltipTemplate(tooltip)
   end
   function tooltip:IsOwned(frame)
     return self.owner == frame and self.shown
+  end
+  function tooltip:SetMinimumWidth(width)
+    self.minWidth = width
   end
 end
 

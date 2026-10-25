@@ -12,14 +12,15 @@ local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local CardBody = ns.CardBody or require("CraftAlert.UI.CardBody")
 local MainCrafterMenu = ns.MainCrafterMenu or require("CraftAlert.UI.MainCrafterMenu")
 
--- Lead-cards spec §2: what the details pane's tooltips say. Each builder fills a tooltip that
--- already has its owner: a gold title, white text, green instruction lines. UI/LeadDetails.lua and
--- UI/DetailsBody.lua own the zones and decide when a tooltip shows.
+-- Lead-cards spec §2: what the lead tooltips say. Each builder fills a tooltip that already has its
+-- owner: a gold title, white text, green instruction lines. The details pane's zones
+-- (UI/LeadDetails.lua, UI/DetailsBody.lua) and the list rows (UI/LeadRow.lua: Chat, Compact)
+-- decide when one shows. InfoLines builds no tooltip: it gives the lines of a customer's info line
+-- in a WhisperMessenger conversation (UI/BridgeInfo.lua).
 local CardTipText = {}
 
 local format = string.format
 local tostring = tostring
-local type = type
 
 local WHY_SEPARATOR = " + "
 
@@ -50,8 +51,7 @@ end
 function CardTipText.Customer(tip, lead)
   local token = FlavorCompat.ClassOf(lead.guid)
   tip:SetText(tostring(lead.customer), rgbOf(FrameKit.ClassColor(token), Theme.COLORS.gold))
-  local names = _G["LOCALIZED_CLASS_NAMES_MALE"]
-  local className = token and type(names) == "table" and names[token]
+  local className = FrameKit.ClassName(token)
   if className then
     white(tip, className)
   end
@@ -135,12 +135,54 @@ local function chatText(lead)
   return format("[%s] %s[%s]: %s", _G["date"]("%H:%M", lead.time), channelPart, name, lead.message)
 end
 
--- The lead's latest chat line, then what a row click does (a left click selects, never greets).
+-- What a row click does (a left click selects, never greets).
+local function rowClickLines(tip)
+  instruction(tip, Localization.Text("Click: select"))
+  instruction(tip, Localization.Text("Right-click: dismiss"))
+end
+
+-- The lead's latest chat line, then the row's click lines.
 function CardTipText.Chat(tip, lead)
   tip:SetText(Localization.Text("Chat with %s", tostring(lead.customer)), customerColor(lead, Theme.COLORS.gold))
   tip:AddLine(chatText(lead), 1, 1, 1, true)
-  instruction(tip, Localization.Text("Click: select"))
-  instruction(tip, Localization.Text("Right-click: dismiss"))
+  rowClickLines(tip)
+end
+
+-- An icon-only row (spec 6a): the customer in class colour and what they asked for, the text the
+-- row hides; the chat line when there is one; the click lines. A lead without a message still has one.
+function CardTipText.Compact(tip, lead)
+  tip:SetText(tostring(lead.customer), customerColor(lead, Theme.COLORS.gold))
+  white(tip, LeadText.What(lead))
+  if lead.message then
+    tip:AddLine(chatText(lead), 1, 1, 1, true)
+  end
+  rowClickLines(tip)
+end
+
+-- At most 7 crafter lines: with the headline, Matched and chat lines, WM's 10-line cap holds.
+local MAX_CRAFTER_LINES = 7
+
+-- The tooltip lines of a customer's info line in a WM conversation (SetContactInfo's tooltipLines):
+-- the headline in gold, Matched, one line per crafter (class-coloured name, rank in grey), the chat
+-- line. WM draws every line white, so colour comes only from the codes. A pure function, no tooltip.
+function CardTipText.InfoLines(lead)
+  local gold, grey = Theme.COLORS.gold, Theme.COLORS.grey
+  local lines = { FrameKit.ColorCode(LeadText.Headline(lead), gold[1], gold[2], gold[3]) }
+  local matched = CardBody.MatchedText(lead)
+  if matched then
+    lines[#lines + 1] = Localization.Text("Matched: %s", matched)
+  end
+  for index, crafter in ipairs(CardBody.Crafters(lead)) do
+    if index > MAX_CRAFTER_LINES then
+      break
+    end
+    local line = FrameKit.ClassCode(crafter.name, crafter.color)
+    lines[#lines + 1] = crafter.rank and (line .. " " .. FrameKit.ColorCode(crafter.rank, grey[1], grey[2], grey[3])) or line
+  end
+  if lead.message then
+    lines[#lines + 1] = chatText(lead)
+  end
+  return lines
 end
 
 ns.CardTipText = CardTipText

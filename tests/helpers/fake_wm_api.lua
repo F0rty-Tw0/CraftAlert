@@ -12,7 +12,11 @@
 --   wm.shown[key]                          IsPanelShown
 --   wm.badgeRefreshes                      RefreshPanelBadge call count
 --   wm.info[key][playerName]               = text (nil removes)
---   wm.showPanel(key, host?)               sets wm.shown[key], runs panel.onShow(host or a 600x400 Frame on UIParent)
+--   wm.tips[key][playerName]               = the tooltip lines (nil clears); SetContactInfo returns false,
+--                                            changing nothing, unless lines is nil or 1-10 non-empty strings
+--   wm.showPanel(key, host?, listWidth?)   sets wm.shown[key], runs panel.onShow(host or a 600x400 Frame on UIParent),
+--                                          then panel.onSplit(host, listWidth) when both exist; wm.hosts[key] = host
+--   wm.split(key, listWidth)               runs panel.onSplit on the host showPanel last used
 --   wm.hidePanel(key)                      clears it, runs panel.onHide()
 -- ShowPanel (not refused) shows; TogglePanel (not refused) shows when hidden, hides when shown, and
 -- returns true. An unknown panel key returns false, as the real one does.
@@ -21,10 +25,41 @@ local Wow = require("tests.helpers.wow")
 local FakeWm = {}
 
 local HOST_WIDTH, HOST_HEIGHT = 600, 400
+local MAX_TOOLTIP_LINES = 10
+
+-- WM's isValidTooltip (Model/ContactInfo.lua): nil, or an array of 1..10 non-empty strings.
+local function validTooltip(lines)
+  if lines == nil then
+    return true
+  end
+  if type(lines) ~= "table" or #lines < 1 or #lines > MAX_TOOLTIP_LINES then
+    return false
+  end
+  local count = 0
+  for _, line in pairs(lines) do
+    if type(line) ~= "string" or line == "" then
+      return false
+    end
+    count = count + 1
+  end
+  return count == #lines
+end
 
 function FakeWm.install(opts)
   opts = opts or {}
-  local wm = { calls = {}, refuse = {}, raise = {}, preview = {}, registered = {}, panels = {}, shown = {}, info = {}, badgeRefreshes = 0 }
+  local wm = {
+    calls = {},
+    refuse = {},
+    raise = {},
+    preview = {},
+    registered = {},
+    panels = {},
+    shown = {},
+    hosts = {},
+    info = {},
+    tips = {},
+    badgeRefreshes = 0,
+  }
   ---@type table<string, any>
   local api = { version = opts.version or 1 }
 
@@ -38,13 +73,22 @@ function FakeWm.install(opts)
     return found
   end
 
-  function wm.showPanel(key, host)
+  function wm.showPanel(key, host, listWidth)
     if host == nil then
       host = _G["CreateFrame"]("Frame", nil, _G["UIParent"])
       host:SetSize(HOST_WIDTH, HOST_HEIGHT)
     end
     wm.shown[key] = true
-    wm.panels[key].onShow(host)
+    wm.hosts[key] = host
+    local panel = wm.panels[key]
+    panel.onShow(host)
+    if listWidth ~= nil and panel.onSplit then
+      panel.onSplit(host, listWidth)
+    end
+  end
+
+  function wm.split(key, listWidth)
+    wm.panels[key].onSplit(wm.hosts[key], listWidth)
   end
 
   function wm.hidePanel(key)
@@ -110,9 +154,14 @@ function FakeWm.install(opts)
     wm.badgeRefreshes = wm.badgeRefreshes + 1
     return true
   end)
-  define("SetContactInfo", function(key, name, text)
+  define("SetContactInfo", function(key, name, text, lines)
+    if not validTooltip(lines) then
+      return false
+    end
     wm.info[key] = wm.info[key] or {}
     wm.info[key][name] = text
+    wm.tips[key] = wm.tips[key] or {}
+    wm.tips[key][name] = lines
     return true
   end)
 

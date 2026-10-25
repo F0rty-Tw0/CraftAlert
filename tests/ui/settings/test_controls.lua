@@ -126,6 +126,36 @@ local function testInput()
   Assert.same(seen, { "Hello", "Hey" }, "Escape commits nothing")
 end
 
+-- A search box: the template's placeholder in place of a label, committed as an input; the clear
+-- button empties the box and commits, also when the box has no focus (its click then fires no
+-- focus loss).
+local function testSearch()
+  local Controls, column = load()
+  local seen, onCommit = recorder()
+  local search = Controls.Search(column, "Find", onCommit)
+  local box = search.input
+  Assert.equal(box.template, "SearchBoxTemplate")
+  Assert.equal(box.Instructions:GetText(), "Find", "the placeholder")
+  Assert.equal(search.row.labelText, nil, "no label row")
+  Assert.equal(search.row.settingsLabel, "Find")
+  Widgets.type(box, "belt")
+  Assert.same(seen, { "belt" }, "Enter commits")
+  Assert.equal(box:HasFocus(), false)
+  Assert.same({ box.clearButton:IsShown(), box.Instructions:IsShown() }, { true, false }, "the template's own toggling is kept")
+  Widgets.fire(box.clearButton, "OnClick")
+  Assert.same(seen, { "belt", "" }, "clear commits the empty text")
+  Assert.same({ box.clearButton:IsShown(), box.Instructions:IsShown() }, { false, true })
+  box:SetFocus()
+  box.text = "typo"
+  Widgets.fire(box, "OnEscapePressed")
+  Assert.equal(box:GetText(), "", "Escape restores the committed text")
+  Assert.same(seen, { "belt", "" }, "Escape commits nothing")
+  box:SetFocus()
+  box.text = "plate"
+  box:ClearFocus()
+  Assert.same(seen, { "belt", "", "plate" }, "focus loss commits")
+end
+
 local function testChoice()
   local Controls, column = load()
   local seen, onChange = recorder()
@@ -326,6 +356,7 @@ return function()
   testToggle()
   testSlider()
   testInput()
+  testSearch()
   testChoice()
   testButton()
   testSectionKeepsFontColour()

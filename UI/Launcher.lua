@@ -72,7 +72,7 @@ local function onLeave(frame)
   if frame.glow then
     frame.glow:Hide()
   end
-  Tooltip.Get():Hide()
+  Tooltip.HideIfOwned(frame)
 end
 
 local function createBadge(frame)

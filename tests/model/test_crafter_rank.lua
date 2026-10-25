@@ -362,6 +362,20 @@ return function()
   rank, byConc = select(3, ranked({ "Me-Realm", 10 }))
   Assert.same({ rank, byConc }, { 1, false }, "no currency API (Classic) counts as 0")
 
+  -- Available is the same projection, exported: live for the current character, a snapshot for another.
+  Wow.stub("C_CurrencyInfo", {
+    GetCurrencyInfo = function()
+      return { quantity = 400 }
+    end,
+  })
+  Assert.equal(CrafterRank.Available(data, "Me-Realm", 3168), 400, "live currency")
+  data.characters["Alt-Realm"].concentration = snapshot(300)
+  Wow.clock.time = 27648
+  Assert.equal(CrafterRank.Available(data, "Alt-Realm", 3168), 380, "a snapshot projected by whole cycles")
+  Assert.equal(CrafterRank.Available(data, "Alt-Realm", 1), 0, "no snapshot for that currency")
+  Wow.clock.time = 0
+  Wow.stub("C_CurrencyInfo", nil)
+
   -- Can-order stays the first key.
   data = db()
   data.characters["Me-Realm"].realms = { "Realm", "Draenor" }

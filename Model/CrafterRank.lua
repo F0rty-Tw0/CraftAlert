@@ -52,7 +52,7 @@ end
 -- Concentration `key` can spend on currency `id` now. The current character reads the live
 -- currency; another one projects its saved snapshot by the recharge cycles since `at`. No
 -- snapshot, no API: 0, so concentration does not count.
-local function available(db, key, id)
+function CrafterRank.Available(db, key, id)
   if key == PlayerName.Own() then
     local api = _G["C_CurrencyInfo"]
     local info = type(api) == "table" and type(api.GetCurrencyInfo) == "function" and api.GetCurrencyInfo(id)
@@ -81,7 +81,7 @@ local function effectiveRank(db, key, recipeKey)
   end
   local cost = recipe.reachCost or 0
   local canGoHigher = cost > 0 and reached < top
-  local byConc = canGoHigher and available(db, key, recipe.reachConc) >= cost
+  local byConc = canGoHigher and CrafterRank.Available(db, key, recipe.reachConc) >= cost
 
   return byConc and reached + 1 or reached, top, byConc
 end

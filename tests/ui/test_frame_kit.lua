@@ -90,6 +90,26 @@ local function testArt()
   Assert.equal(t.shown, false)
 end
 
+-- AtlasExists: the client knows the atlas; a nil answer, a raising GetAtlasInfo or no C_Texture
+-- count as unknown.
+local function testAtlasExists()
+  local FrameKit = load({})
+  Wow.stub("C_Texture", {
+    GetAtlasInfo = function(name)
+      return name == "Known" and { width = 1 } or nil
+    end,
+  })
+  Assert.same({ FrameKit.AtlasExists("Known"), FrameKit.AtlasExists("Missing") }, { true, false })
+  Wow.stub("C_Texture", {
+    GetAtlasInfo = function()
+      error("boom")
+    end,
+  })
+  Assert.equal(FrameKit.AtlasExists("Known"), false)
+  Wow.stub("C_Texture", nil)
+  Assert.equal(FrameKit.AtlasExists("Known"), false)
+end
+
 -- PaintPanel draws a pane atlas when the client has it; with no atlas it touches nothing (never hides).
 local function testPaintPanel()
   local FrameKit = load({})
@@ -155,6 +175,34 @@ local function testClassColor()
   Assert.equal(FrameKit.ClassColor(5), nil, "non-string token")
 end
 
+-- A Theme colour's alpha folds into the colour (a colour code has none): one rule for the codes
+-- and the opaque colour a text with codes takes.
+local function testThemeColourFoldsAlpha()
+  local FrameKit = load({})
+  local halfWhite = { 1, 1, 1, 0.5 }
+  Assert.equal(FrameKit.ThemeCode("x", halfWhite), "|cff7f7f7fx|r")
+  Assert.equal(FrameKit.ThemeCode("x", { 1, 0, 0 }), "|cffff0000x|r", "no alpha: as given")
+  Assert.same(FrameKit.Opaque(halfWhite), { 0.5, 0.5, 0.5, 1 })
+end
+
+-- A name in its class colour; without one, in the fallback Theme colour, else plain.
+local function testClassCode()
+  local FrameKit = load({})
+  Assert.equal(FrameKit.ClassCode("Me", { r = 1, g = 0.5, b = 0 }), "|cffff7f00Me|r")
+  Assert.equal(FrameKit.ClassCode("Me", nil, { 1, 1, 1, 1 }), "|cffffffffMe|r")
+  Assert.equal(FrameKit.ClassCode("Me", nil), "Me")
+end
+
+-- The localized name of a class token, from LOCALIZED_CLASS_NAMES_MALE.
+local function testClassName()
+  local FrameKit = load({})
+  Assert.equal(FrameKit.ClassName("DRUID"), nil, "no LOCALIZED_CLASS_NAMES_MALE")
+  Wow.stub("LOCALIZED_CLASS_NAMES_MALE", { DRUID = "Druid" })
+  Assert.equal(FrameKit.ClassName("DRUID"), "Druid")
+  Assert.equal(FrameKit.ClassName("ROGUE"), nil, "unknown token")
+  Assert.equal(FrameKit.ClassName(nil), nil)
+end
+
 -- The old WhisperMessenger look is gone: no panel/title-bar builders, no surface or control colours
 -- (`divider` is back as the split view's pane line, asserted in test_theme.lua).
 local function testLookCodeGone()
@@ -186,10 +234,14 @@ return function()
   testSavedPosition()
   testMalformedFallsBack()
   testArt()
+  testAtlasExists()
   testPaintPanel()
   testListHighlight()
   testProfessionIcon()
   testClassColor()
+  testClassName()
+  testThemeColourFoldsAlpha()
+  testClassCode()
   testLookCodeGone()
   Wow.reset()
 end

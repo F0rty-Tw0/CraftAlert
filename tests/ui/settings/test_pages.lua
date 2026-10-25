@@ -97,10 +97,9 @@ local function testNavHighlight()
       Assert.same({ hover.texture, hover:GetAlpha() }, { Theme.ART.LIST_HOVER, 0.18 })
     end
   end
-  local window = SettingsFixture.window()
   local nav = SettingsFixture.navButton("General").parent
   Assert.equal(nav.template, nil)
-  Assert.same(nav.points[1], { "TOPLEFT", window.content, "TOPLEFT", 0, 0 })
+  Assert.same(nav.points[1], { "TOPLEFT", nav.parent, "TOPLEFT", 0, 0 })
   -- The Alerts page's content frame: the pane container's child that holds its rows.
   local content = SettingsFixture.row("Lead timeout")
   while content.parent ~= nav.parent do
@@ -113,8 +112,9 @@ local function testNavHighlight()
   Assert.truthy(besideNav, "a page sits right of the nav")
 end
 
--- §6.1: enable and "Only where Trade chat exists" re-evaluate the gate; §6.2: channels, profession-word
--- alerts and unbound items rebuild the index (channels also re-evaluate the registered events).
+-- §6.1: enable and "Only where Trade chat exists" re-evaluate the gate; §6.2: channels and
+-- profession-word alerts rebuild the index (channels also re-evaluate the registered events).
+-- Unbound items moved to the Crafters page, under the recipe list.
 local function testGeneralPage()
   local ns, db, refreshes = SettingsFixture.load()
   local settings = db.settings
@@ -124,9 +124,11 @@ local function testGeneralPage()
     { "Enable Craft Alert", "enable", { "evaluate" } },
     { "Only where Trade chat exists", "onlyResting", { "evaluate" } },
     { "Profession-word alerts", "professionWordAlerts", { "rebuild:professionWordAlerts" } },
-    { "Include unbound items", "includeUnbound", { "rebuild:includeUnbound" } },
     { "Bell markers on recipe rows", "recipeMarkers", {} },
   }
+  Assert.raises(function()
+    row("Include unbound items")
+  end, "no visible row")
   for _, case in ipairs(cases) do
     local before = settings[case[2]]
     Widgets.click(row(case[1]).input)

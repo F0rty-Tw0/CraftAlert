@@ -45,9 +45,14 @@ local function addSound(column, add)
   local choice = Controls.Choice(column, Localization.Text("Alert sound"), soundOptions(), function(value)
     settings().sound = value
   end)
+  -- Under the label, Play first and the dropdown in the rest of the line; the 20 px button sits
+  -- 2 px up, in the middle of the dropdown's 24.
+  local layout = Theme.LAYOUT
   local play = Controls.Button(choice.row, Localization.Text("Play"), 48, playSound)
-  play:SetPoint("RIGHT", choice.input, "LEFT", -Theme.LAYOUT.PADDING, 0)
-  choice.input:SetWidth(choice.input:GetWidth() - 48 - Theme.LAYOUT.PADDING)
+  play:SetPoint("BOTTOMLEFT", choice.row, "BOTTOMLEFT", 0, 2)
+  choice.input:ClearAllPoints()
+  choice.input:SetPoint("BOTTOMLEFT", play, "BOTTOMRIGHT", layout.PADDING, -2)
+  choice.input:SetPoint("BOTTOMRIGHT", choice.row, "BOTTOMRIGHT", 0, 0)
   add(function()
     choice.Set(settings().sound)
   end)
@@ -92,7 +97,7 @@ local function refreshLeadsWindow()
 end
 
 function PageAlerts.Create(parent)
-  local column = Controls.Column(parent)
+  local column = Controls.Column(parent, Theme.LAYOUT.PAGE_PADDING)
   local add, refresh = Controls.Refresher()
   Controls.Section(column, Localization.Text("When a request arrives"))
   addSound(column, add)

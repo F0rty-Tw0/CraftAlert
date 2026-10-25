@@ -40,12 +40,8 @@ local function craftersOf(prof)
 end
 
 local function nameOf(key)
-  local name = Greeting.CrafterName(key)
   local color = FrameKit.ClassColor(db().characters[key].class)
-  if color then
-    return FrameKit.ColorCode(name, color.r, color.g, color.b)
-  end
-  return name
+  return FrameKit.ClassCode(Greeting.CrafterName(key), color)
 end
 
 -- Whether a click can open the menu: Blizzard's menu API is there and an enabled character knows the

@@ -322,9 +322,11 @@ local function testLeadFieldTypes()
     cannotOrder = true,
     greeted = true,
     replied = true,
+    seen = true,
     arrivedWhileAfk = true,
     profName = "Blacksmithing",
     recipeName = "Belt",
+    recipeKey = 9001,
     itemID = 501,
     itemLink = "|cff1eff00|Hitem:501|h[Belt]|h|r",
   }
@@ -349,8 +351,10 @@ local function testLeadFieldTypes()
         cannotOrder = "yes",
         greeted = "no",
         replied = 1,
+        seen = "x",
         arrivedWhileAfk = "x",
         recipeName = 5,
+        recipeKey = {},
         itemID = "501",
         itemLink = {},
       },
@@ -361,6 +365,14 @@ local function testLeadFieldTypes()
   Assert.same(db.leads[1], { id = 1, customer = "A-Realm", crafter = "Me-Realm", time = 10 }, "an unknown lead field is dropped")
   Assert.same(db.leads[2], { customer = "D-Realm", crafter = "Me-Realm", time = 20 })
   Assert.same(db.leads[3], expected, "a well-typed lead keeps every field")
+  -- A recipe key is a number or a string (Classic recipes are keyed by name).
+  local keyed = Schema.Validate({
+    leads = {
+      { id = 1, customer = "A-Realm", crafter = "Me-Realm", time = 10, recipeKey = "belt" },
+      { id = 2, customer = "B-Realm", crafter = "Me-Realm", time = 10, recipeKey = 9001 },
+    },
+  })
+  Assert.same({ keyed.leads[1].recipeKey, keyed.leads[2].recipeKey }, { "belt", 9001 })
 end
 
 -- Every field Model/Leads.lua writes survives a /reload: leads built by the real Leads.OnMatch
@@ -381,9 +393,11 @@ local LEAD_WRITES = {
   "cannotOrder",
   "greeted",
   "replied",
+  "seen",
   "arrivedWhileAfk",
   "profName",
   "recipeName",
+  "recipeKey",
   "itemID",
   "itemLink",
 }
@@ -491,6 +505,24 @@ local function testReachConcentrationAndLeadRank()
   Assert.same({ db.leads[2].rank, db.leads[2].rankConc }, {}, "wrong-typed rank fields are cleared")
 end
 
+-- The expansion line a read stores per recipe: a number stays, any other type is dropped.
+local function testRecipeLine()
+  local Schema = load()
+  local db = Schema.Validate({
+    characters = {
+      ["Bob-Realm"] = {
+        recipes = {
+          [1] = { name = "A", prof = 164, line = 2918 },
+          [2] = { name = "B", prof = 164, line = "2918" },
+        },
+      },
+    },
+  })
+  local bob = db.characters["Bob-Realm"]
+  Assert.equal(bob.recipes[1].line, 2918)
+  Assert.equal(bob.recipes[2].line, nil, "a string line is dropped")
+end
+
 local function testIdempotent()
   local Schema = load()
   local db = Schema.Validate({
@@ -520,5 +552,6 @@ return function()
   testLeadsFromOnMatchSurvive()
   testLeadTestFlag()
   testReachConcentrationAndLeadRank()
+  testRecipeLine()
   testIdempotent()
 end

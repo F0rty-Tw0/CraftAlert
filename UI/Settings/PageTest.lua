@@ -7,6 +7,7 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
+local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
 -- Spec §9 Test: a text box → the result and its "why". This page only previews: it runs
@@ -62,7 +63,7 @@ local function run(text)
 end
 
 function PageTest.Create(parent)
-  local column = Controls.Column(parent)
+  local column = Controls.Column(parent, Theme.LAYOUT.PAGE_PADDING)
   Controls.Section(column, Localization.Text("Try a trade chat line"))
   local output
   local input = Controls.Input(column, Localization.Text("Test a line"), function(text)

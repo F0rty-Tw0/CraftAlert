@@ -135,7 +135,9 @@ local function testFit()
   ns.LeadsView.Refresh(view, leads)
   local rows = shownRows(view)
   Assert.equal(#rows, 10)
-  Assert.same(rows[2].points, { { "TOPLEFT", view.listPane, "TOPLEFT", 2, -52 }, { "TOPRIGHT", view.listPane, "TOPRIGHT", -4, -52 } })
+  -- The bar's width and a 5 px gap are kept free right of the rows, shown or not.
+  local right = -(4 + view.list.bar:GetWidth() + 5)
+  Assert.same(rows[2].points, { { "TOPLEFT", view.listPane, "TOPLEFT", 2, -52 }, { "TOPRIGHT", view.listPane, "TOPRIGHT", right, -52 } })
   Assert.same(rows[1].points[1], { "TOPLEFT", view.listPane, "TOPLEFT", 2, -4 })
   Assert.same({ rows[1].lead, rows[10].lead }, { leads[1], leads[10] })
   size.height = 356
@@ -157,11 +159,45 @@ local function testEmpty()
   local empty = view.list.empty
   Assert.same({ empty:IsShown(), empty.text:GetText() }, { true, "No leads right now. Requests you can craft show up here." })
   Assert.same({ empty.text.font, empty.text.textColor }, { ns.Theme.FONTS.body, ns.Theme.COLORS.textSecondary })
-  Assert.same(empty.text.points, { { "CENTER", empty, "CENTER", 0, 0 } })
+  local pane, padding = view.list.pane, ns.Theme.LAYOUT.PANE_PADDING
+  Assert.same(empty.text.points, { { "LEFT", pane, "LEFT", padding, 0 }, { "RIGHT", pane, "RIGHT", -padding, 0 } })
+  Assert.same({ empty.text.wordWrap, empty.text.justifyH }, { true, "CENTER" })
   Assert.same({ view.details.frame:IsShown(), view.details.lead }, { false, nil })
   Assert.same({ ns.LeadsView.TopRow(view), ns.LeadsView.Selected(view), #shownRows(view) }, { nil, nil, 0 })
   ns.LeadsView.Refresh(view, leadsDown(1))
   Assert.equal(empty:IsShown(), false)
+end
+
+-- Spec 6a: a list narrower than LIST_MIN_WIDTH (WM's rail) is icon-only, rows made then and later,
+-- with no empty text; at 180 and up the rows are full again. Layout then Refresh, as BridgePanel does.
+local function testCompactLayout()
+  local ns, view, _, size = open(0)
+  local function layout(width, leads)
+    size.listWidth = width
+    ns.LeadsView.Layout(view)
+    ns.LeadsView.Refresh(view, leads)
+  end
+  layout(50, {})
+  Assert.same({ view.listPane:GetWidth(), view.list.empty:IsShown() }, { 50, false })
+  layout(50, leadsDown(2))
+  local rows = shownRows(view)
+  Assert.same({ #rows, rows[1].name:IsShown(), rows[2].what:IsShown(), rows[1].iconFrame.points[1][1] }, { 2, false, false, "CENTER" })
+  layout(220, leadsDown(2))
+  Assert.same({ rows[1].name:IsShown(), rows[2].what:IsShown(), rows[1].iconFrame.points[1][1] }, { true, true, "LEFT" })
+  layout(220, {})
+  Assert.equal(view.list.empty:IsShown(), true)
+  layout(179, leadsDown(3))
+  Assert.same({ rows[1].name:IsShown(), shownRows(view)[3].name:IsShown() }, { false, false }, "179: compact, the new row too")
+  layout(180, leadsDown(3))
+  Assert.equal(shownRows(view)[3].name:IsShown(), true)
+  -- On the rail the rows keep the same inset both sides, so the icon sits on the pane's centre, and
+  -- the bar stays hidden even with leads out of view (the wheel still scrolls).
+  local inset = ns.Theme.LAYOUT.LIST_ROW_INSET
+  layout(50, leadsDown(40))
+  Assert.same({ rows[1].points[1][4], rows[1].points[2][4], view.list.bar:IsShown() }, { inset, -inset, false }, "rail")
+  layout(220, leadsDown(40))
+  Assert.equal(view.list.bar:IsShown(), true, "full rows: the bar is back")
+  Assert.equal(rows[1].points[2][4] < -inset, true, "full rows: the bar's width kept free")
 end
 
 -- Selection starts on the newest lead and the details show it.
@@ -258,6 +294,27 @@ local function testScroll()
   Assert.equal(view.list.rows[1].selected:IsShown(), true)
 end
 
+-- Scroll bars spec §3: the list's bar at the pane's right, PANE_PADDING in, above the inset art;
+-- shown only while more leads than fit, its range the rows out of view; a drag scrolls by whole
+-- rows and the wheel moves the bar along. The root keeps the wheel either way.
+local function testScrollBar()
+  local ns, view = open(0)
+  local bar, pane, padding = view.list.bar, view.listPane, ns.Theme.LAYOUT.PANE_PADDING
+  Assert.same(bar.points, { { "TOPRIGHT", pane, "TOPRIGHT", -padding, -padding }, { "BOTTOMRIGHT", pane, "BOTTOMRIGHT", -padding, padding } })
+  Assert.truthy(bar:GetFrameLevel() > pane.art:GetFrameLevel(), "the bar above the inset art")
+  ns.LeadsView.Refresh(view, leadsDown(10))
+  Assert.same({ bar:IsShown(), view.frame.mouseWheelEnabled }, { false, true }, "every lead fits: no bar, the root keeps the wheel")
+  local leads = leadsDown(13)
+  ns.LeadsView.Refresh(view, leads)
+  Assert.same({ bar:IsShown(), select(2, bar:GetMinMaxValues()), bar:GetValueStep() }, { true, 3, 1 })
+  bar:SetValue(1.6)
+  Assert.same({ view.list.offset, shownRows(view)[1].lead, bar:GetValue() }, { 2, leads[3], 2 }, "a drag snaps to a row")
+  view.frame.scripts.OnMouseWheel(view.frame, 1)
+  Assert.same({ view.list.offset, bar:GetValue() }, { 1, 1 }, "the bar follows the wheel")
+  ns.LeadsView.Refresh(view, leadsDown(4))
+  Assert.same({ bar:IsShown(), view.list.offset }, { false, 0 }, "fits again: no bar, at the top")
+end
+
 -- A left click selects the row's lead (no send); the right click is the row's own dismiss.
 local function testClicks()
   local ns, view, calls = open(5)
@@ -309,10 +366,12 @@ return function()
   testLayout()
   testFit()
   testEmpty()
+  testCompactLayout()
   testNewestSelected()
   testArrivalKeepsSelection()
   testSelectedLeaves()
   testScroll()
+  testScrollBar()
   testClicks()
   testReopen()
   testNoOnUpdate()

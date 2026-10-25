@@ -5,51 +5,36 @@ end
 
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local Column = ns.SettingsColumn or require("CraftAlert.UI.Settings.Column")
 
 -- The settings pages' controls on Blizzard templates: check button, slider with steppers,
--- input box, dropdown and panel button. A Column stacks rows top to bottom. Each control returns
--- { row, input, Set(value) }: Set shows a value without reporting it; only the player's action
--- calls onChange. `row.settingsLabel` names the row and `row.input` is its control frame.
+-- input box, search box, dropdown and panel button, in a Column (UI/Settings/Column.lua). Each
+-- control returns { row, input, Set(value) }: Set shows a value without reporting it; only the
+-- player's action calls onChange. `row.settingsLabel` names the row and `row.input` is its control
+-- frame. A row is as wide as the column and its controls are anchored to its edges. As
+-- WhisperMessenger's settings, a slider, input or dropdown sits on the line under its label; a
+-- toggle's label wraps beside the check.
 local Controls = {}
 
 local floor = math.floor
 local max = math.max
-local min = math.min
 local tostring = tostring
+
+-- A toggle's label sits this far below the row's top, and as far above its bottom: one line is
+-- centred on the check.
+local LABEL_TOP = 6
 
 local function create(frameType, parent, template)
   return _G["CreateFrame"](frameType, nil, parent, template)
 end
 
-function Controls.Column(parent)
-  return { parent = parent, last = nil }
-end
-
--- Anchors `region` below the column's last row (`gap` px; default CONTROL_GAP).
-function Controls.Place(column, region, gap)
-  if column.last then
-    region:SetPoint("TOPLEFT", column.last, "BOTTOMLEFT", 0, -(gap or Theme.LAYOUT.CONTROL_GAP))
-  else
-    region:SetPoint("TOPLEFT", column.parent, "TOPLEFT", 0, 0)
-  end
-  column.last = region
-end
-
-function Controls.Section(column, text)
-  local label = FrameKit.Text(column.parent, Theme.FONTS.name)
-  label:SetText(text)
-  Controls.Place(column, label, column.last and Theme.LAYOUT.SECTION_GAP or 0)
-  return label
-end
-
--- A wrapping text block as wide as the controls (previews, results).
-function Controls.Note(column, font)
-  local text = FrameKit.Text(column.parent, font or Theme.FONTS.body)
-  text:SetWidth(Theme.LAYOUT.CONTROL_WIDTH)
-  text:SetWordWrap(true)
-  Controls.Place(column, text)
-  return text
-end
+-- The column's layout, as the pages call it.
+Controls.Column = Column.New
+Controls.Place = Column.Place
+Controls.Section = Column.Section
+Controls.Note = Column.Note
+Controls.Bar = Column.Bar
+Controls.List = Column.List
 
 -- A panel button; `button.label` is its FontString.
 function Controls.Button(parent, label, width, onClick)
@@ -61,16 +46,62 @@ function Controls.Button(parent, label, width, onClick)
   return button
 end
 
-local function newRow(column, label)
+-- A row and its label (`row.labelText`, WhisperMessenger's label font): beside the control, or
+-- `stacked` on a line of its own above it, cut at the row's end.
+local function newRow(column, label, stacked)
   local layout = Theme.LAYOUT
   local row = create("Frame", column.parent)
-  row:SetSize(layout.CONTROL_WIDTH, layout.CONTROL_HEIGHT)
+  Column.Span(column, row)
   row.settingsLabel = label
-  local text = FrameKit.Text(row, Theme.FONTS.body)
-  text:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -4)
+  local text = FrameKit.Text(row, Theme.FONTS.setting)
   text:SetText(label)
-  Controls.Place(column, row)
+  row.labelText = text
+  if stacked then
+    row:SetHeight(layout.LABEL_HEIGHT + layout.CONTROL_HEIGHT)
+    text:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+    text:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+  else
+    row:SetHeight(layout.CONTROL_HEIGHT)
+    text:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -LABEL_TOP)
+  end
+  Column.Place(column, row)
   return row, text
+end
+
+-- A stacked row's control LABEL_HEIGHT down, on the line under the label, `left` and `right` px
+-- in from its edges.
+local function underLabel(row, control, left, right)
+  local top = -Theme.LAYOUT.LABEL_HEIGHT
+  control:SetPoint("TOPLEFT", row, "TOPLEFT", left, top)
+  control:SetPoint("TOPRIGHT", row, "TOPRIGHT", -right, top)
+end
+
+-- Enter or leaving the box commits a changed text (onCommit(text)); Escape restores the last
+-- committed text. Enter and Escape replace the template's scripts (which only clear the focus);
+-- the commit on focus loss is hooked, so the template's own focus-lost script still runs.
+-- → set(text), which shows a text without committing it, and commit().
+local function commitOn(box, onCommit)
+  local committed = ""
+  local function commit()
+    local text = box:GetText()
+    if text ~= committed then
+      committed = text
+      onCommit(text)
+    end
+  end
+  box:SetScript("OnEnterPressed", function()
+    commit()
+    box:ClearFocus()
+  end)
+  box:HookScript("OnEditFocusLost", commit)
+  box:SetScript("OnEscapePressed", function()
+    box:SetText(committed)
+    box:ClearFocus()
+  end)
+  return function(text)
+    committed = text or ""
+    box:SetText(committed)
+  end, commit
 end
 
 -- A page's refresh list: add(fn) collects, refresh() runs them all. → add, refresh
@@ -87,14 +118,21 @@ function Controls.Refresher()
   return add, refresh
 end
 
--- Label on the left, check button on the right; onChange(isOn). The client flips the box
--- before OnClick runs, so the box holds the value.
+-- Label on the left, wrapped short of the check button on the right; the row grows with the
+-- label's lines. onChange(isOn). The client flips the box before OnClick runs, so the box holds
+-- the value.
 function Controls.Toggle(column, label, onChange)
-  local size = Theme.LAYOUT.CONTROL_HEIGHT
-  local row = newRow(column, label)
+  local layout = Theme.LAYOUT
+  local size = layout.CONTROL_HEIGHT
+  local row, text = newRow(column, label)
   local check = create("CheckButton", row, "UICheckButtonTemplate")
   check:SetSize(size, size)
-  check:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+  check:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+  text:SetWordWrap(true)
+  Column.OnWidth(column, function(width)
+    text:SetWidth(max(0, width - size - layout.PADDING))
+    row:SetHeight(max(size, text:GetStringHeight() + 2 * LABEL_TOP))
+  end)
   check:SetScript("OnClick", function()
     onChange(check:GetChecked() and true or false)
   end)
@@ -117,15 +155,16 @@ function Controls.BoundToggle(column, label, owner, key, after)
 end
 
 -- spec = { label, min, max, step, format = fn(value) → text (optional), onChange(value) }.
--- The template draws the value text right of the bar. A change made with the left button up
--- (a stepper click) commits at once; a drag commits when the button comes up. A commit writes
--- the stepped value only when it differs from the last one, so one drag is one write.
+-- The template draws the value text right of the bar, in the room the row keeps there. A change
+-- made with the left button up (a stepper click) commits at once; a drag commits when the button
+-- comes up. A commit writes the stepped value only when it differs from the last one, so one drag
+-- is one write.
 function Controls.Slider(column, spec)
   local layout = Theme.LAYOUT
-  local row = newRow(column, spec.label)
+  local row = newRow(column, spec.label, true)
   local slider = create("Frame", row, "MinimalSliderWithSteppersTemplate")
-  slider:SetSize(layout.CONTROL_WIDTH - layout.LABEL_WIDTH - layout.SLIDER_VALUE_WIDTH, layout.CONTROL_HEIGHT)
-  slider:SetPoint("LEFT", row, "LEFT", layout.LABEL_WIDTH, 0)
+  slider:SetHeight(layout.CONTROL_HEIGHT)
+  underLabel(row, slider, 0, layout.SLIDER_VALUE_WIDTH)
   local format = spec.format or tostring
   local function stepped(value)
     local onStep = spec.min + floor((value - spec.min) / spec.step + 0.5) * spec.step
@@ -166,42 +205,40 @@ function Controls.Slider(column, spec)
   return { row = row, input = slider, Set = set }
 end
 
--- Label on the left, box on the right. Enter or leaving the box commits a changed text
--- (onCommit(text)); Escape restores the last committed text. maxLetters (optional) caps the
--- box; without it a long word list is kept whole (a cut text would be committed on focus loss).
--- The template's art reaches 5 px left of the box, so the box is 8 px short of the column.
+-- The box under its label, committed as commitOn says. maxLetters (optional) caps the box;
+-- without it a long word list is kept whole (a cut text would be committed on focus loss).
+-- The template's art reaches 5 px left of the box, so the box starts 5 px in: the art lines up
+-- with the label. Its text is in the label font, inset clear of the art's end caps.
 function Controls.Input(column, label, onCommit, maxLetters)
   local layout = Theme.LAYOUT
-  local row = newRow(column, label)
+  local row = newRow(column, label, true)
   local box = create("EditBox", row, "InputBoxTemplate")
-  box:SetSize(layout.CONTROL_WIDTH - layout.LABEL_WIDTH - 8, layout.INPUT_HEIGHT)
-  box:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+  box:SetHeight(layout.INPUT_HEIGHT)
+  underLabel(row, box, 5, 0)
   box:SetAutoFocus(false)
+  box:SetFontObject(Theme.FONTS.setting)
+  box:SetTextInsets(layout.INPUT_INSET.left, layout.INPUT_INSET.right, 0, 0)
   if maxLetters then
     box:SetMaxLetters(maxLetters)
   end
-  local committed = ""
-  local function commit()
-    local text = box:GetText()
-    if text ~= committed then
-      committed = text
-      onCommit(text)
-    end
-  end
-  box:SetScript("OnEnterPressed", function()
-    commit()
-    box:ClearFocus()
-  end)
-  -- These replace the template's own Escape and focus-lost scripts.
-  box:SetScript("OnEditFocusLost", commit)
-  box:SetScript("OnEscapePressed", function()
-    box:SetText(committed)
-    box:ClearFocus()
-  end)
-  local function set(text)
-    committed = text or ""
-    box:SetText(committed)
-  end
+  row.input = box
+  return { row = row, input = box, Set = commitOn(box, onCommit) }
+end
+
+-- A search box (SearchBoxTemplate: magnifier, clear button) with `placeholder` as the template's
+-- empty-box text in place of a label, committed as commitOn says. The clear button empties the
+-- box and clears its focus; with no focus to lose, its click commits here. The template keeps its
+-- own font and insets (room for the magnifier and the clear button). `row.settingsLabel` is the
+-- placeholder.
+function Controls.Search(column, placeholder, onCommit)
+  local row = Column.Bar(column, Theme.LAYOUT.INPUT_HEIGHT)
+  row.settingsLabel = placeholder
+  local box = create("EditBox", row, "SearchBoxTemplate")
+  box:SetPoint("TOPLEFT", row, "TOPLEFT", 5, 0)
+  box:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
+  box.Instructions:SetText(placeholder)
+  local set, commit = commitOn(box, onCommit)
+  box.clearButton:HookScript("OnClick", commit)
   row.input = box
   return { row = row, input = box, Set = set }
 end
@@ -216,14 +253,14 @@ local function indexOf(options, value)
 end
 
 -- A dropdown of `options` ({ { value, text }, ... }), one radio each; picking one calls
--- onChange(value). The dropdown shows the selected option's text in `input.Text`.
+-- onChange(value), under its label. The dropdown shows the selected option's text in `input.Text`.
 function Controls.Choice(column, label, options, onChange)
   local layout = Theme.LAYOUT
-  local row = newRow(column, label)
+  local row = newRow(column, label, true)
   local current = 1
   local dropdown = create("DropdownButton", row, "WowStyle1DropdownTemplate")
-  dropdown:SetSize(layout.CONTROL_WIDTH - layout.LABEL_WIDTH, layout.CONTROL_HEIGHT)
-  dropdown:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+  dropdown:SetHeight(layout.CONTROL_HEIGHT)
+  underLabel(row, dropdown, 0, 0)
   local function isSelected(value)
     local option = options[current]
     return option ~= nil and option.value == value
@@ -252,47 +289,6 @@ function Controls.Choice(column, label, options, onChange)
     return option and option.value
   end
   return control
-end
-
--- `count` rows of LIST_ROW_HEIGHT, made by createRow(row, index); the mouse wheel scrolls.
--- Rows are Buttons, as only a button draws its HIGHLIGHT layer on hover.
--- Render(items, show) fills them from the current offset with show(row, item).
-function Controls.List(column, count, createRow)
-  local layout = Theme.LAYOUT
-  local frame = create("Frame", column.parent)
-  frame:SetSize(layout.CONTROL_WIDTH, count * layout.LIST_ROW_HEIGHT)
-  Controls.Place(column, frame)
-  local list = { frame = frame, rows = {}, offset = 0, items = {}, show = nil }
-  for index = 1, count do
-    local row = create("Button", frame)
-    row:SetSize(layout.CONTROL_WIDTH, layout.LIST_ROW_HEIGHT)
-    row:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -(index - 1) * layout.LIST_ROW_HEIGHT)
-    FrameKit.ListHighlight(row)
-    createRow(row, index)
-    list.rows[index] = row
-  end
-  local function paint()
-    list.offset = max(0, min(list.offset, #list.items - count))
-    for index, row in ipairs(list.rows) do
-      local item = list.items[list.offset + index]
-      if item ~= nil then
-        list.show(row, item)
-        row:Show()
-      else
-        row:Hide()
-      end
-    end
-  end
-  function list.Render(items, show)
-    list.items, list.show = items, show
-    paint()
-  end
-  frame:EnableMouseWheel(true)
-  frame:SetScript("OnMouseWheel", function(_, delta)
-    list.offset = list.offset - delta
-    paint()
-  end)
-  return list
 end
 
 ns.SettingsControls = Controls
