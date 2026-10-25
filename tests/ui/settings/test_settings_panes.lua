@@ -57,6 +57,7 @@ local function testPaneFrames()
   Assert.same(divider.points[1], { "TOPLEFT", nav, "TOPRIGHT", 0, 0 })
   Assert.same(divider.points[2], { "BOTTOMLEFT", nav, "BOTTOMRIGHT", 0, 0 })
   Assert.same(page.points[1], { "TOPLEFT", right, "TOPLEFT", 16, -12 })
+  Assert.same(page.points[2], { "BOTTOMRIGHT", right, "BOTTOMRIGHT", -12, 12 })
   Assert.truthy(page:GetFrameLevel() >= right:GetFrameLevel() + 2, "page above the art")
 end
 
@@ -94,11 +95,20 @@ local function testNoAtlasNoFill()
   Assert.equal(regionOf(right, "BACKGROUND").atlas, nil)
 end
 
+-- Width a TOPLEFT/BOTTOMRIGHT pair leaves inside a parent `width` wide.
+local function innerWidth(frame, width)
+  return width - frame.points[1][4] + frame.points[2][4]
+end
+
+-- Controls are CONTROL_WIDTH wide from the page's left edge: the page must be at least that wide
+-- at the window's minimum width, through the real anchors of the content frame, pane and page.
 local function testMinimumWidthFitsControls()
-  local ns = UiFixture.load()
+  local ns = SettingsFixture.load()
+  local window, _, nav, right, page = panes(ns)
   local layout = ns.Theme.LAYOUT
-  local content = layout.WINDOW_MIN_WIDTH - 4 - 6 - layout.LIST_WIDTH - 1
-  Assert.truthy(content >= layout.CONTROL_WIDTH + 2 * layout.PADDING, "controls fit at the minimum width")
+  local content = innerWidth(window.content, layout.WINDOW_MIN_WIDTH)
+  local pane = innerWidth(right, content - nav:GetWidth())
+  Assert.truthy(innerWidth(page, pane) >= layout.CONTROL_WIDTH, "controls fit at the minimum width")
 end
 
 local function bandTexts(window)

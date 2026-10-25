@@ -61,7 +61,8 @@ end
 local function createContent(page)
   local frame = _G["CreateFrame"]("Frame", nil, pane.right)
   frame:SetPoint("TOPLEFT", pane.right, "TOPLEFT", 16, -12)
-  frame:SetPoint("BOTTOMRIGHT", pane.right, "BOTTOMRIGHT", -16, 12)
+  -- Right inset 12, not 16: at the 720 px minimum the page stays CONTROL_WIDTH (420) wide.
+  frame:SetPoint("BOTTOMRIGHT", pane.right, "BOTTOMRIGHT", -12, 12)
   frame:SetFrameLevel(pane.right:GetFrameLevel() + 2)
   local entry = { frame = frame, view = page.Create(frame) }
   pane.content[page.id] = entry
