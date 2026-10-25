@@ -229,9 +229,20 @@ local function testChatTooltip()
     "Click: select",
     "Right-click: dismiss",
   })
-  Assert.same({ tip().colors[1], tip().colors[2] }, { { WARRIOR.r, WARRIOR.g, WARRIOR.b }, { 1, 1, 1 } })
+  local green = { 0.1, 1, 0.1 } -- the GREEN_FONT_COLOR stub, as GameTooltip_AddInstructionLine draws
+  Assert.same(tip().colors, { { WARRIOR.r, WARRIOR.g, WARRIOR.b }, { 1, 1, 1 }, green, green })
   Widgets.fire(row, "OnLeave")
   Assert.equal(tip().shown, false)
+end
+
+-- A customer of unknown class: the title in gold, the name in the chat line in white.
+local function testChatTooltipNoClass()
+  local _, _, lead = hovered(function(edited)
+    edited.guid = nil
+  end)
+  Assert.same(tip().colors[1], { 1, 0.82, 0 })
+  local stamp = "[" .. os.date("%H:%M", lead.time) .. "] [Trade] "
+  Assert.equal(tip().lines[2], stamp .. "[|cffffffffBob-Draenor|r]:   LF plate belt  ")
 end
 
 -- No channel drops its bracket; no message, no tooltip; a link in the message stays as it came.
@@ -290,6 +301,7 @@ end
 
 return function()
   testChatTooltip()
+  testChatTooltipNoClass()
   testChatTooltipLead()
   testChatTooltipForeignOwner()
   testChatTooltipRepaint()

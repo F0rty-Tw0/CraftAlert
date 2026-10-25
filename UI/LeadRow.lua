@@ -174,8 +174,8 @@ function LeadRow.SetSelected(row, selected)
   row.selected:SetShown(selected)
 end
 
+-- Hiding the row hides its chat tooltip too (the OnHide hook).
 function LeadRow.Clear(row)
-  hideChat(row)
   row.lead, row.shownAt = nil, nil
   row.selected:Hide()
   row:Hide()
