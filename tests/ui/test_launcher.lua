@@ -263,6 +263,24 @@ local function testOwnTooltip()
   Assert.equal(tooltip.shown, false)
 end
 
+-- SetSuppressed (WhisperMessenger shows the leads itself): the launcher stays built but hidden and inert.
+local function testSuppressed()
+  local ns = UiFixture.load({ leads = 1 })
+  setScan(ns, true)
+  local frame = ns.Launcher.Create()
+  ns.Launcher.SetSuppressed(true)
+  ns.Launcher.Refresh()
+  Assert.equal(frame:IsShown(), false, "Refresh keeps it hidden")
+  Assert.equal(ns.Launcher.Frame(), nil, "Frame() hides it from the toast dock")
+  ns.Launcher.StartDrag()
+  Assert.equal(frame.moving, nil)
+  ns.Launcher.StopDrag() -- saves nothing
+  ns.Launcher.SetSuppressed(false)
+  ns.Launcher.Refresh()
+  Assert.equal(ns.Launcher.Frame(), frame)
+  Assert.equal(frame:IsShown(), true)
+end
+
 return function()
   testLitDimAndTooltip()
   testOwnTooltip()
@@ -273,5 +291,6 @@ return function()
   testArt()
   testIconAndPulse()
   testDragApi()
+  testSuppressed()
   Wow.reset()
 end

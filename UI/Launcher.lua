@@ -34,6 +34,7 @@ local BADGE_OFFSET = 6
 ---@type table
 local launcher = nil -- the button, nil until Create
 local leadShown = false
+local suppressed = false -- WhisperMessenger shows the leads: the button stays built but hidden
 local movedHandlers = {}
 
 -- The profession's icon from the client, else the bell.
@@ -115,15 +116,23 @@ function Launcher.Create()
   return launcher
 end
 
--- The button, or nil before Create.
+-- The button, or nil before Create and while suppressed (the toast docks to a visible button).
 function Launcher.Frame()
+  if suppressed then
+    return nil
+  end
   return launcher
+end
+
+-- true hides the button and stops its drag and lead icon; false lets the next Refresh show it.
+function Launcher.SetSuppressed(flag)
+  suppressed = flag
 end
 
 -- A lead: its profession's icon, and the ring pulses once then keeps pulsing. nil: the idle
 -- icon, and the looping pulse stops.
 function Launcher.ShowLead(lead)
-  if launcher == nil then
+  if launcher == nil or suppressed then
     return
   end
   leadShown = lead ~= nil
@@ -145,14 +154,14 @@ function Launcher.OnMoved(fn)
 end
 
 function Launcher.StartDrag()
-  if launcher == nil then
+  if launcher == nil or suppressed then
     return
   end
   launcher:StartMoving()
 end
 
 function Launcher.StopDrag()
-  if launcher == nil then
+  if launcher == nil or suppressed then
     return
   end
   launcher:StopMovingOrSizing()
@@ -169,7 +178,7 @@ function Launcher.Refresh()
   if launcher == nil then
     return
   end
-  if FlavorCompat.InInstance() then
+  if suppressed or FlavorCompat.InInstance() then
     launcher:Hide()
     return
   end
