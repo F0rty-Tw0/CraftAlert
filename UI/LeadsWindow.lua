@@ -34,6 +34,8 @@ local SIZE = { key = UI_KEY, width = LAYOUT.WINDOW_WIDTH, height = LAYOUT.WINDOW
 SIZE.minWidth, SIZE.minHeight = LAYOUT.WINDOW_MIN_WIDTH, LAYOUT.WINDOW_MIN_HEIGHT
 
 ---@type table
+local router = nil -- fn() -> true when it handled the toggle (WhisperMessenger's panel), else nil
+---@type table
 local window = nil -- { frame, view, mode = "list" | "settings" }, nil until the first open
 
 local function settings()
@@ -171,11 +173,19 @@ local function create()
   return { frame = frame, view = view, mode = "list" }
 end
 
+-- `fn()` runs first in every Toggle; returning true means it handled the toggle. nil clears it.
+function LeadsWindow.SetRouter(fn)
+  router = fn
+end
+
 -- Opens the window on the list, at the top with the newest lead selected (every row and the
 -- details count as shown from now), or closes it in either mode. X and Esc only hide: a window
 -- closed in Settings comes back on the list here. Silent no-op in an instance.
 function LeadsWindow.Toggle()
   if FlavorCompat.InInstance() then
+    return
+  end
+  if router and router() then
     return
   end
   window = window or create()
