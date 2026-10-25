@@ -368,13 +368,13 @@ function WordGroups.Reset()
 end
 
 -- The first two distinct wordIndex words of the line (§6.4: what an ambiguous word needs).
-local function firstWords(wordIndex, tokens, count)
+local function firstWords(wordIndex, tokens, count, breakBefore)
   local first, other = nil, nil
   for i = 1, count do
     -- "off hand" partners as "offhand"; a "main/one/two hand" hand partners nothing (Slang.HandWord).
     local token = tokens[i]
     if token == "hand" then
-      token = HandWord(tokens, i)
+      token = HandWord(tokens, i, breakBefore)
     end
     local word = token and wordIndex[token]
     if word and first == nil then
@@ -504,7 +504,7 @@ local function collect(index, tokens, count, breakBefore, hasSet)
     -- flag (Slang.HandWord).
     local token = tokens[i]
     if token == "hand" then
-      token = HandWord(tokens, i)
+      token = HandWord(tokens, i, breakBefore)
     end
     local seen = wordStamp[token]
     if token then
@@ -534,7 +534,7 @@ local function collect(index, tokens, count, breakBefore, hasSet)
           local tag, ambiguousSlot, cued, uncued, buyer = tags[token], false, false, false, false
           if ambiguous[token] then
             if not scanned then
-              first, other = firstWords(wordIndex, tokens, count)
+              first, other = firstWords(wordIndex, tokens, count, breakBefore)
               scanned = true
             end
             ambiguousSlot, cued = tag == "slot", cuedAt(tokens, count, breakBefore, i)

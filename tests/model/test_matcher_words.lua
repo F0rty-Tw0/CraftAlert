@@ -162,12 +162,20 @@ local function testOffHandIsNoSlotWord()
   expect(ns, "LF off-hand crafter", "stop:nomatch", "a hyphen splits tokens")
   expect(ns, "LF main hand crafter", "stop:nomatch")
   expect(ns, "LF two hand crafter", "stop:nomatch")
-  Assert.truthy(ns.Slang.IsOffHand({ "one", "hand" }, 2))
-  Assert.falsy(ns.Slang.IsOffHand({ "hand" }, 1), "no token before")
-  Assert.falsy(ns.Slang.IsOffHand({ "off", "hands" }, 2), "only singular hand")
+  local HandWord = ns.Slang.HandWord
+  local function noBreak()
+    return false
+  end
+  local function comma()
+    return true
+  end
+  Assert.equal(HandWord({ "one", "hand" }, 2, noBreak), nil)
+  Assert.equal(HandWord({ "off", "hand" }, 2, noBreak), "offhand")
+  Assert.equal(HandWord({ "off", "hand" }, 2, comma), nil, "off, hand: no slot word")
+  Assert.equal(HandWord({ "hand" }, 1, noBreak), "hand", "no token before")
   expect(ns, "LF hand crafter", "item:802", "a plain hand is gloves")
   Assert.equal(Fixture.outcome(ns, "LF hand crafter"), Fixture.outcome(ns, "LF gloves crafter"))
-  -- firstWords skips an off-hand hand, so it never partners another ambiguous word.
+  -- firstWords reads a main/one/two hand as no word, so it never partners another ambiguous word.
   Assert.equal(Fixture.outcome(ns, "LF off hand legs"), Fixture.outcome(ns, "LF legs"), "off hand does not count legs")
   -- User ruling 2026-10-25: "off hand" and "off-hand" are the off-hand slot word, as "offhand".
   slotIndex(ns, true, function(db)
@@ -178,7 +186,12 @@ local function testOffHandIsNoSlotWord()
   expect(ns, "LF off-hand crafter", "item:913", "off-hand is offhand")
   expect(ns, "WTB off hand", "item:913", "no cue needed: offhand is no ambiguous word")
   expect(ns, "LF main hand crafter", "stop:nomatch", "main hand stays no slot word")
+  expect(ns, "LF main hand legs", "stop:nomatch", "main hand partners nothing, so legs needs a cue")
   expect(ns, "LF hand crafter", "item:802", "a plain hand is still gloves")
+  -- Punctuation between "off" and "hand" is two thoughts: no slot word, as before the ruling.
+  expect(ns, "LF crafter, turned it off, hand me mats", "stop:nomatch", "off, hand")
+  expect(ns, "LF crafter, logged off. hand over mats", "stop:nomatch", "off. hand")
+  expect(ns, "LF off hand crafter, back in 5", "item:913", "punctuation after off hand")
 end
 
 -- User ruling 2026-10-24 ("either slot counts"): a line whose counted words are all slot

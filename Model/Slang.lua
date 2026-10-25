@@ -87,22 +87,20 @@ end
 -- "LF hood" never complete an alias or a stat.
 Slang.wordGroupsOnly = { back = true, hand = true, band = true, hood = true, vest = true }
 
--- User ruling 2026-10-24 (R1): "hand" directly after "off", "main", "one" or "two" ("off hand",
--- "off-hand": a hyphen splits tokens) is no slot word anywhere, so no glove crafter hears of a
--- weapon hand. Only singular "hand": "off hands" is no gear term, and "hands" keeps its meaning.
+-- User ruling 2026-10-24 (R1): "hand" directly after "main", "one" or "two" is no slot word, so
+-- no glove crafter hears of a weapon hand. User ruling 2026-10-25: after "off" ("off hand",
+-- "off-hand": a hyphen splits tokens) it is the off-hand slot, as "offhand". Only singular
+-- "hand": "off hands" is no gear term, and "hands" keeps its meaning.
 local OFF_HAND_PREFIX = { off = true, main = true, one = true, two = true }
 
--- → whether tokens[i] is such a "hand". Hot path: no allocation.
-function Slang.IsOffHand(tokens, i)
-  return tokens[i] == "hand" and i > 1 and OFF_HAND_PREFIX[tokens[i - 1]] == true
-end
-
--- tokens[i] is "hand" → the word it stands for: "offhand" after "off" ("off hand", "off-hand";
--- user ruling 2026-10-25: the off-hand slot, as "offhand"), nil after "main", "one" or "two"
--- (no slot word), else "hand". Callers check for "hand" first, so other tokens pay no call.
-function Slang.HandWord(tokens, i)
+-- tokens[i] is "hand" → the word it stands for: "offhand" right after "off" (spaces or one
+-- hyphen between), nil after "main", "one" or "two", or after "off" across other punctuation
+-- ("logged off. hand over": two thoughts, no slot word; breakBefore: Tokenizer.BreakBefore,
+-- asked only after "off"), else "hand". Callers check for "hand" first, so other tokens pay no
+-- call. Hot path: no allocation.
+function Slang.HandWord(tokens, i, breakBefore)
   local before = i > 1 and tokens[i - 1]
-  if before == "off" then
+  if before == "off" and not breakBefore(i, true) then
     return "offhand"
   end
   return not OFF_HAND_PREFIX[before] and "hand" or nil

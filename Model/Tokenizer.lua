@@ -26,6 +26,7 @@ local type = type
 -- Word characters: ASCII letters and digits, the apostrophe, and every byte >= 128 (UTF-8).
 local WORD = "[%w'\128-\255]+"
 local SPACES = "^%s*" -- anchored, so BreakBefore reads only the gap between two tokens
+local HYPHEN_SPACES = "^%-?%s*" -- always matches: one optional hyphen, then spaces
 local ITEM_LINK = "^|hitem:(%d+)"
 local ENCHANT_LINK = "^|henchant:(%d*)"
 local ANY_LINK = "^|h%a+:"
@@ -237,12 +238,16 @@ end
 -- §6.4 cue adjacency: whether anything but spaces (punctuation, an escape, a link) sits
 -- between tokens k - 1 and k of the last line; never before the first. Asked only for the few
 -- tokens an ambiguous word needs, so Tokenize pays one store per token, not a search.
-function Tokenizer.BreakBefore(k)
+-- hyphenJoins: one hyphen in the gap is no break either ("off-hand", Slang.HandWord).
+function Tokenizer.BreakBefore(k, hyphenJoins)
   if k <= 1 or k > count then
     return false
   end
-  local _, spaceEnd = find(line, SPACES, starts[k - 1] + #tokens[k - 1])
-  return spaceEnd + 1 < starts[k]
+  local _, gapEnd = find(line, SPACES, starts[k - 1] + #tokens[k - 1])
+  if hyphenJoins and gapEnd + 1 < starts[k] then
+    _, gapEnd = find(line, HYPHEN_SPACES, gapEnd + 1)
+  end
+  return gapEnd + 1 < starts[k]
 end
 
 ns.Tokenizer = Tokenizer
