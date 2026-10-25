@@ -90,6 +90,31 @@ local function testArt()
   Assert.equal(t.shown, false)
 end
 
+-- PaintPanel draws a pane atlas when the client has it; with no atlas it touches nothing (never hides).
+local function testPaintPanel()
+  local FrameKit = load({})
+  local texture = _G["CreateFrame"]("Frame"):CreateTexture(nil, "BACKGROUND")
+  Assert.equal(FrameKit.PaintPanel(texture, "Professions-background-summarylist"), true)
+  Assert.same({ texture.atlas, texture.blendMode }, { "Professions-background-summarylist", "BLEND" })
+  Wow.stub("C_Texture", {
+    GetAtlasInfo = function()
+      return nil
+    end,
+  })
+  local bare = _G["CreateFrame"]("Frame"):CreateTexture(nil, "BACKGROUND")
+  Assert.equal(FrameKit.PaintPanel(bare, "x"), false)
+  Assert.same({ bare.atlas, bare.blendMode }, { nil, nil }) -- left empty, never hidden
+  Assert.equal(bare.shown, true)
+  Wow.stub("C_Texture", {
+    GetAtlasInfo = function()
+      error("boom")
+    end,
+  })
+  Assert.equal(FrameKit.PaintPanel(bare, "x"), false, "a raising GetAtlasInfo counts as unknown")
+  Wow.stub("C_Texture", nil)
+  Assert.equal(FrameKit.PaintPanel(bare, "x"), false)
+end
+
 local function testListHighlight()
   local FrameKit = load({})
   local Theme = require("CraftAlert.UI.Theme")
@@ -130,14 +155,15 @@ local function testClassColor()
   Assert.equal(FrameKit.ClassColor(5), nil, "non-string token")
 end
 
--- The WhisperMessenger look is gone: no panel/title-bar builders, no surface or control colours.
+-- The old WhisperMessenger look is gone: no panel/title-bar builders, no surface or control colours
+-- (`divider` is back as the split view's pane line, asserted in test_theme.lua).
 local function testLookCodeGone()
   local FrameKit = load({})
   local Theme = Fresh.require("UI.Theme")
   Assert.equal(FrameKit.Panel, nil, "Panel")
   Assert.equal(FrameKit.Fill, nil, "Fill")
   Assert.equal(FrameKit.TitleBar, nil, "TitleBar")
-  local deleted = { "surface", "chrome", "border", "divider", "toggleOn", "toggleOff", "knob", "option", "optionHover", "optionSelected", "input" }
+  local deleted = { "surface", "chrome", "border", "toggleOn", "toggleOff", "knob", "option", "optionHover", "optionSelected", "input" }
   for _, key in ipairs(deleted) do
     Assert.equal(Theme.COLORS[key], nil, "COLORS." .. key)
   end
@@ -160,6 +186,7 @@ return function()
   testSavedPosition()
   testMalformedFallsBack()
   testArt()
+  testPaintPanel()
   testListHighlight()
   testProfessionIcon()
   testClassColor()

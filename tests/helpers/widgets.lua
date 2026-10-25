@@ -347,6 +347,10 @@ local function addFrameState(frame)
     self.resizeBounds = { minWidth, minHeight, maxWidth, maxHeight }
   end
 
+  function frame:SetClipsChildren(clips)
+    self.clipsChildren = clips
+  end
+
   function frame:SetClampedToScreen(clamped)
     self.clamped = clamped
   end

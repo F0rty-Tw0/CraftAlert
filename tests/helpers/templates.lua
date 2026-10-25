@@ -4,7 +4,8 @@
 -- Widgets.extend calls Apply once the frame's own widget methods exist, before CreateFrame returns it.
 -- That is earlier than newFrame (tests/helpers/wow.lua) defines SetScript/HookScript/Show/Hide, so a
 -- fake that needs a script writes `frame.scripts.X` (and `frame.hooks.X`) directly.
-local Templates = { fakes = {} }
+-- portraitMethod: false models a client whose window template lacks `SetPortraitToAsset` (Classic).
+local Templates = { fakes = {}, portraitMethod = true }
 
 local unpack = unpack
 
@@ -117,6 +118,17 @@ function Templates.fakes.ButtonFrameTemplate(frame)
   titleContainer.TitleText = titleContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   frame.TitleContainer = titleContainer
 
+  -- ButtonFrameTemplate.xml: PortraitContainer.portrait (parentKey) and PortraitFrameMixin:SetPortraitToAsset
+  -- (Blizzard_SharedXML/PortraitFrame.lua), absent from the Classic templates.
+  local portraitContainer = createFrame("Frame", nil, frame)
+  portraitContainer.portrait = portraitContainer:CreateTexture(nil, "OVERLAY")
+  frame.PortraitContainer = portraitContainer
+  if Templates.portraitMethod ~= false then
+    function frame:SetPortraitToAsset(asset)
+      self.portraitAsset = asset
+    end
+  end
+
   function frame:GetTitleText()
     return self.TitleContainer.TitleText
   end
@@ -201,6 +213,12 @@ function Templates.fakes.UICheckButtonTemplate(button)
 end
 
 local MINIMAL_SLIDER_EVENTS = { "OnValueChanged", "OnInteractStart", "OnInteractEnd" }
+
+-- Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml (InsetFrameTemplate: the marble `Bg`
+-- texture, parentKey="Bg", in the BACKGROUND layer, plus a border).
+function Templates.fakes.InsetFrameTemplate(frame)
+  frame.Bg = frame:CreateTexture(nil, "BACKGROUND")
+end
 
 -- Blizzard_SharedXML/Shared/Slider/MinimalSlider.xml:34-90 (250x40 Frame; inner Slider inset 19;
 -- Back and Forward Buttons; five hidden Labels in Left, Right, Top, Min, Max order) and

@@ -20,6 +20,9 @@ Theme.COLORS = {
   white = { 1.0, 1.0, 1.0, 1.0 },
   gold = { 1.0, 0.82, 0.0, 1.0 },
   grey = { 0.5, 0.5, 0.5, 1.0 },
+  -- The details pane's header band and the 1 px line between the panes.
+  headerFill = { 0.09, 0.08, 0.07, 0.60 },
+  divider = { 1, 1, 1, 0.08 },
 }
 
 -- Blizzard font object names (WhisperMessenger's FONT_MAP bases).
@@ -29,6 +32,7 @@ Theme.FONTS = {
   body = "GameFontHighlightSmall",
   detail = "GameFontDisableSmall",
   badge = "GameFontHighlightSmall",
+  heading = "GameFontNormalLarge",
 }
 
 Theme.LAYOUT = {
@@ -66,6 +70,20 @@ Theme.LAYOUT = {
   BUTTON_HEIGHT = 20,
   LIST_ROW_HEIGHT = 20,
   GEAR_SIZE = 20,
+  -- The leads window's split view (WhisperMessenger's Layout numbers): list pane and its 48 px
+  -- rows, the details pane's header, padding, action bar and the status band.
+  LIST_WIDTH = 260,
+  ROW_HEIGHT = 48,
+  LIST_ROW_INSET = 2,
+  PANE_PADDING = 4,
+  LIST_ICON_SIZE = 34,
+  DETAILS_HEADER_HEIGHT = 56,
+  DETAILS_PADDING = 16,
+  DETAILS_GAP = 12,
+  ACTION_BAR_HEIGHT = 44,
+  BAND_HEIGHT = 36,
+  -- left, top, right, bottom: the content frame inside a ButtonFrameTemplate window.
+  CONTENT_INSET = { 4, -60, -6, 4 },
 }
 
 Theme.ICON = "Interface\\Icons\\INV_Misc_Bell_01"
@@ -83,6 +101,12 @@ Theme.ART = {
   GEAR_FILE = "Interface\\WorldMap\\Gear_64Grey",
   BACK_ATLAS = "common-icon-backarrow",
   BACK_FILE = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up",
+  -- Pane backgrounds (atlases, painted through FrameKit.PaintPanel) and the chat window's resize grabber.
+  PANEL_BACKGROUND = "Professions-background-summarylist",
+  WIDE_PANEL_BACKGROUND = "auctionhouse-background-index",
+  SIZE_GRABBER_UP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up",
+  SIZE_GRABBER_DOWN = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down",
+  SIZE_GRABBER_HIGHLIGHT = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight",
 }
 Theme.DIM_ALPHA = 0.5
 
