@@ -201,6 +201,7 @@ function BridgePanel.Refresh()
   end
   if mode == "settings" and FlavorCompat.InInstance() then
     enterLeads()
+    return
   end
   refresh()
 end

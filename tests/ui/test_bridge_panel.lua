@@ -152,6 +152,19 @@ local function testInstanceGateLeavesSettings()
   Wow.stub("IsInInstance", nil)
 end
 
+-- In an instance the gear still closes settings that are open (it only refuses to open them).
+local function testGearClosesSettingsInInstance()
+  local ns, _, _, wm = boot()
+  local host = showWith(wm)
+  Widgets.click(gearOf(host))
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  ns.BridgePanel.ToggleSettings()
+  Assert.equal(ns.BridgePanel.InSettings(), false)
+  Wow.stub("IsInInstance", nil)
+end
+
 local function testModeIsNotSaved()
   local ns, _, _, wm = boot()
   local host = showWith(wm)
@@ -374,6 +387,7 @@ return function()
   testToggleSettings()
   testGearOffInInstance()
   testInstanceGateLeavesSettings()
+  testGearClosesSettingsInInstance()
   testModeIsNotSaved()
   testRefreshSkippedInSettings()
   testNavWidthInWm()
