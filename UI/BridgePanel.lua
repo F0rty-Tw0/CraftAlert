@@ -83,7 +83,7 @@ local function onHide()
 end
 
 local function badge()
-  return #Leads.List()
+  return #visibleLeads()
 end
 
 -- The table for API.RegisterPanel.

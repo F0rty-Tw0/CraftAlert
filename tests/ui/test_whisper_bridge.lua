@@ -324,11 +324,13 @@ local function testPanelEmptyInInstance()
   inInstance(true)
   ns.WhisperBridge.OnGate() -- entering with the panel open
   Assert.equal(ns.WhisperBridge.VisibleLead(), nil, "the open view empties")
+  Assert.equal(wm.panels.CraftAlert.badge(), 0, "and the badge agrees with the empty list")
   wm.hidePanel("CraftAlert")
   wm.showPanel("CraftAlert") -- opening inside
   Assert.equal(ns.Leads.Latest() ~= nil, true, "Leads keeps its leads in an instance")
   Assert.equal(ns.WhisperBridge.VisibleLead(), nil, "the view shows no rows there")
   inInstance(false)
+  Assert.equal(wm.panels.CraftAlert.badge(), 2, "badge counts the leads outside")
   ns.Leads.Dismiss(ns.Leads.Latest().id)
   Assert.equal(ns.WhisperBridge.VisibleLead() ~= nil, true, "rows are back outside")
 end
