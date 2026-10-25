@@ -35,7 +35,7 @@ local WordGroups = {}
 local pairs = pairs
 local ipairs = ipairs
 local lower = string.lower
-local IsOffHand = Slang.IsOffHand
+local HandWord = Slang.HandWord
 local slangWords, ambiguous = Slang.wordSet, Slang.ambiguous
 local buyerWords = Constants.buyerWords
 local MAX_WORDS = 6 -- distinct slang words per line (§6.3 step 4.4; bounds the §4.4 max)
@@ -375,12 +375,15 @@ function WordGroups.Reset()
 end
 
 -- The first two distinct wordIndex words of the line (§6.4: what an ambiguous word needs).
-local function firstWords(wordIndex, tokens, count)
+local function firstWords(wordIndex, tokens, count, breakBefore)
   local first, other = nil, nil
   for i = 1, count do
+    -- "off hand" partners as "offhand"; a "main/one/two hand" hand partners nothing (Slang.HandWord).
     local token = tokens[i]
-    -- No partner: an off-hand hand is no slot word (user ruling 2026-10-24).
-    local word = wordIndex[token] and not (token == "hand" and IsOffHand(tokens, i))
+    if token == "hand" then
+      token = HandWord(tokens, i, breakBefore)
+    end
+    local word = token and wordIndex[token]
     if word and first == nil then
       first = token
     elseif word and other == nil and token ~= first then
@@ -504,10 +507,14 @@ local function collect(index, tokens, count, breakBefore, hasSet)
   lineCount, namedCount, emptyCount, buyerCount, stamp = 0, 0, 0, 0, stamp + 2
   skipped, lineCue = stamp + 1, nil
   for i = 1, count do
+    -- "off hand" counts as "offhand"; a "main/one/two hand" hand: no count, no why, no inference
+    -- flag (Slang.HandWord).
     local token = tokens[i]
+    if token == "hand" then
+      token = HandWord(tokens, i, breakBefore)
+    end
     local seen = wordStamp[token]
-    -- An off-hand hand: no count, no why, no inference flag (user ruling 2026-10-24).
-    if not (token == "hand" and IsOffHand(tokens, i)) then
+    if token then
       if seen == stamp then
         whyCount = whyCount + 1
         why[whyCount] = token
@@ -534,7 +541,7 @@ local function collect(index, tokens, count, breakBefore, hasSet)
           local tag, ambiguousSlot, cued, uncued, buyer = tags[token], false, false, false, false
           if ambiguous[token] then
             if not scanned then
-              first, other = firstWords(wordIndex, tokens, count)
+              first, other = firstWords(wordIndex, tokens, count, breakBefore)
               scanned = true
             end
             ambiguousSlot, cued = tag == "slot", cuedAt(tokens, count, breakBefore, i)

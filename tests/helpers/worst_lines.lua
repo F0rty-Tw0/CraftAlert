@@ -157,6 +157,8 @@ function WorstLines.cases(index)
     { "short_slot", WorstLines.shortSlot() },
     -- 4.4 R3: a buyer word directly before an ambiguous armor slot word, class known
     { "buyer_legs", fill("wtb", "legs wtb") },
+    -- 4.4: "off-hand" repeated, each hand read through Slang.HandWord (BreakBefore with a hyphen)
+    { "off_hand", fill("lf", "off-hand") },
   }
 end
 

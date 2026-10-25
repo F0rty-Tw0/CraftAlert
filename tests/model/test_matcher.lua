@@ -168,9 +168,28 @@ local function testSlotNameGuard()
   local result = expect(ns, "LF green iron chest", "item:green iron hauberk")
   Assert.equal(why(result), "lf+green iron+chest", "the slot word that filtered stays in the why")
   expect(ns, "LF green iron", "item:green iron hauberk")
-  -- "hand" is an everyday word (2026-10-25), so "off hand" never filters a hit: PhraseMatch.addHit
-  -- needs no off-hand check of its own.
-  expect(ns, "LF green iron off hand", "item:green iron hauberk", "off hand is no glove slot")
+  -- User ruling 2026-10-25 ("Treat as offhand"): "off hand" after an alias filters as "offhand"
+  -- does; punctuation before "off" or between the two words leaves the hit alone.
+  expect(ns, "LF green iron offhand", "stop:nomatch")
+  expect(ns, "LF green iron off hand", "stop:nomatch", "off hand filters as offhand")
+  expect(ns, "LF green iron off-hand", "stop:nomatch", "off-hand filters as offhand")
+  expect(ns, "LF green iron, off hand", "item:green iron hauberk", "punctuation before off")
+  expect(ns, "LF green iron off, hand over", "item:green iron hauberk", "punctuation inside off hand")
+  Fixture.itemIndex(ns, function(itemDb)
+    itemDb.characters["Smith-Realm"].recipes[3] = { item = 915, name = "Zorgblade Frostmourne Tome", prof = BS }
+    itemDb.characters["Ins-Realm"] = character({ TAILOR }, { [20] = { item = 913, name = "Silk Tome", prof = TAILOR } })
+  end)
+  result = expect(ns, "LF zorgblade frostmourne off hand", "item:915", "an off-hand item stays")
+  Assert.equal(why(result), "lf+zorgblade frostmourne+offhand")
+  expect(ns, "LF zorgblade frostmourne gloves", "stop:nomatch")
+  -- A short name that needs a companion word takes "off hand" as "offhand" (HasCompanionWord).
+  for _, slot in ipairs({ "offhand", "off hand", "off-hand" }) do
+    expect(ns, "LF zorgblade " .. slot, "item:915", "companion: " .. slot)
+  end
+  -- Only "off hand" with nothing but spaces or a hyphen between is that companion.
+  for _, line in ipairs({ "LF zorgblade off, hand me mats", "LF zorgblade main hand", "LF zorgblade two hand" }) do
+    expect(ns, line, "stop:nomatch", "no companion: " .. line)
+  end
   -- The typo pass skips the tokens of the dropped hit (it matches "thick", kind c, at distance 0).
   Fixture.itemIndex(ns)
   expect(ns, "LF thick plate helm", "stop:nomatch")
