@@ -28,15 +28,11 @@ local function hideTooltip()
   Tooltip.Get():Hide()
 end
 
--- The gear on `frame` (a ButtonFrameTemplate frame); a click runs onClick().
-function SettingsGear.Create(frame, onClick)
+-- The gear Button under `parent`, sized and painted but not placed; a click runs onClick().
+function SettingsGear.Build(parent, onClick)
   local size, art = Theme.LAYOUT.GEAR_SIZE, Theme.ART
-  local gear = _G["CreateFrame"]("Button", nil, frame)
+  local gear = _G["CreateFrame"]("Button", nil, parent)
   gear:SetSize(size, size)
-  gear:SetPoint("RIGHT", frame.CloseButton, "LEFT", -2, 0)
-  -- With the title above the NineSlice border, whose metal top edge covers the title strip. Not the
-  -- close button's level: the Classic template leaves that one under the border.
-  gear:SetFrameLevel(frame.TitleContainer:GetFrameLevel())
   gear.normal = gear:CreateTexture(nil, "ARTWORK")
   FrameKit.Art(gear.normal, art.GEAR_ATLAS, art.GEAR_FILE)
   gear:SetNormalTexture(gear.normal)
@@ -48,6 +44,17 @@ function SettingsGear.Create(frame, onClick)
   end)
   gear:SetScript("OnEnter", showTooltip)
   gear:SetScript("OnLeave", hideTooltip)
+
+  return gear
+end
+
+-- The gear on `frame` (a ButtonFrameTemplate frame); a click runs onClick().
+function SettingsGear.Create(frame, onClick)
+  local gear = SettingsGear.Build(frame, onClick)
+  gear:SetPoint("RIGHT", frame.CloseButton, "LEFT", -2, 0)
+  -- With the title above the NineSlice border, whose metal top edge covers the title strip. Not the
+  -- close button's level: the Classic template leaves that one under the border.
+  gear:SetFrameLevel(frame.TitleContainer:GetFrameLevel())
 
   return gear
 end
