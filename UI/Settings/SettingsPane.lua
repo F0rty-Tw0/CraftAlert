@@ -7,8 +7,9 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 
--- Native-HUD spec §7.1: Craft Alert's settings, a pane in the leads window's inset. Left
--- navigation, one page at a time. A page is { id, title, Create(parent) → { Refresh() } }: built
+-- Native-HUD spec §7.1, UI uplift spec B.1: Craft Alert's settings, a pane in the leads window's
+-- content frame with the split view's two-pane look: navigation on the left, one page at a time
+-- on the right. A page is { id, title, Create(parent) → { Refresh() } }: built
 -- the first time it is selected, refreshed from the db each time it is shown. The pane loads
 -- before the pages (the leads window needs it, and the pages load after the window), so the
 -- built-in pages are looked up on the first Build, never at load.
@@ -20,7 +21,7 @@ local BUILT_IN = { "PageGeneral", "PageAlerts", "PageGreetings", "PageKeywords",
 local added = {} -- pages from AddPage, after the built-ins
 local pages = {} -- every page in nav order, filled by Build
 ---@type table
-local pane = nil -- { host, container, nav, content = { [id] = { frame, view } }, buttons = { [id] = button }, selected }
+local pane = nil -- { host, container, nav, right, content = { [id] = { frame, view } }, buttons = { [id] = button }, selected }
 
 local function pageById(id)
   for _, page in ipairs(pages) do
@@ -31,11 +32,38 @@ local function pageById(id)
   return nil
 end
 
+-- A pane as the leads view's (UI/LeadsView.lua createPane): its atlas in a BACKGROUND texture, the
+-- inset's border one level above, its marble Bg hidden when the atlas paints.
+local function createPane(parent, atlas)
+  local frame = _G["CreateFrame"]("Frame", nil, parent)
+  frame.bg = frame:CreateTexture(nil, "BACKGROUND")
+  frame.bg:SetAllPoints(frame)
+  frame.art = _G["CreateFrame"]("Frame", nil, frame, "InsetFrameTemplate")
+  frame.art:SetAllPoints(frame)
+  frame.art:SetFrameLevel(frame:GetFrameLevel() + 1)
+  if FrameKit.PaintPanel(frame.bg, atlas) then
+    frame.art.Bg:Hide()
+  end
+  return frame
+end
+
+-- The 1 px line in the gap between the panes, a region of the container: the nav's inset art
+-- would cover it.
+local function createDivider(container, nav)
+  local color = Theme.COLORS.divider
+  local divider = container:CreateTexture(nil, "BORDER")
+  divider:SetWidth(1)
+  divider:SetPoint("TOPLEFT", nav, "TOPRIGHT", 0, 0)
+  divider:SetPoint("BOTTOMLEFT", nav, "BOTTOMRIGHT", 0, 0)
+  divider:SetColorTexture(color[1], color[2], color[3], color[4])
+end
+
 local function createContent(page)
-  local padding = Theme.LAYOUT.PADDING
-  local frame = _G["CreateFrame"]("Frame", nil, pane.container)
-  frame:SetPoint("TOPLEFT", pane.nav, "TOPRIGHT", padding, 0)
-  frame:SetPoint("BOTTOMRIGHT", pane.host, "BOTTOMRIGHT", -padding, padding)
+  local frame = _G["CreateFrame"]("Frame", nil, pane.right)
+  frame:SetPoint("TOPLEFT", pane.right, "TOPLEFT", 16, -12)
+  -- Right inset 12, not 16: at the 720 px minimum the page stays CONTROL_WIDTH (420) wide.
+  frame:SetPoint("BOTTOMRIGHT", pane.right, "BOTTOMRIGHT", -12, 12)
+  frame:SetFrameLevel(pane.right:GetFrameLevel() + 2)
   local entry = { frame = frame, view = page.Create(frame) }
   pane.content[page.id] = entry
   return entry
@@ -66,12 +94,13 @@ local function addNavButton(page, index)
   local layout, art = Theme.LAYOUT, Theme.ART
   local button = _G["CreateFrame"]("Button", nil, pane.nav)
   button:SetHeight(layout.NAV_BUTTON_HEIGHT)
+  button:SetFrameLevel(pane.nav:GetFrameLevel() + 2)
   local top = -(4 + (index - 1) * layout.NAV_BUTTON_HEIGHT)
-  button:SetPoint("TOPLEFT", pane.nav, "TOPLEFT", 4, top)
-  button:SetPoint("TOPRIGHT", pane.nav, "TOPRIGHT", -4, top)
+  button:SetPoint("TOPLEFT", pane.nav, "TOPLEFT", 2, top)
+  button:SetPoint("TOPRIGHT", pane.nav, "TOPRIGHT", -2, top)
   button.pageId = page.id
-  button.label = FrameKit.Text(button, Theme.FONTS.body)
-  button.label:SetPoint("LEFT", button, "LEFT", layout.PADDING, 0)
+  button.label = FrameKit.Text(button, Theme.FONTS.name)
+  button.label:SetPoint("LEFT", button, "LEFT", 12, 0)
   button.label:SetText(page.title)
   FrameKit.ListHighlight(button)
   button.selected = button:CreateTexture(nil, "ARTWORK")
@@ -103,15 +132,19 @@ function SettingsPane.Build(host, onBack)
   if pane then
     return
   end
-  local padding = Theme.LAYOUT.PADDING
+  local layout, art = Theme.LAYOUT, Theme.ART
   local container = _G["CreateFrame"]("Frame", nil, host)
   container:SetAllPoints(host)
   container:Hide()
-  local nav = _G["CreateFrame"]("Frame", nil, container, "InsetFrameTemplate")
-  nav:SetPoint("TOPLEFT", host, "TOPLEFT", padding, -padding)
-  nav:SetPoint("BOTTOMLEFT", host, "BOTTOMLEFT", padding, padding)
-  nav:SetWidth(Theme.LAYOUT.NAV_WIDTH)
-  pane = { host = host, container = container, nav = nav, content = {}, buttons = {}, selected = nil }
+  local nav = createPane(container, art.PANEL_BACKGROUND)
+  nav:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 0)
+  nav:SetPoint("BOTTOMLEFT", host, "BOTTOMLEFT", 0, 0)
+  nav:SetWidth(layout.LIST_WIDTH)
+  local right = createPane(container, art.WIDE_PANEL_BACKGROUND)
+  right:SetPoint("TOPLEFT", nav, "TOPRIGHT", 1, 0)
+  right:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", 0, 0)
+  createDivider(container, nav)
+  pane = { host = host, container = container, nav = nav, right = right, content = {}, buttons = {}, selected = nil }
   for _, name in ipairs(BUILT_IN) do
     pages[#pages + 1] = ns[name] or require("CraftAlert.UI.Settings." .. name)
   end
@@ -123,10 +156,11 @@ function SettingsPane.Build(host, onBack)
   end
   -- Controls loads after the pane (TOC), so it resolves here, not at load.
   local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
-  local back = Controls.Button(nav, Localization.Text("Back to leads"), Theme.LAYOUT.NAV_WIDTH - 8, function()
+  local back = Controls.Button(nav, Localization.Text("Back to leads"), layout.LIST_WIDTH - 8, function()
     onBack()
   end)
-  back:SetHeight(Theme.LAYOUT.NAV_BUTTON_HEIGHT)
+  back:SetHeight(layout.NAV_BUTTON_HEIGHT)
+  back:SetFrameLevel(nav:GetFrameLevel() + 2)
   back:SetPoint("BOTTOMLEFT", nav, "BOTTOMLEFT", 4, 4)
   back:SetPoint("BOTTOMRIGHT", nav, "BOTTOMRIGHT", -4, 4)
 end

@@ -74,6 +74,7 @@ UI/LeadDetails.lua
 UI/LeadsList.lua
 UI/LeadsView.lua
 UI/WindowSize.lua
+UI/GhostResize.lua
 UI/SettingsGear.lua
 UI/Settings/SettingsPane.lua
 UI/LeadsWindow.lua

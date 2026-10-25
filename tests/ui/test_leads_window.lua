@@ -328,42 +328,36 @@ local function testReopenResetsSelection()
   assertFresh(90)
 end
 
--- Review Focus 5: resize wrapping, minimum, save, close-and-reopen, reload.
-local function testResizeButton()
+-- Review Focus 5: the ghost grip sizes the window once on release, saves, survives close-and-reopen
+-- and reload. The clamp is tested in test_ghost_resize.lua (the fake models no client clamp).
+local function testResizeGrip()
   local customers = customerNames(12)
   local ns, db = load(customers)
   ns.LeadsWindow.Toggle()
-  local frame, screen = window(), rawget(_G, "UIParent")
-  local button = frame.resizeButton
-  Assert.equal(button.template, "PanelResizeButtonTemplate")
-  Assert.same(
-    { button.target == frame, button.minWidth, button.minHeight, button.maxWidth, button.maxHeight },
-    { true, 720, 420, screen:GetWidth(), screen:GetHeight() }
-  )
+  local frame = window()
+  local grip = frame.resizeGrip
+  Assert.truthy(grip, "the ghost grip")
+  Assert.equal(frame.resizeButton, nil)
   Assert.equal(#rows(), 10)
-  -- Dragging: the client resizes and fires OnSizeChanged. Init wrapped our refresh, so rows refit.
-  button.scripts.OnMouseDown(button, "LeftButton")
-  Assert.equal(frame.sizing, "BOTTOMRIGHT")
-  resize(900, 600)
-  Assert.equal(#rows(), 11) -- floor((600 - 64 - 8) / 48)
-  -- Below the minimum, the button's wrapper pulls the size back (it only works if our script was set before Init).
-  resize(100, 100)
-  Assert.same({ frame:GetWidth(), frame:GetHeight() }, { 720, 420 })
-  resize(900, 600)
-  button.scripts.OnMouseUp(button, "LeftButton")
-  Assert.equal(frame.sizing, nil)
-  Assert.same({ db.ui.window.width, db.ui.window.height }, { 900, 600 })
+  -- Dragging sizes the ghost only: the window and its rows wait for the release.
+  Widgets.fire(grip, "OnMouseDown", "LeftButton")
+  grip.ghost:SetSize(1000, 640)
+  Assert.same({ frame:GetWidth(), frame:GetHeight(), #rows() }, { 840, 560, 10 })
+  Widgets.fire(grip, "OnMouseUp", "LeftButton")
+  Assert.same({ frame:GetWidth(), frame:GetHeight() }, { 1000, 640 })
+  Assert.equal(#rows(), 11) -- floor((640 - 64 - 8) / 48)
+  Assert.same({ db.ui.window.width, db.ui.window.height }, { 1000, 640 })
   -- Closed and reopened: same size, rows refit.
   ns.LeadsWindow.Toggle()
   ns.LeadsWindow.Toggle()
-  Assert.same({ frame:GetWidth(), frame:GetHeight(), #rows() }, { 900, 600, 11 })
+  Assert.same({ frame:GetWidth(), frame:GetHeight(), #rows() }, { 1000, 640, 11 })
   -- After a /reload it opens at the saved size with the rows refit.
   local saved = db.ui.window
   ns = load(customers, function(accountDb)
     accountDb.ui.window = saved
   end)
   ns.LeadsWindow.Toggle()
-  Assert.same({ window():GetWidth(), window():GetHeight(), #rows() }, { 900, 600, 11 })
+  Assert.same({ window():GetWidth(), window():GetHeight(), #rows() }, { 1000, 640, 11 })
 end
 
 local function testSavedFrameAndOpacity()
@@ -372,17 +366,18 @@ local function testSavedFrameAndOpacity()
   ns.LeadsWindow.Toggle()
   local frame = window()
   Assert.equal(frame:GetAlpha(), 0.7)
-  -- Dragging saves the position; the resize button saves the size.
+  -- Dragging saves the position; the grip saves the size and re-anchors at the top-left corner.
   frame.scripts.OnDragStart(frame)
   frame:ClearAllPoints()
   frame:SetPoint("LEFT", rawget(_G, "UIParent"), "LEFT", 30, 40)
   frame.scripts.OnDragStop(frame)
-  local button = frame.resizeButton
-  button.scripts.OnMouseDown(button, "LeftButton")
-  Assert.equal(frame.sizing, "BOTTOMRIGHT")
-  frame:SetSize(900, 600)
-  button.scripts.OnMouseUp(button, "LeftButton")
-  Assert.same(db.ui.window, { point = "LEFT", relativePoint = "LEFT", x = 30, y = 40, width = 900, height = 600 })
+  Assert.same({ db.ui.window.point, db.ui.window.x, db.ui.window.y }, { "LEFT", 30, 40 })
+  frame.left, frame.top = 30, 600
+  local grip = frame.resizeGrip
+  Widgets.fire(grip, "OnMouseDown", "LeftButton")
+  grip.ghost:SetSize(900, 600)
+  Widgets.fire(grip, "OnMouseUp", "LeftButton")
+  Assert.same(db.ui.window, { point = "TOPLEFT", relativePoint = "BOTTOMLEFT", x = 30, y = 600, width = 900, height = 600 })
 
   -- The saved shapes are flat scalars, which the load-time Schema check keeps as they are.
   local Schema = Fresh.require("Persistence.Schema")
@@ -401,7 +396,7 @@ local function testSavedFrameAndOpacity()
   end)
   ns.LeadsWindow.Toggle()
   local point, _, relativePoint, x, y = window():GetPoint()
-  Assert.same({ point, relativePoint, x, y, window():GetWidth(), window():GetHeight() }, { "LEFT", "LEFT", 30, 40, 900, 600 })
+  Assert.same({ point, relativePoint, x, y, window():GetWidth(), window():GetHeight() }, { "TOPLEFT", "BOTTOMLEFT", 30, 600, 900, 600 })
 end
 
 -- Runs fn, raising instead of hanging when it loops (a client freeze).
@@ -424,7 +419,7 @@ local function testHugeSavedSize()
   local parent = rawget(_G, "UIParent")
   Assert.equal(window():GetWidth(), parent:GetWidth(), "no wider than the screen")
   Assert.equal(window():GetHeight(), parent:GetHeight(), "no taller than the screen")
-  Assert.equal(window().resizeButton.maxWidth, parent:GetWidth())
+  Assert.equal(window().resizeGrip.ghost.resizeBounds[3], parent:GetWidth())
   Assert.equal(#rows(), 2)
   -- Even a frame taller than the screen (the client does not guarantee the clamp) rows only
   -- the leads there are.
@@ -476,7 +471,7 @@ return function()
   testWheel()
   testVisibleLatestAndScroll()
   testReopenResetsSelection()
-  testResizeButton()
+  testResizeGrip()
   testSavedFrameAndOpacity()
   testCorruptedSavedLeads()
   testHugeSavedSize()

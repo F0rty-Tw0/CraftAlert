@@ -367,12 +367,21 @@ local function addFrameState(frame)
     self.moving = true
   end
 
-  function frame:StartSizing(corner)
-    self.sizing = corner
+  function frame:StartSizing(corner, useCursor)
+    self.sizing, self.sizingUsesCursor = corner, useCursor
   end
 
   function frame:StopMovingOrSizing()
-    self.moving, self.sizing = false, nil
+    self.moving, self.sizing, self.sizingUsesCursor = false, nil, nil
+  end
+
+  -- Screen coordinates the test sets (frame.left / frame.top); 0 when it never did.
+  function frame:GetLeft()
+    return self.left or 0
+  end
+
+  function frame:GetTop()
+    return self.top or 0
   end
 
   function frame:GetName()
