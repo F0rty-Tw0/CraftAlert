@@ -124,6 +124,74 @@ local function closeMidRead()
   return state, db, Slicer, calls
 end
 
+-- The expansion line (spec crafters-filters Design 1): a parented, non-zero ProfessionInfo
+-- stores `professionID` as `line`; a bare or unloaded answer stores none and keeps a stored one.
+local function lineCases()
+  local lined = { professionID = 2918, parentProfessionID = BS }
+  local state, _, db, run, Slicer = setup()
+  state.recipes = {
+    belt(1, 100, { profession = lined }),
+    belt(2, 200, { profession = { professionID = 2918 } }),
+    belt(3, 300, { profession = { professionID = 0, parentProfessionID = BS } }),
+    belt(4, 400),
+  }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Slicer.Drain()
+  Wow.runTimers()
+  Assert.same(recipesOf(db)[1], { item = 100, name = "Belt 1", prof = BS, line = 2918 })
+  Assert.equal(recipesOf(db)[2].line, nil, "a bare answer gives no line")
+  Assert.equal(recipesOf(db)[3].line, nil, "an unloaded (0) line gives none")
+  Assert.equal(recipesOf(db)[4].line, nil, "no answer gives none")
+  Assert.same(run.reasons, { "read" })
+
+  -- A re-read with no line keeps the stored one, and changes nothing.
+  state.recipes[1].profession = { professionID = 2918 }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Slicer.Drain()
+  Wow.runTimers()
+  Assert.equal(recipesOf(db)[1].line, 2918, "a lineless re-read keeps the line")
+  Assert.same(run.reasons, { "read" }, "an unchanged re-read requests no rebuild")
+
+  -- Even when the same read changes another field, the stored line stays.
+  state.recipes[1].name = "Belt one"
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Slicer.Drain()
+  Wow.runTimers()
+  Assert.same(recipesOf(db)[1], { item = 100, name = "Belt one", prof = BS, line = 2918 })
+  Assert.same(run.reasons, { "read", "read" })
+
+  -- A re-read with a new line replaces it and reports the change.
+  state.recipes[1].profession = { professionID = 2950, parentProfessionID = BS }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Slicer.Drain()
+  Wow.runTimers()
+  Assert.equal(recipesOf(db)[1].line, 2950)
+  Assert.same(run.reasons, { "read", "read", "read" }, "a changed line counts as a change")
+
+  -- The learn path (window closed) stores the line too.
+  local ModernReader
+  state, ModernReader, db = setup()
+  state.recipes = { belt(1, 100, { learned = false, profession = lined }) }
+  Assert.equal(ModernReader.ReadOne(1, BS), true)
+  Assert.equal(recipesOf(db)[1].line, 2918)
+
+  -- The line costs no lookup: N recipes → N in phase 1 (storeKey) and N in phase 2 (foreign drop).
+  local Slicer2
+  state, _, db, _, Slicer2 = setup()
+  local api, lookups = _G["C_TradeSkillUI"], 0
+  ---@type fun(id: number): table|nil
+  local getProfession = api.GetProfessionInfoByRecipeID
+  rawset(api, "GetProfessionInfoByRecipeID", function(id)
+    lookups = lookups + 1
+    return getProfession(id)
+  end)
+  state.recipes = { belt(1, 100, { profession = lined }), belt(2, 200, { profession = lined }), belt(3, 300, { profession = lined }) }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Slicer2.Drain()
+  Assert.equal(lookups, 6, "2N profession lookups")
+  Assert.equal(recipesOf(db)[3].line, 2918)
+end
+
 local function jobCases()
   -- Close mid-read keeps what was stored and marks nothing read; reopening resumes at the cursor.
   local _, db, Slicer, calls = closeMidRead()
@@ -531,5 +599,6 @@ return function()
   Slicer.Drain()
   Assert.truthy(recipesOf(db)[2])
 
+  lineCases()
   jobCases()
 end

@@ -105,14 +105,28 @@ local function usableInfo(api, recipeID, requireLearned)
   return info
 end
 
--- → { item, ranks, name } of a usable recipe (usableInfo).
-local function readFields(api, recipeID, info)
-  local schematic = api.GetRecipeSchematic(recipeID, false)
-  -- Blizzard's spelling: the greeting names the recipe with it; Index lowercases for matching.
-  return { item = schematic and schematic.outputItemID, ranks = copyList(info.qualityItemIDs), name = info.name }
+-- The expansion's skill line of a recipe: the ProfessionInfo's own professionID, only when it
+-- names a child of a profession (non-zero parent) and is loaded (non-zero). A bare or unloaded
+-- answer gives nil.
+local function lineOf(profInfo)
+  local parent = profInfo and profInfo.parentProfessionID
+  local line = profInfo and profInfo.professionID
+  if type(parent) == "number" and parent ~= 0 and type(line) == "number" and line ~= 0 then
+    return line
+  end
+  return nil
 end
 
--- Adds the recipe or updates it in place (mute and bind survive) → whether storage changed.
+-- → { item, ranks, name, line } of a usable recipe (usableInfo); `profInfo` is its
+-- GetProfessionInfoByRecipeID answer, nil when there was none.
+local function readFields(api, recipeID, info, profInfo)
+  local schematic = api.GetRecipeSchematic(recipeID, false)
+  -- Blizzard's spelling: the greeting names the recipe with it; Index lowercases for matching.
+  return { item = schematic and schematic.outputItemID, ranks = copyList(info.qualityItemIDs), name = info.name, line = lineOf(profInfo) }
+end
+
+-- Adds the recipe or updates it in place (mute and bind survive; a read with no line keeps the
+-- stored one) → whether storage changed.
 local function merge(recipes, recipeID, fields, professionKey)
   local old = recipes[recipeID]
   if old == nil then
@@ -120,12 +134,18 @@ local function merge(recipes, recipeID, fields, professionKey)
     recipes[recipeID] = fields
     return true
   end
-  local changed = old.item ~= fields.item or old.name ~= fields.name or old.prof ~= professionKey or not sameList(old.ranks, fields.ranks)
+  local lineChanged = fields.line ~= nil and old.line ~= fields.line
+  local changed = old.item ~= fields.item
+    or old.name ~= fields.name
+    or old.prof ~= professionKey
+    or not sameList(old.ranks, fields.ranks)
+    or lineChanged
   if changed then
     if old.item ~= fields.item then
       old.bind = nil
     end
     old.item, old.name, old.prof, old.ranks = fields.item, fields.name, professionKey, fields.ranks
+    old.line = fields.line or old.line
   end
   return changed
 end
@@ -171,21 +191,22 @@ end
 -- with no profession info (nil, or 0 before the data loads) belongs to the window, and so
 -- does one answered with a bare skill line the character does not store: like the foreign-drop phase,
 -- only a parented answer proves another profession.
--- → the key to store under (nil: skip), and whether the recipe's own lookup named the window.
+-- → the key to store under (nil: skip), whether the recipe's own lookup named the window, and
+-- that lookup's answer (the expansion line is read from it: no second call).
 local function storeKey(charKey, recipeID, key)
   local info = professionInfo(recipeID)
   local parent = info and info.parentProfessionID
   local own = parent or (info and info.professionID)
   if own == key then
-    return key, true
+    return key, true, info
   end
   if own == nil or own == 0 then
-    return key, false
+    return key, false, info
   end
   if ProfessionList.IsStored(db, charKey, own) then
-    return own, false
+    return own, false, info
   end
-  return parent == nil and key or nil, false
+  return parent == nil and key or nil, false, info
 end
 
 local OPS = {
@@ -317,7 +338,8 @@ function ModernReader.ReadOne(recipeID, professionKey)
   if info == nil then
     return false
   end
-  local changed = store(db.characters[PlayerName.Own()].recipes, recipeID, readFields(api, recipeID, info), professionKey)
+  local fields = readFields(api, recipeID, info, professionInfo(recipeID))
+  local changed = store(db.characters[PlayerName.Own()].recipes, recipeID, fields, professionKey)
   if changed then
     Index.RequestRebuild("learn")
   end
