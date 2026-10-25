@@ -20,7 +20,8 @@ local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.Settings
 -- lead's details on the right; the mouse wheel over the view scrolls the list. ESC closes it
 -- (UISpecialFrames, the one sanctioned insert). Ages and rows refresh on open and on each lead
 -- change, never on a ticker. Native-HUD spec §7.1: a gear swaps the view for the settings pane in
--- the same content frame. Movable and resizable: one position and one size
+-- the same content frame; when another host attaches the pane, the window falls back to the list.
+-- Movable and resizable: one position and one size
 -- (CraftAlertDB.ui.window), shared by both modes. The mode is never saved: every open is the list,
 -- at the top with the newest lead selected, except /ca config.
 local LeadsWindow = {}
@@ -35,6 +36,7 @@ SIZE.minWidth, SIZE.minHeight = LAYOUT.WINDOW_MIN_WIDTH, LAYOUT.WINDOW_MIN_HEIGH
 
 ---@type table
 local router = nil -- fn() -> true when it handled the toggle (WhisperMessenger's panel), else nil
+local settingsRouter = nil -- the same for /ca config
 ---@type table
 local window = nil -- { frame, view, mode = "list" | "settings" }, nil until the first open
 
@@ -122,9 +124,9 @@ local function onClose(closeButton)
   return false
 end
 
-local function enterList()
+-- The list's look, without touching the pane: also the fallback when another host takes the pane.
+local function showList()
   local frame = window.frame
-  SettingsPane.Hide()
   window.view.frame:Show()
   frame:SetTitle(Localization.Text("Craft Alert — Leads"))
   SettingsGear.Paint(frame.gear, false)
@@ -132,12 +134,18 @@ local function enterList()
   LeadsWindow.Refresh()
 end
 
+local function enterList()
+  SettingsPane.Hide()
+  showList()
+end
+
 local function enterSettings()
   local frame = window.frame
   window.mode = "settings"
   LeadsView.Clear(window.view)
   window.view.frame:Hide()
-  SettingsPane.Build(frame.content, enterList)
+  SettingsPane.Attach(frame.content, enterList, showList)
+  SettingsPane.SetNavWidth(LAYOUT.LIST_WIDTH)
   SettingsPane.Show()
   frame:SetTitle(Localization.Text("Craft Alert — Settings"))
   SettingsGear.Paint(frame.gear, true)
@@ -178,6 +186,12 @@ function LeadsWindow.SetRouter(fn)
   router = fn
 end
 
+-- `fn()` runs first in every ToggleSettings (/ca config), after the instance check; true = handled.
+-- nil clears it.
+function LeadsWindow.SetSettingsRouter(fn)
+  settingsRouter = fn
+end
+
 -- Opens the window on the list, at the top with the newest lead selected (every row and the
 -- details count as shown from now), or closes it in either mode. X and Esc only hide: a window
 -- closed in Settings comes back on the list here. Silent no-op in an instance.
@@ -205,9 +219,12 @@ end
 
 -- /ca config: opens the window on the settings pane (from the list too), or closes it when the
 -- pane shows. Reopened, the pane shows the page last shown, read again from the db. Silent no-op
--- in an instance.
+-- in an instance. The settings router (WhisperMessenger's panel) goes first, as in Toggle.
 function LeadsWindow.ToggleSettings()
   if FlavorCompat.InInstance() then
+    return
+  end
+  if settingsRouter and settingsRouter() then
     return
   end
   window = window or create()

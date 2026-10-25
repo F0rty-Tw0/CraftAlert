@@ -198,15 +198,18 @@ local function testRowFields()
   Assert.equal(shown[2].what:GetText(), "Blacksmithing")
   Assert.same({ shown[1].greetedIcon:IsShown(), shown[1].repliedTag:IsShown() }, { false, false })
   Assert.same({ shown[2].greetedIcon:IsShown(), shown[2].repliedTag:IsShown() }, { true, true })
-  -- The realm warning is the details header's, not the row's.
+  -- No realm warning on the row; the details header's line 1 follows the selected lead.
   Assert.equal(shown[1].realm, nil)
   local details = view().details
   Assert.equal(details.lead.customer, "Bob-Draenor")
-  Assert.truthy(string.find(details.status:GetText(), "can't order (realm)", 1, true), details.status:GetText())
+  Assert.truthy(string.find(details.lineOne:GetText(), "New lead", 1, true), details.lineOne:GetText())
+  -- The cross-realm lead's details show the Realm row; the other lead's don't.
+  local realmLabel, realm = details.sections.labels.realm, details.sections.lines.realm[1]
+  Assert.same({ realmLabel:IsShown(), realm:IsShown(), realm:GetText() }, { true, true, "Can't send an order (other realm)" })
   Widgets.click(shown[2], "LeftButton")
-  local status = details.status:GetText()
-  Assert.truthy(string.find(status, "Greeted", 1, true) and string.find(status, "Replied", 1, true), status)
-  Assert.falsy(string.find(status, "(realm)", 1, true), status)
+  local status = details.lineOne:GetText()
+  Assert.truthy(string.find(status, "Greeted, replied", 1, true), status)
+  Assert.same({ realmLabel:IsShown(), realm:IsShown() }, { false, false })
   -- Ages are refreshed on each refresh (window open or lead event), never by a ticker.
   Wow.clock.time = UiFixture.T0 + 60
   ns.LeadsWindow.Refresh()

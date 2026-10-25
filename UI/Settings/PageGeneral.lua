@@ -8,12 +8,13 @@ local Constants = ns.Constants or require("CraftAlert.Core.Constants")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
+local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
 -- Spec §9 General: enable, only where Trade chat exists, channels, profession-word alerts,
--- include unbound items, recipe markers. Enable and "Only where Trade chat exists" (saved as
--- onlyResting) re-evaluate the scan gate
--- (§6.1); channels, profession-word alerts and unbound items rebuild the index (§6.2), and a
+-- recipe markers (unbound items are on the Crafters page). Enable and "Only where Trade chat
+-- exists" (saved as onlyResting) re-evaluate the scan gate
+-- (§6.1); channels and profession-word alerts rebuild the index (§6.2), and a
 -- channel also re-evaluates the gate, which owns the registered chat events. A channel the
 -- flavor does not have is not shown (§6.1).
 local PageGeneral = { id = "general", title = Localization.Text("General") }
@@ -54,7 +55,7 @@ end
 local function nothing() end
 
 function PageGeneral.Create(parent)
-  local column = Controls.Column(parent)
+  local column = Controls.Column(parent, Theme.LAYOUT.PAGE_PADDING)
   local add, refresh = Controls.Refresher()
   local function toggle(label, owner, key, after)
     add(Controls.BoundToggle(column, Localization.Text(label), owner, key, after))
@@ -71,7 +72,6 @@ function PageGeneral.Create(parent)
   end
   Controls.Section(column, Localization.Text("Matching"))
   toggle("Profession-word alerts", settings, "professionWordAlerts", rebuild("professionWordAlerts"))
-  toggle("Include unbound items", settings, "includeUnbound", rebuild("includeUnbound"))
   toggle("Bell markers on recipe rows", settings, "recipeMarkers", nothing)
   return { Refresh = refresh }
 end

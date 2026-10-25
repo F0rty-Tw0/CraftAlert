@@ -5,6 +5,7 @@
 --   SettingsFixture.open(ns, "Alerts")                     -- opens the window on that page
 --   SettingsFixture.row("Lead timeout").input              -- the shown control with that label
 --   SettingsFixture.take(refreshes)                        -- what was triggered since last take
+--   SettingsFixture.pageBar(box)                           -- the scroll bar of a page's box
 local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
@@ -106,6 +107,16 @@ function SettingsFixture.button(parent, label)
     end
   end
   error("no visible button " .. label)
+end
+
+-- The scroll bar of the page whose box is `box` (UI/ScrollView.lua puts it on the box).
+function SettingsFixture.pageBar(box)
+  for _, frame in ipairs(Wow.frames) do
+    if frame.frameType == "Slider" and frame.parent == box then
+      return frame
+    end
+  end
+  error("no scroll bar on the page's box")
 end
 
 -- The shown texts of the window's visible frames (so of the selected page), joined by " / ".

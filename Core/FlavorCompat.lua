@@ -88,6 +88,11 @@ function FlavorCompat.GetItemInfo(itemId)
   return callPreferred("C_Item", "GetItemInfo", itemId)
 end
 
+-- r, g, b, hex of an item quality (0 poor .. 8), or nil when the client has neither call.
+function FlavorCompat.GetItemQualityColor(quality)
+  return callPreferred("C_Item", "GetItemQualityColor", quality)
+end
+
 function FlavorCompat.GetSpellTexture(spellId)
   return callPreferred("C_Spell", "GetSpellTexture", spellId)
 end

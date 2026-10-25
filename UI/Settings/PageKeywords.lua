@@ -6,6 +6,7 @@ end
 local Constants = ns.Constants or require("CraftAlert.Core.Constants")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Index = ns.Index or require("CraftAlert.Model.Index")
+local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
 -- Spec §9 Keywords: intent words, blocker words and extra slang (word → slot/type). Every
@@ -99,7 +100,7 @@ local function slangInput(column, add)
 end
 
 function PageKeywords.Create(parent)
-  local column = Controls.Column(parent)
+  local column = Controls.Column(parent, Theme.LAYOUT.PAGE_PADDING)
   local add, refresh = Controls.Refresher()
   Controls.Section(column, Localization.Text("Request words"))
   wordsInput(column, add, "Intent words", "intentWords", Constants.intentWords)

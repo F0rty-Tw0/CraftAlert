@@ -4,7 +4,11 @@ local Widgets = require("tests.helpers.widgets")
 local Fixture = require("tests.helpers.matcher_fixture")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 
+local CraftersFixture = require("tests.helpers.crafters_fixture")
+
 local open, row, take, texts = SettingsFixture.open, SettingsFixture.row, SettingsFixture.take, SettingsFixture.texts
+local BS, ENCH, crafters, rowOf, iconOf =
+  CraftersFixture.BS, CraftersFixture.ENCH, CraftersFixture.crafters, CraftersFixture.rowOf, CraftersFixture.iconOf
 
 -- §6.2: keyword changes rebuild the index (the hot path reads copies).
 local function testKeywordsPage()
@@ -55,44 +59,6 @@ local function testKeywordsPage()
   Assert.equal(slangCount, 60)
 end
 
-local BS, ENCH = 164, 333
-
-local function crafters(accountDb)
-  accountDb.characters["Me-Realm"] = {
-    source = "local",
-    enabled = true,
-    realms = { "Realm" },
-    professions = { [BS] = { name = "Blacksmithing", primary = false, read = true }, [ENCH] = { name = "Enchanting", primary = false, read = true } },
-    recipes = {
-      [9001] = { item = 501, name = "Thick Plate Belt", prof = BS },
-      [9002] = { item = 502, name = "Plate Greaves", prof = BS },
-      [9003] = { name = "Enchant Bracer - Health", prof = ENCH },
-    },
-  }
-  accountDb.characters["Alt-Realm"] = {
-    source = "local",
-    enabled = true,
-    realms = { "Realm" },
-    professions = { [BS] = { name = "Blacksmithing", primary = true, read = true } },
-    recipes = { [9001] = { item = 501, name = "Thick Plate Belt", prof = BS } },
-  }
-  accountDb.characters["Far-Away"] = { source = "import", importedAt = 1, enabled = true, realms = {}, professions = {}, recipes = {} }
-end
-
--- The visible recipe row showing recipe `key`.
-local function rowOf(key)
-  for _, frame in ipairs(Wow.frames) do
-    if frame.icon and frame.item and frame.item.key == key and SettingsFixture.visible(frame) then
-      return frame
-    end
-  end
-  error("no visible recipe row " .. tostring(key))
-end
-
-local function iconOf(key)
-  return rowOf(key).icon
-end
-
 -- §6.2: crafter enable/disable, removal and mute rebuild the index; the primary crafter is
 -- read when a lead picks its crafter (§6.3 step 5), so it rebuilds nothing.
 local function testCraftersPage()
@@ -123,20 +89,33 @@ local function testCraftersPage()
   Widgets.click(row("Main crafter for this profession").input)
   Assert.same(take(refreshes), {})
 
-  -- Recipes of that profession by name, with search; mute toggles the icon and rebuilds.
+  -- Recipes of that profession by name, with search; the mute icon toggles and rebuilds.
   local shown = texts()
-  Assert.truthy(shown:find("Plate Greaves / Mute / Thick Plate Belt / Mute", 1, true), shown)
+  Assert.truthy(shown:find("Plate Greaves / Thick Plate Belt", 1, true), shown)
   Assert.falsy(shown:find("Enchant Bracer", 1, true))
-  Widgets.type(row("Search recipes").input, "BELT")
+  local recipe = rowOf(9002)
+  local nameEnd = { "RIGHT", recipe.mute, "LEFT", -ns.Theme.LAYOUT.PADDING, 0 }
+  Assert.same(recipe.name.points[2], nameEnd, "a long name stops short of the mute icon on a narrow page")
+  local search = row("Search recipes").input
+  Assert.same({ search.template, search.Instructions:GetText() }, { "SearchBoxTemplate", "Search recipes" }, "the native search box")
+  Widgets.type(search, "BELT")
   Assert.falsy(texts():find("Plate Greaves", 1, true))
-  Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Mute"))
+  -- The speaker, swapped for the crossed-out speaker while muted (one texture, never greyed).
+  local mute = rowOf(9001).mute
+  Assert.same({ #mute.regions, mute.icon.atlas, mute.icon.desaturated }, { 1, "voicechat-icon-speaker", false }, "not muted: the speaker")
+  Widgets.click(mute)
   Assert.equal(me.recipes[9001].muted, true)
   Assert.same(take(refreshes), { "rebuild:mute" })
-  Assert.truthy(texts():find("Thick Plate Belt / Unmute", 1, true))
+  mute = rowOf(9001).mute
+  Assert.same({ mute.icon.atlas, mute.icon.desaturated }, { "voicechat-icon-speaker-mute", false }, "muted: the crossed-out speaker")
   Assert.equal(iconOf(9001).desaturated, true, "a muted recipe's icon is grey")
-  Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Unmute"))
+  Widgets.click(mute)
   Assert.equal(me.recipes[9001].muted, nil)
+  Assert.equal(mute.icon.atlas, "voicechat-icon-speaker")
   Assert.equal(iconOf(9001).desaturated, false)
+  -- The clear button empties the search and lists every recipe again.
+  Widgets.fire(search.clearButton, "OnClick")
+  Assert.truthy(texts():find("Plate Greaves / Thick Plate Belt", 1, true), texts())
   Assert.same(take(refreshes), { "rebuild:mute" })
   Widgets.pick(row("Profession").input, ENCH)
   Assert.truthy(texts():find("Enchant Bracer - Health", 1, true), "the search clears with the profession")
@@ -188,6 +167,30 @@ local function testCraftersRecipeOrder()
   Assert.same(shownRecipeKeys(), { 9, 10, "1x", "25y", 9003, 9004, 9002, 9001 })
 end
 
+-- Unmuted recipes first, then muted ones, then unbound ones (they never alert, muted or not), each
+-- group by name. A speaker click repaints in place; the next refresh moves the row to its group.
+local function testCraftersRecipeGroups()
+  local ns = SettingsFixture.load({
+    db = function(accountDb)
+      crafters(accountDb)
+      accountDb.characters["Me-Realm"].recipes = {
+        [9001] = { name = "A Bar", prof = BS, bind = 0 },
+        [9002] = { name = "B Belt", prof = BS, muted = true },
+        [9003] = { name = "C Belt", prof = BS },
+        [9004] = { name = "D Flask", prof = BS, bind = 0, muted = true },
+        [9005] = { name = "E Belt", prof = BS },
+      }
+    end,
+  })
+  open(ns, "Crafters")
+  Assert.same(shownRecipeKeys(), { 9003, 9005, 9002, 9001, 9004 }, "unmuted, muted, unbound")
+  Widgets.click(rowOf(9003).mute)
+  Assert.same(shownRecipeKeys(), { 9003, 9005, 9002, 9001, 9004 }, "a speaker click keeps the order")
+  -- Every name holds a space: a search that lists them all, as a refresh.
+  Widgets.type(row("Search recipes").input, " ")
+  Assert.same(shownRecipeKeys(), { 9005, 9002, 9003, 9001, 9004 }, "the next refresh regroups")
+end
+
 -- Recipe rows show the crafted item's icon, else the recipe spell's (number keys), else the
 -- addon icon (a name key from Classic has neither); a muted row is grey and dim.
 local function testCraftersRecipeIcons()
@@ -220,63 +223,60 @@ local function testCraftersRecipeIcons()
   Assert.equal(iconOf(9001).desaturated, true, "muted: grey")
   Assert.equal(iconOf(9001).alpha, ns.Theme.DIM_ALPHA, "muted: dim")
   Assert.equal(iconOf(9001).texture, "item-icon", "muted keeps its icon")
+  Assert.same(rowOf(9001).name.textColor, { 1, 1, 1, ns.Theme.DIM_ALPHA }, "no C_Item: white, dim while muted")
+  Assert.same(rowOf(9002).name.textColor, { 1, 1, 1, 1 }, "no C_Item: white")
 end
 
-local function mutedNames(character)
-  local names = {}
-  for _, recipe in pairs(character.recipes) do
-    if recipe.muted then
-      names[#names + 1] = recipe.name
+-- The recipe list's own scroll bar: hidden and the wheel left to the page while the recipes fit;
+-- shown over the rows the list cannot show, the wheel taken, when they do not. A drag pages the
+-- rows to the nearest whole recipe; the rows end 5 px short of the bar, shown or not.
+local function testCraftersRecipeBar()
+  local ns = SettingsFixture.load({ db = crafters })
+  open(ns, "Crafters")
+  local list = rowOf(9001).parent
+  local bar
+  for _, frame in ipairs(Wow.frames) do
+    if frame.frameType == "Slider" and frame.parent == list then
+      bar = frame
     end
   end
-  table.sort(names)
-  return names
-end
+  Assert.truthy(bar, "the list has its bar")
+  Assert.same(bar.points, { { "TOPRIGHT", list, "TOPRIGHT", 0, 0 }, { "BOTTOMRIGHT", list, "BOTTOMRIGHT", 0, 0 } })
+  Assert.equal(bar:IsShown(), false, "two recipes fit: no bar")
+  Assert.equal(list.mouseWheelEnabled, false, "the wheel falls through to the page")
+  local right = rowOf(9001).points[2]
+  Assert.same({ right[1], right[2], right[3], right[4] }, { "TOPRIGHT", list, "TOPRIGHT", -(bar:GetWidth() + 5) })
 
--- Mute all / Unmute all act on the recipes the search leaves in the list, rebuild the index once,
--- and rebuild nothing when no recipe changes.
-local function testCraftersMuteAll()
-  local ns, db, refreshes = SettingsFixture.load({
+  ns = SettingsFixture.load({
     db = function(accountDb)
       crafters(accountDb)
-      accountDb.characters["Me-Realm"].recipes = {
-        [9001] = { item = 501, name = "Alpha Plate", prof = BS },
-        [9002] = { item = 502, name = "Beta Plate", prof = BS },
-        [9003] = { item = 503, name = "Gamma Sword", prof = BS },
-        [9004] = { name = "Enchant Plate", prof = ENCH },
-      }
+      local recipes = {}
+      for id = 1, 11 do
+        recipes[9200 + id] = { name = string.format("R %02d", id), prof = BS }
+      end
+      accountDb.characters["Me-Realm"].recipes = recipes
     end,
   })
-  local me = db.characters["Me-Realm"]
   open(ns, "Crafters")
-  take(refreshes)
-  local window = SettingsFixture.window()
-  local function press(label)
-    Widgets.click(SettingsFixture.button(window, label))
+  list = rowOf(9201).parent
+  for _, frame in ipairs(Wow.frames) do
+    if frame.frameType == "Slider" and frame.parent == list then
+      bar = frame
+    end
   end
-
-  press("Unmute all")
-  Assert.same(take(refreshes), {}, "nothing muted: nothing to rebuild")
-  Widgets.type(row("Search recipes").input, "plate")
-  press("Mute all")
-  Assert.same(mutedNames(me), { "Alpha Plate", "Beta Plate" }, "only the listed recipes")
-  Assert.same(take(refreshes), { "rebuild:mute" }, "one request for both")
-  Assert.equal(iconOf(9001).desaturated, true, "the list repaints")
-  press("Mute all")
-  Assert.same(take(refreshes), {}, "all muted already")
-  Widgets.type(row("Search recipes").input, "beta")
-  press("Unmute all")
-  Assert.same(mutedNames(me), { "Alpha Plate" }, "only the listed recipe")
-  Assert.same(take(refreshes), { "rebuild:mute" })
-  Widgets.type(row("Search recipes").input, "")
-  press("Unmute all")
-  Assert.same(mutedNames(me), {})
-  Assert.equal(me.recipes[9001].muted, nil, "unmuted recipes keep no muted field")
-  Assert.same(take(refreshes), { "rebuild:mute" })
-  Widgets.type(row("Search recipes").input, "zzz")
-  press("Mute all")
-  Assert.same(mutedNames(me), {}, "an empty list mutes nothing")
-  Assert.same(take(refreshes), {})
+  Assert.equal(bar:IsShown(), true, "11 recipes, 8 rows: the bar shows")
+  Assert.same({ bar:GetMinMaxValues() }, { 0, 3 })
+  Assert.equal(list.mouseWheelEnabled, true)
+  bar:SetValue(2.6)
+  Assert.equal(shownRecipeKeys()[1], 9204, "a drag to 2.6 shows from the 4th recipe")
+  Assert.equal(bar:GetValue(), 3, "the bar settles on the row")
+  Widgets.fire(list, "OnMouseWheel", 1)
+  Assert.equal(shownRecipeKeys()[1], 9203)
+  Assert.equal(bar:GetValue(), 2, "the bar follows the wheel")
+  Widgets.type(row("Search recipes").input, "R 1")
+  Assert.same(shownRecipeKeys(), { 9210, 9211 }, "a search that fits shows from the top")
+  Assert.equal(bar:IsShown(), false, "the list fits again: no bar")
+  Assert.equal(list.mouseWheelEnabled, false)
 end
 
 -- A tooltip hidden by the client (no OnLeave) while a row is hovered comes back when the scroll
@@ -333,7 +333,8 @@ local function testCraftersRecipeTooltip()
       accountDb.characters["Zed-Other"] = accountDb.characters["Alt-Other"]
       local recipes = {
         [9001] = { item = 501, name = "A Belt", prof = BS },
-        [9002] = { name = "B Bracer", prof = BS, muted = true },
+        -- Muted once the list is sorted (below), so it keeps its place between A and C.
+        [9002] = { name = "B Bracer", prof = BS },
         ["Old Recipe"] = { name = "C Old Recipe", prof = BS },
       }
       for id = 1, 8 do
@@ -345,6 +346,7 @@ local function testCraftersRecipeTooltip()
   open(ns, "Crafters")
   local tooltip = ns.Tooltip.Get()
   local itemRow, mutedRow = rowOf(9001), rowOf(9002)
+  db.characters["Me-Realm"].recipes[9002].muted = true
 
   Widgets.fire(itemRow, "OnEnter")
   Assert.equal(tooltip.owner, itemRow)
@@ -527,9 +529,10 @@ end
 return function()
   testKeywordsPage()
   testCraftersPage()
-  testCraftersMuteAll()
   testCraftersRecipeOrder()
+  testCraftersRecipeGroups()
   testCraftersRecipeIcons()
+  testCraftersRecipeBar()
   testCraftersRecipeTooltip()
   testCraftersRecipeHoverAfterHide()
   testRecipeTooltipNameKey()
