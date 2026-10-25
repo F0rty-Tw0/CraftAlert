@@ -5,20 +5,27 @@ end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
 local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 local CardTipText = ns.CardTipText or require("CraftAlert.UI.CardTipText")
+local RowArt = ns.RowArt or require("CraftAlert.UI.RowArt")
 
 -- Spec A.3: one 48 px row of the leads list pane, WhisperMessenger's contact-row layout
 -- (UI/ContactsList/RowView.lua:67-118, WM). The item or profession icon, the customer in class
 -- colour with the age on its right, and below what was requested, then the greeted check and the
--- replied tag at the bottom right. No link hover; one tooltip, the latest chat line while the
--- cursor is on the row (row-chat-tooltip spec). The details pane has the other tooltips.
--- Left click selects the row (onSelect), right click dismisses through ClickRouter with the look
--- rule. The row carries its lead and the GetTime() at which that lead appeared in it (§7.5 rule 3).
+-- replied tag at the bottom right. The icon is round (RowArt, spec D5) and carries a status dot, as
+-- WM's contacts: gold for an unseen, ungreeted lead (spec B, the badge's rule), else the details
+-- header's state colour (LeadText.State). The texts, the selected overlay and the
+-- hover's fade are WM's too (spec D1-D9); the hover never shows over the selected row. On WM's
+-- rail the row is compact (spec 6a): only the icon, centred. No link hover; one tooltip while the
+-- cursor is on the row: the latest chat line (row-chat-tooltip spec), or when compact the
+-- customer, the request and that line. The details pane has the other tooltips. Left click selects
+-- the row (onSelect), right click dismisses through ClickRouter with the look rule. The row
+-- carries its lead and the GetTime() at which that lead appeared in it (§7.5 rule 3).
 local LeadRow = {}
 
 local select = select
@@ -26,37 +33,58 @@ local tostring = tostring
 local type = type
 
 -- WM's row numbers: EDGE from the row's sides, ICON_GAP after the icon, MARK_GAP between the marks
--- and before the second line's end.
-local EDGE, ICON_GAP, MARK_GAP = 6, 10, 4
+-- and before the second line's end, NAME_GAP between the name and the age.
+local EDGE, ICON_GAP, MARK_GAP, NAME_GAP = 6, 10, 4, 2
 local ANCHOR = "ANCHOR_RIGHT"
+-- A customer of unknown class: white on the row (spec D6), as a RAID_CLASS_COLORS entry.
+local NO_CLASS = { r = 1, g = 1, b = 1 }
 
 local function now()
   return _G["GetTime"]()
 end
 
--- Only a tooltip the row shows: one another frame owns is never hidden or rewritten.
+-- Whether the row shows the tooltip: one another frame owns is never rewritten (nor hidden:
+-- Tooltip.HideIfOwned).
 local function ownsTip(row)
   local tip = Tooltip.Get()
   return tip:IsShown() and tip:IsOwned(row)
 end
 
-local function hideChat(row)
-  if ownsTip(row) then
-    Tooltip.Get():Hide()
-  end
-end
-
--- The row's lead's latest chat line; a lead without a message shows none.
+-- The row's lead's latest chat line; a full row's lead without a message shows none. A compact row
+-- shows its tooltip either way: it is the only place its text is.
 local function showChat(row)
   local lead = row.lead
-  if lead == nil or lead.message == nil then
-    hideChat(row)
+  if lead == nil or (lead.message == nil and not row.compact) then
+    Tooltip.HideIfOwned(row)
     return
   end
   local tip = Tooltip.Get()
   tip:SetOwner(row, ANCHOR)
-  CardTipText.Chat(tip, lead)
+  tip:SetMinimumWidth(Theme.LAYOUT.ROW_TIP_WIDTH)
+  if row.compact then
+    CardTipText.Compact(tip, lead)
+  else
+    CardTipText.Chat(tip, lead)
+  end
   tip:Show()
+end
+
+local function onEnter(row)
+  if not row.selected:IsShown() then
+    RowArt.Hover(row.hover, true)
+  end
+  showChat(row)
+end
+
+local function onLeave(row)
+  RowArt.Hover(row.hover, false)
+  Tooltip.HideIfOwned(row)
+end
+
+-- Hidden (cleared, the window closed): the row comes back without the hover of its last use.
+local function onHide(row)
+  RowArt.Hover(row.hover, false, true)
+  Tooltip.HideIfOwned(row)
 end
 
 local function onClick(row, button)
@@ -73,17 +101,6 @@ local function onShow(row)
   if row.lead then
     row.shownAt = now()
   end
-end
-
-local function createSelected(row)
-  local art = Theme.ART
-  local selected = row:CreateTexture(nil, "ARTWORK")
-  selected:SetAllPoints(row)
-  selected:SetTexture(art.LIST_SELECTED)
-  selected:SetBlendMode("ADD")
-  selected:SetAlpha(art.LIST_SELECTED_ALPHA)
-  selected:Hide()
-  return selected
 end
 
 local function createMarks(row)
@@ -104,24 +121,26 @@ function LeadRow.Create(parent, index, onSelect)
   local row = _G["CreateFrame"]("Button", nil, parent)
   row:SetHeight(layout.ROW_HEIGHT)
   row.isLeadRow, row.rowIndex, row.onSelect = true, index, onSelect
-  row.hover = FrameKit.ListHighlight(row)
-  row.selected = createSelected(row)
-  row.icon = row:CreateTexture(nil, "ARTWORK")
-  row.icon:SetSize(layout.LIST_ICON_SIZE, layout.LIST_ICON_SIZE)
-  row.icon:SetPoint("LEFT", row, "LEFT", EDGE, 0)
-  row.age = FrameKit.Text(row, fonts.detail, colors.textTimestamp)
-  row.age:SetPoint("TOPRIGHT", row, "TOPRIGHT", -EDGE, -4)
+  row.hover, row.selected = RowArt.Overlays(row)
+  row.iconFrame = RowArt.RoundIcon(row, layout.LIST_ICON_SIZE)
+  row.iconFrame:SetPoint("LEFT", row, "LEFT", EDGE, 0)
+  row.icon = row.iconFrame.texture
+  row.dot = RowArt.Dot(row, row.iconFrame)
+  -- WM puts the age's top 4 px above the name's (-6 from the row's top); anchored to the row, as
+  -- the name's RIGHT already anchors to the age.
+  row.age = FrameKit.Text(row, fonts.detail, colors.textSecondary)
+  row.age:SetPoint("TOPRIGHT", row, "TOPRIGHT", -EDGE, -2)
   row.name = FrameKit.Text(row, fonts.name)
-  row.name:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", ICON_GAP, -1)
-  row.name:SetPoint("RIGHT", row.age, "LEFT", -EDGE, 0)
-  row.what = FrameKit.Text(row, fonts.body)
+  row.name:SetPoint("TOPLEFT", row.iconFrame, "TOPRIGHT", ICON_GAP, 1)
+  row.name:SetPoint("RIGHT", row.age, "LEFT", -NAME_GAP, 0)
+  row.what = FrameKit.Text(row, fonts.detail, colors.textSecondary)
   row.greetedIcon, row.repliedTag = createMarks(row)
   row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   row:SetScript("OnClick", onClick)
   row:SetScript("OnShow", onShow)
-  row:SetScript("OnEnter", showChat)
-  row:SetScript("OnLeave", hideChat)
-  row:HookScript("OnHide", hideChat)
+  row:SetScript("OnEnter", onEnter)
+  row:SetScript("OnLeave", onLeave)
+  row:HookScript("OnHide", onHide)
   row:Hide()
   return row
 end
@@ -133,11 +152,11 @@ local function iconOf(lead)
 end
 
 -- The greeted check outermost, the replied tag left of it; the second line ends MARK_GAP short of
--- whichever marks show.
+-- whichever marks show. A compact row shows neither.
 local function placeMarks(row, lead)
   local tag = row.repliedTag
-  row.greetedIcon:SetShown(lead.greeted)
-  tag:SetShown(lead.replied)
+  row.greetedIcon:SetShown(lead.greeted and not row.compact)
+  tag:SetShown(lead.replied and not row.compact)
   tag:ClearAllPoints()
   if lead.greeted then
     tag:SetPoint("BOTTOMRIGHT", row.greetedIcon, "BOTTOMLEFT", -MARK_GAP, 0)
@@ -147,7 +166,7 @@ local function placeMarks(row, lead)
   local greetedWidth = lead.greeted and Theme.LAYOUT.ROW_ICON_SIZE + MARK_GAP or 0
   local marksWidth = greetedWidth + (lead.replied and tag:GetStringWidth() + MARK_GAP or 0)
   row.what:ClearAllPoints()
-  row.what:SetPoint("BOTTOMLEFT", row.icon, "BOTTOMRIGHT", ICON_GAP, 1)
+  row.what:SetPoint("BOTTOMLEFT", row.iconFrame, "BOTTOMRIGHT", ICON_GAP, -1)
   row.what:SetPoint("RIGHT", row, "RIGHT", -(EDGE + marksWidth), 0)
 end
 
@@ -159,8 +178,10 @@ function LeadRow.Show(row, lead)
   end
   row.lead = lead
   row.icon:SetTexture(iconOf(lead))
+  RowArt.PaintDot(row.dot, Leads.IsUnseen(lead) and Theme.COLORS.gold or select(2, LeadText.State(lead)))
   row.name:SetText(tostring(lead.customer))
-  FrameKit.PaintName(row.name, lead.guid)
+  local class = FrameKit.GuidClassColor(lead.guid) or NO_CLASS
+  row.name:SetTextColor(class.r, class.g, class.b, 1)
   row.age:SetText(LeadText.Age(_G["time"]() - lead.time))
   row.what:SetText(LeadText.What(lead))
   placeMarks(row, lead)
@@ -170,11 +191,42 @@ function LeadRow.Show(row, lead)
   end
 end
 
-function LeadRow.SetSelected(row, selected)
-  row.selected:SetShown(selected)
+-- Compact: only the icon, centred in the row; else the full row. Applies to the lead shown now and
+-- to the next ones.
+function LeadRow.SetCompact(row, compact)
+  row.compact = compact
+  row.iconFrame:ClearAllPoints()
+  if compact then
+    row.iconFrame:SetPoint("CENTER", row, "CENTER", 0, 0)
+  else
+    row.iconFrame:SetPoint("LEFT", row, "LEFT", EDGE, 0)
+  end
+  row.name:SetShown(not compact)
+  row.age:SetShown(not compact)
+  row.what:SetShown(not compact)
+  -- Without a lead the marks wait for Show, which places them.
+  if row.lead then
+    placeMarks(row, row.lead)
+  end
 end
 
--- Hiding the row hides its chat tooltip too (the OnHide hook).
+-- Called on every row at each list refresh, so the hover changes only with the selection: the
+-- click that selects a hovered row drops its hover at once; a row deselected under the cursor
+-- fades it back in. The second line's colour is set every time: Clear hides the selection alone.
+function LeadRow.SetSelected(row, selected)
+  if row.selected:IsShown() ~= selected then
+    row.selected:SetShown(selected)
+    if selected then
+      RowArt.Hover(row.hover, false, true)
+    elseif row:IsMouseOver() then
+      RowArt.Hover(row.hover, true)
+    end
+  end
+  local color = selected and Theme.COLORS.white or Theme.COLORS.textSecondary
+  row.what:SetTextColor(color[1], color[2], color[3], color[4])
+end
+
+-- Hiding the row hides its chat tooltip and its hover too (the OnHide hook).
 function LeadRow.Clear(row)
   row.lead, row.shownAt = nil, nil
   row.selected:Hide()

@@ -7,14 +7,18 @@ local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadDetails = ns.LeadDetails or require("CraftAlert.UI.LeadDetails")
 local LeadsList = ns.LeadsList or require("CraftAlert.UI.LeadsList")
+local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 
 -- Spec A.2, A.6, assumption 2: the leads split view, built into any parent frame (the leads
 -- window's content frame, or a WhisperMessenger panel host). The list pane (UI/LeadsList.lua) on
 -- the left, the details pane (UI/LeadDetails.lua) of the selected lead on the right, a 1 px
 -- divider between them. Each pane paints its atlas behind an InsetFrameTemplate art frame, as
 -- WhisperMessenger's panes do (RetailChrome.lua:56-58,70,85-88, WM). The selection follows the
--- lead by id across refreshes; the root frame takes the mouse wheel and scrolls the list.
+-- lead by id across refreshes; the root frame takes the mouse wheel and scrolls the list, as does
+-- a drag of the list's bar.
 local LeadsView = {}
+
+local floor = math.floor
 
 -- A pane: its atlas in a BACKGROUND texture, then the inset's border one level above. The inset's
 -- marble Bg would cover the atlas, so it hides when the atlas paints and stays when it cannot
@@ -65,11 +69,15 @@ local function pick(view, leads)
   return leads[positionOf(view.leads, id)] or leads[#leads]
 end
 
--- Re-reads `leads` (newest first) into the list and the details of the selected lead.
+-- Re-reads `leads` (newest first) into the list and the details of the selected lead, which is
+-- seen first (the badge's count drops, and its row paints without the unseen dot).
 function LeadsView.Refresh(view, leads)
   local selected = pick(view, leads)
   view.selectedId = selected and selected.id
   view.leads = leads
+  if selected then
+    Leads.MarkSeen(selected.id)
+  end
   LeadsList.Refresh(view.list, leads, LeadsList.Fit(view.getHeight()), view.selectedId)
   if selected then
     LeadDetails.Show(view.details, selected)
@@ -106,6 +114,9 @@ function LeadsView.New(parent, opts)
   view.list = LeadsList.New(view.listPane, function(row)
     view.selectedId = row.lead.id
     LeadsView.Refresh(view, view.leads)
+  end, function(value)
+    view.list.offset = floor(value + 0.5)
+    LeadsView.Refresh(view, view.leads)
   end)
   view.details = LeadDetails.New(view.detailsPane)
   view.details.frame:SetFrameLevel(view.detailsPane:GetFrameLevel() + 2)
@@ -113,10 +124,12 @@ function LeadsView.New(parent, opts)
   return view
 end
 
--- Re-reads the list width; the details get the rest of the parent (0 wide: not known yet).
+-- Re-reads the list width; the details get the rest of the parent (0 wide: not known yet). A list
+-- narrower than the minimum (WM's divider on its rail) is icon-only.
 function LeadsView.Layout(view)
   local listWidth = view.getListWidth()
   view.listPane:SetWidth(listWidth)
+  LeadsList.SetCompact(view.list, listWidth < Theme.LAYOUT.LIST_MIN_WIDTH)
   LeadDetails.Layout(view.details, view.parent:GetWidth() - listWidth - 1)
 end
 

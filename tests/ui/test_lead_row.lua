@@ -11,6 +11,8 @@ local LINK_TEXT = "|cffffffff|Hitem:4305|h[Bolt of Silk]|h|r"
 local WARRIOR = { r = 0.78, g = 0.61, b = 0.43 }
 -- WM's row numbers: 6 px edges, 10 px after the icon, 4 px between the marks.
 local EDGE, MARK_GAP, MARK_SIZE = 6, 4, 14
+-- WM's text_secondary (spec D8, D9) and the selected second line's white.
+local MUTED, WHITE = { 1, 1, 1, 0.55 }, { 1, 1, 1, 1 }
 
 -- The fixture with one lead (id 1, Bob-Draenor, 30 s old) and a fresh row built over it, as the
 -- list builds it. → ns, the row, the sends, the lead, what onSelect got ({ row } per call).
@@ -50,15 +52,18 @@ local function testGeometry()
   ns.LeadRow.Show(row, lead)
   Assert.equal(row:GetHeight(), 48)
   Assert.same({ row.isLeadRow, row.rowIndex }, { true, 1 })
-  Assert.same({ row.icon.width, row.icon.height }, { 34, 34 })
-  Assert.same(row.icon.points[1], { "LEFT", row, "LEFT", EDGE, 0 })
-  Assert.same(row.name.points[1], { "TOPLEFT", row.icon, "TOPRIGHT", 10, -1 })
-  Assert.same(row.name.points[2], { "RIGHT", row.age, "LEFT", -EDGE, 0 }, "the name ends before the age")
-  Assert.same(row.age.points[1], { "TOPRIGHT", row, "TOPRIGHT", -EDGE, -4 })
-  Assert.same(row.what.points[1], { "BOTTOMLEFT", row.icon, "BOTTOMRIGHT", 10, 1 })
-  Assert.same({ row.name.font, row.age.font, row.what.font }, { "GameFontNormal", "GameFontDisableSmall", "GameFontHighlightSmall" })
+  Assert.same({ row.iconFrame.width, row.iconFrame.height }, { 34, 34 })
+  Assert.same(row.iconFrame.points[1], { "LEFT", row, "LEFT", EDGE, 0 })
+  Assert.equal(row.icon, row.iconFrame.texture, "the icon is the round holder's texture")
+  Assert.equal(row.icon.mask, ns.Theme.ART.CIRCLE_MASK)
+  -- Spec D6-D9: WM's text anchors (UI/ContactsList/RowTextAnchors.lua, RowElements.lua:188-193).
+  Assert.same(row.name.points[1], { "TOPLEFT", row.iconFrame, "TOPRIGHT", 10, 1 })
+  Assert.same(row.name.points[2], { "RIGHT", row.age, "LEFT", -2, 0 }, "the name ends 2 px before the age")
+  Assert.same(row.age.points, { { "TOPRIGHT", row, "TOPRIGHT", -EDGE, -2 } }, "the age never anchors to the name")
+  Assert.same(row.what.points[1], { "BOTTOMLEFT", row.iconFrame, "BOTTOMRIGHT", 10, -1 })
+  Assert.same({ row.name.font, row.age.font, row.what.font }, { "GameFontNormal", "GameFontDisableSmall", "GameFontDisableSmall" })
   Assert.same({ row.name.wordWrap, row.what.wordWrap }, { false, false })
-  Assert.same(row.age.textColor, ns.Theme.COLORS.textTimestamp)
+  Assert.same({ row.age.textColor, row.what.textColor }, { MUTED, MUTED })
   Assert.equal(row.realm, nil, "the realm tag is the details header's")
   Assert.equal(row.scripts.OnHyperlinkEnter, nil, "rows get no LinkHover")
 end
@@ -79,7 +84,7 @@ local function testMarks()
   Assert.equal(greeted.texture, ns.Theme.GREETED_ICON)
   Assert.equal(row.repliedTag:IsShown(), false)
   Assert.same(row.what.points, {
-    { "BOTTOMLEFT", row.icon, "BOTTOMRIGHT", 10, 1 },
+    { "BOTTOMLEFT", row.iconFrame, "BOTTOMRIGHT", 10, -1 },
     { "RIGHT", row, "RIGHT", -(EDGE + MARK_SIZE + MARK_GAP), 0 },
   })
 
@@ -107,7 +112,7 @@ local function testContent()
   Assert.same(row.name.textColor, { WARRIOR.r, WARRIOR.g, WARRIOR.b, 1 }, "the customer's class colour")
   lead.guid = nil
   ns.LeadRow.Show(row, lead)
-  Assert.same(row.name.textColor, ns.Theme.COLORS.textPrimary, "unknown class: the plain text colour")
+  Assert.same(row.name.textColor, WHITE, "unknown class: white, as WM's rows (spec D6)")
 end
 
 -- The item's icon, else the profession's, else the addon's; the second line shows the link.
@@ -130,21 +135,83 @@ local function testIcon()
   Assert.equal(row.icon.texture, ns.Theme.ICON)
 end
 
+-- Spec D1, D2: both overlays on BACKGROUND sublayer 1, under the icon and texts; the selected one
+-- gold. The second line turns white while selected and back after a Clear (which hides the
+-- selection directly).
 local function testHighlights()
   local ns, row, _, lead = load()
   local art = ns.Theme.ART
-  Assert.same({ row.hover.layer, row.hover.texture, row.hover.blendMode, row.hover:GetAlpha() }, { "HIGHLIGHT", art.LIST_HOVER, "ADD", 0.18 })
-  local selected = row.selected
-  Assert.same({ selected.texture, selected.blendMode, selected:GetAlpha(), selected:IsShown() }, { art.LIST_SELECTED, "ADD", 0.45, false })
+  local hover, selected = row.hover, row.selected
+  Assert.same({ hover.layer, hover.sublevel, hover.texture, hover.blendMode, hover:IsShown() }, { "BACKGROUND", 1, art.LIST_HOVER, "ADD", false })
+  Assert.same({ selected.layer, selected.sublevel, selected.texture, selected.blendMode }, { "BACKGROUND", 1, art.LIST_SELECTED, "ADD" })
+  Assert.same({ selected.vertexColor, selected:GetAlpha(), selected:IsShown() }, { { 1, 0.82, 0 }, 0.45, false })
   Assert.same(selected.points, { { "ALL", row } })
   ns.LeadRow.Show(row, lead)
   ns.LeadRow.SetSelected(row, true)
-  Assert.equal(selected:IsShown(), true)
+  Assert.same({ selected:IsShown(), row.what.textColor }, { true, WHITE })
   ns.LeadRow.SetSelected(row, false)
-  Assert.equal(selected:IsShown(), false)
+  Assert.same({ selected:IsShown(), row.what.textColor }, { false, MUTED })
   ns.LeadRow.SetSelected(row, true)
   ns.LeadRow.Clear(row)
   Assert.equal(selected:IsShown(), false, "a cleared row is not selected")
+  ns.LeadRow.Show(row, lead)
+  ns.LeadRow.SetSelected(row, false)
+  Assert.same(row.what.textColor, MUTED, "a cleared row reused unselected: muted again")
+end
+
+-- A counter of the group's Play calls (its OnPlay script).
+local function countPlays(group)
+  local counter = { n = 0 }
+  group:SetScript("OnPlay", function()
+    counter.n = counter.n + 1
+  end)
+  return counter
+end
+
+-- Spec D3, D4: the hover fades in on enter and out on leave, never over the selected row. A hovered
+-- row becoming selected drops the hover at once; losing the selection under the cursor fades it in,
+-- once however often the list repeats the call.
+local function testHover()
+  local ns, row, _, lead = load()
+  local hover = row.hover
+  ns.LeadRow.Show(row, lead)
+  ns.LeadRow.SetSelected(row, false)
+  Widgets.fire(row, "OnEnter")
+  Assert.same({ hover:IsShown(), hover.fadeIn:IsPlaying() }, { true, true }, "enter: fades in")
+  hover.fadeIn:Finish()
+  Widgets.fire(row, "OnLeave")
+  Assert.equal(hover.fadeOut:IsPlaying(), true, "leave: fades out")
+  hover.fadeOut:Finish()
+  Assert.equal(hover:IsShown(), false)
+
+  row.mouseOver = true
+  Widgets.fire(row, "OnEnter")
+  hover.fadeIn:Finish()
+  ns.LeadRow.SetSelected(row, true)
+  Assert.same({ hover:IsShown(), hover.fadeIn:IsPlaying(), hover.fadeOut:IsPlaying() }, { false, false, false }, "selected: hover gone, no fade")
+  Widgets.fire(row, "OnEnter")
+  Assert.equal(hover:IsShown(), false, "no hover on the selected row")
+
+  local plays = countPlays(hover.fadeIn)
+  ns.LeadRow.SetSelected(row, false)
+  Assert.same({ hover:IsShown(), hover.fadeIn:IsPlaying() }, { true, true }, "deselected under the cursor: fades in")
+  ns.LeadRow.SetSelected(row, false)
+  Assert.equal(plays.n, 1, "a repeated call restarts no fade")
+
+  row.mouseOver = false
+  ns.LeadRow.SetSelected(row, true)
+  plays = countPlays(hover.fadeIn)
+  ns.LeadRow.SetSelected(row, false)
+  Assert.same({ plays.n, hover:IsShown() }, { 0, false }, "deselected away from the cursor: no hover")
+end
+
+-- The overlay goes with the row: a row hidden while hovered is reused without a stale hover.
+local function testHoverHide()
+  local ns, row, _, lead = load()
+  ns.LeadRow.Show(row, lead)
+  Widgets.fire(row, "OnEnter")
+  ns.LeadRow.Clear(row)
+  Assert.same({ row.hover:IsShown(), row.hover.fadeIn:IsPlaying() }, { false, false })
 end
 
 -- Left selects whatever the modifier and never sends; right dismisses once the look rule allows.
@@ -299,7 +366,124 @@ local function testChatTooltipHide()
   Assert.equal(tip().shown, false, "parent hidden")
 end
 
+-- Spec 6a: icon-only rows on WM's rail. Only the icon shows, centred; nothing of the lead's text or
+-- marks, also after a Show. Back to full, the row is as before and the marks follow the lead.
+local function testCompact()
+  local ns, row, _, lead = load(function(edited)
+    edited.greeted, edited.replied = true, true
+  end)
+  local function fields()
+    return { row.name:IsShown(), row.age:IsShown(), row.what:IsShown(), row.greetedIcon:IsShown(), row.repliedTag:IsShown() }
+  end
+  ns.LeadRow.Show(row, lead)
+  ns.LeadRow.SetCompact(row, true)
+  Assert.same(fields(), { false, false, false, false, false })
+  Assert.same(row.iconFrame.points, { { "CENTER", row, "CENTER", 0, 0 } })
+  ns.LeadRow.Show(row, lead)
+  Assert.same(fields(), { false, false, false, false, false }, "Show keeps a compact row icon-only")
+  Assert.same({ row.icon:IsShown(), row.icon.texture ~= nil }, { true, true })
+
+  ns.LeadRow.SetCompact(row, false)
+  Assert.same(fields(), { true, true, true, true, true })
+  Assert.same(row.iconFrame.points, { { "LEFT", row, "LEFT", EDGE, 0 } })
+  lead.greeted = false
+  ns.LeadRow.Show(row, lead)
+  Assert.same(fields(), { true, true, true, false, true }, "the marks follow the lead")
+
+  -- Set before any lead: no error, and the first Show is icon-only.
+  local freshNs, fresh, _, other = load()
+  freshNs.LeadRow.SetCompact(fresh, true)
+  freshNs.LeadRow.SetCompact(fresh, false)
+  freshNs.LeadRow.SetCompact(fresh, true)
+  freshNs.LeadRow.Show(fresh, other)
+  Assert.same({ fresh.name:IsShown(), fresh.what:IsShown(), fresh.greetedIcon:IsShown() }, { false, false, false })
+end
+
+-- Every row's icon carries a status dot, as WM's contacts: gold while the lead is unseen and
+-- ungreeted (spec B), else the details header's colour: grey new, green greeted, accent replied.
+-- The row paints it on every Show, compact or not.
+local function testStatusDot()
+  local ns, row, _, lead = load()
+  local colors = ns.Theme.COLORS
+  local function dot()
+    return { row.dot:IsShown(), row.dot.texture.vertexColor }
+  end
+  Assert.equal(row.dot:IsShown(), false, "hidden until a lead is shown")
+  ns.LeadRow.Show(row, lead)
+  Assert.same(dot(), { true, colors.gold }, "unseen")
+  Assert.same(row.dot.points[1], { "BOTTOMRIGHT", row.iconFrame, "BOTTOMRIGHT", 2, -2 })
+  lead.seen = true
+  ns.LeadRow.Show(row, lead)
+  Assert.same(dot(), { true, colors.grey }, "seen, new")
+  lead.seen, lead.greeted = nil, true
+  ns.LeadRow.Show(row, lead)
+  Assert.same(dot(), { true, colors.greeted }, "greeted")
+  lead.replied = true
+  ns.LeadRow.Show(row, lead)
+  Assert.same(dot(), { true, colors.accent }, "replied")
+  lead.greeted, lead.replied = nil, nil
+  ns.LeadRow.SetCompact(row, true)
+  ns.LeadRow.Show(row, lead)
+  Assert.same(dot(), { true, colors.gold }, "a compact row shows it too")
+  lead.seen = true
+  ns.LeadRow.Show(row, lead)
+  Assert.same(dot(), { true, colors.grey }, "a compact row: the state colour once seen")
+  Assert.same(row.iconFrame.points, { { "CENTER", row, "CENTER", 0, 0 } })
+end
+
+-- Review Focus 3: a compact row still shows its selection and selects on a left click.
+local function testCompactSelect()
+  local ns, row, _, lead, selected = load()
+  ns.LeadRow.SetCompact(row, true)
+  ns.LeadRow.Show(row, lead)
+  ns.LeadRow.SetSelected(row, true)
+  Assert.equal(row.selected:IsShown(), true)
+  Widgets.click(row, "LeftButton")
+  Assert.same(selected, { row })
+end
+
+local function compactHovered(edit)
+  local ns, row, _, lead = load(edit)
+  ns.LeadRow.SetCompact(row, true)
+  ns.LeadRow.Show(row, lead)
+  Widgets.fire(row, "OnEnter")
+  return ns, row, lead
+end
+
+-- The compact tooltip names the customer and what they asked for, as the hidden text did; the chat
+-- line when there is one, and it shows without one.
+local function testCompactTooltip()
+  local ns, row, lead = compactHovered()
+  local green, white = { 0.1, 1, 0.1 }, { 1, 1, 1 }
+  Assert.same({ tip().owner, tip().anchor, tip().shown }, { row, "ANCHOR_RIGHT", true })
+  -- Wide enough that the chat line is not a tall column; the next user starts from no minimum.
+  Assert.equal(tip().minWidth, ns.Theme.LAYOUT.ROW_TIP_WIDTH, "row tooltip minimum width")
+  tip():Hide()
+  Assert.equal(tip().minWidth, 0, "hidden: minimum width reset")
+  compactHovered()
+  Assert.same(tip().lines, { "Bob-Draenor", "Blacksmithing", chatLine(lead, "Trade", "  LF plate belt  "), "Click: select", "Right-click: dismiss" })
+  Assert.same(tip().colors, { { WARRIOR.r, WARRIOR.g, WARRIOR.b }, white, white, green, green })
+  compactHovered(function(edited)
+    edited.message = nil
+  end)
+  local lines = { "Bob-Draenor", "Blacksmithing", "Click: select", "Right-click: dismiss" }
+  Assert.same({ tip().shown, tip().lines }, { true, lines }, "no message: still a tooltip")
+end
+
+-- Review Focus 4: a new chat line while the compact tooltip shows rebuilds it.
+local function testCompactTooltipRepaint()
+  local ns, row, lead = compactHovered()
+  lead.message = "WTB belt"
+  ns.LeadRow.Show(row, lead)
+  Assert.same({ tip().shown, tip().lines[3] }, { true, chatLine(lead, "Trade", "WTB belt") })
+end
+
 return function()
+  testCompact()
+  testStatusDot()
+  testCompactSelect()
+  testCompactTooltip()
+  testCompactTooltipRepaint()
   testChatTooltip()
   testChatTooltipNoClass()
   testChatTooltipLead()
@@ -311,6 +495,8 @@ return function()
   testContent()
   testIcon()
   testHighlights()
+  testHover()
+  testHoverHide()
   testClicks()
   testShownAt()
   Wow.reset()
