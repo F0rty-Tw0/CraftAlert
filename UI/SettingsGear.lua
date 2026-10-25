@@ -24,10 +24,6 @@ local function showTooltip(gear)
   tooltip:Show()
 end
 
-local function hideTooltip()
-  Tooltip.Get():Hide()
-end
-
 -- The gear Button under `parent`, sized and painted but not placed; a click runs onClick().
 function SettingsGear.Build(parent, onClick)
   local size, art = Theme.LAYOUT.GEAR_SIZE, Theme.ART
@@ -43,7 +39,7 @@ function SettingsGear.Build(parent, onClick)
     onClick()
   end)
   gear:SetScript("OnEnter", showTooltip)
-  gear:SetScript("OnLeave", hideTooltip)
+  gear:SetScript("OnLeave", Tooltip.HideIfOwned)
 
   return gear
 end

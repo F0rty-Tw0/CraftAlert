@@ -16,11 +16,6 @@ local CardBody = {}
 local sort = table.sort
 local type = type
 
--- `text` in a Theme colour ({ r, g, b, a }).
-local function themed(text, color)
-  return FrameKit.ColorCode(text, color[1], color[2], color[3])
-end
-
 -- A { key = string, rank = number or nil } entry.
 local function isCrafter(entry)
   return type(entry) == "table" and type(entry.key) == "string" and (entry.rank == nil or type(entry.rank) == "number")
@@ -82,8 +77,8 @@ end
 -- Why in white, then the profession in gold; whichever is set, nil for neither.
 function CardBody.MatchedText(lead)
   local colors = Theme.COLORS
-  local why = lead.why and themed(lead.why, colors.white)
-  local profession = lead.profName and themed(lead.profName, colors.gold)
+  local why = lead.why and FrameKit.ThemeCode(lead.why, colors.white)
+  local profession = lead.profName and FrameKit.ThemeCode(lead.profName, colors.gold)
   if why and profession then
     return why .. " · " .. profession
   end

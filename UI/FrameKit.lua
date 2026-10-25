@@ -47,6 +47,7 @@ local function atlasExists(atlas)
 
   return ok and type(info) == "table"
 end
+FrameKit.AtlasExists = atlasExists
 
 -- Draws `atlas` on the texture; when the client lacks it, `fallbackFile`; with neither, hides the
 -- texture. `blend` (when given) is set on a texture that stays visible. True only for the atlas.
@@ -101,6 +102,17 @@ function FrameKit.ClassColor(token)
   return colors[token]
 end
 
+-- The localized name of a class token (LOCALIZED_CLASS_NAMES_MALE), or nil: no token, no table,
+-- or no entry.
+function FrameKit.ClassName(token)
+  local names = _G["LOCALIZED_CLASS_NAMES_MALE"]
+  if type(names) ~= "table" or type(token) ~= "string" then
+    return nil
+  end
+
+  return names[token]
+end
+
 -- The client's icon for a profession skill-line ID, or nil: Classic name keys and a client without
 -- the API have none. C_TradeSkillUI is read through _G (luacheck's read_globals lacks it).
 function FrameKit.ProfessionIcon(prof)
@@ -127,6 +139,35 @@ end
 -- `text` in r, g, b as a colour code. From r/g/b only: a RAID_CLASS_COLORS entry may lack colorStr.
 function FrameKit.ColorCode(text, r, g, b)
   return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) .. text .. "|r"
+end
+
+-- r, g, b of a Theme colour ({ r, g, b, a }) dimmed by its alpha: a colour code has none.
+local function folded(color)
+  local alpha = color[4] or 1
+  return color[1] * alpha, color[2] * alpha, color[3] * alpha
+end
+
+-- A Theme colour with its alpha folded in, opaque: for a text whose colour codes must keep theirs.
+function FrameKit.Opaque(color)
+  local r, g, b = folded(color)
+  return { r, g, b, 1 }
+end
+
+-- `text` in a Theme colour as a colour code, dimmed by the colour's alpha.
+function FrameKit.ThemeCode(text, color)
+  return FrameKit.ColorCode(text, folded(color))
+end
+
+-- `name` in a class colour (a RAID_CLASS_COLORS entry, or nil) as a colour code; without one, in
+-- the Theme colour `fallback`, else plain.
+function FrameKit.ClassCode(name, classColor, fallback)
+  if classColor then
+    return FrameKit.ColorCode(name, classColor.r, classColor.g, classColor.b)
+  end
+  if fallback then
+    return FrameKit.ThemeCode(name, fallback)
+  end
+  return name
 end
 
 -- Colours a customer's name by class, or in the plain text colour when the class is unknown.
