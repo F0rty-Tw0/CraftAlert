@@ -22,16 +22,6 @@ local tostring = tostring
 local type = type
 
 local WHY_SEPARATOR = " + "
--- A lead's channel key and its word, localized when shown. Only the keys come from
--- Core/ScanGate.lua:33; the words are the spec's (§2.1), not the status line's.
-local CHANNEL_NAMES = {
-  trade = "Trade",
-  services = "Services",
-  general = "General",
-  lfg = "LFG",
-  guild = "Guild",
-  communities = "Community",
-}
 
 -- As GameTooltip_SetTitle: replaces the lines, wrapping.
 local function title(tip, text)
@@ -136,15 +126,11 @@ function CardTipText.Greet(tip)
   end
 end
 
-local function channelName(key)
-  local name = CHANNEL_NAMES[key]
-  return name and Localization.Text(name) or tostring(key)
-end
-
 -- "[HH:MM] [Channel] [Name]: message", the customer in class colour, the message with its links.
 local function chatText(lead)
   local name = FrameKit.ColorCode(tostring(lead.customer), customerColor(lead, Theme.COLORS.white))
-  return format("[%s] [%s] [%s]: %s", _G["date"]("%H:%M", lead.time), channelName(lead.channel), name, lead.message)
+  local channel = tostring(LeadText.Channel(lead))
+  return format("[%s] [%s] [%s]: %s", _G["date"]("%H:%M", lead.time), channel, name, lead.message)
 end
 
 -- The lead's latest chat line (§2.1), then what clicking does.

@@ -12,6 +12,18 @@ local LeadText = {}
 
 local floor = math.floor
 local max = math.max
+local tostring = tostring
+
+-- A lead's channel key and its word, localized when shown. Only the keys come from
+-- Core/ScanGate.lua:33; the words are the lead-cards spec's (§2.1), not the status line's.
+local CHANNEL_NAMES = {
+  trade = "Trade",
+  services = "Services",
+  general = "General",
+  lfg = "LFG",
+  guild = "Guild",
+  communities = "Community",
+}
 
 -- The matched item link, else the recipe, else the profession.
 function LeadText.What(lead)
@@ -67,6 +79,16 @@ function LeadText.Age(seconds)
     return Localization.Text("%ds", max(0, floor(seconds)))
   end
   return Localization.Text("%dm", floor(seconds / 60))
+end
+
+-- The word for the lead's channel, a key the table lacks as itself, nil for a lead without one.
+function LeadText.Channel(lead)
+  local key = lead.channel
+  if key == nil then
+    return nil
+  end
+  local name = CHANNEL_NAMES[key]
+  return name and Localization.Text(name) or tostring(key)
 end
 
 ns.LeadText = LeadText
