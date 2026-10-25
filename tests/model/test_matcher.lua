@@ -186,6 +186,10 @@ local function testSlotNameGuard()
   for _, slot in ipairs({ "offhand", "off hand", "off-hand" }) do
     expect(ns, "LF zorgblade " .. slot, "item:915", "companion: " .. slot)
   end
+  -- Only "off hand" with nothing but spaces or a hyphen between is that companion.
+  for _, line in ipairs({ "LF zorgblade off, hand me mats", "LF zorgblade main hand", "LF zorgblade two hand" }) do
+    expect(ns, line, "stop:nomatch", "no companion: " .. line)
+  end
   -- The typo pass skips the tokens of the dropped hit (it matches "thick", kind c, at distance 0).
   Fixture.itemIndex(ns)
   expect(ns, "LF thick plate helm", "stop:nomatch")
