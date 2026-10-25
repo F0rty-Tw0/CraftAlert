@@ -58,6 +58,8 @@ local UI = {
   "UI.Settings.RecipeList",
   "UI.Settings.PageCrafters",
   "UI.Settings.PageTest",
+  "UI.BridgePanel",
+  "UI.WhisperBridge",
   "Core.Bindings",
   "Core.Perf",
   "Core.TestReport",
