@@ -99,6 +99,33 @@ local function capped(tns, tlead)
   return ok == false and why == "rate"
 end
 
+-- SetOpener swaps what opens a whisper box (WhisperMessenger's conversation); nil restores the default.
+local function testOpener()
+  local ns, _, calls = setup()
+  local opened = {}
+  ns.GreetAction.SetOpener(function(target, text)
+    opened[#opened + 1] = { target, text }
+  end)
+  local lead = leadRecord(1)
+  ns.GreetAction.Empty(lead) -- empty whisper
+  ns.GreetAction.Prefill(lead) -- greeting as draft
+  Assert.same(opened[1], { CUSTOMER })
+  Assert.equal(opened[2][1], CUSTOMER)
+  Assert.truthy(opened[2][2] and string.find(opened[2][2], "%S"))
+  -- refused greet (not active) goes through the opener, never the Blizzard box
+  ns.GreetAction.Greet({ id = 99, customer = CUSTOMER, prof = 164, profName = "Blacksmithing", crafter = "Me-Realm", time = T0 }, 50)
+  Assert.equal(#opened, 3)
+  Assert.same(calls, {}, "no Blizzard call while an opener is set")
+  -- nil restores the default
+  ns.GreetAction.SetOpener(nil)
+  ns.GreetAction.Empty(lead)
+  Assert.same(calls, { { "empty", CUSTOMER } })
+  Assert.equal(ns.GreetAction.Target(lead), CUSTOMER)
+  -- Forever drops the realm
+  local forever = setup(nil, "forever")
+  Assert.equal(forever.GreetAction.Target(leadRecord(2, "Bob-Draenor")), "Bob")
+end
+
 return function()
   -- Greet sends the disclosure notice, then the greeting whisper, records the send and
   -- marks the lead greeted.
@@ -336,4 +363,6 @@ return function()
   )
   Assert.same(calls, {})
   Assert.equal(lead.customer, TARGET)
+
+  testOpener()
 end
