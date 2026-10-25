@@ -157,7 +157,7 @@ local function testPerfAndHelp()
   Assert.equal(ns.Perf.IsRunning(), false)
 end
 
--- In an instance every form of /ca does nothing and prints nothing (a chat line taints the frame).
+-- In an instance every form of /ca does nothing but print the off line once.
 local function testOffInInstance()
   local ns, _, _, handler = setup()
   Wow.stub("IsInInstance", function()
@@ -169,7 +169,7 @@ local function testOffInInstance()
   for _, message in ipairs({ "", "config", "test LF plate belt", "perf", "nonsense" }) do
     Wow.chat = {}
     handler(message)
-    Assert.same(SlashFixture.chat(), {}, "/ca " .. message)
+    Assert.same(SlashFixture.chat(), { "Off in instances; it works again when you leave." }, "/ca " .. message)
   end
   Assert.equal(shown(LEADS_WINDOW), false)
   Assert.equal(#ns.Leads.List(), 0, "/ca test made no lead")
