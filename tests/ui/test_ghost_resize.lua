@@ -79,6 +79,16 @@ local function testMouseUpAppliesOnce()
   Assert.equal(#stopped, 1, "a stray mouse up does nothing")
 end
 
+-- A lost mouse up leaves the drag on; the next press must not remember the faded 0.08 as the alpha.
+local function testSecondPressKeepsAlpha()
+  local _, target, grip, _, stopped = setup()
+  Widgets.fire(grip, "OnMouseDown", "LeftButton")
+  Widgets.fire(grip, "OnMouseDown", "LeftButton")
+  Widgets.fire(grip, "OnMouseUp", "LeftButton")
+  Assert.equal(target:GetAlpha(), 0.7, "the window's own alpha comes back")
+  Assert.equal(#stopped, 1)
+end
+
 local function testClamp()
   local _, target, grip, ghost = setup()
   Widgets.fire(grip, "OnMouseDown", "LeftButton")
@@ -137,6 +147,7 @@ return function()
   testGripArt()
   testMouseDownStartsGhost()
   testMouseUpAppliesOnce()
+  testSecondPressKeepsAlpha()
   testClamp()
   testHideMidDragSavesNothing()
   testNoOnUpdate()
