@@ -22,7 +22,7 @@ local CardTips = ns.CardTips or require("CraftAlert.UI.CardTips")
 -- Clicks follow the toast's table (§7.1); a link under the cursor shows its tooltip, and a click
 -- while it is hovered goes to the link, never to the lead (native-HUD spec §4.6). The card frame
 -- carries its lead and the GetTime() at which that lead appeared in it (§7.5 rule 3).
-local LeadRow = {}
+local LeadCard = {}
 
 local min = math.min
 local select = select
@@ -98,7 +98,7 @@ end
 
 -- A hidden card inside `parent`; the list anchors it. index: its slot, 1 at the top; list: the
 -- list it belongs to (CardHover shows one card's buttons at a time).
-function LeadRow.Create(parent, index, list)
+function LeadCard.Create(parent, index, list)
   local layout, colors, fonts = Theme.LAYOUT, Theme.COLORS, Theme.FONTS
   local card = _G["CreateFrame"]("Button", nil, parent)
   card:SetHeight(layout.CARD_HEIGHT)
@@ -133,7 +133,7 @@ end
 
 -- Shows `lead` in the card; a lead new to the card counts as shown from now, the link under the
 -- cursor belonged to the old lead, and so does a tooltip any of the card's frames owns (CardTips).
-function LeadRow.Show(card, lead)
+function LeadCard.Show(card, lead)
   local leadChanged = card.lead ~= lead
   if leadChanged then
     card.shownAt = now()
@@ -157,11 +157,11 @@ function LeadRow.Show(card, lead)
   card:Show()
 end
 
-function LeadRow.Clear(card)
+function LeadCard.Clear(card)
   card.lead, card.shownAt = nil, nil
   LinkHover.Clear(card)
   card:Hide()
 end
 
-ns.LeadRow = LeadRow
-return LeadRow
+ns.LeadCard = LeadCard
+return LeadCard

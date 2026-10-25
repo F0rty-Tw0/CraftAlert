@@ -8,13 +8,13 @@ local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
-local LeadsList = ns.LeadsList or require("CraftAlert.UI.LeadsList")
+local CardList = ns.CardList or require("CraftAlert.UI.CardList")
 local WindowSize = ns.WindowSize or require("CraftAlert.UI.WindowSize")
 local SettingsGear = ns.SettingsGear or require("CraftAlert.UI.SettingsGear")
 local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.SettingsPane")
 
 -- Spec §7.3: the leads window, frame CraftAlertLeadsWindow, created on first open (§4.4 rule
--- 5). The lead cards (UI/LeadsList.lua) show newest first, as many as fit, each with its details;
+-- 5). The lead cards (UI/CardList.lua) show newest first, as many as fit, each with its details;
 -- the mouse wheel scrolls them. ESC closes it (UISpecialFrames, the one sanctioned insert). Ages
 -- and cards refresh on open and on each lead change, never on a ticker. Native-HUD spec §7.1: a
 -- gear swaps the cards for the settings pane. Movable and resizable: one position and one size
@@ -47,14 +47,14 @@ function LeadsWindow.Refresh()
   if window.mode == "settings" then
     return
   end
-  LeadsList.Refresh(window.list, Leads.List())
+  CardList.Refresh(window.list, Leads.List())
 end
 
 local function onMouseWheel(_, delta)
   if window.mode == "settings" then
     return
   end
-  LeadsList.Scroll(window.list, delta)
+  CardList.Scroll(window.list, delta)
   LeadsWindow.Refresh()
 end
 
@@ -105,7 +105,7 @@ end
 local function enterSettings()
   local frame = window.frame
   window.mode = "settings"
-  LeadsList.Clear(window.list)
+  CardList.Clear(window.list)
   SettingsPane.Build(frame.Inset, enterList)
   SettingsPane.Show()
   frame:SetTitle(Localization.Text("Craft Alert — Settings"))
@@ -134,7 +134,7 @@ local function create()
   frame:SetScript("OnMouseWheel", onMouseWheel)
   createResizeButton(frame)
   frame.gear = SettingsGear.Create(frame, onGearClick)
-  local list = LeadsList.New(frame.Inset)
+  local list = CardList.New(frame.Inset)
   frame:Hide()
   table.insert(_G["UISpecialFrames"], FRAME_NAME)
   return { frame = frame, list = list, mode = "list" }
@@ -156,8 +156,8 @@ function LeadsWindow.Toggle()
   if window.mode == "settings" then
     enterList()
   end
-  LeadsList.ResetTop(window.list)
-  LeadsList.Clear(window.list)
+  CardList.ResetTop(window.list)
+  CardList.Clear(window.list)
   frame:Show()
   LeadsWindow.Refresh()
 end
@@ -198,7 +198,7 @@ function LeadsWindow.VisibleLatest()
   if window == nil or not window.frame:IsVisible() then
     return nil
   end
-  local row = LeadsList.TopRow(window.list)
+  local row = CardList.TopRow(window.list)
   if not row or not row.lead or not Leads.IsActive(row.lead.id) then
     return nil
   end

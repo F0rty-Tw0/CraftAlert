@@ -100,7 +100,7 @@ local function testGearSwitchesModes()
   Assert.same(size(), { 600, 480 })
   Assert.equal(title(), "Craft Alert — Settings")
   Assert.equal(anyRowShown(), false, "no row drawn over the pane")
-  Assert.equal(row(1).lead, nil, "rows cleared (LeadRow.Clear), not just hidden")
+  Assert.equal(row(1).lead, nil, "rows cleared (LeadCard.Clear), not just hidden")
   Assert.equal(emptyText():IsShown(), false)
   Wow.clock.gettime = 60
   Widgets.click(gear())
