@@ -148,7 +148,7 @@ local function testBackButton()
   local nav = back.parent
   Assert.equal(back:IsVisible(), true)
   Assert.same(back.points[1], { "BOTTOMLEFT", nav, "BOTTOMLEFT", 4, 4 })
-  Assert.equal(back:GetHeight(), 24)
+  Assert.equal(back:GetHeight(), 28)
   Widgets.click(back)
   Assert.equal(frame():IsShown(), true)
   Assert.equal(title(), "Craft Alert — Leads")

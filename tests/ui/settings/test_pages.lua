@@ -67,7 +67,7 @@ end
 -- at the top left of the leads window's inset, each page to its right.
 local function testNavHighlight()
   local ns = SettingsFixture.load()
-  local Theme, padding = ns.Theme, ns.Theme.LAYOUT.PADDING
+  local Theme = ns.Theme
   open(ns, "General")
   local function selectedPages()
     local shown = {}
@@ -99,8 +99,8 @@ local function testNavHighlight()
   end
   local window = SettingsFixture.window()
   local nav = SettingsFixture.navButton("General").parent
-  Assert.equal(nav.template, "InsetFrameTemplate")
-  Assert.same(nav.points[1], { "TOPLEFT", window.content, "TOPLEFT", padding, -padding })
+  Assert.equal(nav.template, nil)
+  Assert.same(nav.points[1], { "TOPLEFT", window.content, "TOPLEFT", 0, 0 })
   -- The Alerts page's content frame: the pane container's child that holds its rows.
   local content = SettingsFixture.row("Lead timeout")
   while content.parent ~= nav.parent do
