@@ -265,16 +265,25 @@ end
 
 -- SetSuppressed (WhisperMessenger shows the leads itself): the launcher stays built but hidden and inert.
 local function testSuppressed()
-  local ns = UiFixture.load({ leads = 1 })
+  local ns, db = UiFixture.load({ leads = 1 })
   setScan(ns, true)
+  local moved = 0
+  ns.Launcher.OnMoved(function()
+    moved = moved + 1
+  end)
   local frame = ns.Launcher.Create()
+  local position = { point = db.ui.launcher.point, relativePoint = db.ui.launcher.relativePoint, x = db.ui.launcher.x, y = db.ui.launcher.y }
   ns.Launcher.SetSuppressed(true)
   ns.Launcher.Refresh()
   Assert.equal(frame:IsShown(), false, "Refresh keeps it hidden")
   Assert.equal(ns.Launcher.Frame(), nil, "Frame() hides it from the toast dock")
   ns.Launcher.StartDrag()
   Assert.equal(frame.moving, nil)
-  ns.Launcher.StopDrag() -- saves nothing
+  frame:ClearAllPoints()
+  frame:SetPoint("BOTTOMRIGHT", rawget(_G, "UIParent"), "BOTTOMRIGHT", -20, 80)
+  ns.Launcher.StopDrag()
+  Assert.same(db.ui.launcher, position, "a suppressed launcher saves nothing")
+  Assert.equal(moved, 0, "and runs no OnMoved handler")
   ns.Launcher.SetSuppressed(false)
   ns.Launcher.Refresh()
   Assert.equal(ns.Launcher.Frame(), frame)
