@@ -197,7 +197,103 @@ local function testShownAt()
   Assert.equal(row.shownAt, nil, "no lead, no shownAt")
 end
 
+-- Row-chat-tooltip spec: the addon's tooltip on the row while the cursor is on it.
+local function tip()
+  return rawget(_G, "CraftAlertTooltip")
+end
+
+local function tipShown()
+  return tip() ~= nil and tip().shown
+end
+
+-- The spec's chat line, the name coloured by hand (not FrameKit.ColorCode) so the oracle stands apart.
+local function chatLine(lead, channel, message)
+  local name = string.format("|cff%02x%02x%02x", WARRIOR.r * 255, WARRIOR.g * 255, WARRIOR.b * 255) .. "Bob-Draenor|r"
+  local channelPart = channel and ("[" .. channel .. "] ") or ""
+  return "[" .. os.date("%H:%M", lead.time) .. "] " .. channelPart .. "[" .. name .. "]: " .. message
+end
+
+local function hovered(edit)
+  local ns, row, _, lead = load(edit)
+  ns.LeadRow.Show(row, lead)
+  Widgets.fire(row, "OnEnter")
+  return ns, row, lead
+end
+
+local function testChatTooltip()
+  local _, row, lead = hovered()
+  Assert.same({ tip().owner, tip().anchor, tip().shown }, { row, "ANCHOR_RIGHT", true })
+  Assert.same(tip().lines, {
+    "Chat with Bob-Draenor",
+    chatLine(lead, "Trade", "  LF plate belt  "),
+    "Click: select",
+    "Right-click: dismiss",
+  })
+  Assert.same({ tip().colors[1], tip().colors[2] }, { { WARRIOR.r, WARRIOR.g, WARRIOR.b }, { 1, 1, 1 } })
+  Widgets.fire(row, "OnLeave")
+  Assert.equal(tip().shown, false)
+end
+
+-- No channel drops its bracket; no message, no tooltip; a link in the message stays as it came.
+local function testChatTooltipLead()
+  local _, _, lead = hovered(function(edited)
+    edited.channel = nil
+  end)
+  Assert.equal(tip().lines[2], chatLine(lead, nil, "  LF plate belt  "))
+  hovered(function(edited)
+    edited.message = nil
+  end)
+  Assert.equal(tipShown(), false, "no message: no tooltip")
+  _, _, lead = hovered(function(edited)
+    edited.message = LINK_TEXT
+  end)
+  Assert.equal(tip().lines[2], chatLine(lead, "Trade", LINK_TEXT))
+end
+
+-- A tooltip another frame owns is never hidden or rewritten by the row.
+local function testChatTooltipForeignOwner()
+  local ns, row, _, lead = load()
+  local other = _G["CreateFrame"]("Frame")
+  local shared = ns.Tooltip.Get()
+  shared:SetOwner(other, "ANCHOR_RIGHT")
+  shared:SetText("Other")
+  shared:Show()
+  Widgets.fire(row, "OnLeave")
+  ns.LeadRow.Show(row, lead)
+  ns.LeadRow.Clear(row)
+  Assert.same({ tip().owner, tip().shown, tip().lines }, { other, true, { "Other" } })
+end
+
+-- Show rebuilds an owned tooltip for the row's lead (none without a message) and adds none unhovered.
+local function testChatTooltipRepaint()
+  local ns, row = hovered()
+  ns.LeadRow.Show(row, UiFixture.lead(2))
+  Assert.same({ tip().owner, tip().shown, tip().lines[1] }, { row, true, "Chat with Customer2-Draenor" })
+  local quiet = UiFixture.lead(3)
+  quiet.message = nil
+  ns.LeadRow.Show(row, quiet)
+  Assert.equal(tip().shown, false, "no message: the tooltip goes")
+  local fresh, unhovered, _, lead = load()
+  fresh.LeadRow.Show(unhovered, lead)
+  Assert.equal(tipShown(), false, "not hovered: Show adds no tooltip")
+end
+
+-- Clearing the row or hiding its parent (the window closed) takes the tooltip down.
+local function testChatTooltipHide()
+  local ns, row = hovered()
+  ns.LeadRow.Clear(row)
+  Assert.equal(tip().shown, false, "cleared")
+  _, row = hovered()
+  row:GetParent():Hide()
+  Assert.equal(tip().shown, false, "parent hidden")
+end
+
 return function()
+  testChatTooltip()
+  testChatTooltipLead()
+  testChatTooltipForeignOwner()
+  testChatTooltipRepaint()
+  testChatTooltipHide()
   testGeometry()
   testMarks()
   testContent()

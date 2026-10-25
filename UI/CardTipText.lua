@@ -17,6 +17,7 @@ local MainCrafterMenu = ns.MainCrafterMenu or require("CraftAlert.UI.MainCrafter
 -- UI/DetailsBody.lua own the zones and decide when a tooltip shows.
 local CardTipText = {}
 
+local format = string.format
 local tostring = tostring
 local type = type
 
@@ -119,6 +120,27 @@ function CardTipText.Greet(tip)
   for index = 1, 3 do
     instruction(tip, lines[index])
   end
+end
+
+local function customerColor(lead, fallback)
+  return rgbOf(FrameKit.GuidClassColor(lead.guid), fallback)
+end
+
+-- Row-chat-tooltip spec: "[HH:MM] [Channel] [Name]: message", the customer in class colour, the
+-- message with its links; a lead without a channel has no channel part.
+local function chatText(lead)
+  local name = FrameKit.ColorCode(tostring(lead.customer), customerColor(lead, Theme.COLORS.white))
+  local channel = LeadText.Channel(lead)
+  local channelPart = channel and format("[%s] ", channel) or ""
+  return format("[%s] %s[%s]: %s", _G["date"]("%H:%M", lead.time), channelPart, name, lead.message)
+end
+
+-- The lead's latest chat line, then what a row click does (a left click selects, never greets).
+function CardTipText.Chat(tip, lead)
+  tip:SetText(Localization.Text("Chat with %s", tostring(lead.customer)), customerColor(lead, Theme.COLORS.gold))
+  tip:AddLine(chatText(lead), 1, 1, 1, true)
+  instruction(tip, Localization.Text("Click: select"))
+  instruction(tip, Localization.Text("Right-click: dismiss"))
 end
 
 ns.CardTipText = CardTipText

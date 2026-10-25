@@ -9,11 +9,14 @@ local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
+local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
+local CardTipText = ns.CardTipText or require("CraftAlert.UI.CardTipText")
 
 -- Spec A.3: one 48 px row of the leads list pane, WhisperMessenger's contact-row layout
 -- (UI/ContactsList/RowView.lua:67-118, WM). The item or profession icon, the customer in class
 -- colour with the age on its right, and below what was requested, then the greeted check and the
--- replied tag at the bottom right. No link hover and no tooltip: the details pane has those.
+-- replied tag at the bottom right. No link hover; one tooltip, the latest chat line while the
+-- cursor is on the row (row-chat-tooltip spec). The details pane has the other tooltips.
 -- Left click selects the row (onSelect), right click dismisses through ClickRouter with the look
 -- rule. The row carries its lead and the GetTime() at which that lead appeared in it (§7.5 rule 3).
 local LeadRow = {}
@@ -25,9 +28,35 @@ local type = type
 -- WM's row numbers: EDGE from the row's sides, ICON_GAP after the icon, MARK_GAP between the marks
 -- and before the second line's end.
 local EDGE, ICON_GAP, MARK_GAP = 6, 10, 4
+local ANCHOR = "ANCHOR_RIGHT"
 
 local function now()
   return _G["GetTime"]()
+end
+
+-- Only a tooltip the row shows: one another frame owns is never hidden or rewritten.
+local function ownsTip(row)
+  local tip = Tooltip.Get()
+  return tip:IsShown() and tip:IsOwned(row)
+end
+
+local function hideChat(row)
+  if ownsTip(row) then
+    Tooltip.Get():Hide()
+  end
+end
+
+-- The row's lead's latest chat line; a lead without a message shows none.
+local function showChat(row)
+  local lead = row.lead
+  if lead == nil or lead.message == nil then
+    hideChat(row)
+    return
+  end
+  local tip = Tooltip.Get()
+  tip:SetOwner(row, ANCHOR)
+  CardTipText.Chat(tip, lead)
+  tip:Show()
 end
 
 local function onClick(row, button)
@@ -90,6 +119,9 @@ function LeadRow.Create(parent, index, onSelect)
   row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   row:SetScript("OnClick", onClick)
   row:SetScript("OnShow", onShow)
+  row:SetScript("OnEnter", showChat)
+  row:SetScript("OnLeave", hideChat)
+  row:HookScript("OnHide", hideChat)
   row:Hide()
   return row
 end
@@ -119,7 +151,8 @@ local function placeMarks(row, lead)
   row.what:SetPoint("RIGHT", row, "RIGHT", -(EDGE + marksWidth), 0)
 end
 
--- Shows `lead` in the row; a lead new to the row counts as shown from now.
+-- Shows `lead` in the row; a lead new to the row counts as shown from now. A chat tooltip the row
+-- shows is rebuilt for it (a refresh, a wheel scroll, a new chat line).
 function LeadRow.Show(row, lead)
   if row.lead ~= lead then
     row.shownAt = now()
@@ -132,6 +165,9 @@ function LeadRow.Show(row, lead)
   row.what:SetText(LeadText.What(lead))
   placeMarks(row, lead)
   row:Show()
+  if ownsTip(row) then
+    showChat(row)
+  end
 end
 
 function LeadRow.SetSelected(row, selected)
@@ -139,6 +175,7 @@ function LeadRow.SetSelected(row, selected)
 end
 
 function LeadRow.Clear(row)
+  hideChat(row)
   row.lead, row.shownAt = nil, nil
   row.selected:Hide()
   row:Hide()
