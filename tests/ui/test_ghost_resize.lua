@@ -114,6 +114,28 @@ local function testHideMidDragSavesNothing()
   Assert.equal(ns.GhostResize.IsResizing(), false)
 end
 
+-- Hovering the grip shows the client's resize cursor, as PanelResizeButtonTemplate did; a client
+-- without SetCursor gets no error.
+local function testResizeCursor()
+  local cursor = "default"
+  rawset(_G, "SetCursor", function(name)
+    cursor = name
+  end)
+  rawset(_G, "ResetCursor", function()
+    cursor = "default"
+  end)
+  local _, _, grip = setup()
+  Widgets.fire(grip, "OnEnter")
+  Assert.equal(cursor, "UI_RESIZE_CURSOR")
+  Widgets.fire(grip, "OnLeave")
+  Assert.equal(cursor, "default")
+  rawset(_G, "SetCursor", nil)
+  rawset(_G, "ResetCursor", nil)
+  local _, _, bare = setup()
+  Widgets.fire(bare, "OnEnter")
+  Widgets.fire(bare, "OnLeave")
+end
+
 local function testNoOnUpdate()
   local _, target, grip, ghost = setup()
   for _, frame in ipairs({ target, grip, ghost }) do
@@ -150,6 +172,7 @@ return function()
   testSecondPressKeepsAlpha()
   testClamp()
   testHideMidDragSavesNothing()
+  testResizeCursor()
   testNoOnUpdate()
   testLeadsWindowWiring()
   Wow.reset()

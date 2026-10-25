@@ -39,6 +39,17 @@ local function createGrip(frame)
   grip:SetNormalTexture(gripTexture(grip, art.SIZE_GRABBER_UP, "ARTWORK"))
   grip:SetPushedTexture(gripTexture(grip, art.SIZE_GRABBER_DOWN, "ARTWORK"))
   grip:SetHighlightTexture(gripTexture(grip, art.SIZE_GRABBER_HIGHLIGHT, "HIGHLIGHT"), "ADD")
+  -- The resize cursor on hover, as PanelResizeButtonTemplate showed it.
+  grip:SetScript("OnEnter", function()
+    if _G["SetCursor"] then
+      _G["SetCursor"]("UI_RESIZE_CURSOR")
+    end
+  end)
+  grip:SetScript("OnLeave", function()
+    if _G["ResetCursor"] then
+      _G["ResetCursor"]()
+    end
+  end)
   return grip
 end
 
