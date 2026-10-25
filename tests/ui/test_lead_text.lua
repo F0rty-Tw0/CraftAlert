@@ -86,6 +86,12 @@ local function testQuality()
   })
   Assert.same(plain(Q(qualityLead(), short)), { "R2 with the best reagents", "R3 needs 120 concentration (you have 40)" })
 
+  -- Exactly enough still covers it, with none left.
+  local exact = qualityDb(record({ ranks = ranks, reachRank = 2, reachCost = 120, reachConc = CONC }), {
+    [CONC] = { amount = 120, at = 0, cycleMs = 345600, perCycle = 1, max = 1000 },
+  })
+  Assert.same(plain(Q(qualityLead(), exact)), { "R2 with the best reagents", "R3 with 120 concentration (0 left)" })
+
   -- Colours: the rank white, the explanation 55 % white, the count grey.
   Assert.equal(Q(qualityLead(), full)[2], "|cffffffffR3|r |cff8c8c8cwith 120 concentration|r |cff7f7f7f(840 left)|r")
   Wow.reset()

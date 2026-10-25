@@ -64,6 +64,18 @@ local function testLoadedItemLinkRebuilds()
   Assert.equal(wm.info.CraftAlert[lead.customer], "|cffffd100Craft Alert:|r " .. lead.itemLink .. " · Blacksmithing · Me")
 end
 
+-- A new main crafter (Leads.Repick) on a profession lead changes only `crafter`; the line follows it.
+local function testNewCrafterRebuilds()
+  local ns, wm = boot()
+  local built = spyBuilds(ns)
+  local lead = leadOf(ns, 2)
+  lead.crafter = "Alt-Realm"
+  ns.WhisperBridge.SyncInfo()
+  Assert.equal(built[lead.customer], 1)
+  local info = wm.info.CraftAlert[lead.customer]
+  Assert.equal(info:sub(-#" · Alt"), " · Alt", "the new crafter went out: " .. info)
+end
+
 -- One greeting syncs the info lines once: its "greeted" is always followed by a "change".
 local function testGreetingSyncsOnce()
   local ns = boot()
@@ -81,6 +93,7 @@ return function()
   testOnlyTheChangedCustomerIsRebuilt()
   testUnchangedLeadsAreNotRebuilt()
   testLoadedItemLinkRebuilds()
+  testNewCrafterRebuilds()
   testGreetingSyncsOnce()
   Wow.reset()
 end
