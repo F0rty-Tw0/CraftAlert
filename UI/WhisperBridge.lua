@@ -25,6 +25,7 @@ local WhisperBridge = {}
 local concat = table.concat
 local ipairs = ipairs
 local pairs = pairs
+local pcall = pcall
 local type = type
 
 local KEY = "CraftAlert"
@@ -53,7 +54,7 @@ local function now()
 end
 
 local function isUsable(candidate)
-  if type(candidate) ~= "table" or type(candidate.version) ~= "number" or candidate.version < 1 then
+  if type(candidate) ~= "table" or candidate.version ~= 1 then
     return false
   end
   for _, name in ipairs(REQUIRED) do
@@ -62,6 +63,13 @@ local function isUsable(candidate)
     end
   end
   return true
+end
+
+-- A call into WM's API from a click, a keybind or an event: a raise counts as a refusal (false),
+-- so a broken WM never costs the player the Blizzard fallback.
+local function ask(name, ...)
+  local ok, result = pcall(api[name], ...)
+  return ok and result
 end
 
 -- Today's two calls (Blizzard's whisper box), for when WM refuses (combat, lockdown).
@@ -74,7 +82,7 @@ local function defaultOpen(target, text)
 end
 
 local function open(target, text)
-  if not api.OpenConversation(target, text) then
+  if not ask("OpenConversation", target, text) then
     defaultOpen(target, text)
   end
 end
@@ -154,7 +162,7 @@ function WhisperBridge.Activate()
   api, active = candidate, true
   Launcher.SetSuppressed(true)
   LeadsWindow.SetRouter(function()
-    return api.TogglePanel(KEY)
+    return ask("TogglePanel", KEY)
   end)
   GreetAction.SetOpener(open)
   Leads.On("change", onChange)
@@ -173,7 +181,7 @@ local function previewFor(lead, entry)
       -- Only a greeting this click sent: otherwise Greet opened the draft already, and a test
       -- lead (dry run) has no customer to open.
       if action == "greet" and lead.greeted and not wasGreeted and not lead.test then
-        api.OpenConversation(GreetAction.Target(lead))
+        ask("OpenConversation", GreetAction.Target(lead))
       end
       if shown == entry then
         shown = nil
@@ -199,7 +207,7 @@ function WhisperBridge.ShowLead(lead)
     return
   end
   local entry = { lead = lead, shownAt = now() }
-  if not api.ShowPreview(KEY, previewFor(lead, entry)) then
+  if not ask("ShowPreview", KEY, previewFor(lead, entry)) then
     AlertToast.Show(lead)
     return
   end
@@ -241,12 +249,12 @@ function WhisperBridge.VisibleLead()
       found, foundAt = lead, shownAt
     end
   end
-  if shown and api.IsPreviewShown(KEY) then
+  if shown and ask("IsPreviewShown", KEY) then
     consider(shown.lead, shown.shownAt)
   else
     consider(AlertToast.VisibleLead())
   end
-  if api.IsPanelShown(KEY) then
+  if ask("IsPanelShown", KEY) then
     consider(BridgePanel.TopRow())
   end
   return found, foundAt

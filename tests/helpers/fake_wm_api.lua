@@ -6,6 +6,7 @@
 --   wm.calls                               every call in order, { name, args... } (RegisterPanel included)
 --   wm.callsTo(name)                       those entries
 --   wm.refuse[name] = true                 that function records the call, changes nothing, returns false
+--   wm.raise[name] = true                  that function records the call, then raises
 --   wm.preview[key]                        the preview table while shown (ShowPreview sets it, HidePreview clears it)
 --   wm.registered                          { { key, panel }, ... }; wm.panels[key] = panel
 --   wm.shown[key]                          IsPanelShown
@@ -23,7 +24,7 @@ local HOST_WIDTH, HOST_HEIGHT = 600, 400
 
 function FakeWm.install(opts)
   opts = opts or {}
-  local wm = { calls = {}, refuse = {}, preview = {}, registered = {}, panels = {}, shown = {}, info = {}, badgeRefreshes = 0 }
+  local wm = { calls = {}, refuse = {}, raise = {}, preview = {}, registered = {}, panels = {}, shown = {}, info = {}, badgeRefreshes = 0 }
   ---@type table<string, any>
   local api = { version = opts.version or 1 }
 
@@ -55,6 +56,9 @@ function FakeWm.install(opts)
   local function define(name, effect)
     api[name] = function(...)
       wm.calls[#wm.calls + 1] = { name, ... }
+      if wm.raise[name] then
+        error("WhisperMessengerAPI." .. name .. " raised")
+      end
       if wm.refuse[name] then
         return false
       end

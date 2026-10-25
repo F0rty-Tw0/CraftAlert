@@ -53,6 +53,8 @@ local function testStandaloneWhenApiMissingOrIncomplete()
   Assert.equal(ns.WhisperBridge.Activate(), false)
   local ns2 = boot(nil, { version = 0 })
   Assert.equal(ns2.WhisperBridge.Activate(), false, "version 0")
+  local ns3 = boot(nil, { version = 2 })
+  Assert.equal(ns3.WhisperBridge.Activate(), false, "a version this bridge was not written for")
   for _, missing in ipairs({ "ShowPreview", "OpenConversation", "SetContactInfo" }) do
     local n, _, _, _, wm = boot(nil, { without = { missing } })
     Assert.equal(n.WhisperBridge.Activate(), false, missing .. " missing")
@@ -393,6 +395,34 @@ local function testPreviewClickOpensOnce()
   Assert.same({ #wm2.callsTo("OpenConversation"), #UiFixture.callsTo(calls2, "chat") }, { 0, 0 }, "test lead: dry run only")
 end
 
+-- A raising WM API is a refusal: the click, the keybind and the alert still reach today's path.
+local function testRaisingApiIsARefusal()
+  local ns, _, calls, _, wm = boot({ leads = 2 })
+  ns.WhisperBridge.Activate()
+  local lead = ns.Leads.Latest()
+  wm.raise.OpenConversation = true
+  ns.GreetAction.Empty(lead)
+  Assert.same(calls, { { "empty", lead.customer } }, "the Blizzard box opens")
+  wm.raise.TogglePanel = true
+  ns.LeadsWindow.Toggle()
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"):IsShown(), true, "own window")
+  wm.raise.ShowPreview = true
+  ns.WhisperBridge.ShowLead(lead)
+  Assert.truthy(rawget(_G, "CraftAlertToast"), "own toast")
+  local ns2, _, _, _, wm2 = boot()
+  ns2.WhisperBridge.Activate()
+  ns2.WhisperBridge.ShowLead(ns2.Leads.Latest())
+  wm2.showPanel("CraftAlert")
+  Assert.equal(ns2.WhisperBridge.VisibleLead() ~= nil, true, "shown when the API answers")
+  wm2.raise.IsPreviewShown, wm2.raise.IsPanelShown = true, true
+  Assert.equal(ns2.WhisperBridge.VisibleLead(), nil, "neither shows when it raises, and nothing raised")
+  wm2.raise.IsPreviewShown, wm2.raise.IsPanelShown = nil, nil
+  wm2.raise.OpenConversation = true
+  Wow.clock.gettime = 51
+  wm2.preview.CraftAlert.onClick() -- sent, then the chat open raises
+  Assert.equal(ns2.Leads.Latest().greeted, true, "the click still greeted")
+end
+
 local function testNoOnUpdateAnywhere()
   local ns, _, _, _, wm = boot()
   ns.WhisperBridge.Activate()
@@ -424,6 +454,7 @@ return function()
   testLeavingInstanceRefreshesPanel()
   testPanelRefusedStaysStandalone()
   testPreviewClickOpensOnce()
+  testRaisingApiIsARefusal()
   testNoOnUpdateAnywhere()
   Wow.reset()
 end
