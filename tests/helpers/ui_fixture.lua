@@ -40,6 +40,8 @@ local UI = {
   "UI.LeadCard",
   "UI.CardList",
   "UI.LeadRow",
+  "UI.DetailsBody",
+  "UI.LeadDetails",
   "UI.WindowSize",
   "UI.SettingsGear",
   "UI.Settings.SettingsPane",

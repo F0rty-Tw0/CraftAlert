@@ -359,7 +359,6 @@ local function testNoPaneLeft()
   local ns = load({ UiFixture.lead(1) })
   ns.LeadsWindow.Toggle()
   Assert.equal(window().details, nil)
-  Assert.equal(ns.LeadDetails, nil)
 end
 
 local HOVERED = { true, true, true, true }

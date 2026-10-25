@@ -120,7 +120,7 @@ function CardBody.Crafters(lead)
 end
 
 -- Why in white, then the profession in gold; whichever is set, nil for neither.
-local function matchedText(lead)
+function CardBody.MatchedText(lead)
   local colors = Theme.COLORS
   local why = lead.why and themed(lead.why, colors.white)
   local profession = lead.profName and themed(lead.profName, colors.gold)
@@ -165,7 +165,7 @@ end
 
 function CardBody.Paint(card, lead)
   setRow(card, "request", lead.message)
-  setRow(card, "matched", matchedText(lead))
+  setRow(card, "matched", CardBody.MatchedText(lead))
   setRow(card, "crafters", craftersText(lead))
 end
 
