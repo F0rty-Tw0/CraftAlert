@@ -12,26 +12,15 @@ local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local CardBody = ns.CardBody or require("CraftAlert.UI.CardBody")
 local MainCrafterMenu = ns.MainCrafterMenu or require("CraftAlert.UI.MainCrafterMenu")
 
--- Lead-cards spec §2, §2.1: what a card's tooltips say. Each builder fills a tooltip that already has
--- its owner: a gold title, white text, green instruction lines. UI/CardTips.lua owns the zones and
--- decides when a tooltip shows.
+-- Lead-cards spec §2: what the details pane's tooltips say. Each builder fills a tooltip that
+-- already has its owner: a gold title, white text, green instruction lines. UI/LeadDetails.lua and
+-- UI/DetailsBody.lua own the zones and decide when a tooltip shows.
 local CardTipText = {}
 
-local format = string.format
 local tostring = tostring
 local type = type
 
 local WHY_SEPARATOR = " + "
--- A lead's channel key and its word, localized when shown. Only the keys come from
--- Core/ScanGate.lua:33; the words are the spec's (§2.1), not the status line's.
-local CHANNEL_NAMES = {
-  trade = "Trade",
-  services = "Services",
-  general = "General",
-  lfg = "LFG",
-  guild = "Guild",
-  communities = "Community",
-}
 
 -- As GameTooltip_SetTitle: replaces the lines, wrapping.
 local function title(tip, text)
@@ -53,10 +42,6 @@ local function rgbOf(color, fallback)
     return color.r, color.g, color.b
   end
   return fallback[1], fallback[2], fallback[3]
-end
-
-local function customerColor(lead, fallback)
-  return rgbOf(FrameKit.GuidClassColor(lead.guid), fallback)
 end
 
 -- The customer in class colour, their class, and whether they were greeted or replied. The class
@@ -134,26 +119,6 @@ function CardTipText.Greet(tip)
   for index = 1, 3 do
     instruction(tip, lines[index])
   end
-end
-
-local function channelName(key)
-  local name = CHANNEL_NAMES[key]
-  return name and Localization.Text(name) or tostring(key)
-end
-
--- "[HH:MM] [Channel] [Name]: message", the customer in class colour, the message with its links.
-local function chatText(lead)
-  local name = FrameKit.ColorCode(tostring(lead.customer), customerColor(lead, Theme.COLORS.white))
-  return format("[%s] [%s] [%s]: %s", _G["date"]("%H:%M", lead.time), channelName(lead.channel), name, lead.message)
-end
-
--- The lead's latest chat line (§2.1), then what clicking does.
-function CardTipText.Chat(tip, lead)
-  tip:SetText(Localization.Text("Chat with %s", tostring(lead.customer)), customerColor(lead, Theme.COLORS.gold))
-  tip:AddLine(chatText(lead), 1, 1, 1, true)
-  local lines = LeadText.ClickLines()
-  instruction(tip, lines[1])
-  instruction(tip, lines[4])
 end
 
 ns.CardTipText = CardTipText

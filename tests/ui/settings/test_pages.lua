@@ -100,7 +100,7 @@ local function testNavHighlight()
   local window = SettingsFixture.window()
   local nav = SettingsFixture.navButton("General").parent
   Assert.equal(nav.template, "InsetFrameTemplate")
-  Assert.same(nav.points[1], { "TOPLEFT", window.Inset, "TOPLEFT", padding, -padding })
+  Assert.same(nav.points[1], { "TOPLEFT", window.content, "TOPLEFT", padding, -padding })
   -- The Alerts page's content frame: the pane container's child that holds its rows.
   local content = SettingsFixture.row("Lead timeout")
   while content.parent ~= nav.parent do

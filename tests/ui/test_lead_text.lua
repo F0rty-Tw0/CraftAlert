@@ -15,5 +15,12 @@ return function()
   -- An alt on another realm keeps its realm.
   Assert.equal(H({ crafter = "Alt-Other", recipeName = "Plate Belt" }), "Wants Plate Belt — your alt Alt-Other can craft it")
   Assert.equal(H({ crafter = "Alt-Other", profName = "Blacksmithing" }), "Wants Blacksmithing — your alt Alt-Other has it")
+  -- A lead's channel key as its word; an unknown key as itself; no key, nil.
+  local channels = { trade = "Trade", services = "Services", general = "General", lfg = "LFG", guild = "Guild", communities = "Community" }
+  for key, name in pairs(channels) do
+    Assert.equal(ns.LeadText.Channel({ channel = key }), name, key)
+  end
+  Assert.equal(ns.LeadText.Channel({ channel = "weird" }), "weird")
+  Assert.equal(ns.LeadText.Channel({}), nil)
   Wow.reset()
 end

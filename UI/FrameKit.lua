@@ -68,6 +68,18 @@ function FrameKit.Art(texture, atlas, fallbackFile, blend)
   return hasAtlas
 end
 
+-- Paints a pane's atlas on the texture and returns true; a client without the atlas keeps the texture
+-- as it was (empty, not hidden) and gets false. Same rule as WhisperMessenger's NativeArt.PaintPanel.
+function FrameKit.PaintPanel(texture, atlas)
+  if not atlasExists(atlas) then
+    return false
+  end
+  texture:SetAtlas(atlas)
+  texture:SetBlendMode("BLEND")
+
+  return true
+end
+
 -- The quest-log hover highlight over the whole of `button`, shown by the client while hovered.
 function FrameKit.ListHighlight(button)
   local texture = button:CreateTexture(nil, "HIGHLIGHT")

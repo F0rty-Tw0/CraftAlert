@@ -1,6 +1,7 @@
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
+local Templates = require("tests.helpers.templates")
 
 -- The stub layer the tests and tools/sim.lua share: a reset leaves nothing of the last run.
 return function()
@@ -61,4 +62,19 @@ return function()
   rawget(_G, "SetItemRef")("item:1", "[x]", "LeftButton", box)
   Assert.same(Wow.itemRefs, { { "item:1", "[x]", "LeftButton", box } })
   Assert.equal(type(rawget(_G, "C_Texture").GetAtlasInfo("Any")), "table")
+  -- SetClipsChildren is stored; the portrait template fakes follow ButtonFrameTemplate.
+  box:SetClipsChildren(true)
+  Assert.equal(box.clipsChildren, true)
+  local window = rawget(_G, "CreateFrame")("Frame", nil, parent, "ButtonFrameTemplate")
+  window:SetPortraitToAsset("asset")
+  Assert.equal(window.portraitAsset, "asset")
+  window.PortraitContainer.portrait:SetTexture("file")
+  Assert.equal(window.PortraitContainer.portrait.texture, "file")
+  Templates.portraitMethod = false
+  local classic = rawget(_G, "CreateFrame")("Frame", nil, parent, "ButtonFrameTemplate")
+  Templates.portraitMethod = true
+  Assert.equal(classic.SetPortraitToAsset, nil)
+  Assert.equal(type(classic.PortraitContainer.portrait.SetTexture), "function")
+  local inset = rawget(_G, "CreateFrame")("Frame", nil, parent, "InsetFrameTemplate")
+  Assert.equal(inset.Bg.layer, "BACKGROUND")
 end
