@@ -136,8 +136,8 @@ local function onChange()
 end
 
 -- Activates once per session (spec C.2): → whether the bridge is on. A second call returns the
--- first answer and wires nothing again. RegisterPanel, the one call out, comes before the wiring,
--- so a raise there leaves CraftAlert standalone.
+-- first answer and wires nothing again. RegisterPanel, the one call out, comes before the wiring:
+-- a raise or a false answer (WM refuses, e.g. the key is taken) leaves CraftAlert standalone.
 function WhisperBridge.Activate()
   if active ~= nil then
     return active
@@ -147,7 +147,10 @@ function WhisperBridge.Activate()
     active = false
     return false
   end
-  candidate.RegisterPanel(KEY, BridgePanel.Build())
+  if candidate.RegisterPanel(KEY, BridgePanel.Build()) ~= true then
+    active = false
+    return false
+  end
   api, active = candidate, true
   Launcher.SetSuppressed(true)
   LeadsWindow.SetRouter(function()

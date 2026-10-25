@@ -354,6 +354,22 @@ local function testLeavingInstanceRefreshesPanel()
   Assert.truthy(wm.preview.CraftAlert, "preview kept")
 end
 
+-- WM's RegisterPanel answers false (never raises) when it refuses, e.g. the key is taken: the
+-- bridge stays off, the launcher and the own window stay, no later event reaches the API.
+local function testPanelRefusedStaysStandalone()
+  local ns, _, _, _, wm = boot()
+  wm.refuse.RegisterPanel = true
+  Assert.equal(ns.WhisperBridge.Activate(), false)
+  Assert.equal(ns.WhisperBridge.Activate(), false, "the answer sticks")
+  local launcher = ns.Launcher.Create()
+  Assert.equal(ns.Launcher.Frame(), launcher, "launcher not suppressed")
+  ns.LeadsWindow.Toggle()
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"):IsShown(), true, "own window, not TogglePanel")
+  ns.Leads.Dismiss(ns.Leads.Latest().id)
+  ns.WhisperBridge.OnGate()
+  Assert.same(#wm.calls, 1, "RegisterPanel was the only call")
+end
+
 local function testNoOnUpdateAnywhere()
   local ns, _, _, _, wm = boot()
   ns.WhisperBridge.Activate()
@@ -383,6 +399,7 @@ return function()
   testPanelHostRules()
   testPanelEmptyInInstance()
   testLeavingInstanceRefreshesPanel()
+  testPanelRefusedStaysStandalone()
   testNoOnUpdateAnywhere()
   Wow.reset()
 end
