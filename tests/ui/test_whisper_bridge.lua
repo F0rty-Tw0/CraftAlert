@@ -370,6 +370,29 @@ local function testPanelRefusedStaysStandalone()
   Assert.same(#wm.calls, 1, "RegisterPanel was the only call")
 end
 
+-- The click opens the conversation after a greeting it sent, and only then: a lead already greeted
+-- got its draft from the greet itself (one conversation, not two), and a `/ca test` lead stays a
+-- dry run (nothing sent, nothing opened).
+local function testPreviewClickOpensOnce()
+  local ns, _, calls, _, wm = boot()
+  ns.WhisperBridge.Activate()
+  local lead = ns.Leads.Latest()
+  ns.Leads.MarkGreeted(lead.id)
+  ns.WhisperBridge.ShowLead(lead)
+  Wow.clock.gettime = 51
+  wm.preview.CraftAlert.onClick()
+  Assert.same(wm.callsTo("OpenConversation"), { { "OpenConversation", lead.customer, GREETING } }, "greeted: the draft, once")
+  Assert.same(UiFixture.callsTo(calls, "chat"), {}, "not sent again")
+  local ns2, _, calls2, _, wm2 = boot()
+  ns2.WhisperBridge.Activate()
+  local test = ns2.Leads.Latest()
+  test.test = true
+  ns2.WhisperBridge.ShowLead(test)
+  Wow.clock.gettime = 51
+  wm2.preview.CraftAlert.onClick()
+  Assert.same({ #wm2.callsTo("OpenConversation"), #UiFixture.callsTo(calls2, "chat") }, { 0, 0 }, "test lead: dry run only")
+end
+
 local function testNoOnUpdateAnywhere()
   local ns, _, _, _, wm = boot()
   ns.WhisperBridge.Activate()
@@ -400,6 +423,7 @@ return function()
   testPanelEmptyInInstance()
   testLeavingInstanceRefreshesPanel()
   testPanelRefusedStaysStandalone()
+  testPreviewClickOpensOnce()
   testNoOnUpdateAnywhere()
   Wow.reset()
 end

@@ -168,8 +168,11 @@ local function previewFor(lead, entry)
     sender = lead.customer,
     text = LeadText.What(lead),
     onClick = function()
+      local wasGreeted = lead.greeted
       local action = ClickRouter.Handle("LeftButton", lead, entry.shownAt)
-      if action == "greet" and lead.greeted then
+      -- Only a greeting this click sent: otherwise Greet opened the draft already, and a test
+      -- lead (dry run) has no customer to open.
+      if action == "greet" and lead.greeted and not wasGreeted and not lead.test then
         api.OpenConversation(GreetAction.Target(lead))
       end
       if shown == entry then
