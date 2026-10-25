@@ -2,6 +2,7 @@ local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
+local SettingsFixture = require("tests.helpers.settings_fixture")
 local FakeWm = require("tests.helpers.fake_wm_api")
 
 -- Spec C.3, the state x event table of the WhisperMessenger bridge: one function per row, all on
@@ -133,16 +134,15 @@ local function testToggleAndConfigRows()
   Assert.equal(G("CraftAlertLeadsWindow"):IsShown(), true, "refused: the own window opens")
   G("CraftAlert_ToggleLeads")()
   Assert.equal(G("CraftAlertLeadsWindow"):IsShown(), false, "and closes again")
-  -- /ca config: the own window on Settings, WM not asked, with or without the panel up
+  -- /ca config: the panel ends on Settings (shown on the leads), the own window stays down
   wm.refuse.TogglePanel = false
   wm.showPanel("CraftAlert")
-  local toggles = #wm.callsTo("TogglePanel")
   ns.LeadsWindow.ToggleSettings()
-  Assert.equal(#wm.callsTo("TogglePanel"), toggles, "no TogglePanel")
-  Assert.same({ G("CraftAlertLeadsWindow"):IsShown(), G("CraftAlertLeadsWindow"):GetTitleText():GetText() }, { true, "Craft Alert — Settings" })
+  Assert.same({ ns.BridgePanel.InSettings(), wm.shown.CraftAlert }, { true, true })
+  Assert.equal(G("CraftAlertLeadsWindow"):IsShown(), false, "own window stays hidden")
 end
 
--- "Gear in embedded view": the one Button on the details pane's TOPRIGHT opens the own window on Settings.
+-- "Gear in embedded view": the one Button with the gear's art (.normal) opens Settings inside the host.
 local function testGearRow()
   local ns, _, _, _, wm = boot()
   ns.WhisperBridge.Activate()
@@ -151,8 +151,7 @@ local function testGearRow()
   wm.showPanel("CraftAlert", host)
   local gear
   for _, frame in ipairs(Wow.frames) do
-    local point = frame.points and frame.points[1]
-    if frame.frameType == "Button" and frame.scripts.OnClick and point and point[1] == "TOPRIGHT" then
+    if frame.frameType == "Button" and frame.normal then
       local parent = frame.parent
       while parent and parent ~= host do
         parent = parent.parent
@@ -164,7 +163,9 @@ local function testGearRow()
   end
   Assert.truthy(gear, "gear in the embedded view")
   Widgets.click(gear)
-  Assert.same({ G("CraftAlertLeadsWindow"):IsShown(), G("CraftAlertLeadsWindow"):GetTitleText():GetText() }, { true, "Craft Alert — Settings" })
+  local back = SettingsFixture.button(host, "Back to leads")
+  Assert.same({ back.parent.parent.parent, back.parent.parent:IsShown() }, { host, true }, "the settings pane fills the host")
+  Assert.equal(G("CraftAlertLeadsWindow"), nil, "no own window")
   Assert.equal(#wm.callsTo("TogglePanel"), 0)
 end
 

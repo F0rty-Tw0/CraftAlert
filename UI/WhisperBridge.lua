@@ -3,28 +3,27 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
-local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
-local CardBody = ns.CardBody or require("CraftAlert.UI.CardBody")
 local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
 local BridgePanel = ns.BridgePanel or require("CraftAlert.UI.BridgePanel")
+local BridgeInfo = ns.BridgeInfo or require("CraftAlert.UI.BridgeInfo")
 
 -- Spec C.2, C.3: when WhisperMessenger's addon API (_G.WhisperMessengerAPI, version 1) is there at
--- login, the toast becomes WM's widget preview, the leads window becomes a WM panel, whisper boxes
--- open as WM conversations and each customer's conversation gets an info line. The earlier modules
--- never call this one: Activate plugs it in through their setters (Launcher.SetSuppressed,
--- LeadsWindow.SetRouter, GreetAction.SetOpener). Without the API nothing here runs.
+-- login, the toast becomes WM's widget preview, the leads window becomes a WM panel
+-- (UI/BridgePanel.lua), /ca config opens its settings, whisper boxes open as WM conversations and
+-- each customer's conversation gets an info line (UI/BridgeInfo.lua). The earlier modules never
+-- call this one: Activate plugs it in through their setters (Launcher.SetSuppressed,
+-- LeadsWindow.SetRouter and SetSettingsRouter, GreetAction.SetOpener). Without the API nothing
+-- here runs.
 local WhisperBridge = {}
 
-local concat = table.concat
 local ipairs = ipairs
-local pairs = pairs
 local pcall = pcall
 local type = type
 
@@ -47,7 +46,6 @@ local api = nil -- _G.WhisperMessengerAPI once Activate accepted it
 local active = nil -- nil until Activate ran, then whether it activated
 ---@type table|nil
 local shown = nil -- { lead, shownAt } of the preview on WM's widget, nil when none
-local sentInfo = {} -- customer -> the info line last sent
 
 local function now()
   return _G["GetTime"]()
@@ -72,6 +70,24 @@ local function ask(name, ...)
   return ok and result
 end
 
+-- /ca config: the panel on settings. Shown in settings → closes it (as the own window does); shown
+-- on the leads → settings; hidden → opens it, then settings (WM runs onShow inside ShowPanel).
+-- → whether WM answered; false leaves /ca config to the own window.
+local function toggleSettings()
+  if BridgePanel.IsShown() then
+    if BridgePanel.InSettings() then
+      return ask("TogglePanel", KEY)
+    end
+    BridgePanel.ShowSettings()
+    return true
+  end
+  if not ask("ShowPanel", KEY) then
+    return false
+  end
+  BridgePanel.ShowSettings()
+  return true
+end
+
 -- Today's two calls (Blizzard's whisper box), for when WM refuses (combat, lockdown).
 local function defaultOpen(target, text)
   if text then
@@ -92,45 +108,13 @@ local function hidePreview()
   ask("HidePreview", KEY)
 end
 
-local function add(parts, text)
-  if text and text ~= "" then
-    parts[#parts + 1] = text
-  end
+-- The info lines go out through SetContactInfo (UI/BridgeInfo.lua), a refusal or raise as false.
+local function sendInfo(customer, text, lines)
+  return ask("SetContactInfo", KEY, customer, text, lines)
 end
 
--- "Craft Alert: <what> · <profession> · <crafter>", the profession dropped when it is the what.
-local function infoText(lead)
-  local what, parts = LeadText.What(lead), {}
-  add(parts, what)
-  if lead.profName ~= what then
-    add(parts, lead.profName)
-  end
-  local crafter = CardBody.Crafters(lead)[1]
-  add(parts, crafter and crafter.name)
-  return "|cffffd100" .. Localization.Text("Craft Alert") .. ":|r " .. concat(parts, " · ")
-end
-
--- Each customer's info line follows their newest active lead (Leads.List is newest first); a line
--- goes out only when its text changed, a customer without an active lead loses theirs. Only what WM
--- accepted counts as sent, so a refused line or removal is tried again on the next sync.
 local function syncInfo()
-  local newest = {}
-  for _, lead in ipairs(Leads.List()) do
-    if newest[lead.customer] == nil then
-      newest[lead.customer] = lead
-    end
-  end
-  for customer, lead in pairs(newest) do
-    local text = infoText(lead)
-    if sentInfo[customer] ~= text and ask("SetContactInfo", KEY, customer, text) then
-      sentInfo[customer] = text
-    end
-  end
-  for customer in pairs(sentInfo) do
-    if newest[customer] == nil and ask("SetContactInfo", KEY, customer, nil) then
-      sentInfo[customer] = nil
-    end
-  end
+  BridgeInfo.Sync(sendInfo)
 end
 
 -- Bootstrap's step after Leads.Restore: the leads of the last session are back without a "change",
@@ -171,10 +155,13 @@ function WhisperBridge.Activate()
   LeadsWindow.SetRouter(function()
     return ask("TogglePanel", KEY)
   end)
+  LeadsWindow.SetSettingsRouter(toggleSettings)
   GreetAction.SetOpener(open)
+  -- "greeted" and "replied" are always followed by a "change", which syncs the info lines.
   Leads.On("change", onChange)
-  Leads.On("greeted", syncInfo)
-  Leads.On("replied", syncInfo)
+  Leads.On("seen", function()
+    ask("RefreshPanelBadge", KEY)
+  end)
   return true
 end
 
@@ -182,6 +169,8 @@ local function previewFor(lead, entry)
   return {
     sender = lead.customer,
     text = LeadText.What(lead),
+    classTag = FlavorCompat.ClassOf(lead.guid),
+    pulse = true,
     onClick = function()
       local wasGreeted = lead.greeted
       local action = ClickRouter.Handle("LeftButton", lead, entry.shownAt)
