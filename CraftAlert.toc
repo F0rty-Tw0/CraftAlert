@@ -72,6 +72,7 @@ UI/CardTipText.lua
 UI/CardTips.lua
 UI/LeadCard.lua
 UI/CardList.lua
+UI/LeadRow.lua
 UI/WindowSize.lua
 UI/SettingsGear.lua
 UI/Settings/SettingsPane.lua
