@@ -82,8 +82,9 @@ function MatchCandidates.FromRecords(records, n)
   MatchCandidates.count = count
 end
 
--- R4 (slot-words spec): whether an entry stays under a slot word. A group without word-index
--- words (an enchant, an itemless recipe) stays; any other stays when its item has the word.
+-- R4 (slot-words spec): whether an entry stays under a slot word. A group without a word set
+-- (an enchant, an itemless recipe, an item nobody wears) stays; any other stays when its item
+-- has the word, so worn profession gear (an empty set, WordGroups) goes.
 local function entryKept(entry, slot, groupWords)
   local words = groupWords[entry.group]
   return words == nil or words[slot] == true
