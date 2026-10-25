@@ -200,9 +200,9 @@ function BridgePanel.Refresh()
   end
 end
 
--- The gear: leads <-> settings in the shown panel. A no-op while hidden.
+-- The gear: leads <-> settings in the shown panel. A no-op while hidden or in an instance.
 function BridgePanel.ToggleSettings()
-  if not panelShown then
+  if not panelShown or FlavorCompat.InInstance() then
     return
   end
   if mode == "settings" then

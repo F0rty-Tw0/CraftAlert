@@ -123,6 +123,19 @@ local function testToggleSettings()
   Assert.equal(container:IsShown(), true)
 end
 
+-- In an instance the gear does nothing: the panel stays on its (empty) leads.
+local function testGearOffInInstance()
+  local ns, _, _, wm = boot()
+  local captured = capture(ns)
+  showWith(wm)
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  ns.BridgePanel.ToggleSettings()
+  Assert.same({ ns.BridgePanel.InSettings(), captured.view.frame:IsShown() }, { false, true })
+  Wow.stub("IsInInstance", nil)
+end
+
 local function testModeIsNotSaved()
   local ns, _, _, wm = boot()
   local host = showWith(wm)
@@ -343,6 +356,7 @@ return function()
   testGearOpensSettingsInTheHost()
   testBackReturnsToLeads()
   testToggleSettings()
+  testGearOffInInstance()
   testModeIsNotSaved()
   testRefreshSkippedInSettings()
   testNavWidthInWm()
