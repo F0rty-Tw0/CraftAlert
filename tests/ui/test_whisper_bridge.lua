@@ -333,6 +333,25 @@ local function testPanelEmptyInInstance()
   Assert.equal(ns.WhisperBridge.VisibleLead() ~= nil, true, "rows are back outside")
 end
 
+-- Leaving an instance with the panel open: the rows come back and the badge is refreshed without
+-- waiting for a lead change; a preview shown outside stays on a gate change that is not an entry.
+local function testLeavingInstanceRefreshesPanel()
+  local ns, _, _, _, wm = boot({ leads = 2 })
+  ns.WhisperBridge.Activate()
+  wm.showPanel("CraftAlert")
+  inInstance(true)
+  ns.WhisperBridge.OnGate()
+  Assert.equal(ns.WhisperBridge.VisibleLead(), nil, "empty inside")
+  local badges = wm.badgeRefreshes
+  inInstance(false)
+  ns.WhisperBridge.OnGate() -- leaving: no lead changed
+  Assert.equal(ns.WhisperBridge.VisibleLead() ~= nil, true, "rows are back at once")
+  Assert.equal(wm.badgeRefreshes, badges + 1, "badge refreshed on leaving")
+  ns.WhisperBridge.ShowLead(ns.Leads.Latest())
+  ns.WhisperBridge.OnGate() -- a gate change outside an instance keeps the preview
+  Assert.truthy(wm.preview.CraftAlert, "preview kept")
+end
+
 local function testNoOnUpdateAnywhere()
   local ns, _, _, _, wm = boot()
   ns.WhisperBridge.Activate()
@@ -361,6 +380,7 @@ return function()
   testPanelRefreshesOnlyWhileShown()
   testPanelHostRules()
   testPanelEmptyInInstance()
+  testLeavingInstanceRefreshesPanel()
   testNoOnUpdateAnywhere()
   Wow.reset()
 end

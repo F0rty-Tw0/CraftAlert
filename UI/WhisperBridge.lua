@@ -208,15 +208,17 @@ function WhisperBridge.ShowLead(lead)
 end
 
 -- ScanGate.OnChange (wired by Bootstrap, also standalone): entering an instance takes the preview
--- down and empties an open panel. Arguments are ignored.
+-- down; an open panel and the badge follow the gate both ways (empty inside, full again outside).
+-- Arguments are ignored.
 function WhisperBridge.OnGate()
-  if not active or not FlavorCompat.InInstance() then
+  if not active then
     return
   end
-  if shown then
+  if shown and FlavorCompat.InInstance() then
     hidePreview()
   end
   BridgePanel.Refresh()
+  api.RefreshPanelBadge(KEY)
 end
 
 -- The latest lead and GetTime() when it appeared, from whichever of the WM preview (else the
