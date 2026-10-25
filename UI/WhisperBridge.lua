@@ -65,8 +65,8 @@ local function isUsable(candidate)
   return true
 end
 
--- A call into WM's API from a click, a keybind or an event: a raise counts as a refusal (false),
--- so a broken WM never costs the player the Blizzard fallback.
+-- Every call into WM's API after Activate: a raise counts as a refusal (false), so a broken WM
+-- never costs the player the Blizzard fallback or the rest of a handler.
 local function ask(name, ...)
   local ok, result = pcall(api[name], ...)
   return ok and result
@@ -89,7 +89,7 @@ end
 
 local function hidePreview()
   shown = nil
-  api.HidePreview(KEY)
+  ask("HidePreview", KEY)
 end
 
 local function add(parts, text)
@@ -111,7 +111,8 @@ local function infoText(lead)
 end
 
 -- Each customer's info line follows their newest active lead (Leads.List is newest first); a line
--- goes out only when its text changed, a customer without an active lead loses theirs.
+-- goes out only when its text changed, a customer without an active lead loses theirs. Only what WM
+-- accepted counts as sent, so a refused line or removal is tried again on the next sync.
 local function syncInfo()
   local newest = {}
   for _, lead in ipairs(Leads.List()) do
@@ -121,15 +122,13 @@ local function syncInfo()
   end
   for customer, lead in pairs(newest) do
     local text = infoText(lead)
-    if sentInfo[customer] ~= text then
+    if sentInfo[customer] ~= text and ask("SetContactInfo", KEY, customer, text) then
       sentInfo[customer] = text
-      api.SetContactInfo(KEY, customer, text)
     end
   end
   for customer in pairs(sentInfo) do
-    if newest[customer] == nil then
+    if newest[customer] == nil and ask("SetContactInfo", KEY, customer, nil) then
       sentInfo[customer] = nil
-      api.SetContactInfo(KEY, customer, nil)
     end
   end
 end
@@ -147,7 +146,7 @@ local function onChange()
     hidePreview()
   end
   BridgePanel.Refresh()
-  api.RefreshPanelBadge(KEY)
+  ask("RefreshPanelBadge", KEY)
   syncInfo()
 end
 
@@ -240,7 +239,7 @@ function WhisperBridge.OnGate()
     hidePreview()
   end
   BridgePanel.Refresh()
-  api.RefreshPanelBadge(KEY)
+  ask("RefreshPanelBadge", KEY)
 end
 
 -- The latest lead and GetTime() when it appeared, from whichever of the WM preview (else the

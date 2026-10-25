@@ -423,6 +423,42 @@ local function testRaisingApiIsARefusal()
   Assert.equal(ns2.Leads.Latest().greeted, true, "the click still greeted")
 end
 
+-- The side calls too: a raising HidePreview or RefreshPanelBadge does not stop the info line going.
+local function testRaisingSideCallsKeepTheRest()
+  local ns, _, _, _, wm = boot()
+  ns.WhisperBridge.Activate()
+  local lead = ns.Leads.Latest()
+  ns.Leads.MarkGreeted(lead.id)
+  ns.WhisperBridge.ShowLead(lead)
+  wm.raise.HidePreview, wm.raise.RefreshPanelBadge = true, true
+  ns.Leads.Dismiss(lead.id)
+  Assert.equal(wm.info.CraftAlert[lead.customer], nil, "the line still goes")
+  inInstance(true)
+  ns.WhisperBridge.OnGate()
+  inInstance(false)
+end
+
+-- A refused or raising SetContactInfo (WM full, or broken) is not remembered as sent: the next sync
+-- tries again, for a new line and for a removal.
+local function testRefusedInfoLineIsRetried()
+  local ns, _, _, _, wm = boot()
+  ns.WhisperBridge.Activate()
+  local lead = ns.Leads.Latest()
+  wm.refuse.SetContactInfo = true
+  ns.Leads.MarkGreeted(lead.id)
+  Assert.equal(wm.info.CraftAlert, nil, "refused")
+  wm.refuse.SetContactInfo, wm.raise.SetContactInfo = nil, true
+  ns.WhisperBridge.SyncInfo()
+  wm.raise.SetContactInfo = nil
+  ns.WhisperBridge.SyncInfo()
+  Assert.equal(wm.info.CraftAlert[lead.customer], "|cffffd100Craft Alert:|r Blacksmithing · Me", "sent on retry")
+  wm.refuse.SetContactInfo = true
+  ns.Leads.Dismiss(lead.id)
+  wm.refuse.SetContactInfo = nil
+  ns.WhisperBridge.SyncInfo()
+  Assert.equal(wm.info.CraftAlert[lead.customer], nil, "removal retried")
+end
+
 local function testNoOnUpdateAnywhere()
   local ns, _, _, _, wm = boot()
   ns.WhisperBridge.Activate()
@@ -455,6 +491,8 @@ return function()
   testPanelRefusedStaysStandalone()
   testPreviewClickOpensOnce()
   testRaisingApiIsARefusal()
+  testRaisingSideCallsKeepTheRest()
+  testRefusedInfoLineIsRetried()
   testNoOnUpdateAnywhere()
   Wow.reset()
 end
