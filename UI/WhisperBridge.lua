@@ -134,6 +134,14 @@ local function syncInfo()
   end
 end
 
+-- Bootstrap's step after Leads.Restore: the leads of the last session are back without a "change",
+-- so their customers' lines go out now. Not activated: nothing.
+function WhisperBridge.SyncInfo()
+  if active then
+    syncInfo()
+  end
+end
+
 local function onChange()
   if shown and not Leads.IsActive(shown.lead.id) then
     hidePreview()

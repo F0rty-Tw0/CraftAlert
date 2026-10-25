@@ -136,6 +136,24 @@ local function testBridged()
   Assert.same(errors, {})
 end
 
+-- /reload: the leads come back from the saved data without a "change", so the customers' info
+-- lines are sent by the login itself, after Restore.
+local function testReloadSendsInfoLines()
+  local ns = boot(true)
+  trade("LF " .. BELT_LINK .. " crafter", "Buyer-OtherRealm")
+  Assert.equal(#ns.Leads.List(), 1)
+  Wow.fireEvent("PLAYER_LOGOUT")
+  local saved = rawget(_G, "CraftAlertDB")
+  startClient()
+  Wow.clock.time = START_TIME + 30
+  local wm2 = select(2, FakeWm.install())
+  Wow.stub("CraftAlertDB", saved)
+  local ns2 = login()
+  Assert.equal(#ns2.Leads.List(), 1, "the lead was restored")
+  local line = wm2.info.CraftAlert["Buyer-OtherRealm"]
+  Assert.truthy(line and line:find("Craft Alert:", 1, true) and line:find("Blacksmithing", 1, true), "info line sent at login")
+end
+
 local function testStandalone()
   local ns, errors = boot(false)
   Assert.equal(rawget(_G, "WhisperMessengerAPI"), nil)
@@ -152,6 +170,7 @@ end
 
 return function()
   testBridged()
+  testReloadSendsInfoLines()
   testStandalone()
   Wow.reset()
 end

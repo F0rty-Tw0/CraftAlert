@@ -158,6 +158,7 @@ local LOGIN_STEPS = {
   wireIndex,
   activateBridge,
   wireLeads,
+  WhisperBridge.SyncInfo,
   installReaders,
   installQualityReach,
   installScanGate,
