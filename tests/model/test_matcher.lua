@@ -177,10 +177,15 @@ local function testSlotNameGuard()
   expect(ns, "LF green iron off, hand over", "item:green iron hauberk", "punctuation inside off hand")
   Fixture.itemIndex(ns, function(itemDb)
     itemDb.characters["Smith-Realm"].recipes[3] = { item = 915, name = "Zorgblade Frostmourne Tome", prof = BS }
+    itemDb.characters["Ins-Realm"] = character({ TAILOR }, { [20] = { item = 913, name = "Silk Tome", prof = TAILOR } })
   end)
   result = expect(ns, "LF zorgblade frostmourne off hand", "item:915", "an off-hand item stays")
   Assert.equal(why(result), "lf+zorgblade frostmourne+offhand")
   expect(ns, "LF zorgblade frostmourne gloves", "stop:nomatch")
+  -- A short name that needs a companion word takes "off hand" as "offhand" (HasCompanionWord).
+  for _, slot in ipairs({ "offhand", "off hand", "off-hand" }) do
+    expect(ns, "LF zorgblade " .. slot, "item:915", "companion: " .. slot)
+  end
   -- The typo pass skips the tokens of the dropped hit (it matches "thick", kind c, at distance 0).
   Fixture.itemIndex(ns)
   expect(ns, "LF thick plate helm", "stop:nomatch")

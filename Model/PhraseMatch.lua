@@ -242,11 +242,14 @@ local function phrasesAt(i, token, id, found)
 end
 
 -- Whether a token of the last Run's line is a wordIndex word (except a Slang.wordGroupsOnly
--- one) or an enchant slot word, the companions of §6.2 item 1.
+-- one) or an enchant slot word, the companions of §6.2 item 1. "off hand" counts as "offhand".
 function PhraseMatch.HasCompanionWord()
   local wordIndex, enchantSlotWords = index.wordIndex, index.enchantSlotWords
   for i = 1, tokenCount do
     local token = tokens[i]
+    if token == "hand" then
+      token = HandWord(tokens, i, BreakBefore) or token
+    end
     if (wordIndex[token] and not wordGroupsOnly[token]) or enchantSlotWords[token] then
       return true
     end
