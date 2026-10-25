@@ -61,6 +61,10 @@ for _, entry in ipairs(ProfessionWords.entries) do
   end
 end
 
+-- In-game C26 (2026-10-25): the word set of a worn item without words (index.wordlessGear), so
+-- a slot word drops it (MatchCandidates entryKept) where a group without a set stays.
+local NO_WORDS = {}
+
 -- groupWords by inversion of wordIndex: each group walks a trie of word sets in pairs()
 -- order (the same order for every group), so groups with equal word sets end on one node and
 -- share its set.
@@ -86,6 +90,9 @@ local function buildGroupWords(index)
     end
   end
   local groupWords, wordSets, listed = {}, {}, {}
+  for group in pairs(index.wordlessGear) do
+    groupWords[group] = NO_WORDS
+  end
   for group, node in pairs(nodeOf) do
     local set = node.set
     groupWords[group] = set

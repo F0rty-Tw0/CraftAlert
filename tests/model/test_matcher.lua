@@ -192,6 +192,27 @@ local function testSlotNameGuard()
   end)
   expect(ns, "LF Charged Scrapmaster's Helm", "stop:nomatch")
   expect(ns, "LF Charged Scrapmaster's Gloves", "item:802")
+  -- In-game C26 (2026-10-25): the real gauntlets are profession gear, a worn item no slot word
+  -- names, so "helm" drops them too; their own name still matches.
+  Fixture.items[803] = { "INVTYPE_PROFESSION_GEAR", 19, 7 }
+  Fixture.itemIndex(ns, function(db)
+    db.characters["Smith-Realm"].recipes[3] = { item = 803, name = "Charged Scrapmaster's Gauntlets", prof = BS }
+  end)
+  expect(ns, "LF Charged Scrapmaster's Helm", "stop:nomatch", "profession gear under helm")
+  expect(ns, "LF Charged Scrapmaster's Gauntlets", "item:803")
+  -- User ruling 2026-10-25 ("Yes, drop it"): profession gear has no body slot, so every slot word drops it.
+  expect(ns, "LF Charged Scrapmaster's Gloves", "stop:nomatch", "profession gear under gloves")
+  Fixture.items[803] = nil
+  -- An item nobody wears (retail "INVTYPE_NON_EQUIP_IGNORE", Classic "") stays under a slot
+  -- word, like an enchant: a scroll is asked for by the slot it enchants.
+  for _, equipLoc in ipairs({ "INVTYPE_NON_EQUIP_IGNORE", "" }) do
+    Fixture.items[804] = { equipLoc, 0, 8 }
+    Fixture.itemIndex(ns, function(db)
+      db.characters["Smith-Realm"].recipes[3] = { item = 804, name = "Zorgblade Frostmourne Scroll", prof = BS }
+    end)
+    expect(ns, "LF zorgblade frostmourne boots", "item:804", "not worn: " .. equipLoc)
+  end
+  Fixture.items[804] = nil
   -- The typo pass skips every token of a dropped multi-token hit, not only its first: "frostmourne"
   -- (the 2nd token, a kind c alias) is not revived as a typo target of itself.
   Fixture.itemIndex(ns, function(db)

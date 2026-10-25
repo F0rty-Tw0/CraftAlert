@@ -48,8 +48,12 @@ local function addItem(index, ctx, itemID, entry)
   append(index.itemIndex, itemID, entry)
   local words = ctx.words[itemID]
   if words == nil then
-    words = ItemKeywords.WordsFor(itemID, ctx.settings.extraSlang)
+    local worn
+    words, worn = ItemKeywords.WordsFor(itemID, ctx.settings.extraSlang)
     ctx.words[itemID] = words
+    if worn and #words == 0 then
+      index.wordlessGear[entry.group] = true -- the group is the item, so once per group
+    end
   end
   for _, word in ipairs(words) do
     append(index.wordIndex, word, entry)
@@ -210,6 +214,7 @@ local function newIndex(settings, opts)
     itemIndex = {},
     nameIndex = {},
     wordIndex = {},
+    wordlessGear = {}, -- group -> true: a worn item without words (profession gear), read by WordGroups.Build
     professionWords = {},
     mutedProfessions = {}, -- characterKey -> { professionKey -> true }: every stored recipe muted
     channelEnabled = copySet(settings.channels),

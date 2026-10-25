@@ -46,14 +46,20 @@ local function addExtras(words, seen, extraSlang)
   end
 end
 
--- → a new array of lowercase words (slot words, then type words, then extras); empty when the
--- item is unknown or the item API is missing.
+-- The equip locations of items nobody wears: Classic "", retail "INVTYPE_NON_EQUIP_IGNORE"
+-- (named "INVTYPE_NON_EQUIP" before 10.2.6).
+local NOT_WORN = { [""] = true, INVTYPE_NON_EQUIP = true, INVTYPE_NON_EQUIP_IGNORE = true }
+
+-- → a new array of lowercase words (slot words, then type words, then extras), empty when the
+-- item is unknown or the item API is missing; and whether the item is worn (it has an equip
+-- location, profession gear and trinkets too, whose slots have no words).
 function ItemKeywords.WordsFor(itemID, extraSlang)
   local words, seen = {}, {}
   if itemID == nil then
-    return words
+    return words, false
   end
   local _, _, _, equipLoc, _, classID, subclassID = FlavorCompat.GetItemInfoInstant(itemID)
+  local worn = equipLoc ~= nil and not NOT_WORN[equipLoc]
   addAll(words, seen, Slang.slots[equipLoc])
   if classID == Slang.CLASS_ARMOR then
     addAll(words, seen, Slang.armor[subclassID])
@@ -65,7 +71,7 @@ function ItemKeywords.WordsFor(itemID, extraSlang)
   if extraSlang then
     addExtras(words, seen, extraSlang)
   end
-  return words
+  return words, worn
 end
 
 -- → a new table: Slang.armorTags plus each extra slang word whose target has a tag, with that
