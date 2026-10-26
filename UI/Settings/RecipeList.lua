@@ -232,6 +232,7 @@ function RecipeList.Create(column)
     row.icon:SetTexture(recipeIcon(item))
     row.icon:SetDesaturated(dim)
     row.icon:SetAlpha(dim and Theme.DIM_ALPHA or 1)
+    row.mute.recipe = item.recipe
     RecipeMute.Paint(row.mute, muted, greyed)
     if row.hovered then
       showTooltip(row)
@@ -242,6 +243,12 @@ function RecipeList.Create(column)
   createMuteAll(column, muteAll)
   list.onlyCurrent = createOnlyCurrent(column, onlyCurrent)
   list.recipes = Controls.List(column, RECIPE_ROWS, createRecipeRow)
+  -- A mute made elsewhere (the profession window) shows when the index rebuilds; the order stays.
+  Index.OnRebuilt(function()
+    if list.recipes.frame:IsVisible() then
+      repaint()
+    end
+  end)
 
   -- Shows `prof`'s recipes of `character` (a db.characters record, or nil) under the current search.
   function list.Show(character, prof)

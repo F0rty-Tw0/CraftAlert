@@ -19,15 +19,15 @@ function RecipeMute.Untracked(recipe)
   return recipe.bind == 0 and not _G["CraftAlertDB"].settings.includeUnbound
 end
 
--- The tooltip for the row's recipe as it is now. An untracked recipe says why it does not alert,
--- muted or not.
+-- The tooltip for the switch's recipe as it is now: `mute.recipe` and `mute.muted`, the switch's
+-- own state (its parent may be a Blizzard row we do not write to). An untracked recipe says why it
+-- does not alert, muted or not.
 local function showTooltip(mute)
-  local recipe = mute:GetParent().item.recipe
-  local muted = recipe.muted == true
+  local recipe, muted = mute.recipe, mute.muted == true
   local title, text, instruction
-  if RecipeMute.Untracked(recipe) then
+  if recipe and RecipeMute.Untracked(recipe) then
     title, text = "Not tracked", "Items with no binding (materials, potions, gems) do not alert"
-    instruction = "Turn on Track unbound items below"
+    instruction = "Turn on Track unbound items in Craft Alert's Crafters settings"
   else
     title = muted and "Muted" or "Alerts on"
     text = muted and "Requests for this recipe do not alert you" or "Requests for this recipe alert you"
@@ -42,7 +42,8 @@ local function showTooltip(mute)
   tooltip:Show()
 end
 
--- The switch on `row` (which carries `item`), anchored at its right end; a click runs onClick().
+-- The switch on `row`, anchored at its right end; a click runs onClick(). The caller sets
+-- `mute.recipe` (the recipe it stands for) and paints it.
 function RecipeMute.Create(row, onClick)
   local size = Theme.LAYOUT.MUTE_SIZE
   local mute = _G["CreateFrame"]("Button", nil, row)
@@ -60,6 +61,7 @@ end
 -- The art swaps whole: greying would dull the muted speaker's red slash. Only an unmuted,
 -- untracked speaker is greyed. A tooltip the switch shows follows the new state.
 function RecipeMute.Paint(mute, muted, greyed)
+  mute.muted = muted
   local art = Theme.ART
   if muted then
     FrameKit.Art(mute.icon, art.MUTED_ATLAS, art.MUTED_FILE)
