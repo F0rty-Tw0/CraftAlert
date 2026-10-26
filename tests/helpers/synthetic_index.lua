@@ -1,12 +1,15 @@
 local Wow = require("tests.helpers.wow")
 
 -- A synthetic 10-character / 2,000-recipe db for the §4.4 budgets (plan A4): 8 professions,
--- 200 recipes each; Enchanting gets "Enchant <slot> - <tier> <stat>" names, the rest armor
--- items, half with a made-up word unique to the recipe, half with shared adjectives. Off-hand
--- items (held-in-off-hand armor, off-hand daggers) put "offhand" in the word index, as any real
--- index with one does, so the "off hand" reads pay their full cost here.
+-- 200 recipes each; characters 9 and 10 know the recipes of characters 1 and 2 (alts of one
+-- profession), so 400 names have two crafters of one profession. Enchanting gets
+-- "Enchant <slot> - <tier> <stat>" names, the rest armor items, half with a made-up word unique
+-- to the recipe, half with shared adjectives. Off-hand items (held-in-off-hand armor, off-hand
+-- daggers) put "offhand" in the word index; { offHand = false } leaves them out, like a player
+-- with no off-hand recipe. Neither index is the costlier one for every line (off_hand costs
+-- more without "offhand"), so the perf test measures the worst lines on both.
 --   local Synthetic = require("tests.helpers.synthetic_index")
---   local db, items = Synthetic.db(ns)
+--   local db, items = Synthetic.db(ns)                        -- or Synthetic.db(ns, { offHand = false })
 --   Synthetic.stubItems(items)
 --   local index = Synthetic.build(ns, db)
 local Synthetic = {}
@@ -16,8 +19,10 @@ local SUBCLASS_MISC, SUBCLASS_DAGGER = 0, 15
 Synthetic.PROFESSIONS = { 164, 165, 197, 333, 755, 171, 202, 773 }
 local PROFESSIONS = Synthetic.PROFESSIONS
 local ENCH = 333
--- { equipLoc, noun, class, subclass }: the class and subclass a real item of the slot has; an
--- entry without them is armor of subclass (n % 4) + 1 (cloth to plate).
+-- { equipLoc, noun, class, subclass }. An entry without class and subclass is armor of
+-- subclass (n % 4) + 1 (cloth to plate), Ring, Necklace and Cloak too, unlike real ones (misc;
+-- cloaks cloth): kept, since real subclasses would move every budget's baseline. The last
+-- OFF_HAND entries are the off-hand slots.
 local SLOTS = {
   { "INVTYPE_WAIST", "Belt" },
   { "INVTYPE_FEET", "Boots" },
@@ -33,6 +38,7 @@ local SLOTS = {
   { "INVTYPE_HOLDABLE", "Orb", CLASS_ARMOR, SUBCLASS_MISC },
   { "INVTYPE_WEAPONOFFHAND", "Parrying Dagger", CLASS_WEAPON, SUBCLASS_DAGGER },
 }
+local OFF_HAND = 2
 local ADJECTIVES = { "Green", "Blue", "Ornate", "Imperial", "Dark", "Bright", "Shadow", "Storm", "Frost", "Flame", "Earthen", "Radiant" }
 local MATERIALS = { "Iron", "Steel", "Mithril", "Thorium", "Copper", "Bronze", "Silk", "Linen", "Rugged", "Thick", "Heavy", "Felsteel" }
 local ENCHANT_SLOTS = { "Chest", "Bracer", "Boots", "Gloves", "Cloak", "Weapon", "Shield", "2H Weapon" }
@@ -58,13 +64,13 @@ local function uniqueWord(n)
   return table.concat(letters)
 end
 
-local function recipeAt(n, prof, items)
+local function recipeAt(n, prof, items, slotCount)
   if prof == ENCH then
     local tier = pick(TIERS, math.floor(n / 8))
     local stat = (tier ~= "" and tier .. " " or "") .. pick(STATS, math.floor(n / 48))
     return { name = "Enchant " .. pick(ENCHANT_SLOTS, n) .. " - " .. stat, prof = prof }
   end
-  local slot = pick(SLOTS, n)
+  local slot = SLOTS[n % slotCount + 1]
   local itemID = 100000 + n
   items[itemID] = { slot[1], slot[3] or CLASS_ARMOR, slot[4] or (n % 4) + 1 }
   local name
@@ -77,14 +83,17 @@ local function recipeAt(n, prof, items)
 end
 
 -- 10 characters x 200 recipes; returns the db and the item table for the C_Item stub.
-function Synthetic.db(ns)
+-- opts = { offHand = false } leaves the off-hand slots out.
+function Synthetic.db(ns, opts)
   local db, items = ns.Defaults.Db(), {}
+  local slotCount = (opts and opts.offHand == false) and #SLOTS - OFF_HAND or #SLOTS
   for c = 1, 10 do
-    local prof = PROFESSIONS[(c - 1) % #PROFESSIONS + 1]
+    local base = (c - 1) % #PROFESSIONS -- character c knows the recipes of character base + 1
+    local prof = PROFESSIONS[base + 1]
     local recipes = {}
     for k = 1, 200 do
-      local n = (c - 1) * 200 + k
-      recipes[200000 + n * 131] = recipeAt(n, prof, items) -- sparse, like real recipe spell IDs
+      local n = base * 200 + k
+      recipes[200000 + n * 131] = recipeAt(n, prof, items, slotCount) -- sparse, like real recipe spell IDs
     end
     db.characters["Char" .. c .. "-Realm"] = {
       source = "local",
@@ -95,6 +104,23 @@ function Synthetic.db(ns)
     }
   end
   return db, items
+end
+
+-- → the number of full names with two crafters of one profession.
+function Synthetic.sharedNames(index)
+  local count = 0
+  for _, record in pairs(index.phraseSet) do
+    local crafterOf = {}
+    for _, entry in ipairs(record.entries) do
+      local other = crafterOf[entry.prof]
+      if other ~= nil and other ~= entry.character then
+        count = count + 1
+        break
+      end
+      crafterOf[entry.prof] = entry.character
+    end
+  end
+  return count
 end
 
 function Synthetic.stubItems(items)

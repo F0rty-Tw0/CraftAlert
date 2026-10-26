@@ -5,6 +5,7 @@ local Fixture = require("tests.helpers.matcher_fixture")
 -- Spec §4.4 budgets and §13 "Performance proxy" (plan A4), against a synthetic 10-character /
 -- 2,000-recipe index. Every line is generated before any measurement; lines are synthetic
 -- (request-like and non-request shapes with unique suffixes), so this test needs no corpus.
+-- The worst lines run on two indexes, with and without off-hand items, and each keeps its max.
 --   python scripts/run_test.py --jit tests/perf/test_hot_path_perf.lua   (lupa.luajit21)
 --   python scripts/run_test.py tests/perf/test_hot_path_perf.lua         (lupa.lua51; CI lua5.1)
 local IS_JIT = rawget(_G, "jit") ~= nil
@@ -173,6 +174,23 @@ local function worstMicros(Matcher, line)
   return best
 end
 
+-- Each case of WorstLines.cases on each { name, index, items } (the cases depend on the
+-- index); → { name, micros, index name } per case, the costlier index's timing.
+local function worstCases(Matcher, indexes)
+  local worst = {}
+  for _, built in ipairs(indexes) do
+    Matcher.SetIndex(built[2])
+    Synthetic.stubItems(built[3])
+    for k, case in ipairs(WorstLines.cases(built[2])) do
+      local micros = worstMicros(Matcher, case[2])
+      if worst[k] == nil or micros > worst[k][2] then
+        worst[k] = { case[1], micros, built[1] }
+      end
+    end
+  end
+  return worst
+end
+
 return function()
   local ns = Fixture.load()
   local db, items = Synthetic.db(ns)
@@ -209,14 +227,22 @@ return function()
   -- The intersection of neck and cloak is empty: a match means the union decided it.
   local union = Matcher.Match("trade", WorstLines.UNION, SENDER, GUID)
   Assert.equal(union and union.kind, "profession", "the union line matches")
-  local worstCases = WorstLines.cases(index)
-  local worstLines, worstText = {}, {}
-  local worstMean = 0
-  for k, case in ipairs(worstCases) do
-    local micros = worstMicros(Matcher, case[2])
-    worstMean = math.max(worstMean, micros)
+  local plainDb, plainItems = Synthetic.db(ns, { offHand = false })
+  Synthetic.stubItems(plainItems)
+  local plain = build(ns, plainDb)
+  Assert.truthy(index.wordIndex.offhand and not plain.wordIndex.offhand, "only the first index has off-hand items")
+  local worstText, worstMean, worstWhere = {}, 0, ""
+  for k, case in ipairs(worstCases(Matcher, { { "offhand", index, items }, { "no-offhand", plain, plainItems } })) do
+    if case[2] > worstMean then
+      worstMean, worstWhere = case[2], case[1] .. " on " .. case[3]
+    end
+    worstText[k] = string.format("%s=%.0f(%s)", case[1], case[2], case[3])
+  end
+  Matcher.SetIndex(index)
+  Synthetic.stubItems(items)
+  local worstLines = {}
+  for k, case in ipairs(WorstLines.cases(index)) do
     worstLines[k] = case[2]
-    worstText[k] = string.format("%s=%.0f", case[1], micros)
   end
   worstLines[#worstLines + 1] = mixed[10]
 
@@ -232,11 +258,12 @@ return function()
 
   print(
     string.format(
-      "perf: runtime=%s size=%d mean=%.2fus worst=%.2fus (%s) retained=%.2fKB retainedMixed=%.2fKB growth=%.3fKB worstGrowth=%.3fKB build=%.1fms step=%.1fms in %d steps index=%.0fKB",
+      "perf: runtime=%s size=%d mean=%.2fus worst=%.2fus %s (%s) retained=%.2fKB retainedMixed=%.2fKB growth=%.3fKB worstGrowth=%.3fKB build=%.1fms step=%.1fms in %d steps index=%.0fKB",
       IS_JIT and "luajit" or "lua51",
       index.size,
       mean,
       worstMean,
+      worstWhere,
       table.concat(worstText, " "),
       retained,
       retainedMatching,
