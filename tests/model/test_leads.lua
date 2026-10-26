@@ -139,6 +139,26 @@ local function testIgnoreList()
   Assert.equal(seen.change, 1, "nobody ignored: no change")
 end
 
+-- Restore drops the saved leads of a customer ignored since they were saved, with one "change":
+-- no IGNORELIST_UPDATE comes when the list loaded before the addon did.
+local function testRestoreDropsIgnored()
+  local ns, db = setup()
+  local Leads = ns.Leads
+  local ignored = { id = 1, customer = CUSTOMER, time = T0 - 20, kind = "item", greeted = false, replied = false }
+  local kept = { id = 2, customer = "Other-Draenor", time = T0 - 10, kind = "item", greeted = false, replied = false }
+  db.leads = { ignored, kept }
+  Wow.stub("C_FriendList", {
+    IsIgnored = function(name)
+      return name == CUSTOMER
+    end,
+  })
+  local seen = listen(Leads)
+  Leads.Restore(db)
+  Wow.stub("C_FriendList", nil)
+  Assert.same(db.leads, { kept }, "the ignored customer's lead went")
+  Assert.equal(seen.change, 1, "one change")
+end
+
 -- A guid under Leads.TEST_GUID_PREFIX marks a synthetic lead; nothing else does, whatever the name.
 local function testTestFlag()
   local ns = setup()
@@ -452,6 +472,7 @@ return function()
   testLinkWaitEndsWithLead()
   testRestoreAsksForLinks()
   testIgnoreList()
+  testRestoreDropsIgnored()
   testMarkAllSeen()
   testCraftersOnLead()
   testTestFlag()
