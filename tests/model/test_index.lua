@@ -394,7 +394,7 @@ local function testCombatDeferral()
 end
 
 -- A job started out of combat whose tick comes in combat waits instead of building.
-local function testCombatStartsBeforeTimer()
+local function testCombatBeforeFirstTick()
   local Index, Defaults = load()
   configure(Index, Defaults)
   local builds = countBuilds(Index)
@@ -459,7 +459,7 @@ return function()
   testFailingCallback()
   testCoalescing()
   testCombatDeferral()
-  testCombatStartsBeforeTimer()
+  testCombatBeforeFirstTick()
   testAddPending()
   testPendingSharesStoredGroup()
   Wow.reset()
