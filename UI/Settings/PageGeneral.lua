@@ -8,6 +8,7 @@ local Constants = ns.Constants or require("CraftAlert.Core.Constants")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
+local ModernRows = ns.ModernRows or require("CraftAlert.UI.RecipeMarkers.ModernRows")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
@@ -51,9 +52,6 @@ local function rebuildChannels()
   ScanGate.Evaluate()
 end
 
--- Recipe markers (Phase 3) read the flag when they draw.
-local function nothing() end
-
 function PageGeneral.Create(parent)
   local column = Controls.Column(parent, Theme.LAYOUT.PAGE_PADDING)
   local add, refresh = Controls.Refresher()
@@ -72,7 +70,7 @@ function PageGeneral.Create(parent)
   end
   Controls.Section(column, Localization.Text("Matching"))
   toggle("Profession-word alerts", settings, "professionWordAlerts", rebuild("professionWordAlerts"))
-  toggle("Bell markers on recipe rows", settings, "recipeMarkers", nothing)
+  toggle("Bell markers on recipe rows", settings, "recipeMarkers", ModernRows.Refresh)
   return { Refresh = refresh }
 end
 

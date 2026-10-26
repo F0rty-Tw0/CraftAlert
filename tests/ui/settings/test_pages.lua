@@ -124,7 +124,7 @@ local function testGeneralPage()
     { "Enable Craft Alert", "enable", { "evaluate" } },
     { "Only where Trade chat exists", "onlyResting", { "evaluate" } },
     { "Profession-word alerts", "professionWordAlerts", { "rebuild:professionWordAlerts" } },
-    { "Bell markers on recipe rows", "recipeMarkers", {} },
+    { "Bell markers on recipe rows", "recipeMarkers", { "markers" } },
   }
   Assert.raises(function()
     row("Include unbound items")
