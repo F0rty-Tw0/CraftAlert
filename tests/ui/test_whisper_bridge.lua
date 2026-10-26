@@ -455,6 +455,24 @@ local function testUnreadDot()
   Assert.same(dotOf(lead), { 1, 0.5, 0.9, 1 }, "onShow repaints")
 end
 
+-- WM refuses the panel (combat, M+ lockdown), so CraftAlert's own window opens: its rows go pink
+-- too, and WM's unread callback repaints it.
+local function testUnreadDotInOwnWindow()
+  local ns, _, _, _, wm = boot({ leads = 2 })
+  Wow.stub("ChatTypeInfo", { WHISPER = { r = 1, g = 0.5, b = 0.9 } })
+  local dotOf = dotColors(ns)
+  Assert.equal(ns.WhisperBridge.Activate(), true)
+  local other = ns.Leads.List()[2]
+  wm.unread[other.customer] = 3
+  wm.refuse.TogglePanel = true
+  ns.LeadsWindow.Toggle()
+  Assert.equal(rawget(_G, "CraftAlertLeadsWindow"):IsShown(), true, "refused: the own window opens")
+  Assert.same(dotOf(other), { 1, 0.5, 0.9, 1 }, "the own window paints pink")
+  wm.unread[other.customer] = 0
+  wm.unreadChanged("CraftAlert")
+  Assert.same(dotOf(other), ns.Theme.COLORS.gold, "read in WM: the own window repaints")
+end
+
 -- WM without GetUnreadCount (an older one): no onUnreadChanged, the rows never go pink, the
 -- bridge still activates.
 local function testUnreadDotOlderWm()
@@ -729,6 +747,7 @@ return function()
   testPanel()
   testPanelRefreshesOnlyWhileShown()
   testUnreadDot()
+  testUnreadDotInOwnWindow()
   testUnreadDotOlderWm()
   testUnreadDotRaisingWm()
   testPanelHostRules()

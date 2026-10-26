@@ -155,6 +155,13 @@ local function unreadOf(lead)
   return ask("GetUnreadCount", lead.customer)
 end
 
+-- WM's unread counts changed: repaint every view whose rows can be pink. CraftAlert's own window
+-- shows them too when WM refuses the panel (combat, M+ lockdown). Both are no-ops while hidden.
+local function onUnreadChanged()
+  BridgePanel.Refresh()
+  LeadsWindow.Refresh()
+end
+
 -- Activates once per session (spec C.2): → whether the bridge is on. A second call returns the
 -- first answer and wires nothing again. RegisterPanel, the one call out, comes before the wiring:
 -- a raise or a false answer (WM refuses, e.g. the key is taken) leaves CraftAlert standalone.
@@ -171,7 +178,7 @@ function WhisperBridge.Activate()
   -- An older WM has no GetUnreadCount: no unread callback, no pink dots.
   local countsUnread = type(candidate.GetUnreadCount) == "function"
   if countsUnread then
-    panel.onUnreadChanged = BridgePanel.Refresh
+    panel.onUnreadChanged = onUnreadChanged
   end
   if candidate.RegisterPanel(KEY, panel) ~= true then
     active = false
