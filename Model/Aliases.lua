@@ -29,6 +29,8 @@ local MIN_UNIQUE_LETTERS = 5 -- kind c words
 local MIN_JOIN_LETTERS = 6
 local MIN_SPLIT_SIDE = 2
 
+local function noPause() end
+
 -- "enchant bracer - minor health" -> "enchant bracer minor health", { words }; the form
 -- Tokenizer.normalized uses. nil for a name without word characters.
 function Aliases.Normalize(name)
@@ -70,9 +72,10 @@ local function guardSet(index)
 end
 
 -- word -> the one group whose names hold it, or false when several do (kind c).
-local function uniqueWords(parsed, names)
+local function uniqueWords(parsed, names, pause)
   local owner = {}
   for _, item in ipairs(names) do
+    pause()
     local info = parsed[item.name]
     if info and not item.pending then
       for _, word in ipairs(info.words) do
@@ -171,9 +174,10 @@ end
 -- joinIndex[left] = the record, or a list of the records (shortest phrase first), whose phrase
 -- starts with left (the Matcher checks the right side's bytes): no table and no string per
 -- right side.
-local function addJoins(index, records)
+local function addJoins(index, records, pause)
   local joinIndex = index.joinIndex
   for phrase, record in pairs(records) do
+    pause()
     local length = #phrase
     if record.wordCount == 1 and length >= MIN_JOIN_LETTERS then
       for split = MIN_SPLIT_SIDE, length - MIN_SPLIT_SIDE do
@@ -193,6 +197,7 @@ local function addJoins(index, records)
     if not found.phrase then
       sort(found, shorterPhrase)
     end
+    pause()
   end
 end
 
@@ -222,13 +227,15 @@ local function canonical(byFirst, list)
   return sameEntries(found, list) and found or list
 end
 
-local function shareEntryLists(index, records)
+local function shareEntryLists(index, records, pause)
   local byFirst, itemIndex = {}, index.itemIndex
   for itemID, list in pairs(itemIndex) do
     itemIndex[itemID] = canonical(byFirst, list)
+    pause()
   end
   for _, record in pairs(records) do
     record.entries = canonical(byFirst, record.entries)
+    pause()
   end
 end
 
@@ -247,14 +254,17 @@ end
 -- names = { { name = lowercase recipe name, entry = entry, pending = true|nil }, ... } in
 -- build order. Fills index.nameIndex, phraseSet, recipeRecords, needsSecondWord, phraseIds, phraseKeys,
 -- phraseWordRange, joinIndex, statSlotIndex and enchantSlotWords; intentSet and blockerSet
--- must already be set.
-function Aliases.Build(index, names)
+-- must already be set. pause (optional) runs inside the long loops: Index's sliced build yields
+-- there, so it is never called from a sort comparator.
+function Aliases.Build(index, names, pause)
+  pause = pause or noPause
   index.phraseSet, index.recipeRecords, index.needsSecondWord, index.joinIndex = {}, {}, {}, {}
   local notKindC = {}
   PhraseMatch.Begin(index)
   StatSlot.Begin(index)
   local parsed, fullNames = {}, {}
   for _, item in ipairs(names) do
+    pause()
     if parsed[item.name] == nil then
       local phrase, words = Aliases.Normalize(item.name)
       parsed[item.name] = phrase and { phrase = phrase, words = words } or false
@@ -263,7 +273,7 @@ function Aliases.Build(index, names)
       end
     end
   end
-  local owner, guard = uniqueWords(parsed, names), guardSet(index)
+  local owner, guard = uniqueWords(parsed, names, pause), guardSet(index)
   local records = {}
   for _, item in ipairs(names) do
     local info = parsed[item.name]
@@ -294,10 +304,11 @@ function Aliases.Build(index, names)
         StatSlot.Add(index, item.name, words, entry)
       end
     end
+    pause()
   end
   StatSlot.Finish(index)
-  addJoins(index, records)
-  shareEntryLists(index, records)
+  addJoins(index, records, pause)
+  shareEntryLists(index, records, pause)
 end
 
 ns.Aliases = Aliases

@@ -28,7 +28,7 @@ local function load(flavor)
       return itemID, "type", "subtype", item[1], 0, item[2], item[3]
     end,
   })
-  for _, path in ipairs({ "Core.FlavorCompat", "Core.Constants", "Core.EventRouter", "Core.PlayerName" }) do
+  for _, path in ipairs({ "Core.FlavorCompat", "Core.Constants", "Core.EventRouter", "Core.Slicer", "Core.PlayerName" }) do
     Fresh.require(path)
   end
   for _, path in ipairs({
@@ -300,6 +300,7 @@ local function testRebuild()
   Assert.truthy(rawequal(Index.Current(), index))
   Assert.equal(index.size, 4)
   Assert.equal(Index.lastBuildMs, 7.5)
+  Assert.equal(Index.lastBuildSteps, 1, "a synchronous build is one step")
   Assert.equal(#calls, 2)
   Assert.equal(calls[1][1], "first")
   Assert.equal(calls[2][1], "second")
@@ -367,26 +368,32 @@ local function regenRegistered()
   return false
 end
 
--- §4.4 rule 6: in combat, one build on PLAYER_REGEN_ENABLED, registered only while pending.
+-- §4.4 rule 6: the index job waits out combat in the Slicer, which builds once on
+-- PLAYER_REGEN_ENABLED and is registered for it only while waiting.
 local function testCombatDeferral()
   local Index, Defaults = load()
+  local Slicer = require("CraftAlert.Core.Slicer")
   configure(Index, Defaults)
   local builds = countBuilds(Index)
   Wow.combat = true
   for _ = 1, 5 do
     Index.RequestRebuild("bind")
   end
-  Assert.equal(#Wow.timers, 0, "no timer in combat")
+  Wow.runTimers()
+  Assert.equal(builds.n, 0, "no build in combat")
+  Assert.truthy(Slicer.IsRunning("index"), "the job waits")
   Assert.truthy(regenRegistered(), "PLAYER_REGEN_ENABLED registered")
   Wow.combat = false
   Wow.fireEvent("PLAYER_REGEN_ENABLED")
+  Wow.runTimers()
   Assert.equal(builds.n, 1)
   Assert.falsy(regenRegistered(), "unregistered after the build")
   Wow.fireEvent("PLAYER_REGEN_ENABLED")
+  Wow.runTimers()
   Assert.equal(builds.n, 1)
 end
 
--- A timer armed out of combat that fires in combat defers instead of building.
+-- A job started out of combat whose tick comes in combat waits instead of building.
 local function testCombatStartsBeforeTimer()
   local Index, Defaults = load()
   configure(Index, Defaults)
@@ -398,6 +405,7 @@ local function testCombatStartsBeforeTimer()
   Assert.truthy(regenRegistered())
   Wow.combat = false
   Wow.fireEvent("PLAYER_REGEN_ENABLED")
+  Wow.runTimers()
   Assert.equal(builds.n, 1)
   Assert.equal(#Wow.timers, 0)
 end

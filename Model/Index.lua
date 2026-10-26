@@ -4,7 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
-local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
+local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local ItemKeywords = ns.ItemKeywords or require("CraftAlert.Model.ItemKeywords")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
@@ -17,8 +17,9 @@ local WordGroups = ns.WordGroups or require("CraftAlert.Model.WordGroups")
 -- CraftAlertDB. Build may allocate and call the item API; it never runs per line. Phrase
 -- records, aliases and the join and stat + slot structures come from Aliases, typo targets
 -- from TypoPass, the step 4.4 group structures from WordGroups.
--- Rebuild requests coalesce into one C_Timer.After(0) and wait out combat (§4.3 rule 1,
--- §4.4 rule 6).
+-- A rebuild request runs Build as the Slicer job "index", a coroutine that yields at pause
+-- points, so a rebuild after login takes no long frame; the Slicer waits out combat (§4.3 rule
+-- 1, §4.4 rule 6). Login's Rebuild stays synchronous (spec 2026-10-26-sliced-index-build).
 local Index = {}
 
 local pairs = pairs
@@ -27,8 +28,15 @@ local pcall = pcall
 local type = type
 local lower = string.lower
 local sort = table.sort
+local create = coroutine.create
+local resume = coroutine.resume
+local yield = coroutine.yield
+local status = coroutine.status
 
-local REGEN_EVENT = "PLAYER_REGEN_ENABLED"
+local JOB = "index"
+local PAUSE_EVERY = 32 -- pause calls per clock read
+
+local function noPause() end
 
 local function append(map, key, value)
   local list = map[key]
@@ -76,7 +84,7 @@ end
 -- the same order (a slot's synonyms, an extraSlang key and its target) become one table, so
 -- the index and WordGroups' per-list data are held once. A hash of the entries finds the
 -- candidates; a collision just leaves a list unshared. Lists are read-only after the build.
-local function shareLists(wordIndex)
+local function shareLists(wordIndex, pause)
   local ids, count, shared = {}, 0, {}
   for word, list in pairs(wordIndex) do
     local hash = #list
@@ -96,6 +104,7 @@ local function shareLists(wordIndex)
     elseif first ~= list and sameEntries(first, list) then
       wordIndex[word] = first
     end
+    pause()
   end
 end
 
@@ -131,22 +140,32 @@ local function noteMuted(index, key, stored, listening)
   end
 end
 
--- → whether the character added at least one entry.
-local function addCharacter(index, ctx, key, character)
+-- → whether the character added at least one entry. The recipe keys are copied first (pairs
+-- order), so no db table is traversed across a pause; a recipe gone by then is skipped.
+local function addCharacter(index, ctx, key, character, pause)
   for profKey in pairs(character.professions or {}) do
     ctx.professions[profKey] = true
   end
+  local recipes, keys = character.recipes or {}, {}
+  for recipeKey in pairs(recipes) do
+    keys[#keys + 1] = recipeKey
+  end
   local added, stored, listening = false, {}, {}
-  for recipeKey, recipe in pairs(character.recipes or {}) do
-    local prof = recipe.prof
-    if prof ~= nil then
-      stored[prof] = true
-      listening[prof] = listening[prof] or not recipe.muted
+  for i = 1, #keys do
+    local recipeKey = keys[i]
+    local recipe = recipes[recipeKey]
+    if recipe ~= nil then
+      local prof = recipe.prof
+      if prof ~= nil then
+        stored[prof] = true
+        listening[prof] = listening[prof] or not recipe.muted
+      end
+      if indexed(recipe, ctx.settings.includeUnbound) then
+        addRecipe(index, ctx, key, recipeKey, recipe)
+        added = true
+      end
     end
-    if indexed(recipe, ctx.settings.includeUnbound) then
-      addRecipe(index, ctx, key, recipeKey, recipe)
-      added = true
-    end
+    pause()
   end
   noteMuted(index, key, stored, listening)
   return added
@@ -154,12 +173,13 @@ end
 
 -- §5.3: session-only Classic learns match by name, crafted by the current character, in the
 -- group an alt stores that name under (its item ID: one recipe in step 4.4), else the name.
-local function addPending(index, ctx, own, pending)
+local function addPending(index, ctx, own, pending, pause)
   local ownRecipes = own and own.recipes or {}
   local added, storedGroup = false, {}
   if pending[1] then
     for _, item in ipairs(ctx.names) do
       storedGroup[item.name] = storedGroup[item.name] or item.entry.group
+      pause()
     end
   end
   for _, name in ipairs(pending) do
@@ -169,6 +189,7 @@ local function addPending(index, ctx, own, pending)
       index.size = index.size + 1
       added = true
     end
+    pause()
   end
   return added
 end
@@ -241,9 +262,11 @@ local function sortedKeys(map)
 end
 
 -- Pure: reads db and settings, writes neither. opts = { professionOrder = fn → key[],
--- ownKey = "Name-Realm", pending = { lowerName, ... } }.
+-- ownKey = "Name-Realm", pending = { lowerName, ... }, pause = fn }. pause runs inside the long
+-- loops (the sliced build yields there); a no-op when absent.
 function Index.Build(db, settings, opts)
   opts = opts or {}
+  local pause = opts.pause or noPause
   local index = newIndex(settings, opts)
   local ctx = { settings = settings, names = {}, words = {}, professions = {} }
   local characters = db.characters or {}
@@ -251,7 +274,7 @@ function Index.Build(db, settings, opts)
   -- Sorted, so entry lists come out in the same order on every build.
   for _, key in ipairs(sortedKeys(characters)) do
     local character = characters[key]
-    if character.enabled ~= false and addCharacter(index, ctx, key, character) then
+    if character and character.enabled ~= false and addCharacter(index, ctx, key, character, pause) then
       crafters[key] = true
       index.crafterCount = index.crafterCount + 1
     end
@@ -259,14 +282,14 @@ function Index.Build(db, settings, opts)
   local ownKey = opts.ownKey
   local own = ownKey and characters[ownKey]
   local ownEnabled = not (own and own.enabled == false)
-  if ownKey and ownEnabled and addPending(index, ctx, own, opts.pending or {}) and not crafters[ownKey] then
+  if ownKey and ownEnabled and addPending(index, ctx, own, opts.pending or {}, pause) and not crafters[ownKey] then
     index.crafterCount = index.crafterCount + 1
   end
-  shareLists(index.wordIndex)
+  shareLists(index.wordIndex, pause)
   addProfessionWords(index, ctx.professions)
-  Aliases.Build(index, ctx.names)
+  Aliases.Build(index, ctx.names, pause)
   TypoPass.Build(index)
-  WordGroups.Build(index)
+  WordGroups.Build(index, pause)
   return index
 end
 
@@ -276,10 +299,9 @@ local current = nil
 local rebuilt = {}
 local pendingNames = {}
 local pendingSet = {}
-local timerPending = false
-local combatPending = false
 
-Index.lastBuildMs = nil
+Index.lastBuildMs = nil -- CPU ms of the last build: the sum of its steps
+Index.lastBuildSteps = nil -- Slicer steps of the last build; 1 for a synchronous one
 Index.lastReason = nil
 
 function Index.Configure(db, opts)
@@ -303,20 +325,17 @@ local function reportError(err)
   end
 end
 
--- Synchronous build from the configured context; nil before Configure.
-function Index.Rebuild()
-  if context == nil then
-    return nil
-  end
-  local clock = _G["debugprofilestop"]
-  local started = clock()
-  local opts = context.opts
-  local index = Index.Build(context.db, context.db.settings, {
+local function buildOpts(opts, pause)
+  return {
     professionOrder = opts.professionOrder,
     ownKey = opts.ownKey or PlayerName.Own(),
     pending = pendingNames,
-  })
-  Index.lastBuildMs = clock() - started
+    pause = pause,
+  }
+end
+
+local function swapIn(index, ms, steps)
+  Index.lastBuildMs, Index.lastBuildSteps = ms, steps
   current = index
   for i = 1, #rebuilt do
     local ok, err = pcall(rebuilt[i], index)
@@ -324,45 +343,67 @@ function Index.Rebuild()
       reportError(err)
     end
   end
+end
+
+-- Synchronous build from the configured context (login); cancels a running sliced build. nil
+-- before Configure.
+function Index.Rebuild()
+  if context == nil then
+    return nil
+  end
+  Slicer.Cancel(JOB)
+  local clock = _G["debugprofilestop"]
+  local started = clock()
+  local index = Index.Build(context.db, context.db.settings, buildOpts(context.opts))
+  swapIn(index, clock() - started, 1)
   return index
 end
 
-local function inCombat()
-  local fn = _G["InCombatLockdown"]
-  return type(fn) == "function" and fn() == true
-end
-
-local function onRegenEnabled()
-  EventRouter.Off(REGEN_EVENT, onRegenEnabled)
-  combatPending = false
-  Index.Rebuild()
-end
-
-local function deferToCombatEnd()
-  combatPending = true
-  EventRouter.On(REGEN_EVENT, onRegenEnabled)
-end
-
-local function runTimer()
-  timerPending = false
-  if inCombat() then
-    deferToCombatEnd()
-  else
-    Index.Rebuild()
+-- The sliced build: each step resumes the coroutine, which yields from pause once
+-- Slicer.BUDGET_MS has passed since that resume (the clock is read every PAUSE_EVERY calls).
+-- Pause runs only in plain Lua loop bodies: never in a sort comparator, a gsub callback, a
+-- metamethod or under pcall (Lua 5.1 cannot yield across those). An abandoned coroutine (the
+-- job restarted or cancelled) is never resumed, so StatSlot.Begin's reset holds for the next.
+local function startJob(db, opts)
+  local clock = _G["debugprofilestop"]
+  local resumedAt, calls, spent, steps = 0, 0, 0, 0
+  local function pause()
+    calls = calls + 1
+    if calls >= PAUSE_EVERY then
+      calls = 0
+      if clock() - resumedAt >= Slicer.BUDGET_MS then
+        yield()
+      end
+    end
   end
+  local thread = create(function()
+    return Index.Build(db, db.settings, buildOpts(opts, pause))
+  end)
+  Slicer.Start(JOB, {
+    step = function()
+      resumedAt = clock()
+      local ok, result = resume(thread)
+      spent, steps = spent + (clock() - resumedAt), steps + 1
+      if not ok then
+        error(result, 0)
+      end
+      if status(thread) ~= "dead" then
+        return false
+      end
+      swapIn(result, spent, steps)
+      return true
+    end,
+  })
 end
 
+-- Starts the sliced build, or restarts it: the db may have changed under a half-built index,
+-- so a request during a build drops that work. The old index stays live until a build ends.
+-- OnRebuilt subscribers run inside the job's last step and must not request a rebuild.
 function Index.RequestRebuild(reason)
   Index.lastReason = reason
-  if timerPending or combatPending then
-    return
+  if context ~= nil then
+    startJob(context.db, context.opts)
   end
-  if inCombat() then
-    deferToCombatEnd()
-    return
-  end
-  timerPending = true
-  _G["C_Timer"].After(0, runTimer)
 end
 
 -- §5.3 Classic session learn: a lowercase recipe name, matched by name until logout.

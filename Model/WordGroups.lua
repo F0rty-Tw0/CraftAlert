@@ -65,13 +65,16 @@ end
 -- a slot word drops it (MatchCandidates entryKept) where a group without a set stays.
 local NO_WORDS = {}
 
+local function noPause() end
+
 -- groupWords by inversion of wordIndex: each group walks a trie of word sets in pairs()
 -- order (the same order for every group), so groups with equal word sets end on one node and
 -- share its set.
-local function buildGroupWords(index)
+local function buildGroupWords(index, pause)
   local root = { set = {}, children = {} }
   local nodeOf = {}
   for word, list in pairs(index.wordIndex) do
+    pause()
     for _, entry in ipairs(list) do
       local group = entry.group
       local node = nodeOf[group] or root
@@ -94,6 +97,7 @@ local function buildGroupWords(index)
     groupWords[group] = NO_WORDS
   end
   for group, node in pairs(nodeOf) do
+    pause()
     local set = node.set
     groupWords[group] = set
     if not listed[set] then
@@ -290,10 +294,12 @@ local function buildArmorInfo(index, rank, seenIn)
 end
 
 -- Index build (also after a test adds wordIndex words): fills slotsOf, groupWords, wordInfo and
--- the profession key of every profession word (professionKeys).
-function WordGroups.Build(index)
+-- the profession key of every profession word (professionKeys). pause (optional) runs inside
+-- the long loops: Index's sliced build yields there.
+function WordGroups.Build(index, pause)
+  pause = pause or noPause
   buildSlotsOf(index)
-  buildGroupWords(index)
+  buildGroupWords(index, pause)
   local rank = {}
   for i, key in ipairs(index.professionOrder or {}) do
     rank[key] = i
@@ -325,6 +331,7 @@ function WordGroups.Build(index)
       infoOf[list] = info
     end
     index.wordInfo[word] = info
+    pause()
   end
   buildArmorInfo(index, rank, seenIn)
 end

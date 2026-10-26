@@ -20,6 +20,7 @@ local MODULES = {
   "Core.FlavorCompat",
   "Core.Constants",
   "Core.EventRouter",
+  "Core.Slicer",
   "Core.PlayerName",
   "Model.Tokenizer",
   "Model.Slang",
