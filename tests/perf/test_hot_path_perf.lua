@@ -13,6 +13,7 @@ local WORST_US = 200 -- §4.4 per-line max, every runtime
 local GROWTH_KB = IS_JIT and 8 or 1
 local RETAINED_KB = 50
 local BUILD_MS = 100 -- was 80: with the game running beside the tests the build takes 79-85 ms
+local STEP_MS = 5 -- longest Slicer tick of the sliced rebuild (spec 2026-10-26-sliced-index-build)
 local INDEX_KB = 3200 -- §4.4 idle memory; was 3 MB, raised for recipe-link IDs (user ruling 2026-10-24)
 local LINES = 10000
 local RUNS = 3 -- the 10,000-line mean: median of 3 (plan A4)
@@ -135,6 +136,30 @@ local function buildMs(ns, db)
   return best
 end
 
+-- The sliced rebuild (Index.RequestRebuild) on the real clock: → the fastest of RUNS longest
+-- Slicer ticks, and the last run's index.
+local function slicedStepMs(ns, db)
+  Wow.stub("debugprofilestop", function()
+    return os.clock() * 1000
+  end)
+  ns.Index.Configure(db, {
+    ownKey = "Me-Realm",
+    professionOrder = function()
+      return Synthetic.PROFESSIONS
+    end,
+  })
+  local best = math.huge
+  for _ = 1, RUNS do
+    collectgarbage("collect")
+    ns.Slicer.ResetStats()
+    ns.Index.RequestRebuild("perf")
+    Wow.runTimers()
+    Assert.falsy(ns.Slicer.IsRunning("index"), "the sliced build finished")
+    best = math.min(best, ns.Slicer.stats.longestTickMs)
+  end
+  return best, ns.Index.Current()
+end
+
 -- Fastest of BEST_OF timings of WORST_REPS calls on one line; → microseconds per call.
 local function worstMicros(Matcher, line)
   local best = math.huge
@@ -202,10 +227,12 @@ return function()
   local retainedMatching = retainedKB(Matcher, mixed, 5)
   local growth = warmGrowthKB(Matcher, mixed)
   local worstGrowth = warmGrowthKB(Matcher, worstLines)
+  local stepMs, sliced = slicedStepMs(ns, db)
+  Assert.equal(Synthetic.difference(sliced, build(ns, db)), nil, "the sliced build equals Index.Build's")
 
   print(
     string.format(
-      "perf: runtime=%s size=%d mean=%.2fus worst=%.2fus (%s) retained=%.2fKB retainedMixed=%.2fKB growth=%.3fKB worstGrowth=%.3fKB build=%.1fms index=%.0fKB",
+      "perf: runtime=%s size=%d mean=%.2fus worst=%.2fus (%s) retained=%.2fKB retainedMixed=%.2fKB growth=%.3fKB worstGrowth=%.3fKB build=%.1fms step=%.1fms in %d steps index=%.0fKB",
       IS_JIT and "luajit" or "lua51",
       index.size,
       mean,
@@ -216,6 +243,8 @@ return function()
       growth,
       worstGrowth,
       ms,
+      stepMs,
+      ns.Index.lastBuildSteps,
       indexKB
     )
   )
@@ -234,6 +263,7 @@ return function()
   within(growth, GROWTH_KB, "warm-pass growth KB")
   within(worstGrowth, GROWTH_KB, "typo warm-pass growth KB")
   within(ms, BUILD_MS, "index build ms")
+  within(stepMs, STEP_MS, "sliced build longest step ms")
   within(indexKB, INDEX_KB, "idle index KB")
   Assert.equal(#breaches, 0, "over budget: " .. table.concat(breaches, "; "))
   Wow.reset()

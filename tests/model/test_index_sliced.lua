@@ -1,0 +1,149 @@
+local Assert = require("tests.helpers.assert")
+local Wow = require("tests.helpers.wow")
+local Fixture = require("tests.helpers.matcher_fixture")
+local Synthetic = require("tests.helpers.synthetic_index")
+
+-- Sliced index rebuild (spec 2026-10-26-sliced-index-build §3-§4): Index.RequestRebuild runs
+-- Index.Build as the Slicer job "index", a coroutine that yields at pause points; Rebuild()
+-- stays synchronous. The profile clock advances on every read, so the build really yields.
+local JOB = "index"
+local TICK_MS = 0.25 -- profile clock advance per debugprofilestop call
+
+local function advancingClock()
+  Wow.stub("debugprofilestop", function()
+    Wow.clock.profile = Wow.clock.profile + TICK_MS
+    return Wow.clock.profile
+  end)
+end
+
+-- The perf fixture (10 characters, 2,000 recipes), configured like the client.
+local function setup()
+  local ns = Fixture.load()
+  local db, items = Synthetic.db(ns)
+  Synthetic.stubItems(items)
+  ns.Index.Configure(db, {
+    ownKey = "Me-Realm",
+    professionOrder = function()
+      return Synthetic.PROFESSIONS
+    end,
+  })
+  local builds = { n = 0 }
+  ns.Index.OnRebuilt(function()
+    builds.n = builds.n + 1
+  end)
+  advancingClock()
+  return ns, db, builds
+end
+
+local function captureErrors()
+  local reported = {}
+  Wow.stub("geterrorhandler", function()
+    return function(err)
+      reported[#reported + 1] = err
+    end
+  end)
+  return reported
+end
+
+local function runOneTick()
+  table.remove(Wow.timers, 1).fn()
+end
+
+-- AC 2: the sliced build yields many times and ends with the same index as Index.Build.
+local function testSlicedEqualsSync()
+  local ns, db, builds = setup()
+  ns.Index.RequestRebuild("read")
+  Assert.equal(builds.n, 0, "nothing built before the job runs")
+  Assert.truthy(ns.Slicer.IsRunning(JOB), "the request starts the index job")
+  ns.Slicer.Drain()
+  Assert.equal(builds.n, 1)
+  Assert.truthy(ns.Index.lastBuildSteps > 1, "the build yielded, steps " .. tostring(ns.Index.lastBuildSteps))
+  Assert.equal(type(ns.Index.lastBuildMs), "number")
+  Assert.equal(Synthetic.difference(ns.Index.Current(), Synthetic.build(ns, db)), nil, "sliced index equals Index.Build's")
+end
+
+-- A request during a build restarts it: the finished index holds the db as of the second
+-- request, and only one build swaps in.
+local function testSecondRequestRestarts()
+  local ns, db, builds = setup()
+  ns.Index.RequestRebuild("read")
+  runOneTick()
+  Assert.truthy(ns.Slicer.IsRunning(JOB), "one tick leaves the build unfinished")
+  db.characters["Char1-Realm"].recipes[1] = { item = 100001, name = "Restart Belt", prof = Synthetic.PROFESSIONS[1], bind = 1 }
+  ns.Index.RequestRebuild("mute")
+  ns.Slicer.Drain()
+  Assert.equal(builds.n, 1, "the first build is dropped")
+  Assert.equal(ns.Index.lastReason, "mute")
+  Assert.equal(ns.Index.Current().size, 2001)
+  Assert.truthy(ns.Index.Current().nameIndex.restart, "the second request's recipe is indexed")
+end
+
+-- A subscriber that requests a rebuild inside the job's last step gets that build: the
+-- finishing job doesn't remove its replacement.
+local function testSubscriberRequestRuns()
+  local ns, _, builds = setup()
+  local requested = false
+  ns.Index.OnRebuilt(function()
+    if not requested then
+      requested = true
+      ns.Index.RequestRebuild("again")
+    end
+  end)
+  ns.Index.RequestRebuild("read")
+  ns.Slicer.Drain()
+  Assert.equal(builds.n, 2, "the requested build ran")
+  Assert.falsy(ns.Slicer.IsRunning(JOB))
+end
+
+-- A raising step cancels the job and reports with the coroutine's stack; the old index stays.
+local function testRaisingStepKeepsOldIndex()
+  local ns, db, builds = setup()
+  local old = ns.Index.Rebuild()
+  local reported = captureErrors()
+  Wow.stub("debugstack", function(thread)
+    return type(thread) == "thread" and "build stack" or "caller stack"
+  end)
+  db.characters["Char5-Realm"].recipes[7] = { item = 100007, prof = Synthetic.PROFESSIONS[5], bind = 1 } -- no name
+  ns.Index.RequestRebuild("read")
+  ns.Slicer.Drain()
+  Assert.equal(#reported, 1)
+  Assert.truthy(string.find(tostring(reported[1]), "\nbuild stack", 1, true), "the error carries the build's stack")
+  Assert.falsy(ns.Slicer.IsRunning(JOB))
+  Assert.truthy(rawequal(ns.Index.Current(), old), "the old index stays")
+  Assert.equal(builds.n, 1, "only the sync build swapped in")
+end
+
+-- Login's Rebuild() cancels a running job and builds in one call (1 step).
+local function testRebuildCancelsJob()
+  local ns, _, builds = setup()
+  ns.Index.RequestRebuild("read")
+  runOneTick()
+  Assert.truthy(ns.Slicer.IsRunning(JOB))
+  local index = ns.Index.Rebuild()
+  Assert.falsy(ns.Slicer.IsRunning(JOB), "Rebuild cancels the job")
+  Assert.equal(ns.Index.lastBuildSteps, 1)
+  ns.Slicer.Drain()
+  Wow.runTimers()
+  Assert.equal(builds.n, 1)
+  Assert.truthy(rawequal(ns.Index.Current(), index))
+end
+
+-- Before Configure a request starts nothing (Rebuild returns nil there too).
+local function testNoJobBeforeConfigure()
+  local ns = Fixture.load()
+  ns.Index.RequestRebuild("read")
+  Assert.equal(ns.Index.lastReason, "read")
+  Assert.falsy(ns.Slicer.IsRunning(JOB))
+  Assert.equal(#Wow.timers, 0)
+  Assert.equal(ns.Index.Current(), nil)
+end
+
+return function()
+  testSlicedEqualsSync()
+  testSecondRequestRestarts()
+  testSubscriberRequestRuns()
+  testRaisingStepKeepsOldIndex()
+  testRebuildCancelsJob()
+  testNoJobBeforeConfigure()
+  Wow.reset()
+end

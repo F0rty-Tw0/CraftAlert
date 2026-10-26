@@ -110,4 +110,62 @@ function Synthetic.build(ns, db)
   })
 end
 
+-- Pairs each table of a with the table at the same place in b, reached through non-table keys
+-- only; the first place a table is reached wins.
+local function pairTables(a, b, pairOf)
+  if type(a) ~= "table" or type(b) ~= "table" or pairOf[a] ~= nil then
+    return
+  end
+  pairOf[a] = b
+  for key, value in pairs(a) do
+    if type(key) ~= "table" then
+      pairTables(value, b[key], pairOf)
+    end
+  end
+end
+
+local function firstDifference(a, b, path, pairOf, seen)
+  if type(a) ~= "table" or type(b) ~= "table" then
+    return a ~= b and path or nil
+  end
+  if pairOf[a] ~= b then
+    return path .. " (a different table, or one shared differently)"
+  end
+  if seen[a] then
+    return nil
+  end
+  seen[a] = true
+  local count = 0
+  for key, value in pairs(a) do
+    local keyB = type(key) == "table" and pairOf[key] or key
+    local where = path .. "." .. (type(key) == "table" and tostring(key.phrase or key) or tostring(key))
+    if keyB == nil then
+      return where .. " (a key table with no match)"
+    end
+    local found = firstDifference(value, b[keyB], where, pairOf, seen)
+    if found then
+      return found
+    end
+    count = count + 1
+  end
+  for _ in pairs(b) do
+    count = count - 1
+  end
+  return count ~= 0 and path .. " (b has other keys)" or nil
+end
+
+-- → nil when two builds are equal: same values in the same order, the same tables shared, and
+-- table-keyed sets (needsSecondWord holds records) matched through the paired tables; else the
+-- path of the first difference. Assert.same can't compare two builds: their record keys differ.
+-- Checked both ways, so a list shared in b but not in a counts too.
+local function oneWay(a, b)
+  local pairOf = {}
+  pairTables(a, b, pairOf)
+  return firstDifference(a, b, "index", pairOf, {})
+end
+
+function Synthetic.difference(a, b)
+  return oneWay(a, b) or oneWay(b, a)
+end
+
 return Synthetic

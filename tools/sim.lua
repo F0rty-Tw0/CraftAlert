@@ -243,6 +243,24 @@ local function newContext(plan, out)
   return ctx
 end
 
+-- `read: prof=<key> stored=<n> pendingBind=<n>` after a profession window read.
+local function reportRead(ctx)
+  local read = ctx.ns.ModernReader.lastRead
+  if read then
+    ctx.ns.ModernReader.lastRead = nil
+    ctx.out[#ctx.out + 1] = string.format("read: prof=%s stored=%d pendingBind=%d", tostring(read.prof), read.stored, read.pendingBind)
+  end
+end
+
+-- `learn: stored=<bool>` after a NEW_RECIPE_LEARNED.
+local function reportLearn(ctx)
+  local stored = ctx.ns.LearnWatcher.lastStored
+  if stored ~= nil then
+    ctx.ns.LearnWatcher.lastStored = nil
+    ctx.out[#ctx.out + 1] = "learn: stored=" .. tostring(stored)
+  end
+end
+
 -- `bind: stored=<n>` once the 1 s timer has stored arrived bind types; printed just before
 -- the rebuild it requested, or after the timers when no rebuild followed.
 local function flushBind(ctx)
@@ -325,6 +343,10 @@ local function watch(ctx)
     ctx.out[#ctx.out + 1] = "lead: replied customer=" .. lead.customer
   end)
   ns.Index.OnRebuilt(function(index)
+    -- The read or learn that requested this build is reported first: Slicer.Drain runs the
+    -- index job right after it, before STEPS.event reports.
+    reportRead(ctx)
+    reportLearn(ctx)
     flushBind(ctx)
     ctx.out[#ctx.out + 1] = "index: size=" .. index.size
   end)
@@ -406,26 +428,8 @@ local function eventArg(text)
   return tonumber(text) or text
 end
 
--- `read: prof=<key> stored=<n> pendingBind=<n>` after a profession window read.
-local function reportRead(ctx)
-  local read = ctx.ns.ModernReader.lastRead
-  if read then
-    ctx.ns.ModernReader.lastRead = nil
-    ctx.out[#ctx.out + 1] = string.format("read: prof=%s stored=%d pendingBind=%d", tostring(read.prof), read.stored, read.pendingBind)
-  end
-end
-
--- `learn: stored=<bool>` after a NEW_RECIPE_LEARNED.
-local function reportLearn(ctx)
-  local stored = ctx.ns.LearnWatcher.lastStored
-  if stored ~= nil then
-    ctx.ns.LearnWatcher.lastStored = nil
-    ctx.out[#ctx.out + 1] = "learn: stored=" .. tostring(stored)
-  end
-end
-
--- Runs the timers armed for `maxDelay` seconds or less (0: the same frame, index rebuild
--- coalescing); longer ones, such as the lead expiry, stay pending, as in the game where no
+-- Runs the timers armed for `maxDelay` seconds or less (0: the same frame, such as the Slicer
+-- tick that runs an index rebuild the bind timer requested); longer ones, such as the lead expiry, stay pending, as in the game where no
 -- second passes between two sim steps.
 local function runFrameTimers(maxDelay)
   local found = true

@@ -39,7 +39,7 @@ local function setup(flavor)
   Fresh.require("Professions.QualityReach").Queue = function(recipeIDs)
     queued[#queued + 1] = recipeIDs
   end
-  local Slicer = Fresh.require("Core.Slicer")
+  local Slicer = ns.Slicer -- the one Index runs its build job on
   local ModernReader = Fresh.require("Professions.ModernReader")
   local db = ns.Defaults.Db()
   ProfessionList.Refresh(db, CHAR)
@@ -83,8 +83,7 @@ local function readFlow(flavor)
   Assert.same({ lastRead.prof, lastRead.stored, lastRead.pendingBind }, { BS, 3, 2 }, flavor)
   Assert.equal(type(lastRead.ms), "number", flavor)
   Assert.equal(type(lastRead.steps), "number", flavor)
-  Assert.equal(Wow.pendingTimers(0), 2, "the Slicer tick and one coalesced rebuild")
-  Wow.runTimers()
+  -- The finished read requests the rebuild, a Slicer job that Drain runs right after it.
   Assert.same(run.reasons, { "read" })
   Assert.equal(run.builds, 1)
   Assert.same(queued, { { 1, 2, 3 } }, "a finished read queues the stored IDs in read order")
