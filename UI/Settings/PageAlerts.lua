@@ -8,15 +8,15 @@ local Constants = ns.Constants or require("CraftAlert.Core.Constants")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
-local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
-local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
 -- Spec §9 Alerts: sound + test, taskbar flash, toast duration, lead timeout, launcher "Hide
 -- when no leads", opacity. Nothing here touches the index or the scan gate. Sound, flash and
 -- duration are read when an alert fires; a new lead timeout re-arms the expiry timer
 -- (Leads.Rearm); the launcher and the leads window repaint at once (the toast takes the
--- opacity when it next shows). Ranges are Schema's.
+-- opacity when it next shows). Both repaints come through setters Bootstrap calls
+-- (SetOnLauncherToggle, SetOnOpacity): the window needs the settings pane, which lists these
+-- pages, and the launcher needs the window, so a page requires neither. Ranges are Schema's.
 local PageAlerts = { id = "alerts", title = Localization.Text("Alerts") }
 
 local SOUND_CHANNEL = "Master" -- as AlertToast plays it
@@ -84,16 +84,30 @@ end
 
 local function nothing() end
 
+local onLauncherToggle = nothing
+local onOpacity = nothing
+
 local function rearm()
   Leads.Rearm()
 end
 
-local function refreshLauncher()
-  Launcher.Refresh()
+local function launcherToggled()
+  onLauncherToggle()
 end
 
-local function refreshLeadsWindow()
-  LeadsWindow.Refresh()
+local function opacityChanged()
+  onOpacity()
+end
+
+-- `fn()` runs after every "Hide the launcher when there are no leads" change (Bootstrap passes
+-- Launcher.Refresh); nil clears it.
+function PageAlerts.SetOnLauncherToggle(fn)
+  onLauncherToggle = fn or nothing
+end
+
+-- `fn()` runs after every opacity change (Bootstrap passes LeadsWindow.Refresh); nil clears it.
+function PageAlerts.SetOnOpacity(fn)
+  onOpacity = fn or nothing
 end
 
 function PageAlerts.Create(parent)
@@ -108,9 +122,9 @@ function PageAlerts.Create(parent)
   local timeout = { label = Localization.Text("Lead timeout"), min = 1, max = 60, step = 1, format = minutes }
   addSlider(column, add, timeout, "leadTimeoutMin", rearm)
   local hideLabel = Localization.Text("Hide the launcher when there are no leads")
-  add(Controls.BoundToggle(column, hideLabel, settings, "hideLauncherWhenNoLeads", refreshLauncher))
+  add(Controls.BoundToggle(column, hideLabel, settings, "hideLauncherWhenNoLeads", launcherToggled))
   local opacity = { label = Localization.Text("Opacity"), min = 0.3, max = 1, step = 0.05, format = percent }
-  addSlider(column, add, opacity, "opacity", refreshLeadsWindow)
+  addSlider(column, add, opacity, "opacity", opacityChanged)
   return { Refresh = refresh }
 end
 
