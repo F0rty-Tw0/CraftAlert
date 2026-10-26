@@ -34,7 +34,7 @@ local yield = coroutine.yield
 local status = coroutine.status
 
 local JOB = "index"
-local PAUSE_EVERY = 32 -- pause calls per clock read
+local PAUSE_EVERY = 8 -- pause calls per clock read
 
 local function noPause() end
 

@@ -2,17 +2,22 @@ local Wow = require("tests.helpers.wow")
 
 -- A synthetic 10-character / 2,000-recipe db for the §4.4 budgets (plan A4): 8 professions,
 -- 200 recipes each; Enchanting gets "Enchant <slot> - <tier> <stat>" names, the rest armor
--- items, half with a made-up word unique to the recipe, half with shared adjectives.
+-- items, half with a made-up word unique to the recipe, half with shared adjectives. Off-hand
+-- items (held-in-off-hand armor, off-hand daggers) put "offhand" in the word index, as any real
+-- index with one does, so the "off hand" reads pay their full cost here.
 --   local Synthetic = require("tests.helpers.synthetic_index")
 --   local db, items = Synthetic.db(ns)
 --   Synthetic.stubItems(items)
 --   local index = Synthetic.build(ns, db)
 local Synthetic = {}
 
-local CLASS_ARMOR = 4
+local CLASS_ARMOR, CLASS_WEAPON = 4, 2
+local SUBCLASS_MISC, SUBCLASS_DAGGER = 0, 15
 Synthetic.PROFESSIONS = { 164, 165, 197, 333, 755, 171, 202, 773 }
 local PROFESSIONS = Synthetic.PROFESSIONS
 local ENCH = 333
+-- { equipLoc, noun, class, subclass }: the class and subclass a real item of the slot has; an
+-- entry without them is armor of subclass (n % 4) + 1 (cloth to plate).
 local SLOTS = {
   { "INVTYPE_WAIST", "Belt" },
   { "INVTYPE_FEET", "Boots" },
@@ -25,6 +30,8 @@ local SLOTS = {
   { "INVTYPE_CLOAK", "Cloak" },
   { "INVTYPE_FINGER", "Ring" },
   { "INVTYPE_NECK", "Necklace" },
+  { "INVTYPE_HOLDABLE", "Orb", CLASS_ARMOR, SUBCLASS_MISC },
+  { "INVTYPE_WEAPONOFFHAND", "Parrying Dagger", CLASS_WEAPON, SUBCLASS_DAGGER },
 }
 local ADJECTIVES = { "Green", "Blue", "Ornate", "Imperial", "Dark", "Bright", "Shadow", "Storm", "Frost", "Flame", "Earthen", "Radiant" }
 local MATERIALS = { "Iron", "Steel", "Mithril", "Thorium", "Copper", "Bronze", "Silk", "Linen", "Rugged", "Thick", "Heavy", "Felsteel" }
@@ -59,7 +66,7 @@ local function recipeAt(n, prof, items)
   end
   local slot = pick(SLOTS, n)
   local itemID = 100000 + n
-  items[itemID] = { slot[1], CLASS_ARMOR, (n % 4) + 1 }
+  items[itemID] = { slot[1], slot[3] or CLASS_ARMOR, slot[4] or (n % 4) + 1 }
   local name
   if n % 2 == 0 then
     name = uniqueWord(n) .. " " .. slot[2]
