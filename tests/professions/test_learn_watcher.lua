@@ -77,8 +77,36 @@ return function()
     Assert.equal(LearnWatcher.lastStored, false)
   end
 
+  -- With a stored profession's window open, a learn answered with a bare skill line the
+  -- character does not store (no parent) belongs to the window, as in the window read; a
+  -- parented unstored answer is still skipped, and a blocked or closed window lends no key.
+  local _, state, LearnWatcher, db = setup()
+  state.base = BS
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  state.recipes = {
+    recipe(1, { professionID = 2872 }),
+    recipe(2, { professionID = 2872, parentProfessionID = COOKING }),
+    recipe(3, { professionID = 2872 }),
+    recipe(4, { professionID = 2872 }),
+  }
+  Wow.fireEvent(EVENT, 1)
+  Assert.equal(LearnWatcher.lastStored, true, "a bare skill line proves no other profession")
+  Assert.equal(db.characters[CHAR].recipes[1].prof, BS)
+  Wow.fireEvent(EVENT, 2)
+  Assert.equal(LearnWatcher.lastStored, false, "a parented unstored answer")
+  Assert.equal(db.characters[CHAR].recipes[2], nil)
+  state.guards.IsTradeSkillLinked = true
+  Wow.fireEvent(EVENT, 3)
+  Assert.equal(LearnWatcher.lastStored, false, "a linked window is somebody else's")
+  state.guards.IsTradeSkillLinked = nil
+  Wow.fireEvent("TRADE_SKILL_CLOSE")
+  Wow.fireEvent(EVENT, 4)
+  Assert.equal(LearnWatcher.lastStored, false, "no window to fall back to")
+  Assert.equal(db.characters[CHAR].recipes[4], nil)
+
   -- A secret recipe ID is ignored before anything else is called.
-  local _, state, LearnWatcher, db, run = setup()
+  local run
+  _, state, LearnWatcher, db, run = setup()
   state.recipes = { recipe(1) }
   trapProfessionApi("a secret recipeID reached the API")
   Wow.fireEvent(EVENT, Wow.secret(1))

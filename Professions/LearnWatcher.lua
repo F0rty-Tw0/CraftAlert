@@ -26,7 +26,7 @@ local function onLearned(recipeID)
   if FlavorCompat.issecretvalue(recipeID) then
     return
   end
-  local professionKey = ModernReader.ProfessionOf(recipeID)
+  local professionKey = ModernReader.LearnKey(recipeID)
   if professionKey ~= nil then
     LearnWatcher.lastStored = ModernReader.ReadOne(recipeID, professionKey)
   end

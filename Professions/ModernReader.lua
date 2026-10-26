@@ -18,7 +18,7 @@ local QualityReach = ns.QualityReach or require("CraftAlert.Professions.QualityR
 -- §4.2). Guards skip other players' lists and special modes, a window of a profession the
 -- character does not store (Cooking, Smelting) stores nothing, and reads only add. A job cut
 -- off by a closed or switched window is kept and resumes when the same window reopens.
--- ReadOne serves the learn path (§5.3) with the window closed.
+-- LearnKey and ReadOne serve the learn path (§5.3), with or without the window open.
 local ModernReader = {}
 
 local ipairs = ipairs
@@ -179,13 +179,6 @@ local function professionInfo(recipeID)
   return type(info) == "table" and info or nil
 end
 
--- The base profession of a recipe: the parent skill line when there is one, else the skill
--- line itself; nil when the lookup gives nothing.
-function ModernReader.ProfessionOf(recipeID)
-  local info = professionInfo(recipeID)
-  return info and (info.parentProfessionID or info.professionID) or nil
-end
-
 -- Mid-switch the list may still hold another profession's recipes: each is stored under its
 -- own profession when the character stores that one, and skipped (nil) otherwise. A recipe
 -- with no profession info (nil, or 0 before the data loads) belongs to the window, and so
@@ -207,6 +200,20 @@ local function storeKey(charKey, recipeID, key)
     return own, false, info
   end
   return parent == nil and key or nil, false, info
+end
+
+-- The key a learned recipe is stored under (nil: skip). With an unblocked window of a stored
+-- profession open, storeKey's rule decides, so a parentless or unloaded answer belongs to the
+-- window as in a window read; otherwise the recipe's base profession: the parent skill line
+-- when there is one, else the skill line itself.
+function ModernReader.LearnKey(recipeID)
+  local api = tradeSkillApi()
+  local key = windowOpen and api ~= nil and not isBlocked(api) and windowProfession(api) or nil
+  if key ~= nil then
+    return (storeKey(PlayerName.Own(), recipeID, key))
+  end
+  local info = professionInfo(recipeID)
+  return info and (info.parentProfessionID or info.professionID) or nil
 end
 
 local OPS = {
@@ -328,7 +335,7 @@ function ModernReader.OnListUpdate()
   onWindowEvent(false)
 end
 
--- Reads one recipe with the window closed (§5.3) → whether it is now stored.
+-- Reads one learned recipe (§5.3), the window open or not → whether it is now stored.
 function ModernReader.ReadOne(recipeID, professionKey)
   local api = tradeSkillApi()
   if api == nil or db == nil or not ProfessionList.IsStored(db, PlayerName.Own(), professionKey) then
