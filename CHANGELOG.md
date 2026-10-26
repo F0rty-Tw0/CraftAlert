@@ -7,6 +7,7 @@ Player-friendly release notes for Craft Alert.
 - Your main crafter for a profession now wins ties over the character you're playing.
 - Choose the main crafter from a lead card: left-click its Crafters row.
 - Settings → Crafters has Mute all and Unmute all for the recipes listed.
+- The profession window shows Craft Alert's mute switch on each recipe you know: click it to mute or unmute alerts for that recipe (Retail and Forever).
 
 - A toast pops up beside the launcher, on the side facing the middle of the screen, when someone in Trade asks for something you can craft. It shows a plain headline ("Wants … — you can craft it"), their whole Trade message with item and recipe links you can hover, and what matched in its tooltip. Left-click to greet them, shift-click to edit the greeting first, ctrl-click for an empty whisper, right-click to dismiss; a click on a link only opens the link. Dragging the toast moves the launcher.
 - A leads window lists every open request, newest first, with the same clicks as the toast. Drag it, resize it, close it with Escape.
