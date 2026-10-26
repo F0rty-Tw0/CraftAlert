@@ -207,14 +207,15 @@ local function testAlertsPage()
   Assert.same(take(refreshes), { "leadsWindow" })
 end
 
--- The Alerts page reaches the leads window only through SetOnOpacity: loading it loads no
--- window (the window loads the settings pane, which lists the pages). The launcher is stubbed,
--- as it requires the window itself.
+-- The Alerts page reaches the launcher and the leads window only through its setters: loading it
+-- loads neither (the window loads the settings pane, which lists the pages; the launcher needs
+-- the window).
 local function testAlertsPageNeedsNoWindow()
   SettingsFixture.load()
   package.loaded["UI.LeadsWindow"] = nil
-  package.loaded["UI.Launcher"] = { Refresh = function() end }
+  package.loaded["UI.Launcher"] = nil
   Fresh.require("UI.Settings.PageAlerts")
+  Assert.equal(package.loaded["UI.Launcher"], nil)
   Assert.equal(package.loaded["UI.LeadsWindow"], nil)
 end
 

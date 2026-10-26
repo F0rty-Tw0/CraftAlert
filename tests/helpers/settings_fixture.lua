@@ -1,7 +1,7 @@
 -- The settings pane in the leads window over UiFixture, with the refreshes a setting may trigger recorded instead
 -- of run: Index.RequestRebuild(reason) → "rebuild:<reason>", ScanGate.Evaluate → "evaluate",
 -- Leads.Rearm → "rearm", Launcher.Refresh → "launcher", LeadsWindow.Refresh → "leadsWindow". The Alerts
--- page's opacity slider calls LeadsWindow.Refresh as Bootstrap wires it (PageAlerts.SetOnOpacity).
+-- page calls the last two as Bootstrap wires them (PageAlerts.SetOnLauncherToggle, SetOnOpacity).
 --   local ns, db, refreshes = SettingsFixture.load(opts)   -- opts as UiFixture.load
 --   SettingsFixture.open(ns, "Alerts")                     -- opens the window on that page
 --   SettingsFixture.row("Lead timeout").input              -- the shown control with that label
@@ -38,6 +38,7 @@ function SettingsFixture.load(opts)
       refreshes[#refreshes + 1] = entry[3]
     end)
   end
+  ns.PageAlerts.SetOnLauncherToggle(ns.Launcher.Refresh)
   ns.PageAlerts.SetOnOpacity(ns.LeadsWindow.Refresh)
   return ns, db, refreshes, calls
 end

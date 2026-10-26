@@ -579,11 +579,18 @@ local function testLoginInInstanceIsSilent(db)
   Wow.stub("IsInInstance", nil)
 end
 
--- Bootstrap hands LeadsWindow.Refresh to the Alerts page, so dragging Opacity repaints the window.
-local function testOpacityRepaintsWindow(db)
+-- Bootstrap hands Launcher.Refresh and LeadsWindow.Refresh to the Alerts page: with no leads,
+-- ticking "Hide the launcher when there are no leads" hides the launcher at once, and dragging
+-- Opacity repaints the window.
+local function testAlertsPageRepaints(db)
+  db.leads = {}
   local session = startClient(db)
   local ns = login(session)
   SettingsFixture.open(ns, "Alerts")
+  local launcher = rawget(_G, "CraftAlertLauncher")
+  Assert.equal(launcher:IsShown(), true)
+  Widgets.click(SettingsFixture.row("Hide the launcher when there are no leads").input)
+  Assert.equal(launcher:IsShown(), false, "hidden at once")
   local window = rawget(_G, "CraftAlertLeadsWindow")
   Assert.equal(window:GetAlpha(), 1)
   Widgets.slide(SettingsFixture.row("Opacity").input, 0.5)
@@ -619,6 +626,6 @@ return function()
   testIgnoreDropsLead(deepCopy(saved))
   testInstanceHidesUi(deepCopy(saved))
   testLoginInInstanceIsSilent(deepCopy(saved))
-  testOpacityRepaintsWindow(deepCopy(saved))
+  testAlertsPageRepaints(deepCopy(saved))
   Wow.reset()
 end
