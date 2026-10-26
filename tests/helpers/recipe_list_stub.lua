@@ -5,6 +5,8 @@
 --   local row, node = list:row(101)   -- a new row showing recipe 101 (nil: a category row)
 --   list:init(row, 102)               -- the row re-initialized for recipe 102 (scroll, list change)
 --   list.callbacks[1]                 -- { box, callback, owner, iterate } per AddInitializedFrameCallback
+--   RecipeListStub.switchOf(row)      -- the mute switch the markers put on `row` (its child frame), or nil
+--   RecipeListStub.SPEAKER, .MUTED    -- the atlases the switch's icon shows, from Theme.ART
 -- opts.recipes: Blizzard recipe infos by recipe ID, each { learned, disabled }.
 -- opts.chains: rank chains, each a list of recipe IDs, lowest rank first; any other recipe is a
 -- single rank.
@@ -12,13 +14,29 @@
 -- and the global IsAddOnLoaded missing.
 -- opts.noHelpers: Professions.GetHighestLearnedRecipe and EnumerateRecipes missing.
 -- opts.noScrollBox / opts.noScrollUtil: that part of the client missing.
+-- opts.onRegister(box): called after each AddInitializedFrameCallback is recorded.
+-- list.box:ForEachFrame(fn) stops at the first truthy return of fn, as Blizzard's does.
 -- Rows, nodes, node data and recipe infos are RuntimeTraps proxies made on first use, so a write
 -- on any of them raises; call RuntimeTraps.install (which resets proxies) before list:row.
 -- list.clicks counts calls of the rows' own Click method and OnClick script.
 local Wow = require("tests.helpers.wow")
 local RuntimeTraps = require("tests.helpers.runtime_traps")
+local Theme = require("CraftAlert.UI.Theme")
 
 local RecipeListStub = {}
+
+RecipeListStub.SPEAKER = Theme.ART.SPEAKER_ATLAS
+RecipeListStub.MUTED = Theme.ART.MUTED_ATLAS
+
+-- The switch the markers put on `row`: its only child frame, or nil.
+function RecipeListStub.switchOf(row)
+  for _, frame in ipairs(Wow.frames) do
+    if frame.parent == row then
+      return frame
+    end
+  end
+  return nil
+end
 
 local List = {}
 List.__index = List
@@ -109,7 +127,9 @@ local function stubScrollBox(list)
   local box = {}
   function box:ForEachFrame(fn)
     for _, entry in ipairs(list.rows) do
-      fn(entry.row, entry.node)
+      if fn(entry.row, entry.node) then
+        return
+      end
     end
   end
   list.box = box
@@ -149,6 +169,9 @@ function RecipeListStub.install(opts)
     Wow.stub("ScrollUtil", {
       AddInitializedFrameCallback = function(box, callback, owner, iterate)
         list.callbacks[#list.callbacks + 1] = { box = box, callback = callback, owner = owner, iterate = iterate }
+        if opts.onRegister then
+          opts.onRegister(box)
+        end
       end,
     })
   end

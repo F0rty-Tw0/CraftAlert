@@ -9,6 +9,7 @@ package.path = ROOT .. "/?.lua;" .. package.path
 local Wow = require("tests.helpers.wow")
 local Toc = require("tests.helpers.toc")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
+local RecipeListStub = require("tests.helpers.recipe_list_stub")
 
 local DEFAULT_SENDER = "Customer-OtherRealm"
 local SIM_CLASS_GUID = "Player-0-SIMCLASS"
@@ -201,20 +202,11 @@ end
 -- is not loaded until `--event ADDON_LOADED Blizzard_Professions`, which registers the row
 -- callback and prints `markers: installed modern`. The list has no rows.
 local function stubRecipeList(out)
-  Wow.stub("C_AddOns", {
-    IsAddOnLoaded = function()
-      return false
-    end,
-  })
-  Wow.stub("ScrollUtil", {
-    AddInitializedFrameCallback = function()
+  RecipeListStub.install({
+    loaded = false,
+    onRegister = function()
       out[#out + 1] = "markers: installed modern"
     end,
-  })
-  Wow.stub("ProfessionsFrame", {
-    CraftingPage = { RecipeList = { ScrollBox = {
-      ForEachFrame = function() end,
-    } } },
   })
 end
 

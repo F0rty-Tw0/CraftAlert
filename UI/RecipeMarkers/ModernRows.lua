@@ -102,7 +102,8 @@ local function chainOf(recipeInfo, shownInfo, recipes)
   elseif recipes[shownInfo.recipeID] then
     chain[1] = recipes[shownInfo.recipeID]
   end
-  return chain, recipes[shownInfo.recipeID] or chain[#chain]
+  local shown = recipes[shownInfo.recipeID] or chain[#chain]
+  return chain, shown
 end
 
 -- The switch on `row`, created on first use, 14 × 14 at the row's right end.
@@ -121,17 +122,23 @@ local function paint(row, node)
   local data = node and node:GetData()
   local recipeInfo = type(data) == "table" and data.recipeInfo or nil
   if recipeInfo == nil then
-    return hide(row)
+    hide(row)
+    return
   end
+  local shownInfo = recipeInfo
   local highest = professionsHelper("GetHighestLearnedRecipe")
-  local shownInfo = highest and highest(recipeInfo) or recipeInfo
+  if highest then
+    shownInfo = highest(recipeInfo) or recipeInfo
+  end
   local character = db.characters[PlayerName.Own()]
   if gated(shownInfo) or character == nil or character.recipes == nil then
-    return hide(row)
+    hide(row)
+    return
   end
   local chain, shown = chainOf(recipeInfo, shownInfo, character.recipes)
   if MarkerState.Of(chain, shown) == "hidden" then
-    return hide(row)
+    hide(row)
+    return
   end
   local switch = switchOf(row)
   switch.chain, switch.recipe = chain, shown
@@ -144,12 +151,17 @@ local function onInitialized(_, row, node)
   paint(row, node)
 end
 
+-- ForEachFrame stops at the first truthy return, so paint's return must not reach it.
 local function walk()
-  scrollBox:ForEachFrame(paint)
+  scrollBox:ForEachFrame(function(row, node)
+    paint(row, node)
+  end)
 end
 
 -- Registers the row callback once, while the setting is on and the client has the list, then
--- paints the rows already there. We walk them ourselves rather than through `iterateExisting`.
+-- paints the rows already there. `iterateExisting` is false: ScrollUtil would pass ForEachFrame our
+-- callback, which gets (frame, elementData) there but (owner, frame, elementData) from the
+-- initialized-frame hook; `walk` is the one adapter.
 local function hook()
   if hooked or not db.settings.recipeMarkers then
     return

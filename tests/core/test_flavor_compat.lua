@@ -174,7 +174,7 @@ local function testIsAddOnLoaded()
       return true, true
     end,
   })
-  Assert.equal(FlavorCompat.IsAddOnLoaded("WhisperMessenger"), true, "namespace loaded")
+  Assert.equal(FlavorCompat.IsAddOnLoaded("Blizzard_Professions"), true, "namespace loaded")
 
   Wow.stub("C_AddOns", {
     IsAddOnLoaded = function()
@@ -184,13 +184,13 @@ local function testIsAddOnLoaded()
   Wow.stub("IsAddOnLoaded", function()
     return 1
   end)
-  Assert.equal(FlavorCompat.IsAddOnLoaded("WhisperMessenger"), false, "namespace wins over global")
+  Assert.equal(FlavorCompat.IsAddOnLoaded("Blizzard_Professions"), false, "namespace wins over global")
 
   Wow.stub("C_AddOns", nil)
-  Assert.equal(FlavorCompat.IsAddOnLoaded("WhisperMessenger"), true, "global 1 is true")
+  Assert.equal(FlavorCompat.IsAddOnLoaded("Blizzard_Professions"), true, "global 1 is true")
 
   Wow.stub("IsAddOnLoaded", nil)
-  Assert.equal(FlavorCompat.IsAddOnLoaded("WhisperMessenger"), false, "no api")
+  Assert.equal(FlavorCompat.IsAddOnLoaded("Blizzard_Professions"), false, "no api")
 end
 
 local function testTellWrappers()

@@ -1,203 +1,18 @@
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
-local UiFixture = require("tests.helpers.ui_fixture")
+local MarkerFixture = require("tests.helpers.marker_fixture")
 local RecipeListStub = require("tests.helpers.recipe_list_stub")
 
 -- The mute switches on Blizzard's recipe rows (UI/RecipeMarkers/ModernRows.lua, spec
--- 2026-10-26-recipe-markers §6.2-6.5): when the hook registers, which rows show a switch and how
--- it looks, the window-wide gates, what a click mutes, and repaints. Rows, nodes and recipe infos
--- are write-trapping proxies, so any field written on a Blizzard table fails the test.
+-- 2026-10-26-recipe-markers §6.3-6.5): which rows show a switch and how it looks, the window-wide
+-- gates, what a click mutes, and repaints. Registration is test_modern_rows_install.lua. Rows,
+-- nodes and recipe infos are write-trapping proxies, so any field written on a Blizzard table
+-- fails the test.
 
--- Blizzard's recipes: single ranks 101-106 and the rank chain 201 < 202 < 203.
-local RECIPES = {
-  [101] = { learned = true },
-  [102] = { learned = true },
-  [103] = { learned = true },
-  [104] = { learned = true },
-  [105] = { learned = false },
-  [106] = { learned = true, disabled = true },
-  [201] = { learned = true },
-  [202] = { learned = true },
-  [203] = { learned = true },
-}
-local CHAINS = { { 201, 202, 203 } }
-
--- Me-Realm's stored records: 104 is not stored; 105 is stored though unlearned (the learn path
--- does not check `learned`).
-local function stored()
-  return {
-    [101] = { name = "On", bind = 4 },
-    [102] = { name = "Muted", bind = 4, muted = true },
-    [103] = { name = "Unbound", bind = 0 },
-    [105] = { name = "Unlearned", bind = 4 },
-    [106] = { name = "Disabled", bind = 4 },
-    [201] = { name = "Rank 1", bind = 4 },
-    [202] = { name = "Rank 2", bind = 4 },
-    [203] = { name = "Rank 3", bind = 4 },
-  }
-end
-
--- opts.loaded / noHelpers / noScrollBox / noScrollUtil: RecipeListStub's; opts.loaded defaults to
--- true. opts.noCharacter: no Me-Realm record. opts.db(db): edits before the modules load.
-local function load(opts)
-  opts = opts or {}
-  local ns, db = UiFixture.load({
-    db = function(accountDb)
-      if not opts.noCharacter then
-        accountDb.characters["Me-Realm"] = { source = "local", enabled = true, realms = { "Realm" }, professions = {}, recipes = stored() }
-      end
-      if opts.db then
-        opts.db(accountDb)
-      end
-    end,
-  })
-  local loaded = opts.loaded
-  if loaded == nil and not opts.apiMissing then
-    loaded = true
-  end
-  local list = RecipeListStub.install({
-    recipes = RECIPES,
-    chains = CHAINS,
-    loaded = loaded,
-    noHelpers = opts.noHelpers,
-    noScrollBox = opts.noScrollBox,
-    noScrollUtil = opts.noScrollUtil,
-  })
-  return ns, db, list
-end
-
--- Our switch on `row` (its only child frame), or nil.
-local function switchOf(row)
-  for _, frame in ipairs(Wow.frames) do
-    if frame.parent == row then
-      return frame
-    end
-  end
-  return nil
-end
-
-local function shown(row)
-  local switch = switchOf(row)
-  return switch ~= nil and switch:IsShown()
-end
-
--- What the switch on `row` shows: { atlas, desaturated }, or "none".
-local function look(row)
-  if not shown(row) then
-    return "none"
-  end
-  local switch = assert(switchOf(row))
-  return { switch.icon.atlas, switch.icon.desaturated == true }
-end
-
-local SPEAKER, MUTED = "voicechat-icon-speaker", "voicechat-icon-speaker-mute"
-
--- Blizzard_Professions loaded at login: one callback, without Blizzard's iterate (we walk the
--- existing rows ourselves), and the rows already on screen get their switch.
-local function testInstallWhenLoaded()
-  local ns, db, list = load()
-  local row = list:row(101)
-  ns.ModernRows.Install(db)
-  Assert.equal(#list.callbacks, 1)
-  local call = list.callbacks[1]
-  Assert.same({ call.box, call.owner, call.iterate }, { list.box, ns.ModernRows, false })
-  Assert.same(look(row), { SPEAKER, false }, "existing row painted")
-  local fresh = list:row(102)
-  list:init(fresh, 102)
-  Assert.same(look(fresh), { MUTED, false }, "a row initialized later is painted through the callback")
-end
-
--- Not loaded at login: hooks on ADDON_LOADED of Blizzard_Professions only, then stops listening.
-local function testInstallWaitsForAddon()
-  local ns, db, list = load({ loaded = false })
-  local row = list:row(101)
-  ns.ModernRows.Install(db)
-  Assert.equal(#list.callbacks, 0, "not loaded: nothing registered")
-  Wow.fireEvent("ADDON_LOADED", "SomeOtherAddon")
-  Assert.equal(#list.callbacks, 0)
-  Wow.fireEvent("ADDON_LOADED", "Blizzard_Professions")
-  Assert.equal(#list.callbacks, 1)
-  Assert.equal(list.callbacks[1].iterate, false)
-  Assert.same(look(row), { SPEAKER, false })
-  for _, frame in ipairs(Wow.frames) do
-    Assert.falsy(frame.events.ADDON_LOADED, "stopped listening")
-  end
-end
-
--- No IsAddOnLoaded on the client: treated as not loaded, so Install listens.
-local function testInstallWithoutApi()
-  local ns, db, list = load({ apiMissing = true })
-  ns.ModernRows.Install(db)
-  Assert.equal(#list.callbacks, 0)
-  Wow.fireEvent("ADDON_LOADED", "Blizzard_Professions")
-  Assert.equal(#list.callbacks, 1)
-end
-
--- Setting off: nothing registered at all; turned on, Refresh registers once.
-local function testSettingOffRegistersNothing()
-  local ns, db, list = load({
-    db = function(accountDb)
-      accountDb.settings.recipeMarkers = false
-    end,
-  })
-  local row = list:row(101)
-  ns.ModernRows.Install(db)
-  Assert.equal(#list.callbacks, 0)
-  Assert.equal(look(row), "none")
-  db.settings.recipeMarkers = true
-  ns.ModernRows.Refresh()
-  Assert.equal(#list.callbacks, 1)
-  Assert.same(look(row), { SPEAKER, false })
-  ns.ModernRows.Refresh()
-  Assert.equal(#list.callbacks, 1, "registered once")
-end
-
--- Setting off when Blizzard_Professions loads: no hook, no more listening; turned on later, the
--- loaded addon is remembered even without IsAddOnLoaded.
-local function testSettingOnAfterAddonLoaded()
-  local ns, db, list = load({
-    apiMissing = true,
-    db = function(accountDb)
-      accountDb.settings.recipeMarkers = false
-    end,
-  })
-  local row = list:row(101)
-  ns.ModernRows.Install(db)
-  Wow.fireEvent("ADDON_LOADED", "Blizzard_Professions")
-  Assert.equal(#list.callbacks, 0)
-  db.settings.recipeMarkers = true
-  ns.ModernRows.Refresh()
-  Assert.equal(#list.callbacks, 1)
-  Assert.same(look(row), { SPEAKER, false })
-end
-
--- A client without the list's ScrollBox or without ScrollUtil: nothing registered, no error.
-local function testMissingClientParts()
-  local ns, db, list = load({ noScrollBox = true })
-  ns.ModernRows.Install(db)
-  ns.ModernRows.Refresh()
-  Assert.equal(#list.callbacks, 0)
-
-  ns, db, list = load({ noScrollUtil = true })
-  local row = list:row(101)
-  ns.ModernRows.Install(db)
-  ns.ModernRows.Refresh()
-  Assert.equal(look(row), "none")
-end
-
--- Refresh before Install (a settings toggle before login, or on Classic) reads nothing.
-local function testRefreshBeforeInstall()
-  local ns = load()
-  local trap = setmetatable({}, {
-    __index = function(_, key)
-      error("read " .. tostring(key))
-    end,
-  })
-  Wow.stub("ProfessionsFrame", trap)
-  Wow.stub("ScrollUtil", trap)
-  ns.ModernRows.Refresh()
-end
+local load, look = MarkerFixture.load, MarkerFixture.look
+local switchOf = RecipeListStub.switchOf
+local SPEAKER, MUTED = RecipeListStub.SPEAKER, RecipeListStub.MUTED
 
 -- Only a learned, enabled, stored recipe row gets a switch; it is 14 × 14 at the row's right end
 -- and shows the recipe's state: speaker, crossed out while muted, greyed while untracked.
@@ -326,6 +141,32 @@ local function testRefreshRepaintsRows()
   Assert.equal(recipes[101].muted, true)
 end
 
+-- The row shows the highest learned rank's state, not the chain's last stored rank: rank 2 of
+-- 301 < 302 < 303 has no binding (greyed), rank 3 is stored and bound but not learned. When that
+-- rank is not stored (401 < 402), the chain's last stored record stands in for it.
+local function testShownRankDecidesLook()
+  local ns, db, list = load()
+  local ranked, gap = list:row(301), list:row(401)
+  ns.ModernRows.Install(db)
+  Assert.same(look(ranked), { SPEAKER, true }, "rank 2 is learned and untracked; rank 3 would show on")
+  Assert.same(look(gap), { SPEAKER, true }, "rank 2 is not stored: the last stored rank, untracked")
+end
+
+-- Blizzard's ForEachFrame stops at the first truthy return; the walk must paint the rows after a
+-- category row and a hidden row, on install and on Refresh.
+local function testWalkPaintsEveryRow()
+  local ns, db, list = load()
+  local category, hidden, first, second = list:row(nil), list:row(104), list:row(101), list:row(102)
+  ns.ModernRows.Install(db)
+  Assert.same({ look(first), look(second) }, { { SPEAKER, false }, { MUTED, false } }, "after the hide paths")
+  db.settings.recipeMarkers = false
+  ns.ModernRows.Refresh()
+  db.settings.recipeMarkers = true
+  ns.ModernRows.Refresh()
+  Assert.same({ look(category), look(hidden) }, { "none", "none" })
+  Assert.same({ look(first), look(second) }, { { SPEAKER, false }, { MUTED, false } }, "after a Refresh")
+end
+
 -- Without the Professions rank helpers the chain is the shown recipe's own record.
 local function testFallbackWithoutHelpers()
   local ns, db, list = load({ noHelpers = true })
@@ -339,18 +180,13 @@ local function testFallbackWithoutHelpers()
 end
 
 return function()
-  testInstallWhenLoaded()
-  testInstallWaitsForAddon()
-  testInstallWithoutApi()
-  testSettingOffRegistersNothing()
-  testSettingOnAfterAddonLoaded()
-  testMissingClientParts()
-  testRefreshBeforeInstall()
   testPaint()
   testPaintWithoutCharacter()
   testGates()
   testClickMutesChain()
   testRefreshRepaintsRows()
+  testShownRankDecidesLook()
+  testWalkPaintsEveryRow()
   testFallbackWithoutHelpers()
   Wow.reset()
 end

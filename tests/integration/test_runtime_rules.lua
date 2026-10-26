@@ -191,6 +191,9 @@ local function testTrapsCatchViolations()
       G("ProfessionsFrame").CraftingPage.RecipeList.ScrollBox.Extra = 1
     end, "ScrollBox.Extra")
     Assert.raises(function()
+      state.list:row(9001).Extra = 1
+    end, "write to Blizzard table row.Extra")
+    Assert.raises(function()
       G("C_Timer").After = function() end
     end, "C_Timer.After")
     Assert.raises(function()
@@ -319,7 +322,7 @@ local function testLearnSignalAllowsSystemEvents()
 end
 
 local function testAddonObeysTheRules()
-  withTraps(function(state, sent, verify)
+  withTraps(function(state, sent)
     local ns = loadAddon()
     -- The trap asks the gate itself, so a registration made before the gate flips raises.
     state.isActive = ns.ScanGate.IsActive
@@ -435,32 +438,33 @@ local function testAddonObeysTheRules()
     for _, frame in ipairs(Wow.frames) do
       Assert.equal(frame.scripts.OnUpdate, nil, "no OnUpdate script")
     end
+  end)
+end
 
-    -- Recipe markers (§6.2-6.5) under the traps: Blizzard_Professions loads after login, a stored
-    -- row gets its switch, a click mutes and unmutes through the index rebuild. Nothing is
-    -- written on the row, its node or the lists; verify() would report a raw write.
-    local row = state.list:row(9001)
-    Assert.raises(function()
-      row.Extra = 1
-    end, "write to Blizzard table row.Extra")
+-- Recipe markers (§6.2-6.5) under the traps: Blizzard_Professions loads after login, a stored row
+-- gets its switch, a click mutes and unmutes through the index rebuild. Nothing is written on the
+-- row, its node or the lists; withTraps' verify would report a raw write.
+local function testMarkersObeyTheRules()
+  withTraps(function(state)
+    local ns = loadAddon()
+    state.isActive = ns.ScanGate.IsActive
+    Wow.fireEvent("ADDON_LOADED", "CraftAlert")
+    rawget(_G, "CraftAlertDB").characters = dofile("tools/sim_fixture.lua").characters
+    Wow.fireEvent("PLAYER_LOGIN")
+    local list = state.list
+    local row = list:row(9001)
+    Assert.equal(#list.callbacks, 0, "Blizzard_Professions is not loaded: nothing registered")
     Wow.fireEvent("ADDON_LOADED", "Blizzard_Professions")
-    Assert.equal(#state.list.callbacks, 1, "the row callback registered through the ScrollUtil proxy")
-    local switch
-    for _, frame in ipairs(Wow.frames) do
-      if frame.parent == row then
-        switch = frame
-      end
-    end
-    Assert.truthy(switch, "the stored row got its switch")
+    Assert.equal(#list.callbacks, 1, "the row callback registered through the ScrollUtil proxy")
+    local switch = assert(RecipeListStub.switchOf(row), "the stored row got its switch")
     Assert.equal(switch:IsShown(), true)
     Widgets.click(switch)
     ns.Index.Rebuild()
-    Assert.equal(switch.icon.atlas, "voicechat-icon-speaker-mute", "the click muted the recipe and the rebuild kept it")
+    Assert.equal(switch.icon.atlas, RecipeListStub.MUTED, "the click muted the recipe and the rebuild kept it")
     Widgets.click(switch)
     ns.Index.Rebuild()
-    Assert.equal(switch.icon.atlas, "voicechat-icon-speaker")
-    Assert.equal(state.list.clicks.method + state.list.clicks.script, 0, "the row's own click never ran")
-    verify()
+    Assert.equal(switch.icon.atlas, RecipeListStub.SPEAKER)
+    Assert.equal(list.clicks.method + list.clicks.script, 0, "the row's own click never ran")
   end)
 end
 
@@ -483,5 +487,6 @@ return function()
   testTrapsCatchViolations()
   testLearnSignalAllowsSystemEvents()
   testAddonObeysTheRules()
+  testMarkersObeyTheRules()
   testSourceRules()
 end

@@ -204,7 +204,6 @@ local function testFreshInstall()
   for _, event in ipairs(INSTALLED_EVENTS) do
     Assert.truthy(isRegistered(event), event .. " registered")
   end
-  -- Bootstrap's own listener is dropped; the one left waits for Blizzard_Professions (ModernRows).
   Assert.equal(isRegistered("ADDON_LOADED"), true, "only the recipe markers' wait for Blizzard_Professions is left")
   Assert.equal(isRegistered("PLAYER_LOGIN"), false)
   Assert.equal(type(rawget(_G, "SlashCmdList").CRAFTALERT), "function")
@@ -580,17 +579,7 @@ local function testLoginInInstanceIsSilent(db)
   Wow.stub("IsInInstance", nil)
 end
 
--- The switch the markers put on `row` (its only child frame); raises when it has none.
-local function markerOf(row)
-  for _, frame in ipairs(Wow.frames) do
-    if frame.parent == row then
-      return frame
-    end
-  end
-  error("no switch on the row")
-end
-
-local SPEAKER, MUTED = "voicechat-icon-speaker", "voicechat-icon-speaker-mute"
+local SPEAKER, MUTED = RecipeListStub.SPEAKER, RecipeListStub.MUTED
 
 -- Recipe markers on Retail: nothing registers before Blizzard_Professions loads; then one callback,
 -- and a rebuild or entering an instance repaints a stored row (muted look, then hidden).
@@ -603,7 +592,7 @@ local function testRecipeMarkers(db)
   Wow.fireEvent("ADDON_LOADED", "Blizzard_Professions")
   Assert.equal(#list.callbacks, 1, "the row callback registers once the window's addon loads")
   Assert.equal(isRegistered("ADDON_LOADED"), false, "and the wait is over")
-  local switch = markerOf(row)
+  local switch = assert(RecipeListStub.switchOf(row), "the stored row got its switch")
   Assert.same({ switch:IsShown(), switch.icon.atlas }, { true, SPEAKER })
 
   db.characters[OWN_KEY].recipes[9001].muted = true
