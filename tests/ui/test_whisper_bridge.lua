@@ -403,6 +403,93 @@ local function testPanelRefreshesOnlyWhileShown()
   Assert.equal(wm.badgeRefreshes, badges + 1, "badge still refreshed")
 end
 
+-- The rows the shown panel paints, by lead: wraps LeadRow.Show before the panel is shown.
+-- → a function giving the colour of that lead's dot, nil when its row was never painted.
+local function dotColors(ns)
+  local rows = {}
+  local show = ns.LeadRow.Show
+  ns.LeadRow.Show = function(row, lead)
+    show(row, lead)
+    rows[lead] = row
+  end
+  return function(lead)
+    return rows[lead] and rows[lead].dot.texture.vertexColor
+  end
+end
+
+-- Reply-unread dot (spec §2-§5): WM with GetUnreadCount gets onUnreadChanged on the panel, the
+-- customer's count paints the row pink and a change repaints the shown panel. WM is asked on
+-- paint only.
+local function testUnreadDot()
+  local ns, _, _, _, wm = boot({ leads = 2 })
+  Wow.stub("ChatTypeInfo", { WHISPER = { r = 1, g = 0.5, b = 0.9 } })
+  local dotOf = dotColors(ns)
+  Assert.equal(ns.WhisperBridge.Activate(), true)
+  local panel = wm.panels.CraftAlert
+  Assert.equal(type(panel.onUnreadChanged), "function", "the panel asks WM for unread changes")
+  -- The details pane marks the selected (latest) lead seen, so its dot is the state colour.
+  local lead, other = ns.Leads.Latest(), ns.Leads.List()[2]
+  wm.showPanel("CraftAlert")
+  local gold, grey = ns.Theme.COLORS.gold, ns.Theme.COLORS.grey
+  Assert.same({ dotOf(lead), dotOf(other) }, { grey, gold }, "no unread: the seen lead's state colour, the unseen gold")
+  local asks = #wm.callsTo("GetUnreadCount")
+  wm.unread[lead.customer] = 2
+  Assert.equal(#wm.callsTo("GetUnreadCount"), asks, "WM is not asked before a paint")
+  wm.unreadChanged("CraftAlert")
+  Assert.same({ dotOf(lead), dotOf(other) }, { { 1, 0.5, 0.9, 1 }, gold }, "the customer with unread turns pink, seen or not")
+  Assert.same(wm.callsTo("GetUnreadCount")[asks + 1], { "GetUnreadCount", lead.customer })
+  wm.unread[lead.customer] = 0
+  wm.unread[other.customer] = 4
+  wm.unreadChanged("CraftAlert")
+  Assert.same({ dotOf(lead), dotOf(other) }, { grey, { 1, 0.5, 0.9, 1 } }, "an unseen lead with unread: pink over gold")
+  wm.unread[other.customer] = 0
+  wm.unreadChanged("CraftAlert")
+  Assert.same(dotOf(other), gold, "read in WM: back to gold")
+  -- A hidden panel is not repainted by the change; onShow does it.
+  wm.hidePanel("CraftAlert")
+  wm.unread[lead.customer] = 1
+  local before = #wm.callsTo("GetUnreadCount")
+  wm.unreadChanged("CraftAlert")
+  Assert.equal(#wm.callsTo("GetUnreadCount"), before, "hidden: nothing asked")
+  wm.showPanel("CraftAlert")
+  Assert.same(dotOf(lead), { 1, 0.5, 0.9, 1 }, "onShow repaints")
+end
+
+-- WM without GetUnreadCount (an older one): no onUnreadChanged, the rows never go pink, the
+-- bridge still activates.
+local function testUnreadDotOlderWm()
+  local ns, _, _, _, wm = boot({ leads = 1 }, { without = { "GetUnreadCount" } })
+  local dotOf = dotColors(ns)
+  Assert.equal(ns.WhisperBridge.Activate(), true)
+  Assert.equal(wm.panels.CraftAlert.onUnreadChanged, nil)
+  wm.showPanel("CraftAlert")
+  Assert.same(dotOf(ns.Leads.Latest()), ns.Theme.COLORS.grey)
+  Assert.same(wm.callsTo("GetUnreadCount"), {})
+end
+
+-- A GetUnreadCount that raises, refuses or answers a non-number counts as 0: no pink, no error out
+-- of the paint.
+local function testUnreadDotRaisingWm()
+  for _, mode in ipairs({ "raise", "refuse" }) do
+    local ns, _, _, _, wm = boot({ leads = 1 })
+    local dotOf = dotColors(ns)
+    Assert.equal(ns.WhisperBridge.Activate(), true)
+    local lead = ns.Leads.Latest()
+    wm.unread[lead.customer] = 5
+    wm[mode].GetUnreadCount = true
+    wm.showPanel("CraftAlert")
+    wm.unreadChanged("CraftAlert")
+    Assert.same(dotOf(lead), ns.Theme.COLORS.grey, mode)
+    Assert.truthy(#wm.callsTo("GetUnreadCount") >= 1, mode .. ": asked")
+  end
+  local ns, _, _, _, wm = boot({ leads = 1 })
+  local dotOf = dotColors(ns)
+  ns.WhisperBridge.Activate()
+  wm.unread[ns.Leads.Latest().customer] = "many"
+  wm.showPanel("CraftAlert")
+  Assert.same(dotOf(ns.Leads.Latest()), ns.Theme.COLORS.grey, "a non-number")
+end
+
 local function testPanelHostRules()
   local ns, _, _, _, wm = boot({ leads = 2 })
   ns.WhisperBridge.Activate()
@@ -641,6 +728,9 @@ return function()
   testInfoStripNamesTheWhat()
   testPanel()
   testPanelRefreshesOnlyWhileShown()
+  testUnreadDot()
+  testUnreadDotOlderWm()
+  testUnreadDotRaisingWm()
   testPanelHostRules()
   testPanelEmptyInInstance()
   testLeavingInstanceRefreshesPanel()

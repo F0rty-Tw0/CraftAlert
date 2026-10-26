@@ -13,6 +13,7 @@ local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
 local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
+local LeadRow = ns.LeadRow or require("CraftAlert.UI.LeadRow")
 local BridgePanel = ns.BridgePanel or require("CraftAlert.UI.BridgePanel")
 local BridgeInfo = ns.BridgeInfo or require("CraftAlert.UI.BridgeInfo")
 
@@ -21,8 +22,8 @@ local BridgeInfo = ns.BridgeInfo or require("CraftAlert.UI.BridgeInfo")
 -- (UI/BridgePanel.lua), /ca config opens its settings, whisper boxes open as WM conversations and
 -- each customer's conversation gets an info line (UI/BridgeInfo.lua). The earlier modules never
 -- call this one: Activate plugs it in through their setters (Launcher.SetSuppressed,
--- LeadsWindow.SetRouter and SetSettingsRouter, GreetAction.SetOpener). Without the API nothing
--- here runs.
+-- LeadsWindow.SetRouter and SetSettingsRouter, GreetAction.SetOpener, LeadRow.SetUnreadSource).
+-- Without the API nothing here runs.
 local WhisperBridge = {}
 
 local ipairs = ipairs
@@ -148,6 +149,12 @@ local function onChange()
   syncInfo()
 end
 
+-- How many whispers of the lead's customer the player has not read in WM; a raise answers false,
+-- which LeadRow (like any non-number) counts as 0.
+local function unreadOf(lead)
+  return ask("GetUnreadCount", lead.customer)
+end
+
 -- Activates once per session (spec C.2): → whether the bridge is on. A second call returns the
 -- first answer and wires nothing again. RegisterPanel, the one call out, comes before the wiring:
 -- a raise or a false answer (WM refuses, e.g. the key is taken) leaves CraftAlert standalone.
@@ -160,11 +167,20 @@ function WhisperBridge.Activate()
     active = false
     return false
   end
-  if candidate.RegisterPanel(KEY, BridgePanel.Build()) ~= true then
+  local panel = BridgePanel.Build()
+  -- An older WM has no GetUnreadCount: no unread callback, no pink dots.
+  local countsUnread = type(candidate.GetUnreadCount) == "function"
+  if countsUnread then
+    panel.onUnreadChanged = BridgePanel.Refresh
+  end
+  if candidate.RegisterPanel(KEY, panel) ~= true then
     active = false
     return false
   end
   api, active = candidate, true
+  if countsUnread then
+    LeadRow.SetUnreadSource(unreadOf)
+  end
   Launcher.SetSuppressed(true)
   LeadsWindow.SetRouter(function()
     return ask("TogglePanel", KEY)
