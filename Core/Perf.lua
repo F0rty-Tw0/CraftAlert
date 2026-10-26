@@ -51,15 +51,17 @@ local function millis(value)
   return value and Localization.Text("%.1f ms", value) or Localization.Text("n/a")
 end
 
--- "Login 42.0 ms, index build 12.5 ms, last read 12.5 ms in 4 steps, background 7 steps in 10
--- ticks, longest 9.3 ms." — shown in every report. No read yet (or Classic): "last read n/a in 0 steps".
+-- "Login 42.0 ms, index build 92.0 ms in 46 steps, last read 12.5 ms in 4 steps, background 7
+-- steps in 10 ticks, longest 9.3 ms." — shown in every report. A synchronous build is 1 step;
+-- no build yet: "index build n/a in 0 steps"; no read yet (or Classic): "last read n/a in 0 steps".
 local function setupText()
   local read = ModernReader.lastRead
   local stats = Slicer.stats
   return Localization.Text(
-    "Login %s, index build %s, last read %s in %d steps, background %d steps in %d ticks, longest %s.",
+    "Login %s, index build %s in %d steps, last read %s in %d steps, background %d steps in %d ticks, longest %s.",
     millis(Perf.loginMs),
     millis(Index.lastBuildMs),
+    Index.lastBuildSteps or 0,
     millis(read and read.ms),
     read and read.steps or 0,
     stats.steps,
