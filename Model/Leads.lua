@@ -165,6 +165,18 @@ local function sweep(list, limit)
   return removed
 end
 
+-- Drops the leads of every customer on Blizzard's ignore list. → whether any went.
+local function dropIgnored(list)
+  local removed = false
+  for i = #list, 1, -1 do
+    if CrafterRank.IsIgnored(list[i].customer) then
+      remove(list, i)
+      removed = true
+    end
+  end
+  return removed
+end
+
 local armExpiry
 
 local function onExpiry(generation)
@@ -303,9 +315,10 @@ local function dropLiveFields()
 end
 
 -- Binds db.leads (Bootstrap, at PLAYER_LOGIN): repairs a hand-edited list (ids, times, order,
--- size), drops test leads and expired leads, starts the timer and asks again for the item links
--- the last session never got. The db is bound last: while a repair raises, Leads stays unbound
--- and makes no lead.
+-- size), drops test leads, expired leads and the leads of ignored customers (the ignore list may
+-- have loaded before the addon, so no IGNORELIST_UPDATE comes for it), starts the timer and asks
+-- again for the item links the last session never got. The db is bound before the ignore check,
+-- which calls Blizzard's API: while a repair raises, Leads stays unbound and makes no lead.
 function Leads.Restore(accountDb)
   local list = accountDb.leads
   dropTest(list)
@@ -318,6 +331,7 @@ function Leads.Restore(accountDb)
   armExpiry(list, limit)
   db, leads = accountDb, list
   EventRouter.On("PLAYER_LOGOUT", dropLiveFields)
+  removed = dropIgnored(list) or removed
   for i = 1, #list do
     if list[i].itemID ~= nil and list[i].itemLink == nil then
       fillLink(list[i])
@@ -606,14 +620,7 @@ end
 
 -- Blizzard's ignore list changed (IGNORELIST_UPDATE): drop the open leads of every ignored customer.
 function Leads.DismissIgnored()
-  local removed = false
-  for i = #leads, 1, -1 do
-    if CrafterRank.IsIgnored(leads[i].customer) then
-      remove(leads, i)
-      removed = true
-    end
-  end
-  if removed then
+  if dropIgnored(leads) then
     fire("change")
   end
 end
