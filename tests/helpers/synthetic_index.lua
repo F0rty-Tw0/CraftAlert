@@ -157,10 +157,15 @@ end
 -- → nil when two builds are equal: same values in the same order, the same tables shared, and
 -- table-keyed sets (needsSecondWord holds records) matched through the paired tables; else the
 -- path of the first difference. Assert.same can't compare two builds: their record keys differ.
-function Synthetic.difference(a, b)
+-- Checked both ways, so a list shared in b but not in a counts too.
+local function oneWay(a, b)
   local pairOf = {}
   pairTables(a, b, pairOf)
   return firstDifference(a, b, "index", pairOf, {})
+end
+
+function Synthetic.difference(a, b)
+  return oneWay(a, b) or oneWay(b, a)
 end
 
 return Synthetic
