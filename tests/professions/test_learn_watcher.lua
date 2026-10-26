@@ -9,7 +9,8 @@ local BS, ENCH, COOKING = 164, 333, 185
 local CHAR = "Me-Realm"
 
 -- "Me-Realm" knows Blacksmithing and Enchanting. Recipes are not `learned` yet, as inside the event.
-local function setup(flavor)
+-- withoutDb: the reader is installed before the saved data loaded.
+local function setup(flavor, withoutDb)
   local ns = Fixture.load(flavor)
   Wow.stub("UnitName", function()
     return "Me"
@@ -32,7 +33,7 @@ local function setup(flavor)
     run.builds = run.builds + 1
     run.reasons[#run.reasons + 1] = ns.Index.lastReason
   end)
-  ModernReader.Install(db)
+  ModernReader.Install(not withoutDb and db or nil)
   LearnWatcher.Install()
   return ns, state, LearnWatcher, db, run
 end
@@ -77,17 +78,24 @@ return function()
     Assert.equal(LearnWatcher.lastStored, false)
   end
 
-  -- With a stored profession's window open, a learn answered with a bare skill line the
-  -- character does not store (no parent) belongs to the window, as in the window read; a
-  -- parented unstored answer is still skipped, and a blocked or closed window lends no key.
+  -- With a stored profession's window open, a learn the window lists answered with a bare skill
+  -- line the character does not store (no parent) belongs to the window, as in the window read;
+  -- a parented unstored answer is still skipped, a recipe the window does not list borrows no
+  -- key, and a blocked or closed window lends no key.
   local _, state, LearnWatcher, db = setup()
   state.base = BS
   Wow.fireEvent("TRADE_SKILL_SHOW")
+  local bareCooking = recipe(5, { professionID = COOKING })
+  bareCooking.unlisted = true
+  local unloaded = recipe(6, { professionID = 0 })
+  unloaded.unlisted = true
   state.recipes = {
     recipe(1, { professionID = 2872 }),
     recipe(2, { professionID = 2872, parentProfessionID = COOKING }),
     recipe(3, { professionID = 2872 }),
     recipe(4, { professionID = 2872 }),
+    bareCooking,
+    unloaded,
   }
   Wow.fireEvent(EVENT, 1)
   Assert.equal(LearnWatcher.lastStored, true, "a bare skill line proves no other profession")
@@ -95,6 +103,12 @@ return function()
   Wow.fireEvent(EVENT, 2)
   Assert.equal(LearnWatcher.lastStored, false, "a parented unstored answer")
   Assert.equal(db.characters[CHAR].recipes[2], nil)
+  Wow.fireEvent(EVENT, 5)
+  Assert.equal(LearnWatcher.lastStored, false, "a bare Cooking learn the window does not list")
+  Assert.equal(db.characters[CHAR].recipes[5], nil)
+  Wow.fireEvent(EVENT, 6)
+  Assert.equal(LearnWatcher.lastStored, false, "an unloaded answer the window does not list")
+  Assert.equal(db.characters[CHAR].recipes[6], nil)
   state.guards.IsTradeSkillLinked = true
   Wow.fireEvent(EVENT, 3)
   Assert.equal(LearnWatcher.lastStored, false, "a linked window is somebody else's")
@@ -103,6 +117,14 @@ return function()
   Wow.fireEvent(EVENT, 4)
   Assert.equal(LearnWatcher.lastStored, false, "no window to fall back to")
   Assert.equal(db.characters[CHAR].recipes[4], nil)
+
+  -- A learn with the window open before the saved data loaded reads no data and stores nothing.
+  _, state, LearnWatcher = setup(nil, true)
+  state.base = BS
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  state.recipes = { recipe(1, { professionID = 2872 }) }
+  Wow.fireEvent(EVENT, 1)
+  Assert.equal(LearnWatcher.lastStored, false, "no saved data yet")
 
   -- A secret recipe ID is ignored before anything else is called.
   local run

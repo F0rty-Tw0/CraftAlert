@@ -202,14 +202,25 @@ local function storeKey(charKey, recipeID, key)
   return parent == nil and key or nil, false, info
 end
 
--- The key a learned recipe is stored under (nil: skip). With an unblocked window of a stored
--- profession open, storeKey's rule decides, so a parentless or unloaded answer belongs to the
--- window as in a window read; otherwise the recipe's base profession: the parent skill line
--- when there is one, else the skill line itself.
+local function inWindowList(api, recipeID)
+  for _, id in ipairs(api.GetAllRecipeIDs() or {}) do
+    if id == recipeID then
+      return true
+    end
+  end
+  return false
+end
+
+-- The key a learned recipe is stored under (nil: skip). When an unblocked window of a stored
+-- profession lists the recipe, storeKey's rule decides, so a parentless or unloaded answer
+-- belongs to the window as in a window read; otherwise the recipe's base profession: the parent
+-- skill line when there is one, else the skill line itself. A recipe the window does not list
+-- borrows nothing from it: a bare Cooking line or a 0 then stores nothing.
 function ModernReader.LearnKey(recipeID)
   local api = tradeSkillApi()
-  local key = windowOpen and api ~= nil and not isBlocked(api) and windowProfession(api) or nil
-  if key ~= nil then
+  local usable = windowOpen and db ~= nil and api ~= nil and not isBlocked(api)
+  local key = usable and windowProfession(api) or nil
+  if key ~= nil and inWindowList(api, recipeID) then
     return (storeKey(PlayerName.Own(), recipeID, key))
   end
   local info = professionInfo(recipeID)

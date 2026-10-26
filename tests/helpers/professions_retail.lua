@@ -8,7 +8,8 @@
 -- state.changing: C_TradeSkillUI.IsDataSourceChanging() (the list is still rebuilding).
 -- state.lookups[id]: what GetProfessionInfoByRecipeID reports for a recipe not in the list.
 -- A recipe: { id, name, item, ranks, learned, profession = {professionID, parentProfessionID},
--- isRecraft, isDummyRecipe, isSalvageRecipe, isGatheringRecipe }.
+-- isRecraft, isDummyRecipe, isSalvageRecipe, isGatheringRecipe, unlisted }. An unlisted recipe
+-- answers every lookup but is left out of GetAllRecipeIDs, like another profession's recipe.
 local Wow = require("tests.helpers.wow")
 
 local ProfessionsRetail = {}
@@ -56,8 +57,10 @@ local function installTradeSkill(state)
   local api = {
     GetAllRecipeIDs = function()
       local ids = {}
-      for i, recipe in ipairs(state.recipes) do
-        ids[i] = recipe.id
+      for _, recipe in ipairs(state.recipes) do
+        if not recipe.unlisted then
+          ids[#ids + 1] = recipe.id
+        end
       end
       return ids
     end,
