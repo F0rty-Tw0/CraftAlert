@@ -29,7 +29,7 @@ Theme.COLORS = {
   selectedTint = { 1, 0.82, 0 },
 }
 
--- Blizzard font object names (WhisperMessenger's FONT_MAP bases).
+-- Blizzard font object names.
 Theme.FONTS = {
   title = "GameFontHighlight",
   name = "GameFontNormal",

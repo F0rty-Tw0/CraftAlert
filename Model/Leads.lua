@@ -22,7 +22,8 @@ local tostring = tostring
 local type = type
 
 local MAX_LEADS = 100
--- A lead whose guid starts with this is a synthetic `/ca test` lead: flagged `test`, never saved.
+-- A lead whose guid starts with this is a synthetic `/ca test` lead: flagged `test`. It reaches
+-- the saved data at logout and is dropped at the next load (SavedState.Load, Leads.Restore).
 Leads.TEST_GUID_PREFIX = FlavorCompat.TEST_GUID_PREFIX
 local EVENTS = { new = true, change = true, greeted = true, replied = true, seen = true }
 local ITEM_EVENT = "GET_ITEM_INFO_RECEIVED"
