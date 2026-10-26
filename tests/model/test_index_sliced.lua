@@ -130,6 +130,52 @@ local function testRebuildCancelsJob()
   Assert.truthy(rawequal(ns.Index.Current(), index))
 end
 
+-- Pause takes a weight, the loop body's work: eight heavy words in a row (1 ms each, a list of
+-- 64 entries) yield once the budget is spent, rather than after the eighth pause call.
+local function testHeavyWordsYieldOnBudget()
+  local ns = setup()
+  Wow.stub("debugprofilestop", function()
+    return Wow.clock.profile
+  end)
+  local wordGroupsBuild = ns.WordGroups.Build
+  ns.WordGroups.Build = function(index, pause)
+    for _ = 1, 8 do
+      Wow.clock.profile = Wow.clock.profile + 1
+      pause(64)
+    end
+    return wordGroupsBuild(index, pause)
+  end
+  ns.Slicer.ResetStats()
+  ns.Index.RequestRebuild("read")
+  Wow.runTimers()
+  ns.WordGroups.Build = wordGroupsBuild
+  Assert.falsy(ns.Slicer.IsRunning(JOB), "the sliced build finished")
+  local longest = ns.Slicer.stats.longestTickMs
+  Assert.truthy(longest <= ns.Slicer.BUDGET_MS + 1, "a tick holds at most one heavy word past the budget, longest " .. longest)
+end
+
+-- Both WordGroups loops over wordIndex weigh a word by its list's length.
+local function testWordGroupsWeighsLists()
+  local ns, db = setup()
+  local index = Synthetic.build(ns, db)
+  local longest, words = 0, 0
+  for _, list in pairs(index.wordIndex) do
+    if #list > longest then
+      longest, words = #list, 1
+    elseif #list == longest then
+      words = words + 1
+    end
+  end
+  local heavy = 0
+  ns.WordGroups.Build(index, function(weight)
+    if weight == longest then
+      heavy = heavy + 1
+    end
+  end)
+  Assert.truthy(longest > 8, "the longest list outweighs a clock read, " .. longest)
+  Assert.equal(heavy, 2 * words, "pauses weighted by the longest list")
+end
+
 -- Before Configure a request starts nothing (Rebuild returns nil there too).
 local function testNoJobBeforeConfigure()
   local ns = Fixture.load()
@@ -147,5 +193,7 @@ return function()
   testRaisingStepKeepsOldIndex()
   testRebuildCancelsJob()
   testNoJobBeforeConfigure()
+  testHeavyWordsYieldOnBudget()
+  testWordGroupsWeighsLists()
   Wow.reset()
 end
