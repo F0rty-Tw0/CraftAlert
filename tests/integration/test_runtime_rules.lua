@@ -7,6 +7,7 @@ local Wow = require("tests.helpers.wow")
 local Toc = require("tests.helpers.toc")
 local RuntimeTraps = require("tests.helpers.runtime_traps")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
+local RecipeListStub = require("tests.helpers.recipe_list_stub")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 local Widgets = require("tests.helpers.widgets")
 
@@ -58,7 +59,6 @@ local function installBlizzard(sent)
       return false
     end,
   })
-  Wow.stub("ProfessionsFrame", { CraftingPage = { RecipeList = { ScrollBox = {} } } })
   Wow.stub("SlashCmdList", {})
   Wow.stub("UISpecialFrames", {})
   Wow.stub("Settings", {
@@ -133,6 +133,9 @@ local function withTraps(fn, learnSignal)
     Wow.stub("ChatFrame_OpenChat", function() end)
     local sent = {}
     installBlizzard(sent)
+    -- Blizzard's recipe list (ProfessionsFrame, ScrollUtil) behind the traps; its rows are made
+    -- after RuntimeTraps.install, so they are proxies too.
+    state.list = RecipeListStub.install({ recipes = { [9001] = { learned = true } } })
     ProfessionsRetail.install({
       slots = { { name = "Blacksmithing", skillLine = 164 } },
       base = 164,
@@ -316,7 +319,7 @@ local function testLearnSignalAllowsSystemEvents()
 end
 
 local function testAddonObeysTheRules()
-  withTraps(function(state, sent)
+  withTraps(function(state, sent, verify)
     local ns = loadAddon()
     -- The trap asks the gate itself, so a registration made before the gate flips raises.
     state.isActive = ns.ScanGate.IsActive
@@ -432,6 +435,32 @@ local function testAddonObeysTheRules()
     for _, frame in ipairs(Wow.frames) do
       Assert.equal(frame.scripts.OnUpdate, nil, "no OnUpdate script")
     end
+
+    -- Recipe markers (§6.2-6.5) under the traps: Blizzard_Professions loads after login, a stored
+    -- row gets its switch, a click mutes and unmutes through the index rebuild. Nothing is
+    -- written on the row, its node or the lists; verify() would report a raw write.
+    local row = state.list:row(9001)
+    Assert.raises(function()
+      row.Extra = 1
+    end, "write to Blizzard table row.Extra")
+    Wow.fireEvent("ADDON_LOADED", "Blizzard_Professions")
+    Assert.equal(#state.list.callbacks, 1, "the row callback registered through the ScrollUtil proxy")
+    local switch
+    for _, frame in ipairs(Wow.frames) do
+      if frame.parent == row then
+        switch = frame
+      end
+    end
+    Assert.truthy(switch, "the stored row got its switch")
+    Assert.equal(switch:IsShown(), true)
+    Widgets.click(switch)
+    ns.Index.Rebuild()
+    Assert.equal(switch.icon.atlas, "voicechat-icon-speaker-mute", "the click muted the recipe and the rebuild kept it")
+    Widgets.click(switch)
+    ns.Index.Rebuild()
+    Assert.equal(switch.icon.atlas, "voicechat-icon-speaker")
+    Assert.equal(state.list.clicks.method + state.list.clicks.script, 0, "the row's own click never ran")
+    verify()
   end)
 end
 

@@ -43,6 +43,7 @@ RuntimeTraps.BLIZZARD_GLOBALS = {
   "UIParent",
   "GameTooltip",
   "ProfessionsFrame",
+  "ScrollUtil",
   "ChatFrameUtil",
   "C_Timer",
   "C_ChatInfo",
