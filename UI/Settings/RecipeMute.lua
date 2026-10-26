@@ -8,10 +8,11 @@ local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 
--- The Crafters page's mute switch at a recipe row's right end: the speaker, crossed out while
--- muted, greyed for an untracked recipe, and its house tooltip (gold title, white text, green
--- instruction) saying what the recipe does now and what a click changes. UI/Settings/RecipeList.lua
--- owns the rows and what a click mutes.
+-- The mute switch at a recipe row's right end, on the Crafters page and on Blizzard's profession
+-- window rows: the speaker, crossed out while muted, greyed for an untracked recipe, and its house
+-- tooltip (gold title, white text, green instruction) saying what the recipe does now and what a
+-- click changes. The caller owns the row, what a click mutes and when to repaint
+-- (UI/Settings/RecipeList.lua, UI/RecipeMarkers/ModernRows.lua).
 local RecipeMute = {}
 
 -- A recipe whose item has no binding is not indexed while "Track unbound items" is off (Index).
