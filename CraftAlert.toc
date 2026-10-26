@@ -49,6 +49,7 @@ Model/Greeting.lua
 Model/SendGuard.lua
 Model/GreetAction.lua
 Model/WhisperTracker.lua
+Model/Ledger.lua
 Professions/ProfessionList.lua
 Professions/BindLookup.lua
 Professions/ReadJob.lua
@@ -76,6 +77,7 @@ UI/DetailsBody.lua
 UI/DetailsHeader.lua
 UI/LeadDetails.lua
 UI/LeadsList.lua
+UI/LedgerStrip.lua
 UI/LeadsView.lua
 UI/WindowSize.lua
 UI/GhostResize.lua

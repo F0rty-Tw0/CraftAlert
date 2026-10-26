@@ -350,6 +350,9 @@ local function watch(ctx)
     flushBind(ctx)
     ctx.out[#ctx.out + 1] = "index: size=" .. index.size
   end)
+  ns.Ledger.OnChange(function()
+    ctx.ledgerChanged = true
+  end)
   ns.ScanGate.OnChange(function(active, state)
     ctx.out[#ctx.out + 1] = "scan: " .. (active and "active" or string.format("paused (%s)", state.reason))
   end)
@@ -388,6 +391,15 @@ local function bindDb(ctx)
   end
   ctx.out[#ctx.out + 1] =
     string.format("db: schema=%s characters=%d recipes=%d leads=%d", tostring(db.schema), count(db.characters), recipes, #db.leads)
+end
+
+-- `ledger: seen=<n> greeted=<n> replied=<n> filled=<n>`, today's counters, as the last line of a
+-- run that changed one (spec §8).
+local function reportLedger(ctx)
+  if ctx.ledgerChanged then
+    local today = ctx.ns.Ledger.Today()
+    ctx.out[#ctx.out + 1] = string.format("ledger: seen=%d greeted=%d replied=%d filled=%d", today.seen, today.greeted, today.replied, today.filled)
+  end
 end
 
 local STEPS = {}
@@ -546,6 +558,7 @@ function Sim.Run(argv)
   for _, step in ipairs(plan.steps) do
     STEPS[step.kind](ctx, step)
   end
+  reportLedger(ctx)
   return out
 end
 

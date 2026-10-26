@@ -99,6 +99,8 @@ Theme.LAYOUT = {
   DETAILS_PADDING = 16,
   ACTION_BAR_HEIGHT = 44,
   BAND_HEIGHT = 36,
+  -- The ledger line above the split view's panes (UI/LedgerStrip.lua).
+  LEDGER_HEIGHT = 20,
   -- left, top, right, bottom: the content frame inside a ButtonFrameTemplate window.
   CONTENT_INSET = { 4, -60, -6, 4 },
 }

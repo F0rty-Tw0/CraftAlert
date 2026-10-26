@@ -264,6 +264,8 @@ local function testFreshInstall()
     CUSTOMER,
   })
   Assert.equal(lead.greeted, true)
+  -- Bootstrap installed the ledger: the new lead and its greeting are today's counters.
+  Assert.same(ns.Ledger.Today(), { seen = 1, greeted = 1, replied = 0, filled = 0 }, "Ledger.Install subscribed")
 
   -- Selling is not asking: nothing.
   trade("WTS plate belt, cheap", "Seller-OtherRealm")
