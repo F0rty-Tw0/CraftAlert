@@ -1,5 +1,6 @@
 local Assert = require("tests.helpers.assert")
 local Toc = require("tests.helpers.toc")
+local Wow = require("tests.helpers.wow")
 
 -- Runs tools/sim.lua as `python scripts/sim.py ...argv` would: its main block prints every line
 -- and exits. print and os.exit are captured, then restored. → the printed lines, the exit code
@@ -49,6 +50,15 @@ local function stepLines(lines)
     end
   end
   error("no db: line in " .. table.concat(lines, " / "))
+end
+
+local function isRegistered(event)
+  for _, frame in ipairs(Wow.frames) do
+    if frame.events[event] then
+      return true
+    end
+  end
+  return false
 end
 
 -- The lines the first step prints before its own: the index build and scan activation
@@ -262,7 +272,18 @@ return function()
     stepLines(Sim.Run({ "--event", "TRADE_SKILL_SHOW", "--event", "GET_ITEM_INFO_RECEIVED", "190005", "true" })),
     booted({ "read: prof=164 stored=3 pendingBind=1", "index: size=5", "bind: stored=1", "index: size=4" })
   )
-  Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "TRADE_SKILL_SHOW" })), booted({}, "Trade"))
+  Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "TRADE_SKILL_SHOW" })), booted({ "professions: blacksmithing,enchanting" }, "Trade"))
+
+  -- Classic flavors log in on the Classic fixture (name keys): Bootstrap reads the professions
+  -- (skill lines on Era/TBC/Wrath, GetProfessions on Cata/MoP) and listens for skill-line changes.
+  for _, key in ipairs({ "era", "tbc", "wrath", "cata", "mop" }) do
+    Assert.same(
+      stepLines(Sim.Run({ "--flavor", key, "--event", "PLAYER_UPDATE_RESTING" })),
+      booted({ "professions: blacksmithing,enchanting" }, "Trade"),
+      key
+    )
+    Assert.truthy(isRegistered("SKILL_LINES_CHANGED"), key)
+  end
 
   -- A recipe read from the window keeps Blizzard's spelling, so the greeting names it as the game does.
   local greeted = {}

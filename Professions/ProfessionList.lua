@@ -6,34 +6,38 @@ end
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
 
--- Spec §5.1: the current character's crafting professions, keyed by base skill-line ID
--- (Retail and Forever; the Classic name keys arrive with the Classic task). Gathering,
--- cooking, fishing and first aid are left out by listing only the skill lines
+-- Spec §5.1: the current character's crafting professions, keyed by base skill-line ID on
+-- Retail and Forever and by the lowercase English name on Classic. GetProfessions when the
+-- client has it (Retail, Forever, Cata, MoP), else the skill-line list (Era, TBC, Wrath).
+-- Gathering, cooking, fishing and first aid are left out by listing only the professions
 -- ProfessionWords knows. Runs at login.
 local ProfessionList = {}
 
 local ipairs = ipairs
 local pairs = pairs
 local select = select
+local lower = string.lower
 local sort = table.sort
 
 local SLOTS = 6 -- GetProfessions returns prof1, prof2, then the secondary slots
 local PROFESSION_SLOTS = 2
 
-local crafting = {}
+local crafting = {} -- skill-line ID -> ProfessionWords entry
+local craftingNames = {} -- englishName -> true
 for _, entry in ipairs(ProfessionWords.entries) do
-  crafting[entry.skillLineID] = true
+  crafting[entry.skillLineID] = entry
+  craftingNames[entry.englishName] = true
 end
 
 local order = {}
 
 -- → { { key, name }... } in GetProfessions slot order, the number of slots in use and of
 -- profession slots (prof1, prof2) in use; nil when the API is missing or a slot's skill line
--- has not loaded (unknown data).
-local function currentProfessions()
-  local getProfessions = _G["GetProfessions"]
+-- has not loaded (unknown data). The 7th GetProfessionInfo return is the skill line on Cata
+-- and MoP too (inferred from Retail).
+local function slotProfessions(getProfessions)
   local getInfo = _G["GetProfessionInfo"]
-  if type(getProfessions) ~= "function" or type(getInfo) ~= "function" then
+  if type(getInfo) ~= "function" then
     return nil
   end
   local list, slots, professionSlots = {}, 0, 0
@@ -46,13 +50,48 @@ local function currentProfessions()
       if skillLine == nil then
         return nil
       end
-      if crafting[skillLine] then
-        list[#list + 1] = { key = skillLine, name = name }
+      local entry = crafting[skillLine]
+      if entry then
+        list[#list + 1] = { key = FlavorCompat.isClassic and entry.englishName or skillLine, name = name }
       end
     end
   end
 
   return list, slots, professionSlots
+end
+
+-- The skill-line list (Era, TBC, Wrath) as slotProfessions answers, every non-header line
+-- counting as a profession slot; nil when the API is missing or a collapsed header hides lines.
+local function skillLineProfessions()
+  local getCount = _G["GetNumSkillLines"]
+  local getInfo = _G["GetSkillLineInfo"]
+  if type(getCount) ~= "function" or type(getInfo) ~= "function" then
+    return nil
+  end
+  local list, lines = {}, 0
+  for index = 1, getCount() or 0 do
+    local name, isHeader, isExpanded = getInfo(index)
+    if isHeader and not isExpanded then
+      return nil
+    end
+    if not isHeader and type(name) == "string" then
+      lines = lines + 1
+      local key = lower(name)
+      if craftingNames[key] then
+        list[#list + 1] = { key = key, name = name }
+      end
+    end
+  end
+
+  return list, lines, lines
+end
+
+local function currentProfessions()
+  local getProfessions = _G["GetProfessions"]
+  if type(getProfessions) == "function" then
+    return slotProfessions(getProfessions)
+  end
+  return skillLineProfessions()
 end
 
 -- Whether a known read must not be written: nothing to create, or, for a character with
@@ -81,14 +120,15 @@ local function sameOrder(a, b)
 end
 
 -- Before the first usable read of a session, the stored professions stand in, sorted. Only the
--- skill-line IDs Refresh writes: the Schema also keeps string keys, and sorting a mix raises.
+-- key type Refresh writes on this flavor: the Schema keeps both, and sorting a mix raises.
 local function seedOrder(character)
   if #order > 0 or character == nil then
     return
   end
+  local keyType = FlavorCompat.isClassic and "string" or "number"
   local keys = {}
   for key in pairs(character.professions) do
-    if type(key) == "number" then
+    if type(key) == keyType then
       keys[#keys + 1] = key
     end
   end
@@ -108,8 +148,9 @@ end
 -- per profession, so it is kept, never derived from the slot) and removes the recipes of a
 -- profession it no longer has. Other characters are never touched. Unknown data writes
 -- nothing, so a failed lookup cannot wipe stored recipes: a missing API, a slot whose
--- skill line has not loaded, or, for a character that has professions stored, no slot at all
--- or secondary slots only (a partial read at login); then the stored professions seed Order.
+-- skill line has not loaded, a collapsed skill-line header, or, for a character that has
+-- professions stored, no slot or line at all or secondary slots only (a partial read at
+-- login); then the stored professions seed Order.
 -- Trade-off: a character that unlearns both professions keeps its stale data until it
 -- learns one. A list of non-crafting professions only (gathering...) is real data and drops.
 -- Runs at login and on SKILL_LINES_CHANGED. → whether Order changed (rebuild the index).

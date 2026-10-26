@@ -63,11 +63,7 @@ local function onSkillLinesChanged()
   end
 end
 
--- Retail and Forever only: the Classic profession keys and readers arrive with their task.
 local function installProfessions()
-  if FlavorCompat.isClassic then
-    return
-  end
   ProfessionList.Refresh(db, ownKey)
   EventRouter.On(SKILL_LINES_CHANGED, onSkillLinesChanged)
 end

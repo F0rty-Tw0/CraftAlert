@@ -9,6 +9,7 @@ package.path = ROOT .. "/?.lua;" .. package.path
 local Wow = require("tests.helpers.wow")
 local Toc = require("tests.helpers.toc")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
+local ProfessionsClassic = require("tests.helpers.professions_classic")
 
 local DEFAULT_SENDER = "Customer-OtherRealm"
 local SIM_CLASS_GUID = "Player-0-SIMCLASS"
@@ -40,6 +41,18 @@ local SIM_RECIPES = {
   { id = 9004, name = "Sim Plate Helm", item = 190004, profession = { professionID = 2872, parentProfessionID = 164 } },
   { id = 9005, name = "Sim Iron Bar", item = 190005, learned = true },
 }
+-- Classic flavors read the Classic fixture (name keys); Cata and MoP list professions through
+-- GetProfessions, the older three through the skill-line list.
+local CLASSIC = { era = true, tbc = true, wrath = true, cata = true, mop = true }
+local PROFESSION_SLOT_FLAVORS = { cata = true, mop = true }
+local CLASSIC_SKILL_LINES = {
+  { name = "Professions", header = true },
+  { name = "Blacksmithing" },
+  { name = "Enchanting" },
+  { name = "Secondary Skills", header = true },
+  { name = "Cooking" },
+}
+local SIM_SLOTS = { { name = "Blacksmithing", skillLine = 164 }, { name = "Enchanting", skillLine = 333 } }
 local BIND_DEBOUNCE_SECONDS = 1
 local ON_OFF = { on = true, off = false }
 -- Events with a known payload take exactly that many arguments, so a chat line may follow
@@ -106,7 +119,7 @@ end
 
 -- Turns argv into { flavor, dbPath, steps } or returns nil, "error: ...".
 local function parse(argv)
-  local plan = { flavor = DEFAULT_FLAVOR, dbPath = ROOT .. "/tools/sim_fixture.lua", steps = {} }
+  local plan = { flavor = DEFAULT_FLAVOR, steps = {} }
   local i = 1
   while i <= #argv do
     local token = argv[i]
@@ -140,6 +153,7 @@ local function parse(argv)
     end
     i = i + 1
   end
+  plan.dbPath = plan.dbPath or (ROOT .. (CLASSIC[plan.flavor] and "/tools/sim_fixture_classic.lua" or "/tools/sim_fixture.lua"))
   return plan
 end
 
@@ -233,8 +247,18 @@ local function newContext(plan, out)
   Wow.stub("GetRealmName", function()
     return OWN_REALM
   end)
+  if CLASSIC[plan.flavor] then
+    ProfessionsClassic.install({
+      skillLines = CLASSIC_SKILL_LINES,
+      slots = PROFESSION_SLOT_FLAVORS[plan.flavor] and SIM_SLOTS or nil,
+      items = SIM_ITEMS,
+      bind = SIM_BIND,
+      autoCache = true,
+    })
+    return ctx
+  end
   ProfessionsRetail.install({
-    slots = { { name = "Blacksmithing", skillLine = 164 }, { name = "Enchanting", skillLine = 333 } },
+    slots = SIM_SLOTS,
     base = WINDOW_PROFESSION,
     recipes = SIM_RECIPES,
     items = SIM_ITEMS,
@@ -368,12 +392,16 @@ local function watch(ctx)
 end
 
 -- PLAYER_LOGIN, once, before the first chat line, event, command or click: Bootstrap installs
--- everything and builds the index.
+-- everything and builds the index. Classic flavors then print `professions: <keys>`, the
+-- name keys ProfessionList read at login.
 local function start(ctx)
   if not ctx.started then
     ctx.started = true
     ctx.ns.BindLookup.lastStored = nil
     Wow.fireEvent("PLAYER_LOGIN")
+    if CLASSIC[ctx.flavor] then
+      ctx.out[#ctx.out + 1] = "professions: " .. table.concat(ctx.ns.ProfessionList.Order(), ",")
+    end
   end
 end
 
