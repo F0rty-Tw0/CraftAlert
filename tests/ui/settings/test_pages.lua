@@ -1,6 +1,7 @@
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
+local Fresh = require("tests.helpers.fresh")
 local UiFixture = require("tests.helpers.ui_fixture")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 
@@ -206,6 +207,17 @@ local function testAlertsPage()
   Assert.same(take(refreshes), { "leadsWindow" })
 end
 
+-- The Alerts page reaches the leads window only through SetOnOpacity: loading it loads no
+-- window (the window loads the settings pane, which lists the pages). The launcher is stubbed,
+-- as it requires the window itself.
+local function testAlertsPageNeedsNoWindow()
+  SettingsFixture.load()
+  package.loaded["UI.LeadsWindow"] = nil
+  package.loaded["UI.Launcher"] = { Refresh = function() end }
+  Fresh.require("UI.Settings.PageAlerts")
+  Assert.equal(package.loaded["UI.LeadsWindow"], nil)
+end
+
 local function character(professions)
   return { source = "local", enabled = true, realms = { "Realm" }, professions = professions, recipes = {} }
 end
@@ -267,5 +279,6 @@ return function()
   testGeneralPage()
   testChannelsPerFlavor()
   testAlertsPage()
+  testAlertsPageNeedsNoWindow()
   testGreetingsPage()
 end

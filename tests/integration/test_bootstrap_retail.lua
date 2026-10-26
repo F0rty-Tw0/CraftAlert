@@ -2,6 +2,8 @@
 -- ADDON_LOADED and PLAYER_LOGIN events, as the client does; Bootstrap does every install.
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
+local Widgets = require("tests.helpers.widgets")
+local SettingsFixture = require("tests.helpers.settings_fixture")
 local Toc = require("tests.helpers.toc")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
 
@@ -577,6 +579,17 @@ local function testLoginInInstanceIsSilent(db)
   Wow.stub("IsInInstance", nil)
 end
 
+-- Bootstrap hands LeadsWindow.Refresh to the Alerts page, so dragging Opacity repaints the window.
+local function testOpacityRepaintsWindow(db)
+  local session = startClient(db)
+  local ns = login(session)
+  SettingsFixture.open(ns, "Alerts")
+  local window = rawget(_G, "CraftAlertLeadsWindow")
+  Assert.equal(window:GetAlpha(), 1)
+  Widgets.slide(SettingsFixture.row("Opacity").input, 0.5)
+  Assert.equal(window:GetAlpha(), 0.5)
+end
+
 local function deepCopy(value)
   if type(value) ~= "table" then
     return value
@@ -606,5 +619,6 @@ return function()
   testIgnoreDropsLead(deepCopy(saved))
   testInstanceHidesUi(deepCopy(saved))
   testLoginInInstanceIsSilent(deepCopy(saved))
+  testOpacityRepaintsWindow(deepCopy(saved))
   Wow.reset()
 end

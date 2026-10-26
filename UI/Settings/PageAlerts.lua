@@ -8,7 +8,6 @@ local Constants = ns.Constants or require("CraftAlert.Core.Constants")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
-local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
@@ -16,7 +15,9 @@ local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls
 -- when no leads", opacity. Nothing here touches the index or the scan gate. Sound, flash and
 -- duration are read when an alert fires; a new lead timeout re-arms the expiry timer
 -- (Leads.Rearm); the launcher and the leads window repaint at once (the toast takes the
--- opacity when it next shows). Ranges are Schema's.
+-- opacity when it next shows). The leads window's repaint comes through SetOnOpacity: the window
+-- needs the settings pane, which lists these pages, so a page does not require the window.
+-- Ranges are Schema's.
 local PageAlerts = { id = "alerts", title = Localization.Text("Alerts") }
 
 local SOUND_CHANNEL = "Master" -- as AlertToast plays it
@@ -84,6 +85,8 @@ end
 
 local function nothing() end
 
+local onOpacity = nothing
+
 local function rearm()
   Leads.Rearm()
 end
@@ -92,8 +95,13 @@ local function refreshLauncher()
   Launcher.Refresh()
 end
 
-local function refreshLeadsWindow()
-  LeadsWindow.Refresh()
+local function opacityChanged()
+  onOpacity()
+end
+
+-- `fn()` runs after every opacity change (Bootstrap passes LeadsWindow.Refresh); nil clears it.
+function PageAlerts.SetOnOpacity(fn)
+  onOpacity = fn or nothing
 end
 
 function PageAlerts.Create(parent)
@@ -110,7 +118,7 @@ function PageAlerts.Create(parent)
   local hideLabel = Localization.Text("Hide the launcher when there are no leads")
   add(Controls.BoundToggle(column, hideLabel, settings, "hideLauncherWhenNoLeads", refreshLauncher))
   local opacity = { label = Localization.Text("Opacity"), min = 0.3, max = 1, step = 0.05, format = percent }
-  addSlider(column, add, opacity, "opacity", refreshLeadsWindow)
+  addSlider(column, add, opacity, "opacity", opacityChanged)
   return { Refresh = refresh }
 end
 
