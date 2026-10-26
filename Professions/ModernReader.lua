@@ -63,6 +63,12 @@ local function isBlocked(api)
   return false
 end
 
+-- True while the open window is one the reader must not touch (NPC, guild, linked, runeforging).
+function ModernReader.IsBlocked()
+  local api = tradeSkillApi()
+  return api ~= nil and isBlocked(api)
+end
+
 local function copyList(list)
   if type(list) ~= "table" or #list == 0 then
     return nil
