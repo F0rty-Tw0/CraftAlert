@@ -299,6 +299,7 @@ local current = nil
 local rebuilt = {}
 local pendingNames = {}
 local pendingSet = {}
+local generation = 0 -- sliced jobs started; tells the running job whether it was replaced
 
 Index.lastBuildMs = nil -- CPU ms of the last build: the sum of its steps
 Index.lastBuildSteps = nil -- Slicer steps of the last build; 1 for a synchronous one
@@ -364,7 +365,10 @@ end
 -- Pause runs only in plain Lua loop bodies: never in a sort comparator, a gsub callback, a
 -- metamethod or under pcall (Lua 5.1 cannot yield across those). An abandoned coroutine (the
 -- job restarted or cancelled) is never resumed, so StatSlot.Begin's reset holds for the next.
+-- A step error carries the coroutine's stack, which the Slicer's pcall can't see.
 local function startJob(db, opts)
+  generation = generation + 1
+  local mine = generation
   local clock = _G["debugprofilestop"]
   local resumedAt, calls, spent, steps = 0, 0, 0, 0
   local function pause()
@@ -385,20 +389,22 @@ local function startJob(db, opts)
       local ok, result = resume(thread)
       spent, steps = spent + (clock() - resumedAt), steps + 1
       if not ok then
-        error(result, 0)
+        local stack = _G["debugstack"]
+        error(type(stack) == "function" and tostring(result) .. "\n" .. stack(thread) or result, 0)
       end
       if status(thread) ~= "dead" then
         return false
       end
       swapIn(result, spent, steps)
-      return true
+      -- A subscriber that requested a rebuild replaced this job under the same name; false
+      -- keeps the Slicer from removing the new one as done.
+      return generation == mine
     end,
   })
 end
 
 -- Starts the sliced build, or restarts it: the db may have changed under a half-built index,
 -- so a request during a build drops that work. The old index stays live until a build ends.
--- OnRebuilt subscribers run inside the job's last step and must not request a rebuild.
 function Index.RequestRebuild(reason)
   Index.lastReason = reason
   if context ~= nil then

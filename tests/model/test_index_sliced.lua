@@ -78,15 +78,36 @@ local function testSecondRequestRestarts()
   Assert.truthy(ns.Index.Current().nameIndex.restart, "the second request's recipe is indexed")
 end
 
--- A raising step cancels the job and reports; the old index stays live.
+-- A subscriber that requests a rebuild inside the job's last step gets that build: the
+-- finishing job doesn't remove its replacement.
+local function testSubscriberRequestRuns()
+  local ns, _, builds = setup()
+  local requested = false
+  ns.Index.OnRebuilt(function()
+    if not requested then
+      requested = true
+      ns.Index.RequestRebuild("again")
+    end
+  end)
+  ns.Index.RequestRebuild("read")
+  ns.Slicer.Drain()
+  Assert.equal(builds.n, 2, "the requested build ran")
+  Assert.falsy(ns.Slicer.IsRunning(JOB))
+end
+
+-- A raising step cancels the job and reports with the coroutine's stack; the old index stays.
 local function testRaisingStepKeepsOldIndex()
   local ns, db, builds = setup()
   local old = ns.Index.Rebuild()
   local reported = captureErrors()
+  Wow.stub("debugstack", function(thread)
+    return type(thread) == "thread" and "build stack" or "caller stack"
+  end)
   db.characters["Char5-Realm"].recipes[7] = { item = 100007, prof = Synthetic.PROFESSIONS[5], bind = 1 } -- no name
   ns.Index.RequestRebuild("read")
   ns.Slicer.Drain()
   Assert.equal(#reported, 1)
+  Assert.truthy(string.find(tostring(reported[1]), "\nbuild stack", 1, true), "the error carries the build's stack")
   Assert.falsy(ns.Slicer.IsRunning(JOB))
   Assert.truthy(rawequal(ns.Index.Current(), old), "the old index stays")
   Assert.equal(builds.n, 1, "only the sync build swapped in")
@@ -120,6 +141,7 @@ end
 return function()
   testSlicedEqualsSync()
   testSecondRequestRestarts()
+  testSubscriberRequestRuns()
   testRaisingStepKeepsOldIndex()
   testRebuildCancelsJob()
   testNoJobBeforeConfigure()
