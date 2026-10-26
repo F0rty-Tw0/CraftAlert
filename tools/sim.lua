@@ -197,6 +197,27 @@ local function loadModules(ns)
   return ok and #files or nil, err
 end
 
+-- Blizzard's profession recipe list for the recipe markers (ModernRows): Blizzard_Professions
+-- is not loaded until `--event ADDON_LOADED Blizzard_Professions`, which registers the row
+-- callback and prints `markers: installed modern`. The list has no rows.
+local function stubRecipeList(out)
+  Wow.stub("C_AddOns", {
+    IsAddOnLoaded = function()
+      return false
+    end,
+  })
+  Wow.stub("ScrollUtil", {
+    AddInitializedFrameCallback = function()
+      out[#out + 1] = "markers: installed modern"
+    end,
+  })
+  Wow.stub("ProfessionsFrame", {
+    CraftingPage = { RecipeList = { ScrollBox = {
+      ForEachFrame = function() end,
+    } } },
+  })
+end
+
 local function newContext(plan, out)
   local ctx = { out = out, flavor = plan.flavor, ns = {}, afk = false, resting = true, started = false, sender = DEFAULT_SENDER }
   ctx.keys = { shift = false, ctrl = false }
@@ -232,6 +253,7 @@ local function newContext(plan, out)
   Wow.stub("GetRealmName", function()
     return OWN_REALM
   end)
+  stubRecipeList(out)
   ProfessionsRetail.install({
     slots = { { name = "Blacksmithing", skillLine = 164 }, { name = "Enchanting", skillLine = 333 } },
     base = WINDOW_PROFESSION,

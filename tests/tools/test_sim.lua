@@ -257,6 +257,12 @@ return function()
   )
   Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "TRADE_SKILL_SHOW" })), booted({}, "Trade"))
 
+  -- Recipe markers: the row callback registers once Blizzard_Professions loads, on Retail and Forever.
+  local markers = booted({ "markers: installed modern" })
+  Assert.same(stepLines(Sim.Run({ "--event", "ADDON_LOADED", "Blizzard_Professions" })), markers)
+  Assert.same(stepLines(Sim.Run({ "--flavor", "forever", "--event", "ADDON_LOADED", "Blizzard_Professions" })), markers)
+  Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "ADDON_LOADED", "Blizzard_Professions" })), booted({}, "Trade"))
+
   -- A recipe read from the window keeps Blizzard's spelling, so the greeting names it as the game does.
   local greeted = {}
   for _, line in ipairs(Sim.Run({ "--event", "TRADE_SKILL_SHOW", "LF plate belt crafter" })) do
