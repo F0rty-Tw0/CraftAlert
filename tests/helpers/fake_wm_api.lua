@@ -8,7 +8,8 @@
 --   wm.refuse[name] = true                 that function records the call, changes nothing, returns false
 --   wm.raise[name] = true                  that function records the call, then raises
 --   wm.preview[key]                        the preview table while shown (ShowPreview sets it, HidePreview clears it)
---   wm.registered                          { { key, panel }, ... }; wm.panels[key] = panel
+--   wm.registered                          { { key, panel }, ... }; wm.panels[key] = a copy of the panel's
+--                                            fields taken at RegisterPanel, as WM's copyPanel does
 --   wm.shown[key]                          IsPanelShown
 --   wm.badgeRefreshes                      RefreshPanelBadge call count
 --   wm.unread[name]                        = the count GetUnreadCount answers for that name (0 for non-string,
@@ -144,7 +145,16 @@ function FakeWm.install(opts)
       return false
     end
     wm.registered[#wm.registered + 1] = { key, panel }
-    wm.panels[key] = panel
+    -- WM keeps a copy read once (copyPanel): fields the caller sets after registering never reach it.
+    wm.panels[key] = {
+      title = panel.title,
+      onShow = panel.onShow,
+      onHide = panel.onHide,
+      onSplit = panel.onSplit,
+      badge = panel.badge,
+      onMarkAllRead = panel.onMarkAllRead,
+      onUnreadChanged = panel.onUnreadChanged,
+    }
     return true
   end)
   define("ShowPanel", function(key)

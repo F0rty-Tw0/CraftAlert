@@ -175,7 +175,8 @@ function WhisperBridge.Activate()
     return false
   end
   local panel = BridgePanel.Build()
-  -- An older WM has no GetUnreadCount: no unread callback, no pink dots.
+  -- An older WM has no GetUnreadCount: no unread callback, no pink dots. The callback goes on the
+  -- panel before RegisterPanel: WM copies the panel once and never reads it again.
   local countsUnread = type(candidate.GetUnreadCount) == "function"
   if countsUnread then
     panel.onUnreadChanged = onUnreadChanged
