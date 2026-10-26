@@ -18,8 +18,9 @@ local RowArt = ns.RowArt or require("CraftAlert.UI.RowArt")
 -- (UI/ContactsList/RowView.lua:67-118, WM). The item or profession icon, the customer in class
 -- colour with the age on its right, and below what was requested, then the greeted check and the
 -- replied tag at the bottom right. The icon is round (RowArt, spec D5) and carries a status dot, as
--- WM's contacts: gold for an unseen, ungreeted lead (spec B, the badge's rule), else the details
--- header's state colour (LeadText.State). The texts, the selected overlay and the
+-- WM's contacts: whisper pink while the customer has a whisper the player has not read in WM,
+-- else gold for an unseen, ungreeted lead (spec B, the badge's rule), else the details header's
+-- state colour (LeadText.State). The texts, the selected overlay and the
 -- hover's fade are WM's too (spec D1-D9); the hover never shows over the selected row. On WM's
 -- rail the row is compact (spec 6a): only the icon, centred. No link hover; one tooltip while the
 -- cursor is on the row: the latest chat line (row-chat-tooltip spec), or when compact the
@@ -32,6 +33,9 @@ local select = select
 local tostring = tostring
 local type = type
 
+-- Whisper pink for a lead whose customer has an unread whisper, when ChatTypeInfo has no WHISPER.
+local FALLBACK_PINK = { 1, 0.5, 1, 1 }
+
 -- WM's row numbers: EDGE from the row's sides, ICON_GAP after the icon, MARK_GAP between the marks
 -- and before the second line's end, NAME_GAP between the name and the age.
 local EDGE, ICON_GAP, MARK_GAP, NAME_GAP = 6, 10, 4, 2
@@ -41,6 +45,35 @@ local NO_CLASS = { r = 1, g = 1, b = 1 }
 
 local function now()
   return _G["GetTime"]()
+end
+
+---@type fun(lead: table): number|nil
+local unreadOf = nil -- WhisperMessenger's unread count of a lead's customer; nil: none known
+
+-- `fn(lead) -> integer` says how many whispers of the lead's customer the player has not read in
+-- WhisperMessenger (WhisperBridge.Activate sets it); nil clears it.
+function LeadRow.SetUnreadSource(fn)
+  unreadOf = fn
+end
+
+-- Whisper pink, read at paint time (the player can recolour the whisper chat type).
+local function whisperPink()
+  local info = _G["ChatTypeInfo"]
+  local whisper = type(info) == "table" and info.WHISPER
+  if type(whisper) ~= "table" then
+    return FALLBACK_PINK
+  end
+  return { whisper.r, whisper.g, whisper.b, 1 }
+end
+
+-- The dot's colour, first match wins: pink while the customer has an unread whisper, gold while
+-- the lead is unseen and ungreeted, else the details header's state colour.
+local function dotColor(lead)
+  local unread = unreadOf and unreadOf(lead)
+  if type(unread) == "number" and unread >= 1 then
+    return whisperPink()
+  end
+  return Leads.IsUnseen(lead) and Theme.COLORS.gold or select(2, LeadText.State(lead))
 end
 
 -- Whether the row shows the tooltip: one another frame owns is never rewritten (nor hidden:
@@ -178,7 +211,7 @@ function LeadRow.Show(row, lead)
   end
   row.lead = lead
   row.icon:SetTexture(iconOf(lead))
-  RowArt.PaintDot(row.dot, Leads.IsUnseen(lead) and Theme.COLORS.gold or select(2, LeadText.State(lead)))
+  RowArt.PaintDot(row.dot, dotColor(lead))
   row.name:SetText(tostring(lead.customer))
   local class = FrameKit.GuidClassColor(lead.guid) or NO_CLASS
   row.name:SetTextColor(class.r, class.g, class.b, 1)
