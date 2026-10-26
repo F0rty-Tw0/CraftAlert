@@ -167,6 +167,32 @@ local function testAddOnMemoryUsage()
   Assert.equal(FlavorCompat.GetAddOnMemoryUsage("CraftAlert"), nil)
 end
 
+local function testIsAddOnLoaded()
+  local FlavorCompat = load("retail")
+  Wow.stub("C_AddOns", {
+    IsAddOnLoaded = function()
+      return true, true
+    end,
+  })
+  Assert.equal(FlavorCompat.IsAddOnLoaded("WhisperMessenger"), true, "namespace loaded")
+
+  Wow.stub("C_AddOns", {
+    IsAddOnLoaded = function()
+      return false
+    end,
+  })
+  Wow.stub("IsAddOnLoaded", function()
+    return 1
+  end)
+  Assert.equal(FlavorCompat.IsAddOnLoaded("WhisperMessenger"), false, "namespace wins over global")
+
+  Wow.stub("C_AddOns", nil)
+  Assert.equal(FlavorCompat.IsAddOnLoaded("WhisperMessenger"), true, "global 1 is true")
+
+  Wow.stub("IsAddOnLoaded", nil)
+  Assert.equal(FlavorCompat.IsAddOnLoaded("WhisperMessenger"), false, "no api")
+end
+
 local function testTellWrappers()
   local FlavorCompat = load("retail")
   local sent = {}
@@ -320,6 +346,7 @@ return function()
   testHasCraftFrame()
   testWrappersPreferNamespacedApis()
   testAddOnMemoryUsage()
+  testIsAddOnLoaded()
   testTellWrappers()
   testIsSecretValue()
   testClassOf()
