@@ -13,14 +13,18 @@ local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 
 -- Spec §7.3 and §4.4: /craftalert and /ca. No argument toggles the leads window; `config` its
 -- settings pane; `test` runs a trade line through the real path (TestLine); `perf` toggles timing.
--- In an instance every form does nothing, silently: an addon line in the chat frame taints it,
--- and Blizzard's chat code then meets secret values in Mythic+ in tainted code.
+-- In an instance every form only prints the off line (spec 2026-10-25-instance-chat-line; the
+-- user accepted the chat-frame taint risk).
 local SlashCommands = {}
 
 local lower = string.lower
 local match = string.match
 
 local COMMAND_1, COMMAND_2 = "/craftalert", "/ca"
+
+local function offLine()
+  ChatPrint.Line(Localization.Text("Off in instances; it works again when you leave."))
+end
 
 local function togglePerf()
   if Perf.IsRunning() then
@@ -52,6 +56,7 @@ local COMMANDS = {
 
 local function onSlash(message)
   if FlavorCompat.InInstance() then
+    offLine()
     return
   end
   local name, rest = match(message or "", "^%s*(%S*)%s*(.-)%s*$")

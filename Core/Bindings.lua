@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
@@ -14,8 +15,12 @@ local SavedState = ns.SavedState or require("CraftAlert.Persistence.SavedState")
 
 -- Spec §7.1 keybinds, called from Bindings.xml: greet or dismiss the latest lead, toggle the
 -- leads window. Defines, at load, the binding labels and the CraftAlert_* functions (§4.3 rule
--- 3 own globals). In an instance every key does nothing, silently (see SlashCommands).
+-- 3 own globals). In an instance every key only prints the off line (see SlashCommands).
 local Bindings = {}
+
+local function offLine()
+  ChatPrint.Line(Localization.Text("Off in instances; it works again when you leave."))
+end
 
 -- GetTime() since when the lead has been on screen: the earlier of its toast (WhisperMessenger's
 -- preview when bridged) and its top row in the leads window (or WM's panel); nil when neither
@@ -36,6 +41,7 @@ end
 -- §7.5 rule 3: with the latest lead on neither the toast nor the window, the keybind prefills.
 function Bindings.GreetLatest()
   if FlavorCompat.InInstance() then
+    offLine()
     return
   end
   local lead = Leads.Latest()
@@ -54,6 +60,7 @@ end
 -- pressed as a new lead pops up never drops it unseen; one on neither is dismissed.
 function Bindings.DismissLatest()
   if FlavorCompat.InInstance() then
+    offLine()
     return
   end
   local lead = Leads.Latest()
@@ -71,6 +78,7 @@ end
 -- failed to load (already reported at ADDON_LOADED).
 function Bindings.ToggleLeads()
   if FlavorCompat.InInstance() then
+    offLine()
     return
   end
   if SavedState.Ready() then

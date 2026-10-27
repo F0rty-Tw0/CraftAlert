@@ -123,6 +123,48 @@ local function testToggleSettings()
   Assert.equal(container:IsShown(), true)
 end
 
+-- In an instance the gear does nothing: the panel stays on its (empty) leads.
+local function testGearOffInInstance()
+  local ns, _, _, wm = boot()
+  local captured = capture(ns)
+  showWith(wm)
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  ns.BridgePanel.ToggleSettings()
+  Assert.same({ ns.BridgePanel.InSettings(), captured.view.frame:IsShown() }, { false, true })
+  Wow.stub("IsInInstance", nil)
+end
+
+-- Settings open when the player enters an instance: the gate goes back to the leads.
+local function testInstanceGateLeavesSettings()
+  local ns, _, _, wm = boot()
+  local captured = capture(ns)
+  local host = showWith(wm)
+  Widgets.click(gearOf(host))
+  Assert.equal(ns.BridgePanel.InSettings(), true)
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  ns.WhisperBridge.OnGate()
+  local _, _, container = backOf(host)
+  Assert.same({ ns.BridgePanel.InSettings(), container:IsShown(), captured.view.frame:IsShown() }, { false, false, true })
+  Wow.stub("IsInInstance", nil)
+end
+
+-- In an instance the gear still closes settings that are open (it only refuses to open them).
+local function testGearClosesSettingsInInstance()
+  local ns, _, _, wm = boot()
+  local host = showWith(wm)
+  Widgets.click(gearOf(host))
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  ns.BridgePanel.ToggleSettings()
+  Assert.equal(ns.BridgePanel.InSettings(), false)
+  Wow.stub("IsInInstance", nil)
+end
+
 local function testModeIsNotSaved()
   local ns, _, _, wm = boot()
   local host = showWith(wm)
@@ -343,6 +385,9 @@ return function()
   testGearOpensSettingsInTheHost()
   testBackReturnsToLeads()
   testToggleSettings()
+  testGearOffInInstance()
+  testInstanceGateLeavesSettings()
+  testGearClosesSettingsInInstance()
   testModeIsNotSaved()
   testRefreshSkippedInSettings()
   testNavWidthInWm()
