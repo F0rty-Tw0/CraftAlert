@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+local Constants = ns.Constants or require("CraftAlert.Core.Constants")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
 local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
@@ -76,6 +77,7 @@ local function installReaders()
   if FlavorCompat.isClassic then
     ClassicReader.Install(db)
     CraftReader.Install(db)
+    LearnWatcher.InstallClassic(Constants.flavors[FlavorCompat.flavorKey].learnSignal)
     return
   end
   ModernReader.Install(db)

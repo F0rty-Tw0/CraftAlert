@@ -337,6 +337,23 @@ return function()
   )
   Assert.same(stepLines(Sim.Run({ "--event", "NEW_RECIPE_LEARNED", "123" })), booted({ "learn: stored=false" }))
 
+  -- Classic: the learn message adds the name to the session's pending list; it matches by name at
+  -- once, crafted by the current character, and the greeting keeps the client's spelling.
+  local learnMessage = "You have learned how to create a new item: Enchant Boots - Sim Agility."
+  Assert.same(
+    stepLines(Sim.Run({ "--flavor", "tbc", "--event", "CHAT_MSG_SYSTEM", learnMessage, "LF enchant boots sim agility" })),
+    booted({
+      "professions: blacksmithing,enchanting",
+      "learn: pending=Enchant Boots - Sim Agility",
+      "index: size=5",
+      "sender: Customer-OtherRealm",
+      "match: item group=enchant boots - sim agility prof=nil why=lf+enchant boots sim agility",
+      "toast: shown lead=1 more=0",
+      "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=false",
+      "greeting: Hi! I can craft Enchant Boots - Sim Agility.",
+    }, "Trade")
+  )
+
   Assert.equal(Sim.Run({ "--event" })[1], "error: --event needs an event name")
 
   local unknownFlag = Sim.Run({ "--nope" })

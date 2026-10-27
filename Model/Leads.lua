@@ -6,6 +6,7 @@ end
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
 local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
+local Index = ns.Index or require("CraftAlert.Model.Index")
 
 -- Spec §7.2: the leads (matched requests) the player can answer. Steps 5-7 of §6.3 run here
 -- on matched lines only. Leads live in `db.leads`, oldest first (an updated lead moves to the
@@ -405,7 +406,7 @@ end
 
 -- What the chosen crafter's own record says about the match: its recipe (item results) and
 -- the name of the profession. `recipeKey` is the entry Pick ranked; nil leaves the recipe
--- fields empty.
+-- fields empty. A Classic session learn has no record yet: the name the client spelled it with.
 local function describeCrafter(lead, kind, prof, crafter, recipeKey)
   lead.recipeKey = recipeKey
   local character = db.characters[crafter]
@@ -415,7 +416,7 @@ local function describeCrafter(lead, kind, prof, crafter, recipeKey)
     return
   end
   local recipe = character and character.recipes and character.recipes[recipeKey]
-  lead.recipeName = recipe and recipe.name or (type(recipeKey) == "string" and recipeKey or nil)
+  lead.recipeName = recipe and recipe.name or Index.PendingName(recipeKey) or (type(recipeKey) == "string" and recipeKey or nil)
   lead.itemID = recipe and recipe.item or nil
   if lead.itemID then
     fillLink(lead)

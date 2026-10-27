@@ -76,6 +76,8 @@ local function classicWindows(flavor)
   return tradeSkill, CRAFT_FRAME_FLAVORS[flavor] and craft or nil
 end
 local SIM_SLOTS = { { name = "Blacksmithing", skillLine = 164 }, { name = "Enchanting", skillLine = 333 } }
+-- ERR_LEARN_RECIPE_S as the TBC Anniversary client spells it (Phase 0): the Classic learn signal.
+local LEARN_FORMAT = "You have learned how to create a new item: %s."
 local BIND_DEBOUNCE_SECONDS = 1
 local ON_OFF = { on = true, off = false }
 -- Events with a known payload take exactly that many arguments, so a chat line may follow
@@ -89,6 +91,7 @@ local EVENT_ARITY = {
   CRAFT_UPDATE = 0,
   CRAFT_CLOSE = 0,
   NEW_RECIPE_LEARNED = 1,
+  CHAT_MSG_SYSTEM = 1, -- text
   GET_ITEM_INFO_RECEIVED = 2,
   CHAT_MSG_WHISPER = 2, -- text, sender
   CHAT_MSG_WHISPER_INFORM = 2, -- text, target
@@ -286,6 +289,7 @@ local function newContext(plan, out)
       bind = SIM_BIND,
       autoCache = true,
     })
+    Wow.stub("ERR_LEARN_RECIPE_S", LEARN_FORMAT)
     return ctx
   end
   ProfessionsRetail.install({
@@ -314,12 +318,17 @@ local function reportRead(ctx)
   end
 end
 
--- `learn: stored=<bool>` after a NEW_RECIPE_LEARNED.
+-- `learn: stored=<bool>` after a NEW_RECIPE_LEARNED; `learn: pending=<name>` after a Classic
+-- learn message.
 local function reportLearn(ctx)
-  local stored = ctx.ns.LearnWatcher.lastStored
+  local LearnWatcher = ctx.ns.LearnWatcher
+  local stored, pending = LearnWatcher.lastStored, LearnWatcher.lastPending
+  LearnWatcher.lastStored, LearnWatcher.lastPending = nil, nil
   if stored ~= nil then
-    ctx.ns.LearnWatcher.lastStored = nil
     ctx.out[#ctx.out + 1] = "learn: stored=" .. tostring(stored)
+  end
+  if pending ~= nil then
+    ctx.out[#ctx.out + 1] = "learn: pending=" .. pending
   end
 end
 
@@ -540,7 +549,7 @@ function STEPS.event(ctx, step)
   for _, name in ipairs(READERS) do
     ctx.ns[name].lastRead = nil
   end
-  ctx.ns.LearnWatcher.lastStored = nil
+  ctx.ns.LearnWatcher.lastStored, ctx.ns.LearnWatcher.lastPending = nil, nil
   ctx.ns.BindLookup.lastStored = nil
   Wow.fireEvent(step.name, unpack(args, 1, #step.args))
   ctx.ns.Slicer.Drain()

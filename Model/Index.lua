@@ -299,7 +299,7 @@ local context = nil
 local current = nil
 local rebuilt = {}
 local pendingNames = {}
-local pendingSet = {}
+local pendingSet = {} -- lowercase name -> the client's spelling
 local generation = 0 -- sliced jobs started; tells the running job whether it was replaced
 
 Index.lastBuildMs = nil -- CPU ms of the last build: the sum of its steps
@@ -414,13 +414,20 @@ function Index.RequestRebuild(reason)
   end
 end
 
--- §5.3 Classic session learn: a lowercase recipe name, matched by name until logout.
-function Index.AddPending(lowerName)
+-- §5.3 Classic session learn: a recipe name as the client spells it, matched by its lowercase
+-- copy until logout.
+function Index.AddPending(name)
+  local lowerName = lower(name)
   if not pendingSet[lowerName] then
-    pendingSet[lowerName] = true
+    pendingSet[lowerName] = name
     pendingNames[#pendingNames + 1] = lowerName
   end
   Index.RequestRebuild("learn")
+end
+
+-- The client's spelling of a pending recipe key (the first learn's), or nil.
+function Index.PendingName(recipeKey)
+  return pendingSet[recipeKey]
 end
 
 ns.Index = Index
