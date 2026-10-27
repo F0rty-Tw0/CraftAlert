@@ -200,6 +200,46 @@ return function()
   Assert.equal(paused.unreadProfession, "Blacksmithing")
   Assert.equal(paused.recipeCount, 0)
 
+  -- While the first index of the session is still being built (the sliced login build), the
+  -- gate says so instead of "empty"; the enable setting still beats it. Without the job and
+  -- without an index (a build that raised) it is "empty" again.
+  ns, db = setup("retail")
+  ns.ScanGate.Install(db)
+  ns.Index.OnRebuilt(ns.ScanGate.Evaluate)
+  ns.Index.RequestRebuild("login")
+  ns.ScanGate.Evaluate()
+  local building = ns.ScanGate.State()
+  Assert.equal(building.reason, "building")
+  Assert.equal(building.unreadProfession, nil)
+  db.settings.enable = false
+  Assert.equal(ns.ScanGate.State().reason, "disabled", "disabled beats building")
+  db.settings.enable = true
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  Assert.equal(ns.ScanGate.State().reason, "instance", "instance beats building")
+  Wow.stub("IsInInstance", function()
+    return false, "none"
+  end)
+  ns.Slicer.Cancel("index")
+  Assert.equal(ns.ScanGate.State().reason, "empty", "no job and no index")
+  ns.Index.RequestRebuild("login")
+  ns.Slicer.Drain()
+  Assert.equal(ns.ScanGate.State().reason, nil, "the build landed")
+  Assert.equal(ns.ScanGate.IsActive(), true)
+  -- An unread profession is named only once the build shows the index empty, not while it runs.
+  ns, db = setup("retail", function(d)
+    d.characters["Smith-Realm"] = nil
+    d.characters["Me-Realm"] = Fixture.character({ BS }, {})
+    d.characters["Me-Realm"].professions[BS] = { name = "Blacksmithing", primary = true, read = false }
+  end)
+  ns.ScanGate.Install(db)
+  ns.Index.RequestRebuild("login")
+  Assert.equal(ns.ScanGate.State().unreadProfession, nil, "building names no profession to open")
+  ns.Slicer.Drain()
+  Assert.equal(ns.ScanGate.State().reason, "empty")
+  Assert.equal(ns.ScanGate.State().unreadProfession, "Blacksmithing")
+
   -- Settings pages and Bootstrap evaluate before Install ran: paused, no error.
   ns = setup("retail")
   ns.ScanGate.Evaluate()

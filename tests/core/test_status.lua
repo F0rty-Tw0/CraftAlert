@@ -31,6 +31,9 @@ return function()
   Assert.equal(Status.Text(paused("disabled")), "Paused — Craft Alert is turned off")
   Assert.equal(Status.Text(paused("notStarted")), "Paused — Craft Alert did not start; /reload to try again")
   Assert.equal(Status.Text(paused("instance")), "Paused — off in instances")
+  -- The first index of the session is still being built: a warm-up, not a pause.
+  Assert.equal(Status.Text(paused("building")), "Starting — loading recipes")
+  Assert.equal(Status.PausedText({ reason = "building" }), "Starting — loading recipes")
 
   -- PausedText is the paused line on its own, for callers that already know the gate is paused.
   Assert.equal(Status.PausedText({ reason = "noTrade" }), "Paused — no Trade chat here")

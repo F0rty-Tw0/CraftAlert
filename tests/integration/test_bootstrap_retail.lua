@@ -639,7 +639,7 @@ local function testNoOrdersOffRetail(db)
   Assert.equal(isRegistered(ORDER_FILLED), false, ORDER_FILLED .. " not registered on Forever")
 end
 
--- Spec §10.2: with CraftScan's data loaded, login asks once (after the login lines); once
+-- Spec §10.2: with CraftScan's data loaded, login asks once (after the other login lines; the gate's status line follows when the build lands); once
 -- answered, never again.
 local function testCraftScanOffer(db)
   local offer = "CraftScan data found. Import characters, recipes, and greetings?"
@@ -751,6 +751,23 @@ local function testRecipesPrintOnlyTheListeningLine(db)
   Assert.same(chatSince(before), { STATUS_ACTIVE }, "the gate's listening line once, no paused line")
 end
 
+-- The client's order: PLAYER_ENTERING_WORLD comes while the login build still runs. The
+-- launcher and /ca test say the recipes are loading (not "no profession read"), chat says
+-- nothing about it, and the one status line comes when the build lands.
+local function testBuildingAtEnteringWorld(db)
+  local session = startClient(db)
+  local before = #Wow.chat
+  local ns = login(session, nil, true)
+  Wow.fireEvent("PLAYER_ENTERING_WORLD")
+  local state = ns.ScanGate.State()
+  Assert.equal(state.reason, "building")
+  Assert.equal(state.unreadProfession, nil)
+  Assert.equal(ns.Status.Text(state), "Starting — loading recipes")
+  ns.Slicer.Drain()
+  Assert.equal(ns.ScanGate.State().reason, nil, "the build landed")
+  Assert.same(chatSince(before), { STATUS_ACTIVE }, "no loading line in chat, the listening line once")
+end
+
 -- An instance at login prints nothing, not even when the build lands.
 local function testInstanceAtLoginOwesNothing()
   local session = startClient(nil)
@@ -850,6 +867,7 @@ return function()
   testLoginInCombatBuildsAtOnce(deepCopy(saved))
   testEmptyIndexOwesStatusLine()
   testRecipesPrintOnlyTheListeningLine(deepCopy(saved))
+  testBuildingAtEnteringWorld(deepCopy(saved))
   testInstanceAtLoginOwesNothing()
   testInstanceBeforeBuildDropsOwedLine()
   testRestartedBuildPrintsOwedLineOnce()

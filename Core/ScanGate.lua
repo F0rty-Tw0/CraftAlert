@@ -13,6 +13,7 @@ local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local Status = ns.Status or require("CraftAlert.Core.Status")
+local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 
 -- Spec §6.1: the public chat events are registered only while scanning is active (not in an
 -- instance, enabled, the index has entries, a Trade channel exists here unless "Only where Trade
@@ -160,7 +161,8 @@ local function hasTrade()
 end
 
 -- Why scanning is paused, or nil while it runs. A login step that raised leaves the gate or
--- Leads without the db: then a match would make no lead, so nothing is scanned.
+-- Leads without the db: then a match would make no lead, so nothing is scanned. "building":
+-- the first index of the session is still being built by the Slicer job (the login build).
 local function pauseReason()
   if db == nil or not Leads.IsBound() then
     return "notStarted"
@@ -172,6 +174,9 @@ local function pauseReason()
     return "disabled"
   end
   local index = Index.Current()
+  if index == nil and Slicer.IsRunning("index") then
+    return "building"
+  end
   if index == nil or index.size == 0 then
     return "empty"
   end
