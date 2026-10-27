@@ -204,6 +204,23 @@ local function testSwitchCancels()
   end
 end
 
+-- A list with no recipe rows (not loaded yet, or headers only) leaves the profession unread, so
+-- the login hint still asks for it.
+local function testEmptyStaysUnread()
+  local cases = {
+    empty = {},
+    headers = { { name = "Bracer", kind = "header" }, { name = "Health", kind = "subheader" } },
+  }
+  for name, rows in pairs(cases) do
+    local state = { tradeSkill = enchanting(rows) }
+    local ns, db = ProfessionsClassic.login("tbc", state)
+    Wow.fireEvent("TRADE_SKILL_SHOW")
+    ns.Slicer.Drain()
+    Assert.equal(db.characters[CHAR].professions.enchanting.read, false, name)
+    Assert.equal(ns.ClassicReader.lastRead.stored, 0, name)
+  end
+end
+
 return function()
   for _, flavor in ipairs(FLAVORS) do
     testShape(flavor)
@@ -214,4 +231,5 @@ return function()
   testUpdates()
   testCloseCancels()
   testSwitchCancels()
+  testEmptyStaysUnread()
 end
