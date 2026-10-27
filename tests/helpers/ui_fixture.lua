@@ -67,6 +67,7 @@ local UI = {
   "UI.CraftScanPrompt",
   "UI.Settings.RecipeMute",
   "UI.RecipeMarkers.MarkerState",
+  "UI.RecipeMarkers.MarkerSwitch",
   "UI.RecipeMarkers.ModernRows",
   "UI.Settings.PageGeneral",
   "UI.Settings.PageAlerts",

@@ -6,15 +6,13 @@ end
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
-local Index = ns.Index or require("CraftAlert.Model.Index")
 local ModernReader = ns.ModernReader or require("CraftAlert.Professions.ModernReader")
-local RecipeMute = ns.RecipeMute or require("CraftAlert.UI.Settings.RecipeMute")
-local MarkerState = ns.MarkerState or require("CraftAlert.UI.RecipeMarkers.MarkerState")
+local MarkerSwitch = ns.MarkerSwitch or require("CraftAlert.UI.RecipeMarkers.MarkerSwitch")
 
 -- Recipe markers on Retail and Forever (spec 2026-10-26-recipe-markers §6.2-6.5): the Settings
 -- mute switch on every learned, stored recipe row of Blizzard's profession window. A click mutes
--- the recipe's rank chain without selecting the row. Nothing is written on Blizzard's rows,
--- nodes or recipe infos: each row's switch lives in `markers`, its state on the switch itself.
+-- the recipe's rank chain without selecting the row (MarkerSwitch). Nothing is written on
+-- Blizzard's rows, nodes or recipe infos.
 local ModernRows = {}
 
 local ipairs = ipairs
@@ -22,7 +20,6 @@ local type = type
 
 local ADDON = "Blizzard_Professions"
 local LOADED_EVENT = "ADDON_LOADED"
-local SWITCH_SIZE = 14 -- 16 would overlap a fully truncated "[n]" count by 1 px (spec F5)
 
 ---@type table
 local db = nil -- set by Install; nil means every call is a no-op
@@ -30,7 +27,6 @@ local professionsLoaded = false
 local hooked = false
 ---@type table
 local scrollBox = nil
-local markers = {} -- Blizzard row frame -> our switch
 
 -- `_G.Professions[name]` when the client has it.
 local function professionsHelper(name)
@@ -51,30 +47,6 @@ local function findScrollBox()
     node = node[key]
   end
   return type(node) == "table" and node or nil
-end
-
-local function hide(row)
-  local switch = markers[row]
-  if switch then
-    switch:Hide()
-  end
-end
-
--- Paints a switch from its own chain: crossed out when every rank is muted, greyed when untracked.
-local function paintSwitch(switch)
-  local state = MarkerState.Of(switch.chain, switch.recipe)
-  RecipeMute.Paint(switch, state == "muted", state == "untracked")
-end
-
--- A click mutes every stored rank of the chain, or unmutes them all when all are muted (D5), then
--- repaints and asks for the rebuild that repaints the other rows and an open Settings list.
-local function onClick(switch)
-  local target = MarkerState.Of(switch.chain, switch.recipe) ~= "muted"
-  for _, record in ipairs(switch.chain) do
-    record.muted = target or nil
-  end
-  paintSwitch(switch)
-  Index.RequestRebuild("mute")
 end
 
 -- True when a gate hides the row's switch: the setting, an instance, another player's or a special
@@ -106,23 +78,12 @@ local function chainOf(recipeInfo, shownInfo, recipes)
   return chain, shown
 end
 
--- The switch on `row`, created on first use, 14 × 14 at the row's right end.
-local function switchOf(row)
-  local switch = markers[row]
-  if switch == nil then
-    switch = RecipeMute.Create(row, onClick)
-    switch:SetSize(SWITCH_SIZE, SWITCH_SIZE)
-    markers[row] = switch
-  end
-  return switch
-end
-
 -- Shows, paints or hides the switch of one row for the recipe its node holds (spec §6.3).
 local function paint(row, node)
   local data = node and node:GetData()
   local recipeInfo = type(data) == "table" and data.recipeInfo or nil
   if recipeInfo == nil then
-    hide(row)
+    MarkerSwitch.Hide(row)
     return
   end
   local shownInfo = recipeInfo
@@ -132,18 +93,11 @@ local function paint(row, node)
   end
   local character = db.characters[PlayerName.Own()]
   if gated(shownInfo) or character == nil or character.recipes == nil then
-    hide(row)
+    MarkerSwitch.Hide(row)
     return
   end
   local chain, shown = chainOf(recipeInfo, shownInfo, character.recipes)
-  if MarkerState.Of(chain, shown) == "hidden" then
-    hide(row)
-    return
-  end
-  local switch = switchOf(row)
-  switch.chain, switch.recipe = chain, shown
-  paintSwitch(switch)
-  switch:Show()
+  MarkerSwitch.Show(row, chain, shown)
 end
 
 -- ScrollUtil's OnInitializedFrame callback: (owner, row, node).

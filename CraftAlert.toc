@@ -103,6 +103,7 @@ UI/Settings/Controls.lua
 UI/CraftScanPrompt.lua
 UI/Settings/RecipeMute.lua
 UI/RecipeMarkers/MarkerState.lua
+UI/RecipeMarkers/MarkerSwitch.lua
 UI/RecipeMarkers/ModernRows.lua
 UI/Settings/PageGeneral.lua
 UI/Settings/PageAlerts.lua
