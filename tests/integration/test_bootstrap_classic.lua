@@ -6,6 +6,8 @@ local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Toc = require("tests.helpers.toc")
 local ProfessionsClassic = require("tests.helpers.professions_classic")
+local ClassicRowsStub = require("tests.helpers.classic_rows_stub")
+local RecipeListStub = require("tests.helpers.recipe_list_stub")
 
 local OWN_KEY = "Crafter-OwnRealm"
 local CUSTOMER = "Customer-OtherRealm"
@@ -232,7 +234,47 @@ local function testLearnSignalGate()
   Assert.truthy(isRegistered("TRADE_SKILL_SHOW"), "the readers still install")
 end
 
+-- Recipe markers on Classic: nothing is hooked before the window's addon loads; then a stored
+-- row gets its switch on Blizzard's update, a rebuild and entering an instance repaint it. The
+-- Craft window gets them on TBC only.
+local function testRecipeMarkers(flavor)
+  local session = startClient(flavor)
+  local stub = ClassicRowsStub.install({ craft = flavor == "tbc", loaded = false })
+  local ns = login(session)
+  local db = rawget(_G, "CraftAlertDB")
+  stub.tradeSkill:define()
+  local blizzardUpdate = rawget(_G, "TradeSkillFrame_Update")
+  Wow.fireEvent("ADDON_LOADED", "Blizzard_TradeSkillUI")
+  Assert.truthy(rawget(_G, "TradeSkillFrame_Update") ~= blizzardUpdate, flavor .. ": TradeSkillFrame_Update hooked")
+  openWindow("TRADE_SKILL_SHOW")
+  stub.tradeSkill:update(0)
+  local switch = assert(RecipeListStub.switchOf(stub.tradeSkill.rows[2]), flavor .. ": the belt's row got its switch")
+  Assert.same({ switch:IsShown(), switch.icon.atlas }, { true, RecipeListStub.SPEAKER }, flavor)
+
+  db.characters[OWN_KEY].recipes["sim plate belt"].muted = true
+  ns.Index.Rebuild()
+  Assert.equal(switch.icon.atlas, RecipeListStub.MUTED, flavor .. ": an index rebuild repaints the rows")
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  ns.ScanGate.Evaluate()
+  Assert.equal(switch:IsShown(), false, flavor .. ": entering an instance hides the switch")
+  Wow.stub("IsInInstance", nil)
+  ns.ScanGate.Evaluate()
+  Assert.equal(switch:IsShown(), true, flavor .. ": back after leaving")
+
+  if flavor == "tbc" then
+    stub.craft:define()
+    Wow.fireEvent("ADDON_LOADED", "Blizzard_CraftUI")
+    openWindow("CRAFT_SHOW")
+    stub.craft:update(0)
+    Assert.truthy(RecipeListStub.switchOf(stub.craft.rows[2]), "the enchant's Craft row got its switch")
+  end
+end
+
 return function()
+  testRecipeMarkers("tbc")
+  testRecipeMarkers("mop")
   testFlow("tbc")
   testFlow("mop")
   testLearnSignalGate()

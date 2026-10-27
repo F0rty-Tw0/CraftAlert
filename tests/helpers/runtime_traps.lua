@@ -56,7 +56,14 @@ RuntimeTraps.BLIZZARD_GLOBALS = {
   "UISpecialFrames",
   "Settings",
   "DEFAULT_CHAT_FRAME",
+  "TradeSkillFrame",
+  "CraftFrame",
 }
+-- The Classic windows' row buttons (UI/RecipeMarkers/ClassicRows.lua).
+for i = 1, 8 do
+  table.insert(RuntimeTraps.BLIZZARD_GLOBALS, "TradeSkillSkill" .. i)
+  table.insert(RuntimeTraps.BLIZZARD_GLOBALS, "Craft" .. i)
+end
 
 -- Rule 4: the events a frame may register while the scan is inactive (CHAT_MSG_SYSTEM only
 -- with opts.learnSignal).

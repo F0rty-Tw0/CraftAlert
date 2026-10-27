@@ -686,15 +686,17 @@ local function testRecipeMarkers(db)
   Wow.stub("IsInInstance", nil)
 end
 
--- Classic has no Blizzard recipe window the markers know: even with the client's list and
--- ScrollUtil stubbed and Blizzard_Professions "loaded", nothing registers and nothing listens.
+-- Classic has no Retail recipe list: even with the client's list and ScrollUtil stubbed and
+-- Blizzard_Professions "loaded" or loading, no row callback registers (the Classic windows'
+-- markers are test_bootstrap_classic.lua's).
 local function testNoMarkersOnClassic(db)
   local session = startClient(db, nil, "era")
   local list = RecipeListStub.install({ recipes = { [9001] = { learned = true } }, loaded = true })
   list:row(9001)
   login(session)
   Assert.equal(#list.callbacks, 0, "no row callback on Classic")
-  Assert.equal(isRegistered("ADDON_LOADED"), false, "and no wait for Blizzard_Professions")
+  Wow.fireEvent("ADDON_LOADED", "Blizzard_Professions")
+  Assert.equal(#list.callbacks, 0, "and none once Blizzard_Professions loads")
 end
 
 local function deepCopy(value)

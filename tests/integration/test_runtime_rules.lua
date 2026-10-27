@@ -9,6 +9,7 @@ local RuntimeTraps = require("tests.helpers.runtime_traps")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
 local ProfessionsClassic = require("tests.helpers.professions_classic")
 local RecipeListStub = require("tests.helpers.recipe_list_stub")
+local ClassicRowsStub = require("tests.helpers.classic_rows_stub")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 local Widgets = require("tests.helpers.widgets")
 
@@ -163,6 +164,11 @@ local function withTraps(fn, learnSignal, flavor)
     -- after RuntimeTraps.install, so they are proxies too.
     state.list = RecipeListStub.install({ recipes = { [9001] = { learned = true } } })
     installProfessions(flavor)
+    -- On Classic, the TradeSkill and Craft windows' addons already loaded: their row buttons are
+    -- Blizzard globals behind the traps.
+    if flavor ~= "retail" then
+      state.windows = ClassicRowsStub.install({ craft = true, loaded = true })
+    end
     local verify
     restore, verify = RuntimeTraps.install({
       isScanActive = function()
@@ -534,6 +540,32 @@ local function testClassicObeysTheRules()
   end, true, "tbc")
 end
 
+-- Classic recipe markers (TBC) under the traps: both windows' updates are hooked at login
+-- through hooksecurefunc, the one sanctioned overwrite of a Blizzard global; a stored row gets its
+-- switch on Blizzard's update, and a click mutes through the rebuild without reaching the row.
+-- Nothing is written on the row buttons; withTraps' verify would report a raw write.
+local function testClassicMarkersObeyTheRules()
+  withTraps(function(state)
+    local ns = loadAddon()
+    state.isActive = ns.ScanGate.IsActive
+    Wow.fireEvent("ADDON_LOADED", "CraftAlert")
+    rawget(_G, "CraftAlertDB").characters = dofile("tools/sim_fixture_classic.lua").characters
+    Wow.fireEvent("PLAYER_LOGIN")
+    state.windows.tradeSkill:update(0)
+    state.windows.craft:update(0)
+    local switch = assert(RecipeListStub.switchOf(G("TradeSkillSkill1")), "the stored TradeSkill row got its switch")
+    Assert.truthy(RecipeListStub.switchOf(G("Craft1")), "the stored Craft row got its switch")
+    Widgets.click(switch)
+    ns.Index.Rebuild()
+    Assert.equal(switch.icon.atlas, RecipeListStub.MUTED, "the click muted the recipe and the rebuild kept it")
+    Widgets.click(switch)
+    state.windows.tradeSkill:update(0)
+    Assert.equal(switch.icon.atlas, RecipeListStub.SPEAKER)
+    local clicks = state.windows.tradeSkill.clicks
+    Assert.equal(clicks.method + clicks.script, 0, "the row's own click never ran")
+  end, true, "tbc")
+end
+
 -- Shipped folders only (the TOC lists exactly those): tools/ is not in it.
 local function testSourceRules()
   local sendsAddonMessage = {}
@@ -555,5 +587,6 @@ return function()
   testAddonObeysTheRules()
   testClassicObeysTheRules()
   testMarkersObeyTheRules()
+  testClassicMarkersObeyTheRules()
   testSourceRules()
 end
