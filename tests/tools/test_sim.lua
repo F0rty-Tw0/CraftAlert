@@ -420,12 +420,12 @@ return function()
   )
 
   -- The account DB goes through SavedState.Load first: one `db:` line. A newer schema's warning
-  -- waits for the login lines (silent in an instance), after the gate's status line.
+  -- prints with the login lines, before the build lands and the gate's status line.
   Assert.equal(Sim.Run({})[2], "db: schema=1 characters=2 recipes=6 leads=0")
   Assert.equal(#Sim.Run({ "--db", "tests/fixtures/db_schema2.lua" }), 2)
   local newer = Sim.Run({ "--db", "tests/fixtures/db_schema2.lua", "LF plate belt" })
   Assert.equal(newer[2], "db: schema=2 characters=1 recipes=2 leads=100")
-  assert(string.find(newer[6], "^chat: Craft Alert: .*newer"), newer[6])
+  assert(string.find(newer[3], "^chat: Craft Alert: .*newer"), newer[3])
   local warnings = 0
   for _, line in ipairs(newer) do
     if string.find(line, "^chat: Craft Alert: .*newer") then
