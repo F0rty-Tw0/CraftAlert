@@ -22,6 +22,12 @@ local function testScan()
   Tokenizer.Configure({ "+5" })
   Assert.equal(Tokenizer.Scan("need +5 stam"), "need +5 stam")
   Assert.equal(Tokenizer.Scan("need 55 stam"), nil)
+  -- "(", "[" and "%" would raise or match something else as a pattern.
+  Tokenizer.Configure({ "lf(", "[wtb", "50%" })
+  Assert.equal(Tokenizer.Scan("LF( belt"), "lf( belt")
+  Assert.equal(Tokenizer.Scan("[WTB belt"), "[wtb belt")
+  Assert.equal(Tokenizer.Scan("50% off"), "50% off")
+  Assert.equal(Tokenizer.Scan("lf belt"), nil)
   -- The list is replaced, not merged, and lowercased once at configure time.
   Tokenizer.Configure({ "WTS" })
   Assert.equal(Tokenizer.Scan("WTS cheap stuff"), "wts cheap stuff")
