@@ -60,19 +60,20 @@ local function slotProfessions(getProfessions)
   return list, slots, professionSlots
 end
 
--- The skill-line list (Era, TBC, Wrath) as slotProfessions answers, every non-header line
--- counting as a profession slot; nil when the API is missing or a collapsed header hides lines.
+-- The skill-line list (Era, TBC, Wrath) as slotProfessions answers, every visible non-header
+-- line counting as a profession slot, plus hidden = true when a collapsed header hides lines;
+-- nil when the API is missing.
 local function skillLineProfessions()
   local getCount = _G["GetNumSkillLines"]
   local getInfo = _G["GetSkillLineInfo"]
   if type(getCount) ~= "function" or type(getInfo) ~= "function" then
     return nil
   end
-  local list, lines = {}, 0
+  local list, lines, hidden = {}, 0, false
   for index = 1, getCount() or 0 do
     local name, isHeader, isExpanded = getInfo(index)
     if isHeader and not isExpanded then
-      return nil
+      hidden = true
     end
     if not isHeader and type(name) == "string" then
       lines = lines + 1
@@ -83,7 +84,7 @@ local function skillLineProfessions()
     end
   end
 
-  return list, lines, lines
+  return list, lines, lines, hidden
 end
 
 local function currentProfessions()
@@ -148,14 +149,16 @@ end
 -- per profession, so it is kept, never derived from the slot) and removes the recipes of a
 -- profession it no longer has. Other characters are never touched. Unknown data writes
 -- nothing, so a failed lookup cannot wipe stored recipes: a missing API, a slot whose
--- skill line has not loaded, a collapsed skill-line header, or, for a character that has
--- professions stored, no slot or line at all or secondary slots only (a partial read at
--- login); then the stored professions seed Order.
+-- skill line has not loaded, or, for a character that has professions stored, no slot or
+-- line at all or secondary slots only (a partial read at login); then the stored professions
+-- seed Order. A collapsed skill-line header may hide a profession, so then every stored one
+-- the visible lines do not list is kept unchanged, with its recipes, after the visible ones
+-- in Order.
 -- Trade-off: a character that unlearns both professions keeps its stale data until it
 -- learns one. A list of non-crafting professions only (gathering...) is real data and drops.
 -- Runs at login and on SKILL_LINES_CHANGED. → whether Order changed (rebuild the index).
 function ProfessionList.Refresh(db, charKey)
-  local list, slots, professionSlots = currentProfessions()
+  local list, slots, professionSlots, hidden = currentProfessions()
   local character = db.characters[charKey]
   if list == nil or isPartial(list, slots, professionSlots, character) then
     seedOrder(character)
@@ -173,10 +176,21 @@ function ProfessionList.Refresh(db, charKey)
     professions[profession.key] = { name = profession.name, primary = old ~= nil and old.primary == true, read = old ~= nil and old.read == true }
     keys[#keys + 1] = profession.key
   end
-  for key in pairs(previous) do
-    if professions[key] == nil then
+  local kept = {}
+  for key, old in pairs(previous) do
+    if professions[key] == nil and hidden then
+      professions[key] = old
+      -- Only name keys join Order: a Retail skill-line ID would make the sort raise.
+      if type(key) == "string" then
+        kept[#kept + 1] = key
+      end
+    elseif professions[key] == nil then
       dropRecipes(character.recipes, key)
     end
+  end
+  sort(kept)
+  for _, key in ipairs(kept) do
+    keys[#keys + 1] = key
   end
   character.professions = professions
   local changed = not sameOrder(order, keys)
