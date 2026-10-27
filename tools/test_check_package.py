@@ -1,6 +1,6 @@
 """Tests for tools/check_package.py on small zips built in a temp dir.
 
-Run:  python -m unittest tools.tests.test_check_package
+Run:  python -m unittest tools.test_check_package
 """
 
 import contextlib

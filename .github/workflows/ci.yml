@@ -87,6 +87,6 @@ jobs:
       - name: Check package
         run: |
           set -euo pipefail
-          python -m unittest tools.tests.test_check_package
+          python -m unittest tools.test_check_package
           pwsh -File scripts/package.ps1
           python tools/check_package.py dist/CraftAlert.zip
