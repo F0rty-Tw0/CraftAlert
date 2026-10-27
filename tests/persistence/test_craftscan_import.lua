@@ -217,13 +217,28 @@ local function testGreetingCutWholeCharacters()
   Assert.equal(#db.settings.templates.item, 254, 'the cut drops the whole "é"')
 end
 
--- A key without a realm takes the one realm it is stored under, not the player's.
+-- A key without a realm takes the one realm it is stored under, not the player's; under no known
+-- realm ("_7" is not in connected_realms) it takes the player's. Either way it then matches an
+-- existing character spelled with an apostrophe instead of adding a second one.
 local function testBareKeyTakesItsRealm()
   local CraftScanImport, ns = load()
   local db = ns.Defaults.Db()
   CraftScanImport.Run(db, { realms = { Legacyrealm = { characters = { Bare = { professions = {} } } } } })
   Assert.truthy(db.characters["Bare-Legacyrealm"])
   Assert.equal(db.characters["Bare-OwnRealm"], nil)
+  db = ns.Defaults.Db()
+  db.characters["O'bare-Legacyrealm"] = Fixture.character({ BS }, {})
+  db.characters["Z'ero-OwnRealm"] = Fixture.character({ BS }, {})
+  local counts = CraftScanImport.Run(db, {
+    realms = {
+      Legacyrealm = { characters = { Obare = { professions = {} } } },
+      _7 = { characters = { Zero = { professions = {} }, Lone = { professions = {} } } },
+    },
+  })
+  Assert.equal(counts.characters, 3)
+  Assert.equal(db.characters["Obare-Legacyrealm"], nil, "matched O'bare-Legacyrealm")
+  Assert.equal(db.characters["Zero-OwnRealm"], nil, "matched Z'ero-OwnRealm")
+  Assert.truthy(db.characters["Lone-OwnRealm"], "no realm known: the player's")
 end
 
 -- CraftScan writes its data while the sliced import pauses: keys it adds then are left for the

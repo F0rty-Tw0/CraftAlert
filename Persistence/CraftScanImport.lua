@@ -87,22 +87,24 @@ local function realmsOf(lists, realmID)
   return string.find(realmID, "^_%d+$") and {} or { RealmTag.Strip(realmID) }
 end
 
--- The Craft Alert key of a CraftScan key, compared without apostrophes (legacy CraftScan keys lack
--- them): an existing character's key, else the realm spelled as a known realm of the group; a
--- bare name in a group of several realms gets the player's realm.
+-- The Craft Alert key of a CraftScan key. A key without a realm first takes the realm it is stored
+-- under when that is one realm, else (none or several) the player's. Then, compared without
+-- apostrophes (legacy CraftScan keys lack them): an existing character's key, else the realm
+-- spelled as a known realm of the group.
 local function keyOf(db, csKey, realms)
   csKey = gsub(csKey, "|", "")
+  local realm = PlayerName.RealmOf(csKey)
+  if not string.find(csKey, "-", 1, true) then
+    realm = #realms == 1 and realms[1] or realm
+    csKey = realm and csKey .. "-" .. realm or csKey
+  end
   local bare = PlayerName.StripApostrophes(csKey)
   for key in pairs(db.characters) do
     if PlayerName.StripApostrophes(key) == bare then
       return key
     end
   end
-  -- A key without a realm takes the realm it is stored under, when that is one realm.
-  if not string.find(csKey, "-", 1, true) and #realms == 1 then
-    return PlayerName.Normalize(csKey .. "-" .. realms[1])
-  end
-  local name, realm = PlayerName.NameOf(csKey), PlayerName.RealmOf(csKey)
+  local name = PlayerName.NameOf(csKey)
   for _, known in ipairs(realms) do
     if realm and PlayerName.StripApostrophes(known) == PlayerName.StripApostrophes(realm) then
       return PlayerName.Normalize(name .. "-" .. known)
