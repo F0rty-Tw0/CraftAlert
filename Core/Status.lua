@@ -29,6 +29,9 @@ function Status.PausedText(state)
   if reason == "disabled" then
     return Localization.Text("Paused — Craft Alert is turned off")
   end
+  if reason == "building" then
+    return Localization.Text("Starting — loading recipes")
+  end
   if state.unreadProfession then
     return Localization.Text("Paused — no profession read yet: open %s once", state.unreadProfession)
   end
