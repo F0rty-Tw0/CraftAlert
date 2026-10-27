@@ -105,6 +105,20 @@ local function testCraftScan()
   Assert.truthy(texts:find("CraftScan import: 3 characters, 1 recipe (0 muted) and 2 greetings (9 skipped).", 1, true), texts)
 end
 
+-- Enter in the import box imports as the button does; a second Enter while it runs does nothing.
+local function testEnterImports()
+  local ns, db = load()
+  ns.Slicer.Drain()
+  local import = box("Import string")
+  Widgets.type(import, otherAccount(ns, "retail"))
+  Assert.equal(button("Import"):IsEnabled(), false, "Enter started the import")
+  Widgets.type(import, "not a string")
+  ns.Slicer.Drain()
+  Assert.equal(db.characters["Alt-Other"].source, "import")
+  local texts = SettingsFixture.texts()
+  Assert.truthy(texts:find("Imported 1 character, 1 recipe (0 skipped).", 1, true), texts)
+end
+
 -- A job that errors or is replaced (Slicer cancels it): the button comes back and no
 -- "Importing..." or "Making the string..." stays behind; reopening restarts the export cleanly.
 local function testCancelRecovers()
@@ -141,6 +155,7 @@ return function()
   testExport()
   testImport()
   testCraftScan()
+  testEnterImports()
   testCancelRecovers()
   testClassic()
   Wow.reset()

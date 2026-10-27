@@ -100,7 +100,7 @@ local function createImport(column, page)
   local box = textBox(column, Localization.Text("Import string"))
   local result
   local button
-  button = Controls.Button(column.parent, Localization.Text("Import"), IMPORT_WIDTH, function()
+  local function import()
     button:Disable()
     result:SetText(Localization.Text("Importing..."))
     ExportString.StartImport(db(), box:GetText(), function(counts, err)
@@ -118,8 +118,16 @@ local function createImport(column, page)
       button:Enable()
       result:SetText("")
     end)
-  end)
+  end
+  button = Controls.Button(column.parent, Localization.Text("Import"), IMPORT_WIDTH, import)
   Controls.Place(column, button)
+  -- Enter in the box imports, as the button does; nothing while an import runs.
+  box:SetScript("OnEnterPressed", function()
+    box:ClearFocus()
+    if button:IsEnabled() then
+      import()
+    end
+  end)
   result = Controls.Note(column)
   page.importBox, page.importButton, page.importResult = box, button, result
   Controls.Section(column, Localization.Text("Imported characters"))
