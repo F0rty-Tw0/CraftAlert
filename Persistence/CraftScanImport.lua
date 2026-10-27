@@ -138,7 +138,8 @@ local function importProfession(ctx, character, parents, profession)
     if malformed then
       ctx.counts.skipped = ctx.counts.skipped + 1
     end
-    ctx.pause(2)
+    -- Up to three client calls per recipe: the Slicer reads its clock after each one.
+    ctx.pause(8)
   end
   local stored = character.professions[prof]
   if stored == nil then

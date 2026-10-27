@@ -158,9 +158,24 @@ local function testMalformed()
   Assert.same(none, { characters = 0, recipes = 0, muted = 0, greetings = 0, skipped = 0 })
 end
 
+-- Each recipe weighs a full Slicer.Run clock check (8): its client calls take up to ~500 us, so
+-- four of them between checks overran the frame budget.
+local function testClockReadPerRecipe()
+  local CraftScanImport, ns = load()
+  local weights = {}
+  CraftScanImport.Run(ns.Defaults.Db(), fixture(), function(weight)
+    weights[#weights + 1] = weight
+  end)
+  Assert.equal(#weights, 8, "one pause per recipe entry of this account")
+  for _, weight in ipairs(weights) do
+    Assert.equal(weight, 8)
+  end
+end
+
 return function()
   testFreshImport()
   testExistingDataWins()
   testMalformed()
+  testClockReadPerRecipe()
   Wow.reset()
 end
