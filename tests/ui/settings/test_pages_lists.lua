@@ -131,6 +131,28 @@ local function testCraftersPage()
   Assert.equal(character.Text:GetText(), "Alt-Realm (same account)")
 end
 
+-- A mute made outside the page (the profession window) shows when the index rebuilds: the open
+-- list repaints in place, a hidden one does nothing until it is shown.
+local function testCraftersRepaintsOnRebuild()
+  local ns, db = SettingsFixture.load({ db = crafters })
+  ns.Index.Configure(db)
+  open(ns, "Crafters")
+  local recipes = db.characters["Me-Realm"].recipes
+  Assert.equal(rowOf(9001).mute.icon.atlas, "voicechat-icon-speaker")
+  recipes[9001].muted = true
+  ns.Index.Rebuild()
+  Assert.equal(rowOf(9001).mute.icon.atlas, "voicechat-icon-speaker-mute", "the open list repaints")
+  Assert.equal(iconOf(9001).desaturated, true)
+
+  local muteRow = rowOf(9001)
+  ns.LeadsWindow.ToggleSettings()
+  recipes[9001].muted = nil
+  ns.Index.Rebuild()
+  Assert.equal(muteRow.mute.icon.atlas, "voicechat-icon-speaker-mute", "hidden: no repaint")
+  open(ns, "Crafters")
+  Assert.equal(rowOf(9001).mute.icon.atlas, "voicechat-icon-speaker", "shown again: current")
+end
+
 -- The recipe keys of the visible recipe rows, top to bottom.
 local function shownRecipeKeys()
   local keys = {}
@@ -534,6 +556,7 @@ end
 return function()
   testKeywordsPage()
   testCraftersPage()
+  testCraftersRepaintsOnRebuild()
   testCraftersRecipeOrder()
   testCraftersRecipeGroups()
   testCraftersRecipeIcons()

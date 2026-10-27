@@ -6,6 +6,7 @@ local Widgets = require("tests.helpers.widgets")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 local Toc = require("tests.helpers.toc")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
+local RecipeListStub = require("tests.helpers.recipe_list_stub")
 
 local OWN_KEY = "Crafter-OwnRealm"
 local CUSTOMER = "Customer-OtherRealm"
@@ -205,7 +206,7 @@ local function testFreshInstall()
   for _, event in ipairs(INSTALLED_EVENTS) do
     Assert.truthy(isRegistered(event), event .. " registered")
   end
-  Assert.equal(isRegistered("ADDON_LOADED"), false, "ADDON_LOADED is dropped once handled")
+  Assert.equal(isRegistered("ADDON_LOADED"), true, "only the recipe markers' wait for Blizzard_Professions is left")
   Assert.equal(isRegistered("PLAYER_LOGIN"), false)
   Assert.equal(type(rawget(_G, "SlashCmdList").CRAFTALERT), "function")
   local launcher = rawget(_G, "CraftAlertLauncher")
@@ -655,6 +656,47 @@ local function testCraftScanOffer(db)
   Assert.equal(rawget(_G, "CraftAlertCraftScanPrompt"), nil)
 end
 
+local SPEAKER, MUTED = RecipeListStub.SPEAKER, RecipeListStub.MUTED
+
+-- Recipe markers on Retail: nothing registers before Blizzard_Professions loads; then one callback,
+-- and a rebuild or entering an instance repaints a stored row (muted look, then hidden).
+local function testRecipeMarkers(db)
+  local session = startClient(db)
+  local list = RecipeListStub.install({ recipes = { [9001] = { learned = true } } })
+  local ns = login(session)
+  Assert.equal(#list.callbacks, 0, "Blizzard_Professions is not loaded: nothing registered")
+  local row = list:row(9001)
+  Wow.fireEvent("ADDON_LOADED", "Blizzard_Professions")
+  Assert.equal(#list.callbacks, 1, "the row callback registers once the window's addon loads")
+  Assert.equal(isRegistered("ADDON_LOADED"), false, "and the wait is over")
+  local switch = assert(RecipeListStub.switchOf(row), "the stored row got its switch")
+  Assert.same({ switch:IsShown(), switch.icon.atlas }, { true, SPEAKER })
+
+  db.characters[OWN_KEY].recipes[9001].muted = true
+  ns.Index.Rebuild()
+  Assert.equal(switch.icon.atlas, MUTED, "an index rebuild repaints the rows")
+  Widgets.click(switch)
+  Assert.equal(switch.icon.atlas, SPEAKER, "a click on the switch unmutes the recipe")
+
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  ns.ScanGate.Evaluate()
+  Assert.equal(switch:IsShown(), false, "entering an instance hides the switch")
+  Wow.stub("IsInInstance", nil)
+end
+
+-- Classic has no Blizzard recipe window the markers know: even with the client's list and
+-- ScrollUtil stubbed and Blizzard_Professions "loaded", nothing registers and nothing listens.
+local function testNoMarkersOnClassic(db)
+  local session = startClient(db, nil, "era")
+  local list = RecipeListStub.install({ recipes = { [9001] = { learned = true } }, loaded = true })
+  list:row(9001)
+  login(session)
+  Assert.equal(#list.callbacks, 0, "no row callback on Classic")
+  Assert.equal(isRegistered("ADDON_LOADED"), false, "and no wait for Blizzard_Professions")
+end
+
 local function deepCopy(value)
   if type(value) ~= "table" then
     return value
@@ -688,5 +730,7 @@ return function()
   testNoOrdersOffRetail(deepCopy(saved))
   testAwaySummary(deepCopy(saved))
   testCraftScanOffer(deepCopy(saved))
+  testRecipeMarkers(deepCopy(saved))
+  testNoMarkersOnClassic(deepCopy(saved))
   Wow.reset()
 end

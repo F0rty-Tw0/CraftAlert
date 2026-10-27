@@ -330,6 +330,28 @@ local function fieldsOfAnyRecipe()
   Assert.same(recipesOf(db), {})
 end
 
+local function isBlockedCases()
+  local _, ModernReader = setup()
+  local names = { "IsNPCCrafting", "IsTradeSkillGuild", "IsTradeSkillGuildMember", "IsTradeSkillLinked", "IsRuneforging" }
+  local function stubGuards(blocked)
+    local api = {}
+    for _, name in ipairs(names) do
+      api[name] = function()
+        return name == blocked
+      end
+    end
+    Wow.stub("C_TradeSkillUI", api)
+  end
+  stubGuards(nil)
+  Assert.equal(ModernReader.IsBlocked(), false, "all guards false")
+  for _, name in ipairs(names) do
+    stubGuards(name)
+    Assert.equal(ModernReader.IsBlocked(), true, name)
+  end
+  Wow.stub("C_TradeSkillUI", nil)
+  Assert.equal(ModernReader.IsBlocked(), false, "no trade skill api")
+end
+
 return function()
   readFlow("retail")
   readFlow("forever")
@@ -615,4 +637,5 @@ return function()
 
   lineCases()
   jobCases()
+  isBlockedCases()
 end

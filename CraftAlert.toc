@@ -101,13 +101,15 @@ UI/AlertToast.lua
 UI/Settings/Column.lua
 UI/Settings/Controls.lua
 UI/CraftScanPrompt.lua
+UI/Settings/RecipeMute.lua
+UI/RecipeMarkers/MarkerState.lua
+UI/RecipeMarkers/ModernRows.lua
 UI/Settings/PageGeneral.lua
 UI/Settings/PageAlerts.lua
 UI/Settings/PageGreetings.lua
 UI/Settings/PageKeywords.lua
 UI/Settings/RecipeTooltip.lua
 UI/Settings/RecipeRarity.lua
-UI/Settings/RecipeMute.lua
 UI/Settings/RecipeList.lua
 UI/Settings/PageCrafters.lua
 UI/Settings/PageLinked.lua

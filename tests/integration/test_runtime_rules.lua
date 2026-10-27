@@ -8,6 +8,7 @@ local Toc = require("tests.helpers.toc")
 local RuntimeTraps = require("tests.helpers.runtime_traps")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
 local ProfessionsClassic = require("tests.helpers.professions_classic")
+local RecipeListStub = require("tests.helpers.recipe_list_stub")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 local Widgets = require("tests.helpers.widgets")
 
@@ -59,7 +60,6 @@ local function installBlizzard(sent)
       return false
     end,
   })
-  Wow.stub("ProfessionsFrame", { CraftingPage = { RecipeList = { ScrollBox = {} } } })
   Wow.stub("SlashCmdList", {})
   Wow.stub("UISpecialFrames", {})
   Wow.stub("Settings", {
@@ -159,6 +159,9 @@ local function withTraps(fn, learnSignal, flavor)
     Wow.stub("ChatFrame_OpenChat", function() end)
     local sent = {}
     installBlizzard(sent)
+    -- Blizzard's recipe list (ProfessionsFrame, ScrollUtil) behind the traps; its rows are made
+    -- after RuntimeTraps.install, so they are proxies too.
+    state.list = RecipeListStub.install({ recipes = { [9001] = { learned = true } } })
     installProfessions(flavor)
     local verify
     restore, verify = RuntimeTraps.install({
@@ -207,6 +210,9 @@ local function testTrapsCatchViolations()
     Assert.raises(function()
       G("ProfessionsFrame").CraftingPage.RecipeList.ScrollBox.Extra = 1
     end, "ScrollBox.Extra")
+    Assert.raises(function()
+      state.list:row(9001).Extra = 1
+    end, "write to Blizzard table row.Extra")
     Assert.raises(function()
       G("C_Timer").After = function() end
     end, "C_Timer.After")
@@ -455,6 +461,33 @@ local function testAddonObeysTheRules()
   end)
 end
 
+-- Recipe markers (§6.2-6.5) under the traps: Blizzard_Professions loads after login, a stored row
+-- gets its switch, a click mutes and unmutes through the index rebuild. Nothing is written on the
+-- row, its node or the lists; withTraps' verify would report a raw write.
+local function testMarkersObeyTheRules()
+  withTraps(function(state)
+    local ns = loadAddon()
+    state.isActive = ns.ScanGate.IsActive
+    Wow.fireEvent("ADDON_LOADED", "CraftAlert")
+    rawget(_G, "CraftAlertDB").characters = dofile("tools/sim_fixture.lua").characters
+    Wow.fireEvent("PLAYER_LOGIN")
+    local list = state.list
+    local row = list:row(9001)
+    Assert.equal(#list.callbacks, 0, "Blizzard_Professions is not loaded: nothing registered")
+    Wow.fireEvent("ADDON_LOADED", "Blizzard_Professions")
+    Assert.equal(#list.callbacks, 1, "the row callback registered through the ScrollUtil proxy")
+    local switch = assert(RecipeListStub.switchOf(row), "the stored row got its switch")
+    Assert.equal(switch:IsShown(), true)
+    Widgets.click(switch)
+    ns.Index.Rebuild()
+    Assert.equal(switch.icon.atlas, RecipeListStub.MUTED, "the click muted the recipe and the rebuild kept it")
+    Widgets.click(switch)
+    ns.Index.Rebuild()
+    Assert.equal(switch.icon.atlas, RecipeListStub.SPEAKER)
+    Assert.equal(list.clicks.method + list.clicks.script, 0, "the row's own click never ran")
+  end)
+end
+
 -- TBC (learnSignal 1) under the traps: the learn message listener from login, both Classic
 -- windows read on Slicer ticks, a learn, a request and a greeting click.
 local function testClassicObeysTheRules()
@@ -513,5 +546,6 @@ return function()
   testLearnSignalAllowsSystemEvents()
   testAddonObeysTheRules()
   testClassicObeysTheRules()
+  testMarkersObeyTheRules()
   testSourceRules()
 end

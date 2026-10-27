@@ -11,6 +11,7 @@ local Wow = require("tests.helpers.wow")
 local Toc = require("tests.helpers.toc")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
 local ProfessionsClassic = require("tests.helpers.professions_classic")
+local RecipeListStub = require("tests.helpers.recipe_list_stub")
 
 local DEFAULT_SENDER = "Customer-OtherRealm"
 local SIM_CLASS_GUID = "Player-0-SIMCLASS"
@@ -250,6 +251,19 @@ local function loadModules(ns)
   return ok and #files or nil, err
 end
 
+-- Blizzard's profession recipe list for the recipe markers (ModernRows): Blizzard_Professions
+-- is not loaded until `--event ADDON_LOADED Blizzard_Professions`, which registers the row
+-- callback and prints `markers: installed modern`. The list has no rows. It is stubbed on every
+-- flavor, so a Classic run without that line shows Bootstrap skips the markers there.
+local function stubRecipeList(out)
+  RecipeListStub.install({
+    loaded = false,
+    onRegister = function()
+      out[#out + 1] = "markers: installed modern"
+    end,
+  })
+end
+
 local function newContext(plan, out)
   local ctx = { out = out, flavor = plan.flavor, ns = {}, afk = false, resting = true, started = false, sender = DEFAULT_SENDER }
   ctx.keys = { shift = false, ctrl = false }
@@ -285,6 +299,7 @@ local function newContext(plan, out)
   Wow.stub("GetRealmName", function()
     return OWN_REALM
   end)
+  stubRecipeList(out)
   if CLASSIC[plan.flavor] then
     local tradeSkill, craft = classicWindows(plan.flavor)
     ProfessionsClassic.install({

@@ -190,6 +190,13 @@ function RecipeList.Create(column)
     list.recipes.Render(list.recipes.items, list.showRecipe)
   end
 
+  -- An index rebuild repaints the rows only while the page shows them.
+  local function repaintIfShown()
+    if list.recipes.frame:IsVisible() then
+      repaint()
+    end
+  end
+
   local function createRecipeRow(row)
     local size = Theme.LAYOUT.ROW_ICON_SIZE
     row.icon = row:CreateTexture(nil, "ARTWORK")
@@ -232,6 +239,7 @@ function RecipeList.Create(column)
     row.icon:SetTexture(recipeIcon(item))
     row.icon:SetDesaturated(dim)
     row.icon:SetAlpha(dim and Theme.DIM_ALPHA or 1)
+    row.mute.recipe = item.recipe
     RecipeMute.Paint(row.mute, muted, greyed)
     if row.hovered then
       showTooltip(row)
@@ -242,6 +250,8 @@ function RecipeList.Create(column)
   createMuteAll(column, muteAll)
   list.onlyCurrent = createOnlyCurrent(column, onlyCurrent)
   list.recipes = Controls.List(column, RECIPE_ROWS, createRecipeRow)
+  -- A mute made elsewhere (the profession window) shows when the index rebuilds; the order stays.
+  Index.OnRebuilt(repaintIfShown)
 
   -- Shows `prof`'s recipes of `character` (a db.characters record, or nil) under the current search.
   function list.Show(character, prof)

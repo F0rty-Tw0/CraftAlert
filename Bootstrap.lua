@@ -31,6 +31,7 @@ local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
 local WhisperBridge = ns.WhisperBridge or require("CraftAlert.UI.WhisperBridge")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local CraftScanPrompt = ns.CraftScanPrompt or require("CraftAlert.UI.CraftScanPrompt")
+local ModernRows = ns.ModernRows or require("CraftAlert.UI.RecipeMarkers.ModernRows")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
 local PageAlerts = ns.PageAlerts or require("CraftAlert.UI.Settings.PageAlerts")
 local Perf = ns.Perf or require("CraftAlert.Core.Perf")
@@ -166,6 +167,17 @@ local function installScanGate()
   ScanGate.Install(db)
 end
 
+-- Retail and Forever only: the mute switches on Blizzard's recipe rows repaint on every rebuild
+-- and gate change.
+local function installMarkers()
+  if FlavorCompat.isClassic then
+    return
+  end
+  ModernRows.Install(db)
+  Index.OnRebuilt(ModernRows.Refresh)
+  ScanGate.OnChange(ModernRows.Refresh)
+end
+
 local function createLauncher()
   Launcher.Create()
   Launcher.OnMoved(AlertToast.Dock)
@@ -197,6 +209,7 @@ local LOGIN_STEPS = {
   installReaders,
   installQualityReach,
   installScanGate,
+  installMarkers,
   createLauncher,
   buildIndex,
   printLoginLines,

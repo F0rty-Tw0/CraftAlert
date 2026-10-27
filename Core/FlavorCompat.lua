@@ -111,6 +111,11 @@ function FlavorCompat.GetAddOnMemoryUsage(name)
   return callPreferred("C_AddOns", "GetAddOnMemoryUsage", name)
 end
 
+-- True when the addon is loaded; the global returns 1 and the namespace a boolean.
+function FlavorCompat.IsAddOnLoaded(name)
+  return callPreferred("C_AddOns", "IsAddOnLoaded", name) and true or false
+end
+
 -- ChatFrameUtil is present on every flavor; returns false when it is missing.
 local function callChatFrameUtil(name, ...)
   local util = _G["ChatFrameUtil"]

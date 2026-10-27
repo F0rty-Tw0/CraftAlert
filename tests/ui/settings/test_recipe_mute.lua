@@ -27,6 +27,32 @@ local function testCraftersMuteTooltip()
   Assert.equal(tooltip:IsShown(), false)
 end
 
+-- The switch keeps its own state (`recipe`, `muted`): a parent without an `item` field, as a
+-- Blizzard recipe row, reads fine, and a repaint under the pointer follows the new state.
+local function testMuteKeepsOwnState()
+  local ns = SettingsFixture.load({ db = crafters })
+  local mute = ns.RecipeMute.Create(_G["CreateFrame"]("Frame", nil, _G["UIParent"]), function() end)
+  local tooltip = ns.Tooltip.Get()
+  mute.recipe = { bind = 4 }
+  ns.RecipeMute.Paint(mute, true, false)
+  Widgets.fire(mute, "OnEnter")
+  Assert.same(tooltip.lines, { "Muted", "Requests for this recipe do not alert you", " ", "Click: unmute" })
+  ns.RecipeMute.Paint(mute, false, false)
+  Assert.same(tooltip.lines, { "Alerts on", "Requests for this recipe alert you", " ", "Click: mute" }, "a shown tooltip follows Paint")
+  Widgets.fire(mute, "OnLeave")
+
+  mute.recipe = { bind = 0 }
+  ns.RecipeMute.Paint(mute, false, true)
+  Widgets.fire(mute, "OnEnter")
+  Assert.same(tooltip.lines, {
+    "Not tracked",
+    "Items with no binding (materials, potions, gems) do not alert",
+    " ",
+    "Turn on Track unbound items in Craft Alert's Crafters settings",
+  })
+  Widgets.fire(mute, "OnLeave")
+end
+
 local function mutedNames(character)
   local names = {}
   for _, recipe in pairs(character.recipes) do
@@ -190,7 +216,12 @@ local function testCraftersUntracked()
   Assert.same(look(9004), { false, 1, "voicechat-icon-speaker", false }, "bind not read yet: tracked")
 
   local tooltip, mute = ns.Tooltip.Get(), rowOf(9001).mute
-  local why = { "Not tracked", "Items with no binding (materials, potions, gems) do not alert", " ", "Turn on Track unbound items below" }
+  local why = {
+    "Not tracked",
+    "Items with no binding (materials, potions, gems) do not alert",
+    " ",
+    "Turn on Track unbound items in Craft Alert's Crafters settings",
+  }
   Widgets.fire(mute, "OnEnter")
   Assert.same(tooltip.lines, why)
   Assert.same(tooltip.colors, { { 1, 0.82, 0 }, { 1, 1, 1 }, {}, { 0.1, 1, 0.1 } })
@@ -243,6 +274,7 @@ end
 
 return function()
   testCraftersMuteTooltip()
+  testMuteKeepsOwnState()
   testCraftersMuteAll()
   testCraftersOnlyExpansion()
   testCraftersUntracked()
