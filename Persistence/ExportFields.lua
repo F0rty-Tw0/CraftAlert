@@ -193,10 +193,14 @@ function ExportFields.ReadTextList(field, max, pause)
   return list
 end
 
--- → the fields of a record, or nil when it has a field count other than `count`.
+-- → the fields of a record, or nil when it has a field count other than `count`. The split stops
+-- past `count`: 32 KB of commas made 32,000 fields (9.7 ms in one slice).
 local function fieldsOf(record, count)
   local fields = {}
   for field in gmatch(record .. ",", "([^,]*),") do
+    if #fields == count then
+      return nil
+    end
     fields[#fields + 1] = field
   end
   return #fields == count and fields or nil

@@ -182,13 +182,34 @@ local function testProfessionCap()
   for i = 1, Fields.MAX.professions + 1 do
     professions[100 + i] = { name = "P" .. i }
   end
-  local db = { characters = { ["Smith-Realm"] = { source = "local", realms = {}, professions = professions, recipes = {} } } }
+  -- A recipe of the profession left out is left out too.
+  local recipes = { [9001] = { name = "Left out", prof = 100 + Fields.MAX.professions + 1 } }
+  local db = { characters = { ["Smith-Realm"] = { source = "local", realms = {}, professions = professions, recipes = recipes } } }
   local data = assert(ExportString.Decode(ExportString.Encode(db, "retail"), "retail"))
   local written = 0
   for _ in pairs(data.characters[1].professions) do
     written = written + 1
   end
   Assert.equal(written, Fields.MAX.professions)
+  Assert.same(ExportString.Apply({ characters = {} }, data), { characters = 1, recipes = 0, skipped = 0 })
+end
+
+-- A record is split into fields only up to one more than it holds: 32 KB of commas once made
+-- 32,000 fields (9.7 ms in one slice) before the count was checked.
+local function testFieldSplitStopsEarly()
+  local gmatch, steps = string.gmatch, 0
+  rawset(string, "gmatch", function(...)
+    local next = gmatch(...)
+    return function()
+      steps = steps + 1
+      return next()
+    end
+  end)
+  local _, _, Fields = load()
+  rawset(string, "gmatch", gmatch)
+  local state = Fields.NewState("retail", function() end)
+  Assert.equal(Fields.ParseRecord(state, "c," .. string.rep(",", 32000)), "character")
+  Assert.truthy(steps <= 6, "split steps " .. steps)
 end
 
 -- A text field holds at most MAX.text bytes, each escaped in 3: a longer field is refused before
@@ -448,6 +469,7 @@ return function()
   testClassicNameKeys()
   testKeyOrder()
   testProfessionCap()
+  testFieldSplitStopsEarly()
   testLongFieldRefusedUnscanned()
   testReimportKeepsChoices()
   testLocalCharacterSkipped()
