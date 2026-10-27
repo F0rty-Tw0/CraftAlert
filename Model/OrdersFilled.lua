@@ -7,6 +7,7 @@ local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Ledger = ns.Ledger or require("CraftAlert.Model.Ledger")
+local SavedState = ns.SavedState or require("CraftAlert.Persistence.SavedState")
 
 -- Spec §8, Retail only (Bootstrap installs it there): a crafting order filled for a customer the
 -- player greeted in the last 24 hours (`db.recentGreeted`, §7.2) counts one "filled". The event's
@@ -19,7 +20,7 @@ local find = string.find
 local pairs = pairs
 
 local EVENT = "CRAFTINGORDERS_DISPLAY_CRAFTER_FULFILLED_MSG"
-local GREETED_SECONDS = 24 * 60 * 60
+local GREETED_SECONDS = SavedState.RECENT_GREETED_SECONDS
 
 ---@type table
 local db = nil
