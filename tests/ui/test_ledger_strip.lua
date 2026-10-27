@@ -49,6 +49,9 @@ local function testLayout()
   local padding = ns.Theme.LAYOUT.PADDING
   Assert.same(strip.text.points, { { "LEFT", strip, "LEFT", padding, 0 }, { "RIGHT", strip, "RIGHT", -padding, 0 } })
   Assert.equal(strip.text.wordWrap, false)
+  -- WhisperMessenger's panel ends the text before its "Settings" link; the left side stays.
+  ns.LedgerStrip.SetRightInset(strip, 88)
+  Assert.same(strip.text.points, { { "LEFT", strip, "LEFT", padding, 0 }, { "RIGHT", strip, "RIGHT", -88, 0 } })
   -- (496 - 20 - 2 * 4) / 48 → 9 rows, not the 10 the whole height holds.
   local leads = {}
   for id = 12, 1, -1 do

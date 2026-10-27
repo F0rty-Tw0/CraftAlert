@@ -12,6 +12,8 @@ local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 -- between the list and the settings pane; the gear turns into a back arrow while the pane shows.
 local SettingsGear = {}
 
+local LABEL_GAP = 4
+
 -- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua): gold title, a
 -- blank line, one green instruction line naming what a click does now.
 local function showTooltip(gear)
@@ -42,6 +44,47 @@ function SettingsGear.Build(parent, onClick)
   gear:SetScript("OnLeave", Tooltip.HideIfOwned)
 
   return gear
+end
+
+-- The gear with a gold "Settings" label on its right, for WhisperMessenger's ledger line: one
+-- Button under `parent`, sized and painted but not placed; a click runs onClick(). The client
+-- stretches a state texture over the whole button on assignment, so the gear and its highlight are
+-- anchored after it: the highlight lights the gear, never the label. Never in settings mode (the
+-- line hides with the list), so no back arrow.
+function SettingsGear.BuildLabeled(parent, onClick)
+  local size, art = Theme.LAYOUT.GEAR_SIZE, Theme.ART
+  local link = _G["CreateFrame"]("Button", nil, parent)
+  link.normal = link:CreateTexture(nil, "ARTWORK")
+  FrameKit.Art(link.normal, art.GEAR_ATLAS, art.GEAR_FILE)
+  link:SetNormalTexture(link.normal)
+  link.highlight = link:CreateTexture(nil, "HIGHLIGHT")
+  FrameKit.Art(link.highlight, art.GEAR_ATLAS, art.GEAR_FILE, "ADD")
+  link:SetHighlightTexture(link.highlight)
+  for _, texture in ipairs({ link.normal, link.highlight }) do
+    texture:ClearAllPoints()
+    texture:SetSize(size, size)
+    texture:SetPoint("LEFT", link, "LEFT", 0, 0)
+  end
+  link.label = FrameKit.Text(link, Theme.FONTS.body, Theme.COLORS.gold)
+  link.label:SetText(Localization.Text("Settings"))
+  link.label:SetPoint("LEFT", link.normal, "RIGHT", LABEL_GAP, 0)
+  -- English only: the label never changes, so it is measured once.
+  link:SetSize(size + LABEL_GAP + link.label:GetStringWidth(), size)
+  link:SetScript("OnClick", function()
+    onClick()
+  end)
+  link:SetScript("OnEnter", function(self)
+    local white = Theme.COLORS.white
+    self.label:SetTextColor(white[1], white[2], white[3], white[4])
+    showTooltip(self)
+  end)
+  link:SetScript("OnLeave", function(self)
+    local gold = Theme.COLORS.gold
+    self.label:SetTextColor(gold[1], gold[2], gold[3], gold[4])
+    Tooltip.HideIfOwned(self)
+  end)
+
+  return link
 end
 
 -- The gear on `frame` (a ButtonFrameTemplate frame); a click runs onClick().

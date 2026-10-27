@@ -152,5 +152,13 @@ function LedgerStrip.New(parent, host)
   return strip
 end
 
+-- Ends the strip text `inset` px before the strip's right, clear of a control placed there.
+function LedgerStrip.SetRightInset(strip, inset)
+  local layout = Theme.LAYOUT
+  strip.text:ClearAllPoints()
+  strip.text:SetPoint("LEFT", strip, "LEFT", layout.PADDING, 0)
+  strip.text:SetPoint("RIGHT", strip, "RIGHT", -inset, 0)
+end
+
 ns.LedgerStrip = LedgerStrip
 return LedgerStrip
