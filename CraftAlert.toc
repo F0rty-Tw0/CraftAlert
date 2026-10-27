@@ -109,6 +109,7 @@ UI/Settings/RecipeRarity.lua
 UI/Settings/RecipeMute.lua
 UI/Settings/RecipeList.lua
 UI/Settings/PageCrafters.lua
+UI/Settings/PageLinked.lua
 UI/Settings/PageTest.lua
 UI/BridgePanel.lua
 UI/BridgeInfo.lua

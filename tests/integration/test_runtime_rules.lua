@@ -405,7 +405,7 @@ local function testAddonObeysTheRules()
 
     -- The settings pages under the traps: every page, and settings that rebuild, re-evaluate,
     -- re-arm and repaint (the pane in the leads window adds no UISpecialFrames entry).
-    for _, title in ipairs({ "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" }) do
+    for _, title in ipairs({ "General", "Alerts", "Greetings", "Keywords", "Crafters", "Linked accounts", "Test" }) do
       SettingsFixture.open(ns, title)
     end
     SettingsFixture.open(ns, "General")

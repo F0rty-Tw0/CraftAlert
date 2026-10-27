@@ -18,7 +18,7 @@ local ScrollView = ns.ScrollView or require("CraftAlert.UI.ScrollView")
 local SettingsPane = {}
 
 -- Module names under CraftAlert.UI.Settings, in nav order.
-local BUILT_IN = { "PageGeneral", "PageAlerts", "PageGreetings", "PageKeywords", "PageCrafters", "PageTest" }
+local BUILT_IN = { "PageGeneral", "PageAlerts", "PageGreetings", "PageKeywords", "PageCrafters", "PageLinked", "PageTest" }
 
 local added = {} -- pages from AddPage, after the built-ins
 local pages = {} -- every page in nav order, filled by the first Attach
