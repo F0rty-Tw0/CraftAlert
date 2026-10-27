@@ -202,7 +202,56 @@ local function testResetStatsZeroesCounters()
   Assert.same(Slicer.stats, { ticks = 0, steps = 0, longestTickMs = 0 })
 end
 
+-- Run: the work yields at pause once BUDGET_MS has passed in a step, onDone gets its results
+-- (nils kept), an error carries its message to the handler, a cancel runs onCancel only.
+local function testRunSlicesCoroutineWork()
+  local Slicer = newSlicer()
+  local reported = captureErrors()
+  Wow.stub("debugprofilestop", function()
+    Wow.clock.profile = Wow.clock.profile + 0.25
+    return Wow.clock.profile
+  end)
+  local done = nil
+  Slicer.Run("work", function(pause)
+    local sum = 0
+    for i = 1, 200 do
+      sum = sum + i
+      pause(1)
+    end
+    return sum, nil, "end"
+  end, function(...)
+    done = { n = select("#", ...), ... }
+  end)
+  Slicer.Drain()
+  Assert.same(done, { n = 3, 20100, nil, "end" })
+  Assert.truthy(Slicer.stats.steps > 1, "the work yielded, steps " .. Slicer.stats.steps)
+
+  Slicer.Run("bad", function()
+    error("broken work", 0)
+  end, function()
+    error("onDone must not run")
+  end)
+  Slicer.Drain()
+  Assert.equal(#reported, 1)
+  Assert.truthy(string.find(reported[1], "broken work", 1, true))
+
+  local cancelled = 0
+  Slicer.Run("cut", function(pause)
+    for _ = 1, 1000 do
+      pause(8)
+    end
+  end, function()
+    error("onDone must not run")
+  end, function()
+    cancelled = cancelled + 1
+  end)
+  Slicer.Cancel("cut")
+  Slicer.Drain()
+  Assert.equal(cancelled, 1)
+end
+
 return function()
+  testRunSlicesCoroutineWork()
   testBudgetStopsAfterTwoOneMsSteps()
   testSlowStepIsPaidBackByIdleTicks()
   testJobsAlternate()
