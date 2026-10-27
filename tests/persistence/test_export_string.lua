@@ -161,11 +161,14 @@ local function testKeyOrder()
   local professions = { [BS] = { name = "BS" }, bs = { name = "BS" } }
   local db = { characters = { ["Smith-Realm"] = { source = "local", realms = {}, professions = professions, recipes = recipes } } }
   local retail, classic = ExportString.Encode(db, "retail"), ExportString.Encode(db, "tbc")
+  local forever = ExportString.Encode(db, "forever")
   rawset(table, "sort", sort)
   Assert.equal(comparators, 0)
-  Assert.truthy(retail:find(",;p,4k,BS;r,5,4k,R5,,,,;r,p,4k,R30,,,,;r,1y,4k,R100,,,,:", 1, true), retail)
+  local numbered = ",;p,4k,BS;r,5,4k,R5,,,,;r,p,4k,R30,,,,;r,1y,4k,R100,,,,:"
+  Assert.truthy(retail:find(numbered, 1, true), retail)
+  Assert.truthy(forever:find(numbered, 1, true), "Forever keys by number, as Retail: " .. forever)
   Assert.truthy(classic:find(",;p,~bs,BS;r,~a,~bs,Ra,,,,;r,~b,~bs,Rb,,,,:", 1, true), classic)
-  for _, case in ipairs({ { retail, "retail", 3 }, { classic, "tbc", 2 } }) do
+  for _, case in ipairs({ { retail, "retail", 3 }, { forever, "forever", 3 }, { classic, "tbc", 2 } }) do
     local counts = ExportString.Apply({ characters = {} }, assert(ExportString.Decode(case[1], case[2])))
     Assert.same(counts, { characters = 1, recipes = case[3], skipped = 0 })
   end
