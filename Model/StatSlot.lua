@@ -154,24 +154,20 @@ function StatSlot.Finish(index, pause)
   ranks = {}
 end
 
--- A stat key for a token, also for "8stam"-style tokens (digits, then the stat word).
-local function statOf(token)
-  local key = statWords[token]
-  local first = byte(token, 1)
-  if key == nil and first >= DIGIT_0 and first <= DIGIT_9 then
-    -- A byte walk, not find(token, "^%d+"): the pattern matcher costs more per token (§4.4).
-    local after = 2
-    local b = byte(token, after)
-    while b and b >= DIGIT_0 and b <= DIGIT_9 do
-      after = after + 1
-      b = byte(token, after)
-    end
-    if b == nil then
-      return nil -- all digits: no stat word left
-    end
-    key = statWords[sub(token, after)]
+-- The stat key of a token that starts with a digit: an "8stam"-style token (digits, then the
+-- stat word), else nil.
+local function digitStatOf(token)
+  -- A byte walk, not find(token, "^%d+"): the pattern matcher costs more per token (§4.4).
+  local after = 2
+  local b = byte(token, after)
+  while b and b >= DIGIT_0 and b <= DIGIT_9 do
+    after = after + 1
+    b = byte(token, after)
   end
-  return key
+  if b == nil then
+    return nil -- all digits: no stat word left
+  end
+  return statWords[sub(token, after)]
 end
 
 -- Per-line buffers of Find: the line's distinct stat keys in line order, each with the first
@@ -183,7 +179,16 @@ local stamp = 0
 local function collectStatKeys(tokens, count)
   lineKeyCount = 0
   for j = 1, count do
-    local key = statOf(tokens[j])
+    -- A stat key for the token, also for "8stam"-style tokens. Inline, not a call per token:
+    -- most tokens are no stat word and start with a letter.
+    local token = tokens[j]
+    local key = statWords[token]
+    if key == nil then
+      local first = byte(token, 1)
+      if first >= DIGIT_0 and first <= DIGIT_9 then
+        key = digitStatOf(token)
+      end
+    end
     if key then
       local known = false
       for k = 1, lineKeyCount do
@@ -191,7 +196,7 @@ local function collectStatKeys(tokens, count)
       end
       if not known then
         lineKeyCount = lineKeyCount + 1
-        lineKeys[lineKeyCount], lineKeyTokens[lineKeyCount] = key, tokens[j]
+        lineKeys[lineKeyCount], lineKeyTokens[lineKeyCount] = key, token
       end
     end
   end

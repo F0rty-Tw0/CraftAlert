@@ -16,7 +16,6 @@ local Tokenizer = {}
 
 local find = string.find
 local strLower = string.lower
-local sub = string.sub
 local byte = string.byte
 local concat = table.concat
 local tonumber = tonumber
@@ -24,7 +23,10 @@ local ipairs = ipairs
 local type = type
 
 -- Word characters: ASCII letters and digits, the apostrophe, and every byte >= 128 (UTF-8).
-local WORD = "[%w'\128-\255]+"
+-- Byte ranges, not %w: a class calls the C library's isalnum per byte, which made this search
+-- most of Tokenize's cost (§4.4). Lowercase first, since Tokenize reads lowercase text.
+local WORD = "[a-z0-9'\128-\255A-Z]+"
+local WORD_CAPTURE = "(" .. WORD .. ")" -- find hands back the token: no sub call per token
 local SPACES = "^%s*" -- anchored, so BreakBefore reads only the gap between two tokens
 local HYPHEN_SPACES = "^%-?%s*" -- always matches: one optional hyphen, then spaces
 local ITEM_LINK = "^|hitem:(%d+)"
@@ -156,6 +158,7 @@ local function link(s, p)
 end
 
 -- Position after the escape sequence starting with the `|` at p; code is the byte after it.
+-- Tokenize skips the two-byte escapes itself.
 local function escape(s, p, code)
   if code == BYTE_H then
     return link(s, p)
@@ -172,7 +175,7 @@ local function escape(s, p, code)
     local close = find(s, closer, p + 2, true)
     return close and close + 2 or #s + 1
   end
-  return TWO_BYTE[code] and p + 2 or p + 1
+  return p + 1
 end
 
 -- Clears what the previous line left past this line's counts, then publishes the counts.
@@ -202,26 +205,30 @@ function Tokenizer.Tokenize(lower)
   -- The next word match is kept across escapes and searched again only when an escape ran
   -- past its start and no escape starts right at i: a search per escape would rescan the rest
   -- of the line each time (O(n^2) on "||||..."), and escapes back to back ("|r|r...") need none.
-  local first, last = find(lower, WORD, 1)
+  local first, last, word = find(lower, WORD_CAPTURE, 1)
   while true do
     if first and first < i and bar ~= i then
-      first, last = find(lower, WORD, i)
+      first, last, word = find(lower, WORD_CAPTURE, i)
     end
     if bar == i or bar < (first or afterEnd) then
       local code = byte(lower, bar + 1)
       if code == BYTE_BAR then -- a run of "||" (literal pipes): one search
         local run = (find(lower, "[^|]", bar) or afterEnd) - bar
         i = bar + run - run % 2 -- an odd last "|" starts the next escape
+      elseif TWO_BYTE[code] then -- inline: a line can hold hundreds of "|r"
+        i = bar + 2
       else
         i = escape(lower, bar, code)
       end
       bar = find(lower, "|", i, true) or afterEnd
     elseif first and (count < MAX_TOKENS or linkEnd) then -- link text leaves the buffer at its |h
-      count = count + 1
-      tokens[count] = sub(lower, first, last)
-      starts[count] = first
-      i = last + 1
-      first, last = find(lower, WORD, i)
+      -- The words before the next escape, without the escape checks above.
+      repeat
+        count = count + 1
+        tokens[count], starts[count] = word, first
+        i = last + 1
+        first, last, word = find(lower, WORD_CAPTURE, i)
+      until not first or first > bar or (count >= MAX_TOKENS and not linkEnd)
     elseif first and bar < afterEnd then
       i = bar -- full: skip the words up to the next escape, whose links still count
     else
