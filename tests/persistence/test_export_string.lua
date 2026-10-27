@@ -140,6 +140,26 @@ local function testClassicNameKeys()
   })
 end
 
+-- Records go out numbers ascending, then string keys ascending, sorted without a Lua comparator
+-- (one took 20 ms in one slice for 5000 keys).
+local function testKeyOrder()
+  local sort, comparators = table.sort, 0
+  rawset(table, "sort", function(list, comparator)
+    comparators = comparators + (comparator and 1 or 0)
+    return sort(list, comparator)
+  end)
+  local ExportString = load()
+  local recipes = {}
+  for _, key in ipairs({ 100, "b", 5, "a", 30 }) do
+    recipes[key] = { name = "R" .. key, prof = BS }
+  end
+  local db = { characters = { ["Smith-Realm"] = { source = "local", realms = {}, professions = { [BS] = { name = "BS" } }, recipes = recipes } } }
+  local text = ExportString.Encode(db, "retail")
+  rawset(table, "sort", sort)
+  Assert.equal(comparators, 0)
+  Assert.truthy(text:find("r,5,4k,R5,,,,;r,p,4k,R30,,,,;r,1y,4k,R100,,,,;r,~a,4k,Ra,,,,;r,~b,4k,Rb,,,,", 1, true), text)
+end
+
 -- A re-import replaces recipes and realms, keeps A's enabled and main crafter choices, refreshes
 -- importedAt, keeps a known bind for an unchanged item, and queues the rest for the bind lookup.
 local function testReimportKeepsChoices()
@@ -281,6 +301,7 @@ end
 return function()
   testRoundTrip()
   testClassicNameKeys()
+  testKeyOrder()
   testReimportKeepsChoices()
   testLocalCharacterSkipped()
   testRejected()

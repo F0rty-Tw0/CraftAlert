@@ -69,22 +69,20 @@ local function checksum(text, pause)
 end
 
 -- Numbers first, ascending, then strings: a Retail and a Classic key never meet, but sort must
--- not raise if they do.
-local function byKey(a, b)
-  local ta, tb = type(a), type(b)
-  if ta ~= tb then
-    return ta == "number"
-  end
-  return a < b
-end
-
+-- not raise if they do. Each kind sorts with the default comparator, which runs in C (a Lua
+-- comparator took 20 ms in one slice for a character's 5000 recipes).
 local function sortedKeys(map)
-  local keys = {}
+  local numbers, strings = {}, {}
   for key in pairs(map) do
+    local keys = type(key) == "number" and numbers or strings
     keys[#keys + 1] = key
   end
-  sort(keys, byKey)
-  return keys
+  sort(numbers)
+  sort(strings)
+  for _, key in ipairs(strings) do
+    numbers[#numbers + 1] = key
+  end
+  return numbers
 end
 
 -- The character record and its profession records, or nil when the key cannot be written.
