@@ -61,8 +61,9 @@ local function slotProfessions(getProfessions)
 end
 
 -- The skill-line list (Era, TBC, Wrath) as slotProfessions answers, every visible non-header
--- line counting as a profession slot, plus hidden = true when a collapsed header hides lines;
--- nil when the API is missing.
+-- line counting as a profession slot, plus hidden = true when a collapsed header may hide a
+-- crafting profession; nil when the API is missing. Every crafting profession sits under the one
+-- Professions header, so a visible crafting line shows nothing of them is hidden.
 local function skillLineProfessions()
   local getCount = _G["GetNumSkillLines"]
   local getInfo = _G["GetSkillLineInfo"]
@@ -84,7 +85,7 @@ local function skillLineProfessions()
     end
   end
 
-  return list, lines, lines, hidden
+  return list, lines, lines, hidden and #list == 0
 end
 
 local function currentProfessions()

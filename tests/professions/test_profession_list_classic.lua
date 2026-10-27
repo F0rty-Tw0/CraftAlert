@@ -99,19 +99,27 @@ local function collapsed(name)
   return { name = name, header = true, collapsed = true }
 end
 
--- A folded header that hides no crafting profession ("Weapon Skills") does not stop the read.
+-- A folded header that hides no crafting profession ("Weapon Skills") does not stop the read, and
+-- a visible crafting line shows the Professions header is open: an unlearned profession drops.
 local function testCollapsedUnrelated(flavor)
   local ProfessionList, Defaults = load(flavor)
   local db = Defaults.Db()
+  db.characters[CHAR] = {
+    source = "local",
+    enabled = true,
+    realms = {},
+    professions = { tailoring = { name = "Tailoring", primary = false, read = true } },
+    recipes = { ["sim cloth belt"] = { name = "Sim Cloth Belt", prof = "tailoring" } },
+  }
   ProfessionsClassic.install({ skillLines = { header("Professions"), line("Blacksmithing"), collapsed("Weapon Skills") } })
   Assert.equal(ProfessionList.Refresh(db, CHAR), true, flavor)
   Assert.same(stored(db).professions, { blacksmithing = { name = "Blacksmithing", primary = false, read = false } }, flavor)
+  Assert.equal(stored(db).recipes["sim cloth belt"], nil, flavor .. ": unlearned profession's recipes drop")
   Assert.same(ProfessionList.Order(), { "blacksmithing" }, flavor)
 end
 
--- A folded header may hide a stored profession: the visible ones are written, every other stored
--- one is kept unchanged with its recipes and follows them in Order, sorted; a Retail skill-line
--- ID key is kept but stays out of Order.
+-- A folded Professions header may hide every stored profession: each one is kept unchanged with
+-- its recipes, in Order sorted; a Retail skill-line ID key is kept but stays out of Order.
 local function testCollapsedKeeps(flavor)
   local ProfessionList, Defaults = load(flavor)
   local db = Defaults.Db()
@@ -130,16 +138,15 @@ local function testCollapsedKeeps(flavor)
       ["lesser magic wand"] = { name = "Lesser Magic Wand", prof = "enchanting", muted = true },
     },
   }
-  ProfessionsClassic.install({ skillLines = { header("Professions"), line("Tailoring"), line("Blacksmithing"), collapsed("Secondary Skills") } })
+  ProfessionsClassic.install({ skillLines = { collapsed("Professions"), header("Secondary Skills"), line("Cooking") } })
   Assert.equal(ProfessionList.Refresh(db, CHAR), true, flavor)
   local professions = stored(db).professions
   Assert.equal(professions.enchanting, enchanting, flavor .. ": kept unchanged")
   Assert.truthy(professions[ENCH], flavor)
-  Assert.same(professions.tailoring, { name = "Tailoring", primary = false, read = false }, flavor)
   Assert.same(professions.blacksmithing, { name = "Blacksmithing", primary = false, read = true }, flavor)
   Assert.same(stored(db).recipes["lesser magic wand"], { name = "Lesser Magic Wand", prof = "enchanting", muted = true }, flavor)
   Assert.truthy(stored(db).recipes["sim plate belt"], flavor)
-  Assert.same(ProfessionList.Order(), { "tailoring", "blacksmithing", "enchanting" }, flavor)
+  Assert.same(ProfessionList.Order(), { "blacksmithing", "enchanting" }, flavor)
 end
 
 -- Before the first usable read the stored name keys seed the order, sorted; the skill-line IDs
