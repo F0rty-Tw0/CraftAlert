@@ -61,7 +61,7 @@ local function testSlicedEqualsSync()
   Assert.equal(type(ns.Index.lastBuildMs), "number")
   Assert.equal(Synthetic.difference(ns.Index.Current(), Synthetic.build(ns, db)), nil, "sliced index equals Index.Build's")
   local shared = Synthetic.sharedNames(ns.Index.Current())
-  Assert.truthy(shared > 0, "some names have two crafters of one profession, shared " .. shared)
+  Assert.equal(shared, 184, "names with two crafters of one profession")
 end
 
 -- A request during a build restarts it: the finished index holds the db as of the second

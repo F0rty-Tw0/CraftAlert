@@ -1,8 +1,9 @@
 local Wow = require("tests.helpers.wow")
 
 -- A synthetic 10-character / 2,000-recipe db for the §4.4 budgets (plan A4): 8 professions,
--- 200 recipes each; characters 9 and 10 know the recipes of characters 1 and 2 (alts of one
--- profession), so 400 names have two crafters of one profession. Enchanting gets
+-- 200 recipes each; characters 9 and 10 share their first SHARED recipes with characters 1 and 2
+-- (alts of one profession), so 184 names have two crafters of one profession, as many as the
+-- old 11-slot fixture had by chance, and the rest stay distinct. Enchanting gets
 -- "Enchant <slot> - <tier> <stat>" names, the rest armor items, half with a made-up word unique
 -- to the recipe, half with shared adjectives. Off-hand items (held-in-off-hand armor, off-hand
 -- daggers) put "offhand" in the word index; { offHand = false } leaves them out, like a player
@@ -39,6 +40,7 @@ local SLOTS = {
   { "INVTYPE_WEAPONOFFHAND", "Parrying Dagger", CLASS_WEAPON, SUBCLASS_DAGGER },
 }
 local OFF_HAND = 2
+local SHARED = 92 -- recipes each of characters 9 and 10 shares with character c - 8
 local ADJECTIVES = { "Green", "Blue", "Ornate", "Imperial", "Dark", "Bright", "Shadow", "Storm", "Frost", "Flame", "Earthen", "Radiant" }
 local MATERIALS = { "Iron", "Steel", "Mithril", "Thorium", "Copper", "Bronze", "Silk", "Linen", "Rugged", "Thick", "Heavy", "Felsteel" }
 local ENCHANT_SLOTS = { "Chest", "Bracer", "Boots", "Gloves", "Cloak", "Weapon", "Shield", "2H Weapon" }
@@ -88,11 +90,13 @@ function Synthetic.db(ns, opts)
   local db, items = ns.Defaults.Db(), {}
   local slotCount = (opts and opts.offHand == false) and #SLOTS - OFF_HAND or #SLOTS
   for c = 1, 10 do
-    local base = (c - 1) % #PROFESSIONS -- character c knows the recipes of character base + 1
-    local prof = PROFESSIONS[base + 1]
+    local prof = PROFESSIONS[(c - 1) % #PROFESSIONS + 1]
     local recipes = {}
     for k = 1, 200 do
-      local n = base * 200 + k
+      local n = (c - 1) * 200 + k
+      if c > #PROFESSIONS and k <= SHARED then
+        n = n - #PROFESSIONS * 200 -- the same recipe as character c - 8, of the same profession
+      end
       recipes[200000 + n * 131] = recipeAt(n, prof, items, slotCount) -- sparse, like real recipe spell IDs
     end
     db.characters["Char" .. c .. "-Realm"] = {
