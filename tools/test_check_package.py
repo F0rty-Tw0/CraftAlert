@@ -90,12 +90,19 @@ class CheckPackageTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("extra: CraftAlert/tests/test_matcher.lua", stderr)
 
-    def test_backslash_paths_are_normalised(self):
-        zip_path = self.build_zip([name.replace("/", "\\") for name in COMPLETE])
+    def test_backslash_paths_fail(self):
+        backslashed = [name.replace("/", "\\") for name in COMPLETE]
+        zip_path = self.build_zip(backslashed)
 
-        # Python's zip reader fixes "\" itself only on Windows; CI (Linux) sees them raw.
         with open(zip_path, "rb") as handle:
             self.assertIn(b"CraftAlert\\Core\\Constants.lua", handle.read())
+        self.assertEqual(check_package.check_package(zip_path, self.toc), (sorted(COMPLETE), sorted(backslashed)))
+
+    def test_toc_backslash_and_bom_are_read(self):
+        with open(self.toc, "w", encoding="utf-8-sig") as handle:
+            handle.write(TOC.replace("Core/Constants.lua", "Core\\Constants.lua"))
+        zip_path = self.build_zip(COMPLETE)
+
         self.assertEqual(check_package.check_package(zip_path, self.toc), ([], []))
 
     def test_init_lua_stub_is_extra(self):

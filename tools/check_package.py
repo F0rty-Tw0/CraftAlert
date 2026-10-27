@@ -21,7 +21,7 @@ DEFAULT_TOC = os.path.join(REPO_ROOT, ADDON + ".toc")
 
 def toc_entries(toc_path):
     """File entries of a TOC (blank lines, comments and ## tags skipped), forward slashes."""
-    with open(toc_path, encoding="utf-8") as handle:
+    with open(toc_path, encoding="utf-8-sig") as handle:
         lines = [line.strip() for line in handle]
     return [line.replace("\\", "/") for line in lines if line and not line.startswith("#")]
 
@@ -37,9 +37,11 @@ def expected_entries(toc_path):
 
 
 def zip_entries(zip_path):
-    """File entries of the zip with forward slashes; directory entries skipped."""
+    """File entries of the zip as stored; directory entries skipped. A "\\" name stays as it is, so
+    it fails as extra: Mac and Linux unzip it as one file named with backslashes. orig_filename,
+    because namelist() turns "\\" into "/" on Windows."""
     with zipfile.ZipFile(zip_path) as archive:
-        names = [name.replace("\\", "/") for name in archive.namelist()]
+        names = [info.orig_filename for info in archive.infolist()]
     return {name for name in names if not name.endswith("/")}
 
 
