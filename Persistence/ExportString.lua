@@ -31,7 +31,6 @@ local ExportString = {}
 local concat = table.concat
 local find = string.find
 local gmatch = string.gmatch
-local gsub = string.gsub
 local ipairs = ipairs
 local match = string.match
 local pairs = pairs
@@ -41,6 +40,7 @@ local VERSION = "1"
 local CHECKSUM_WIDTH = 7
 local ADLER_MOD = 65521
 local CHUNK = 4096 -- checksum bytes between pause calls
+local TRIM_SLACK = 64 -- spaces around a pasted string that may push it past MAX.length
 
 local Fields = ExportFields
 local MAX = Fields.MAX
@@ -160,13 +160,18 @@ end
 
 -- → { flavor, characters = { { key, class, realms, professions = { [key] = name }, recipes =
 -- { [key] = { name, prof, item, ranks, line, muted } } }... } }, or nil and one error message.
--- Leading and trailing spaces (a paste's newline) are ignored.
+-- Leading and trailing spaces (a paste's newline) are ignored, up to TRIM_SLACK bytes past
+-- MAX.length. The trim is linear: an unanchored "%s+$" is quadratic on a run of spaces.
 function ExportString.Decode(text, flavorKey, pause)
   pause = pause or noPause
   if type(text) ~= "string" then
     return nil, Localization.Text("Not a Craft Alert export string.")
   end
-  text = gsub(gsub(text, "^%s+", ""), "%s+$", "")
+  if #text > MAX.length + TRIM_SLACK then
+    return nil, Localization.Text("The string is too long.")
+  end
+  local first = find(text, "%S")
+  text = first and match(text, "^.*%S", first) or ""
   if #text > MAX.length then
     return nil, Localization.Text("The string is too long.")
   end

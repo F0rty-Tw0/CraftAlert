@@ -226,6 +226,20 @@ local function testRejected()
   Assert.same(calls.rebuilds, { "import" })
 end
 
+-- Damaged pastes are refused in one cheap pass: the length before the trim (spaces count past
+-- MAX.length + 64), and a trim that stays linear on a long run of spaces (once 8.6 s for 16,000).
+local function testDamagedIsCheap()
+  local ExportString, _, Fields = load()
+  local good = ExportString.Encode(sourceDb(), "retail")
+  local _, err = ExportString.Decode(string.rep(" ", Fields.MAX.length) .. good, "retail")
+  Assert.truthy(err and err:find("too long", 1, true), tostring(err))
+  local started = os.clock()
+  _, err = ExportString.Decode("CA1:retail:" .. string.rep(" ", 16000) .. "x", "retail")
+  local seconds = os.clock() - started
+  Assert.truthy(err:find("incomplete", 1, true), err)
+  Assert.truthy(seconds < 0.5, "trim took " .. seconds .. " s")
+end
+
 -- The user's Retail account is 6 characters and 2,983 recipes: 3,000 synthetic recipes export
 -- under MAX.length, and the sliced export and import take many short steps.
 local function testLargeExportIsSliced()
@@ -270,6 +284,7 @@ return function()
   testReimportKeepsChoices()
   testLocalCharacterSkipped()
   testRejected()
+  testDamagedIsCheap()
   testLargeExportIsSliced()
   Wow.reset()
 end
