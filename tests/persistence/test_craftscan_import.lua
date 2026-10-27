@@ -85,7 +85,7 @@ local function testFreshImport()
   local nosource = db.characters["Nosource-Kel'Thuzad"]
   Assert.same(nosource.realms, { "Kel'Thuzad" })
   Assert.same(nosource.recipes[9003], { name = "Sim Iron Reagent", prof = BS, item = 190003, muted = true }, "scanning switched off")
-  Assert.equal(nosource.professions[BS].name, "", "no recipe named the profession")
+  Assert.equal(nosource.professions[BS].name, "Blacksmithing", "no recipe named it: the English name")
   local old = db.characters["Old-Legacyrealm"]
   Assert.same(old.realms, { "Legacyrealm" })
   Assert.equal(old.recipes[9003].muted, nil, "legacy enabled: listening")
@@ -176,6 +176,27 @@ local function testProfessionNamedByAnyExpansion()
   end
 end
 
+-- A profession with only unlearned recipes in every expansion takes the client's name for its
+-- skill line, else the English one: an empty name made the greeting "I have , what do you need?".
+local function testUnnamedProfessionTakesClientName()
+  local CraftScanImport, ns = load()
+  local professions = { [2872] = { parentProfID = BS, recipes = { [9001] = { scan_state = 4 } } }, [2437] = { parentProfID = BS, recipes = {} } }
+  local src = { realms = { OwnRealm = { characters = { ["Me-OwnRealm"] = { professions = professions } } } } }
+  local db = ns.Defaults.Db()
+  CraftScanImport.Run(db, src)
+  Assert.equal(db.characters["Me-OwnRealm"].professions[BS].name, "Blacksmithing", "no client call: the English name")
+  _G.C_TradeSkillUI.GetTradeSkillDisplayName = function(skillLineID)
+    return skillLineID == BS and "Schmiedekunst" or ""
+  end
+  db = ns.Defaults.Db()
+  CraftScanImport.Run(db, src)
+  local name = db.characters["Me-OwnRealm"].professions[BS].name
+  Assert.equal(name, "Schmiedekunst")
+  local lead = { kind = "profession", crafter = "Me-OwnRealm", customer = "Buyer-OwnRealm", prof = BS, profName = name }
+  local greeting = Fresh.require("Model.Greeting").Build(lead, db.settings)
+  Assert.equal(greeting, "Hi! I have Schmiedekunst, what do you need?")
+end
+
 -- A legacy profession (before scan_state) with all_enabled listens to every recipe, enabled or not.
 local function testLegacyAllEnabled()
   local CraftScanImport, ns = load()
@@ -243,6 +264,7 @@ return function()
   testExistingDataWins()
   testMalformed()
   testProfessionNamedByAnyExpansion()
+  testUnnamedProfessionTakesClientName()
   testKeysAddedDuringTheWalk()
   testLegacyAllEnabled()
   testBareKeyTakesItsRealm()

@@ -38,9 +38,9 @@ local GREETINGS = {
 local MAX_GREETING = 255
 
 -- The professions Craft Alert listens for; CraftScan also scans Cooking (185).
-local crafting = {} -- skill-line ID -> true
+local crafting = {} -- skill-line ID -> ProfessionWords entry
 for _, entry in ipairs(ProfessionWords.entries) do
-  crafting[entry.skillLineID] = true
+  crafting[entry.skillLineID] = entry
 end
 
 local function noPause() end
@@ -127,6 +127,17 @@ local function stateOf(recipe, profession, parentOff)
   return parentOff or state ~= SCANNING_ON, false
 end
 
+-- The name of a profession no imported recipe named: the client's for its skill line, else the
+-- English one. Never "": a greeting would say "I have , what do you need?".
+local function clientName(prof)
+  local api = _G["C_TradeSkillUI"]
+  local name = type(api) == "table" and type(api.GetTradeSkillDisplayName) == "function" and api.GetTradeSkillDisplayName(prof)
+  if type(name) == "string" and name ~= "" then
+    return name
+  end
+  return (gsub(crafting[prof].englishName, "^%l", string.upper))
+end
+
 -- One CraftScan profession of a character into `character` (Craft Alert shape).
 local function importProfession(ctx, character, parents, profession)
   local prof = profession.parentProfID
@@ -165,13 +176,13 @@ local function importProfession(ctx, character, parents, profession)
     -- Up to three client calls per recipe: the Slicer reads its clock after each one.
     ctx.pause(8)
   end
-  -- One profession comes from several expansions; the first walked may name nothing (all
-  -- unlearned), so a later one fills the empty name.
+  -- One profession comes from several expansions; one with only unlearned recipes names nothing
+  -- and takes the client's name. A stored empty name is filled.
   local stored = character.professions[prof]
-  name = type(name) == "string" and name or nil
+  name = type(name) == "string" and name or clientName(prof)
   if stored == nil then
-    character.professions[prof] = { name = name or "", primary = false, read = true }
-  elseif stored.name == "" and name then
+    character.professions[prof] = { name = name, primary = false, read = true }
+  elseif stored.name == "" then
     stored.name = name
   end
   if parent.primary_crafter == true then
