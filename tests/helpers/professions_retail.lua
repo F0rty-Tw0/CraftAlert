@@ -26,7 +26,8 @@ local function findRecipe(state, id)
   return nil
 end
 
-local function installProfessionList(state)
+-- GetProfessions/GetProfessionInfo from state.slots; Cata and MoP have them too (ProfessionsClassic).
+function ProfessionsRetail.installSlots(state)
   Wow.stub("GetProfessions", function()
     local positions = {}
     for position = 1, MAX_SLOTS do
@@ -97,8 +98,13 @@ end
 
 -- C_Item data: state.bind[itemID] is served once the item is cached. A load request is
 -- recorded in state.requests; it caches the item at once when state.autoCache is set,
--- otherwise the test sets state.cached[itemID] itself (data arrives later in the game).
-local function installItems(state)
+-- otherwise the test sets state.cached[itemID] itself (data arrives later in the game). Classic
+-- has the same calls (ProfessionsClassic).
+function ProfessionsRetail.installItems(state)
+  state.items = state.items or {}
+  state.bind = state.bind or {}
+  state.cached = state.cached or {}
+  state.requests = state.requests or {}
   Wow.stub("C_Item", {
     GetItemInfoInstant = function(itemID)
       local item = state.items[itemID]
@@ -124,13 +130,9 @@ function ProfessionsRetail.install(state)
   state.slots = state.slots or {}
   state.recipes = state.recipes or {}
   state.guards = state.guards or {}
-  state.items = state.items or {}
-  state.bind = state.bind or {}
-  state.cached = state.cached or {}
-  state.requests = state.requests or {}
-  installProfessionList(state)
+  ProfessionsRetail.installSlots(state)
   installTradeSkill(state)
-  installItems(state)
+  ProfessionsRetail.installItems(state)
   return state
 end
 

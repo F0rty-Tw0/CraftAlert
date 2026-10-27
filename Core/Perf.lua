@@ -11,6 +11,7 @@ local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 local ModernReader = ns.ModernReader or require("CraftAlert.Professions.ModernReader")
+local ClassicReader = ns.ClassicReader or require("CraftAlert.Professions.ClassicReader")
 
 -- Spec §4.4 `/ca perf`: times each chat line through a handler that replaces ScanGate's
 -- (ScanGate.SetHandler), so with perf off the hot path holds no timing call at all. The
@@ -53,9 +54,10 @@ end
 
 -- "Login 42.0 ms, index build 92.0 ms in 46 steps, last read 12.5 ms in 4 steps, background 7
 -- steps in 10 ticks, longest 9.3 ms." — shown in every report. A synchronous build is 1 step;
--- no build yet: "index build n/a in 0 steps"; no read yet (or Classic): "last read n/a in 0 steps".
+-- no build yet: "index build n/a in 0 steps"; no read yet: "last read n/a in 0 steps". On Classic
+-- the last read is the newer of the TradeSkill and Craft window reads.
 local function setupText()
-  local read = ModernReader.lastRead
+  local read = ModernReader.lastRead or ClassicReader.newestRead
   local stats = Slicer.stats
   return Localization.Text(
     "Login %s, index build %s in %d steps, last read %s in %d steps, background %d steps in %d ticks, longest %s.",

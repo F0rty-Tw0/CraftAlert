@@ -9,6 +9,7 @@ package.path = ROOT .. "/?.lua;" .. package.path
 local Wow = require("tests.helpers.wow")
 local Toc = require("tests.helpers.toc")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
+local ProfessionsClassic = require("tests.helpers.professions_classic")
 
 local DEFAULT_SENDER = "Customer-OtherRealm"
 local SIM_CLASS_GUID = "Player-0-SIMCLASS"
@@ -40,6 +41,43 @@ local SIM_RECIPES = {
   { id = 9004, name = "Sim Plate Helm", item = 190004, profession = { professionID = 2872, parentProfessionID = 164 } },
   { id = 9005, name = "Sim Iron Bar", item = 190005, learned = true },
 }
+-- Classic flavors read the Classic fixture (name keys); Cata and MoP list professions through
+-- GetProfessions, the older three through the skill-line list.
+local CLASSIC = { era = true, tbc = true, wrath = true, cata = true, mop = true }
+local PROFESSION_SLOT_FLAVORS = { cata = true, mop = true }
+local CRAFT_FRAME_FLAVORS = { era = true, tbc = true }
+local CLASSIC_SKILL_LINES = {
+  { name = "Professions", header = true },
+  { name = "Blacksmithing" },
+  { name = "Enchanting" },
+  { name = "Secondary Skills", header = true },
+  { name = "Cooking" },
+}
+-- The open Classic windows: Blacksmithing (TradeSkill) with the fixture's belt and reagent and a
+-- new Iron Bar, and on Era and TBC Enchanting's Craft window with the fixture's enchant and a new one.
+local function classicWindows(flavor)
+  local tradeSkill = {
+    line = "Blacksmithing",
+    rows = {
+      { name = "Sim Armor", kind = "header" },
+      { name = "Sim Plate Belt", item = 190001 },
+      { name = "Sim Iron Reagent", item = 190003 },
+      { name = "Sim Iron Bar", item = 190005 },
+    },
+  }
+  local craft = {
+    line = "Enchanting",
+    rows = {
+      { name = "Sim Bracer", kind = "header" },
+      { name = "Enchant Bracer - Sim Health", link = "|cffffd000|Henchant:90002|h[Enchant Bracer - Sim Health]|h|r" },
+      { name = "Enchant Boots - Sim Agility", link = "|cffffd000|Henchant:90006|h[Enchant Boots - Sim Agility]|h|r" },
+    },
+  }
+  return tradeSkill, CRAFT_FRAME_FLAVORS[flavor] and craft or nil
+end
+local SIM_SLOTS = { { name = "Blacksmithing", skillLine = 164 }, { name = "Enchanting", skillLine = 333 } }
+-- ERR_LEARN_RECIPE_S as the TBC Anniversary client spells it (Phase 0): the Classic learn signal.
+local LEARN_FORMAT = "You have learned how to create a new item: %s."
 local BIND_DEBOUNCE_SECONDS = 1
 local ON_OFF = { on = true, off = false }
 -- Events with a known payload take exactly that many arguments, so a chat line may follow
@@ -47,7 +85,13 @@ local ON_OFF = { on = true, off = false }
 local EVENT_ARITY = {
   TRADE_SKILL_SHOW = 0,
   TRADE_SKILL_LIST_UPDATE = 0,
+  TRADE_SKILL_UPDATE = 0,
+  TRADE_SKILL_CLOSE = 0,
+  CRAFT_SHOW = 0,
+  CRAFT_UPDATE = 0,
+  CRAFT_CLOSE = 0,
   NEW_RECIPE_LEARNED = 1,
+  CHAT_MSG_SYSTEM = 1, -- text
   GET_ITEM_INFO_RECEIVED = 2,
   CHAT_MSG_WHISPER = 2, -- text, sender
   CHAT_MSG_WHISPER_INFORM = 2, -- text, target
@@ -106,7 +150,7 @@ end
 
 -- Turns argv into { flavor, dbPath, steps } or returns nil, "error: ...".
 local function parse(argv)
-  local plan = { flavor = DEFAULT_FLAVOR, dbPath = ROOT .. "/tools/sim_fixture.lua", steps = {} }
+  local plan = { flavor = DEFAULT_FLAVOR, steps = {} }
   local i = 1
   while i <= #argv do
     local token = argv[i]
@@ -140,6 +184,7 @@ local function parse(argv)
     end
     i = i + 1
   end
+  plan.dbPath = plan.dbPath or (ROOT .. (CLASSIC[plan.flavor] and "/tools/sim_fixture_classic.lua" or "/tools/sim_fixture.lua"))
   return plan
 end
 
@@ -233,8 +278,22 @@ local function newContext(plan, out)
   Wow.stub("GetRealmName", function()
     return OWN_REALM
   end)
+  if CLASSIC[plan.flavor] then
+    local tradeSkill, craft = classicWindows(plan.flavor)
+    ProfessionsClassic.install({
+      skillLines = CLASSIC_SKILL_LINES,
+      tradeSkill = tradeSkill,
+      craft = craft,
+      slots = PROFESSION_SLOT_FLAVORS[plan.flavor] and SIM_SLOTS or nil,
+      items = SIM_ITEMS,
+      bind = SIM_BIND,
+      autoCache = true,
+    })
+    Wow.stub("ERR_LEARN_RECIPE_S", LEARN_FORMAT)
+    return ctx
+  end
   ProfessionsRetail.install({
-    slots = { { name = "Blacksmithing", skillLine = 164 }, { name = "Enchanting", skillLine = 333 } },
+    slots = SIM_SLOTS,
     base = WINDOW_PROFESSION,
     recipes = SIM_RECIPES,
     items = SIM_ITEMS,
@@ -244,21 +303,32 @@ local function newContext(plan, out)
   return ctx
 end
 
--- `read: prof=<key> stored=<n> pendingBind=<n>` after a profession window read.
+-- The readers whose window reads the sim reports: Retail/Forever's, then Classic's two windows.
+local READERS = { "ModernReader", "ClassicReader", "CraftReader" }
+
+-- `read: prof=<key> stored=<n> pendingBind=<n>` after each profession window read.
 local function reportRead(ctx)
-  local read = ctx.ns.ModernReader.lastRead
-  if read then
-    ctx.ns.ModernReader.lastRead = nil
-    ctx.out[#ctx.out + 1] = string.format("read: prof=%s stored=%d pendingBind=%d", tostring(read.prof), read.stored, read.pendingBind)
+  for _, name in ipairs(READERS) do
+    local reader = ctx.ns[name]
+    local read = reader.lastRead
+    if read then
+      reader.lastRead = nil
+      ctx.out[#ctx.out + 1] = string.format("read: prof=%s stored=%d pendingBind=%d", tostring(read.prof), read.stored, read.pendingBind)
+    end
   end
 end
 
--- `learn: stored=<bool>` after a NEW_RECIPE_LEARNED.
+-- `learn: stored=<bool>` after a NEW_RECIPE_LEARNED; `learn: pending=<name>` after a Classic
+-- learn message.
 local function reportLearn(ctx)
-  local stored = ctx.ns.LearnWatcher.lastStored
+  local LearnWatcher = ctx.ns.LearnWatcher
+  local stored, pending = LearnWatcher.lastStored, LearnWatcher.lastPending
+  LearnWatcher.lastStored, LearnWatcher.lastPending = nil, nil
   if stored ~= nil then
-    ctx.ns.LearnWatcher.lastStored = nil
     ctx.out[#ctx.out + 1] = "learn: stored=" .. tostring(stored)
+  end
+  if pending ~= nil then
+    ctx.out[#ctx.out + 1] = "learn: pending=" .. pending
   end
 end
 
@@ -368,12 +438,16 @@ local function watch(ctx)
 end
 
 -- PLAYER_LOGIN, once, before the first chat line, event, command or click: Bootstrap installs
--- everything and builds the index.
+-- everything and builds the index. Classic flavors then print `professions: <keys>`, the
+-- name keys ProfessionList read at login.
 local function start(ctx)
   if not ctx.started then
     ctx.started = true
     ctx.ns.BindLookup.lastStored = nil
     Wow.fireEvent("PLAYER_LOGIN")
+    if CLASSIC[ctx.flavor] then
+      ctx.out[#ctx.out + 1] = "professions: " .. table.concat(ctx.ns.ProfessionList.Order(), ",")
+    end
   end
 end
 
@@ -472,8 +546,10 @@ function STEPS.event(ctx, step)
   for i, text in ipairs(step.args) do
     args[i] = eventArg(text)
   end
-  ctx.ns.ModernReader.lastRead = nil
-  ctx.ns.LearnWatcher.lastStored = nil
+  for _, name in ipairs(READERS) do
+    ctx.ns[name].lastRead = nil
+  end
+  ctx.ns.LearnWatcher.lastStored, ctx.ns.LearnWatcher.lastPending = nil, nil
   ctx.ns.BindLookup.lastStored = nil
   Wow.fireEvent(step.name, unpack(args, 1, #step.args))
   ctx.ns.Slicer.Drain()

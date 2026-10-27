@@ -7,6 +7,7 @@ local Wow = require("tests.helpers.wow")
 local Toc = require("tests.helpers.toc")
 local RuntimeTraps = require("tests.helpers.runtime_traps")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
+local ProfessionsClassic = require("tests.helpers.professions_classic")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 local Widgets = require("tests.helpers.widgets")
 
@@ -106,12 +107,37 @@ local function publicChatEvents()
   return events
 end
 
+-- The fixture crafter's professions: Blacksmithing on Retail; on Classic (`flavor` not retail)
+-- the skill lines with the Blacksmithing and Enchanting windows, and the learn message string.
+local function installProfessions(flavor)
+  if flavor == "retail" then
+    ProfessionsRetail.install({
+      slots = { { name = "Blacksmithing", skillLine = 164 } },
+      base = 164,
+      items = { [190001] = { "INVTYPE_WAIST", 4, 4 } },
+      bind = { [190001] = 2 },
+      autoCache = true,
+    })
+    return
+  end
+  ProfessionsClassic.install({
+    skillLines = { { name = "Professions", header = true }, { name = "Blacksmithing" }, { name = "Enchanting" } },
+    tradeSkill = { line = "Blacksmithing", rows = { { name = "Sim Plate Belt", item = 190001 } } },
+    craft = { line = "Enchanting", rows = { { name = "Enchant Bracer - Sim Health" } } },
+    items = { [190001] = { "INVTYPE_WAIST", 4, 4 } },
+    bind = { [190001] = 2 },
+    autoCache = true,
+  })
+  Wow.stub("ERR_LEARN_RECIPE_S", "You have learned how to create a new item: %s.")
+end
+
 -- Runs fn(state, sent, verify) with the traps installed, then verifies what the metatables could
 -- not see; always removes the traps and resets the stubs. `learnSignal`: the flavor chose the
--- Classic learn signal (CHAT_MSG_SYSTEM allowed).
-local function withTraps(fn, learnSignal)
+-- Classic learn signal (CHAT_MSG_SYSTEM allowed). `flavor` defaults to retail.
+local function withTraps(fn, learnSignal, flavor)
+  flavor = flavor or "retail"
   Wow.reset()
-  Wow.flavor("retail")
+  Wow.flavor(flavor)
   local state = { resting = true, scanActive = false }
   state.isActive = function()
     return state.scanActive
@@ -133,13 +159,7 @@ local function withTraps(fn, learnSignal)
     Wow.stub("ChatFrame_OpenChat", function() end)
     local sent = {}
     installBlizzard(sent)
-    ProfessionsRetail.install({
-      slots = { { name = "Blacksmithing", skillLine = 164 } },
-      base = 164,
-      items = { [190001] = { "INVTYPE_WAIST", 4, 4 } },
-      bind = { [190001] = 2 },
-      autoCache = true,
-    })
+    installProfessions(flavor)
     local verify
     restore, verify = RuntimeTraps.install({
       isScanActive = function()
@@ -435,6 +455,44 @@ local function testAddonObeysTheRules()
   end)
 end
 
+-- TBC (learnSignal 1) under the traps: the learn message listener from login, both Classic
+-- windows read on Slicer ticks, a learn, a request and a greeting click.
+local function testClassicObeysTheRules()
+  withTraps(function(state, sent)
+    local ns = loadAddon()
+    state.isActive = ns.ScanGate.IsActive
+    Wow.fireEvent("ADDON_LOADED", "CraftAlert")
+    rawget(_G, "CraftAlertDB").characters = dofile("tools/sim_fixture_classic.lua").characters
+    Assert.same(publicChatEvents(), {}, "nothing listens before login")
+    Wow.fireEvent("PLAYER_LOGIN")
+    Assert.equal(ns.ScanGate.IsActive(), true)
+    Assert.same(publicChatEvents(), { CHANNEL, "CHAT_MSG_SYSTEM" })
+
+    Wow.fireEvent("TRADE_SKILL_SHOW")
+    Wow.fireEvent("CRAFT_SHOW")
+    Wow.fireEvent("CHAT_MSG_SYSTEM", "You have learned how to create a new item: Sim Plate Helm.")
+    Wow.runTimers()
+    Wow.fireEvent("TRADE_SKILL_CLOSE")
+    Wow.fireEvent("CRAFT_CLOSE")
+    Assert.equal(ns.ClassicReader.lastRead.prof, "blacksmithing")
+    Assert.equal(ns.CraftReader.lastRead.prof, "enchanting")
+
+    fireRequest("LF sim plate helm", "Customer-OtherRealm")
+    local lead = ns.Leads.Latest()
+    Assert.truthy(lead, "the learned name made a lead")
+    local toast = G("CraftAlertToast")
+    Wow.clock.gettime = Wow.clock.gettime + 1
+    toast:GetScript("OnClick")(toast, "LeftButton")
+    Assert.same({ sent[1][1], sent[2][1], sent[2][2] }, { "addon", "chat", "Hi! I can craft Sim Plate Helm." })
+    for _, timer in ipairs(Wow.timers) do
+      Assert.truthy(ALLOWED_DELAYS[timer.delay], "timer with delay " .. tostring(timer.delay))
+    end
+    for _, frame in ipairs(Wow.frames) do
+      Assert.equal(frame.scripts.OnUpdate, nil, "no OnUpdate script")
+    end
+  end, true, "tbc")
+end
+
 -- Shipped folders only (the TOC lists exactly those): tools/ is not in it.
 local function testSourceRules()
   local sendsAddonMessage = {}
@@ -454,5 +512,6 @@ return function()
   testTrapsCatchViolations()
   testLearnSignalAllowsSystemEvents()
   testAddonObeysTheRules()
+  testClassicObeysTheRules()
   testSourceRules()
 end

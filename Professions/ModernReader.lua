@@ -9,6 +9,7 @@ local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local BindLookup = ns.BindLookup or require("CraftAlert.Professions.BindLookup")
+local RecipeStore = ns.RecipeStore or require("CraftAlert.Professions.RecipeStore")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 local ReadJob = ns.ReadJob or require("CraftAlert.Professions.ReadJob")
 local QualityReach = ns.QualityReach or require("CraftAlert.Professions.QualityReach")
@@ -74,21 +75,6 @@ local function copyList(list)
   return copy
 end
 
-local function sameList(a, b)
-  if a == nil or b == nil then
-    return a == b
-  end
-  if #a ~= #b then
-    return false
-  end
-  for i = 1, #a do
-    if a[i] ~= b[i] then
-      return false
-    end
-  end
-  return true
-end
-
 -- → the recipe info of a recipe worth storing, else nil. `learned` is checked by the window
 -- read only: it is still false inside NEW_RECIPE_LEARNED (§5.3).
 local function usableInfo(api, recipeID, requireLearned)
@@ -125,34 +111,9 @@ local function readFields(api, recipeID, info, profInfo)
   return { item = schematic and schematic.outputItemID, ranks = copyList(info.qualityItemIDs), name = info.name, line = lineOf(profInfo) }
 end
 
--- Adds the recipe or updates it in place (mute and bind survive; a read with no line keeps the
--- stored one) → whether storage changed.
-local function merge(recipes, recipeID, fields, professionKey)
-  local old = recipes[recipeID]
-  if old == nil then
-    fields.prof = professionKey
-    recipes[recipeID] = fields
-    return true
-  end
-  local lineChanged = fields.line ~= nil and old.line ~= fields.line
-  local changed = old.item ~= fields.item
-    or old.name ~= fields.name
-    or old.prof ~= professionKey
-    or not sameList(old.ranks, fields.ranks)
-    or lineChanged
-  if changed then
-    if old.item ~= fields.item then
-      old.bind = nil
-    end
-    old.item, old.name, old.prof, old.ranks = fields.item, fields.name, professionKey, fields.ranks
-    old.line = fields.line or old.line
-  end
-  return changed
-end
-
 -- → changed, and queues the bind lookup when the output item's bind is unknown.
 local function store(recipes, recipeID, fields, professionKey)
-  local changed = merge(recipes, recipeID, fields, professionKey)
+  local changed = RecipeStore.Merge(recipes, recipeID, fields, professionKey)
   local recipe = recipes[recipeID]
   if recipe.item and recipe.bind == nil then
     BindLookup.Queue(recipe.item)

@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+local Constants = ns.Constants or require("CraftAlert.Core.Constants")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
 local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
@@ -20,6 +21,8 @@ local AwaySummary = ns.AwaySummary or require("CraftAlert.Model.AwaySummary")
 local WhisperTracker = ns.WhisperTracker or require("CraftAlert.Model.WhisperTracker")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local ModernReader = ns.ModernReader or require("CraftAlert.Professions.ModernReader")
+local ClassicReader = ns.ClassicReader or require("CraftAlert.Professions.ClassicReader")
+local CraftReader = ns.CraftReader or require("CraftAlert.Professions.CraftReader")
 local QualityReach = ns.QualityReach or require("CraftAlert.Professions.QualityReach")
 local LearnWatcher = ns.LearnWatcher or require("CraftAlert.Professions.LearnWatcher")
 local Status = ns.Status or require("CraftAlert.Core.Status")
@@ -63,17 +66,17 @@ local function onSkillLinesChanged()
   end
 end
 
--- Retail and Forever only: the Classic profession keys and readers arrive with their task.
 local function installProfessions()
-  if FlavorCompat.isClassic then
-    return
-  end
   ProfessionList.Refresh(db, ownKey)
   EventRouter.On(SKILL_LINES_CHANGED, onSkillLinesChanged)
 end
 
+-- Classic reads the TradeSkill window and, on Era and TBC, Enchanting's Craft window.
 local function installReaders()
   if FlavorCompat.isClassic then
+    ClassicReader.Install(db)
+    CraftReader.Install(db)
+    LearnWatcher.InstallClassic(Constants.flavors[FlavorCompat.flavorKey].learnSignal)
     return
   end
   ModernReader.Install(db)

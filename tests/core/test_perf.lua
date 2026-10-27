@@ -140,4 +140,13 @@ return function()
     lastChat()
   )
   ModernReader.lastRead = nil
+
+  -- Classic has no ModernReader read: the newer of its two window reads shows instead.
+  local ClassicReader = require("CraftAlert.Professions.ClassicReader")
+  ClassicReader.newestRead = { prof = "enchanting", stored = 2, pendingBind = 0, ms = 3.5, steps = 7 }
+  scriptClock({ 0, 100, 100.010 })
+  Perf.Start()
+  Perf.Stop()
+  Assert.truthy(lastChat():find("last read 3.5 ms in 7 steps", 1, true), lastChat())
+  ClassicReader.newestRead = nil
 end
