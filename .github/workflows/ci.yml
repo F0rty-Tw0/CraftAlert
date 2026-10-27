@@ -83,3 +83,10 @@ jobs:
           while IFS= read -r -d '' test_file; do
             lua5.1 tests/run.lua "${test_file}"
           done < <(find tests -type f -name 'test_*.lua' -print0 | sort -z)
+
+      - name: Check package
+        run: |
+          set -euo pipefail
+          python -m unittest tools.test_check_package
+          pwsh -File scripts/package.ps1
+          python tools/check_package.py dist/CraftAlert.zip
