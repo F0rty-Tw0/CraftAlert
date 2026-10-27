@@ -258,6 +258,15 @@ local function testDamagedIsCheap()
   local seconds = os.clock() - started
   Assert.truthy(err:find("incomplete", 1, true), err)
   Assert.truthy(seconds < 0.5, "trim took " .. seconds .. " s")
+  -- A string cut before its checksum: the header is read without backtracking over the body.
+  local cut = "CA1:retail:" .. string.rep("x", Fields.MAX.length - 20)
+  started = os.clock()
+  for _ = 1, 10 do
+    _, err = ExportString.Decode(cut, "retail")
+  end
+  seconds = os.clock() - started
+  Assert.truthy(err:find("incomplete", 1, true), err)
+  Assert.truthy(seconds < 0.1, "10 headers took " .. seconds .. " s")
 end
 
 -- The user's Retail account is 6 characters and 2,983 recipes: 3,000 synthetic recipes export

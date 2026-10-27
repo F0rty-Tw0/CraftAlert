@@ -33,8 +33,10 @@ local find = string.find
 local gmatch = string.gmatch
 local ipairs = ipairs
 local match = string.match
+local max = math.max
 local pairs = pairs
 local sort = table.sort
+local sub = string.sub
 
 local VERSION = "1"
 local CHECKSUM_WIDTH = 7
@@ -156,6 +158,22 @@ local function damaged(what)
   return Localization.Text("The string is damaged (%s).", what)
 end
 
+-- → head, version, flavor, body, checksum, or nil. The checksum's ":" is looked for in the last
+-- CHECKSUM_WIDTH + 1 bytes and the body checked with a plain find: one "[^:]*" pattern
+-- backtracked over the whole string when its end was damaged.
+local function split(text)
+  local version, flavor, bodyAt = match(text, "^CA(%d+):(%l+):()")
+  local sumAt = bodyAt and find(text, ":%w+$", max(bodyAt, #text - CHECKSUM_WIDTH))
+  if sumAt == nil then
+    return nil
+  end
+  local body = sub(text, bodyAt, sumAt - 1)
+  if find(body, ":", 1, true) then
+    return nil
+  end
+  return sub(text, 1, sumAt - 1), version, flavor, body, sub(text, sumAt + 1)
+end
+
 -- → { flavor, characters = { { key, class, realms, professions = { [key] = name }, recipes =
 -- { [key] = { name, prof, item, ranks, line, muted } } }... } }, or nil and one error message.
 -- Leading and trailing spaces (a paste's newline) are ignored, up to TRIM_SLACK bytes past
@@ -173,7 +191,7 @@ function ExportString.Decode(text, flavorKey, pause)
   if #text > MAX.length then
     return nil, Localization.Text("The string is too long.")
   end
-  local head, version, flavor, body, sum = match(text, "^(CA(%d+):(%l+):([^:]*)):(%w+)$")
+  local head, version, flavor, body, sum = split(text)
   if head == nil and find(text, "^CA%d+:") then
     return nil, damaged(Localization.Text("incomplete"))
   elseif head == nil then
