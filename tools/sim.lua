@@ -1,7 +1,7 @@
 -- CLI sim: feeds chat lines, events, slash commands and clicks through the real addon
 -- modules with stubbed WoW APIs and returns what happened as text lines.
 --   python scripts/sim.py [--flavor retail|forever|era|tbc|wrath|cata|mop] [--db FILE] [--class TOKEN] ...
---   [--export] [--import STRING]
+--   [--export] [--import STRING] [--craftscan FILE]
 --   lua5.1 tools/sim.lua ...   (from the repo root)
 -- Output lines are `<area>: <fact>`; the first is always `sim: flavor=<key> modules=<n>`.
 local ROOT = rawget(_G, "CRAFTALERT_ROOT") or "."
@@ -109,7 +109,7 @@ local Sim = {}
 Sim.lastNs = nil
 
 -- Flags taking exactly one value; the parser checks the value where it is not free text.
-local ONE_VALUE = { "--flavor", "--db", "--sender", "--class", "--cmd", "--click", "--afk", "--resting", "--import" }
+local ONE_VALUE = { "--flavor", "--db", "--sender", "--class", "--cmd", "--click", "--afk", "--resting", "--import", "--craftscan" }
 
 local function isOneValueFlag(flag)
   for _, name in ipairs(ONE_VALUE) do
@@ -147,6 +147,8 @@ local function acceptOption(plan, flag, value)
     plan.steps[#plan.steps + 1] = { kind = "cmd", text = value }
   elseif flag == "--import" then
     plan.steps[#plan.steps + 1] = { kind = "import", text = value }
+  elseif flag == "--craftscan" then
+    plan.steps[#plan.steps + 1] = { kind = "craftscan", path = value }
   end
   return nil
 end
@@ -610,6 +612,44 @@ function STEPS.import(ctx, step)
     end
     local line = string.format("import: characters=%d recipes=%d skipped=%d", counts.characters, counts.recipes, counts.skipped)
     ctx.out[#ctx.out + 1] = line
+  end)
+  ctx.ns.Slicer.Drain()
+end
+
+-- "<character>:<recipe>" of every muted recipe in the db, sorted.
+local function mutedRecipes(db)
+  local list = {}
+  for key, character in pairs(db.characters) do
+    for recipeID, recipe in pairs(character.recipes) do
+      if recipe.muted then
+        list[#list + 1] = key .. ":" .. tostring(recipeID)
+      end
+    end
+  end
+  table.sort(list)
+  return list
+end
+
+-- --craftscan FILE: sets CraftScan_DB to what FILE returns (or the CraftScan_DB global it sets)
+-- and runs the CraftScan import (spec §10.2) → `craftscan: characters=<n> recipes=<n> muted=<n>
+-- greetings=<n> skipped=<n>` and `craftscan: muted <character>:<recipe>,...` (the db's muted
+-- recipes afterwards), printed before the `index:` line of the rebuild it requests.
+function STEPS.craftscan(ctx, step)
+  start(ctx)
+  -- Through Wow.stub, so the next run starts without a CraftScan_DB the file set as a global.
+  Wow.stub("CraftScan_DB", nil)
+  local chunk = loadfile(step.path)
+  local src = chunk and chunk()
+  src = type(src) == "table" and src or rawget(_G, "CraftScan_DB")
+  if type(src) ~= "table" then
+    ctx.out[#ctx.out + 1] = "error: --craftscan " .. step.path .. " holds no CraftScan_DB table"
+    return
+  end
+  Wow.stub("CraftScan_DB", src)
+  ctx.ns.CraftScanImport.Start(ctx.db, src, function(c)
+    local line = "craftscan: characters=%d recipes=%d muted=%d greetings=%d skipped=%d"
+    ctx.out[#ctx.out + 1] = string.format(line, c.characters, c.recipes, c.muted, c.greetings, c.skipped)
+    ctx.out[#ctx.out + 1] = "craftscan: muted " .. table.concat(mutedRecipes(ctx.db), ",")
   end)
   ctx.ns.Slicer.Drain()
 end

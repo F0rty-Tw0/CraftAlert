@@ -447,6 +447,15 @@ return function()
   Assert.equal(refused[#refused], "import: error The string is damaged (checksum).")
   Assert.equal(Sim.Run({ "--import" })[1], "error: --import needs a value")
 
+  -- Spec §10.2: --craftscan imports the CraftScan fixture; its alt answers the request.
+  local scanned = table.concat(Sim.Run({ "--craftscan", "tests/fixtures/craftscan_db.lua", "LF Sim Plate Helm" }), " / ")
+  local counts = "craftscan: characters=3 recipes=5 muted=3 greetings=2 skipped=5"
+  local muted = "craftscan: muted Nosource-Kel'Thuzad:9003,Old-Legacyrealm:9005,Scanalt-OwnRealm:9005"
+  Assert.truthy(scanned:find(counts .. " / " .. muted .. " / index: size=6", 1, true), scanned)
+  Assert.truthy(scanned:find("crafter=Scanalt-OwnRealm", 1, true), scanned)
+  local missing = Sim.Run({ "--craftscan", "tests/fixtures/no_such_file.lua" })
+  Assert.equal(missing[#missing], "error: --craftscan tests/fixtures/no_such_file.lua holds no CraftScan_DB table")
+
   -- Run from the command line, any `error:` line makes the sim exit 1, so a Proof run notices a
   -- broken invocation: a bad flag (the only line) or a step that fails after others printed.
   local printed, code = runMain({ "--nope" })
