@@ -12,7 +12,8 @@
 --   CHAT_MSG_SYSTEM without learnSignal, and other public chat events while the scan is inactive.
 --   verify() runs after the drive and raises for what a metatable cannot see: an existing
 --   global that was overwritten or removed (the snapshot is taken at the end of install, so the
---   stubs a test makes before install are the baseline), a global made with rawset, and raw
+--   stubs a test makes before install are the baseline; the wrapper hooksecurefunc(name, hook)
+--   puts in place is the sanctioned exception), a global made with rawset, and raw
 --   writes (rawset, table.insert) that landed in a proxy. Own names pass; in the UISpecialFrames
 --   proxy only the frame names in SPECIAL_FRAMES pass (rule 3's one sanctioned insert).
 -- Stubs the test installs with Wow.stub (rawset) before install() are never trapped on creation.
@@ -176,11 +177,14 @@ local function proxyViolations()
   return found
 end
 
--- Existing globals must be the same objects as at install; no foreign global may have appeared.
-local function globalViolations(snapshot)
+-- Existing globals must be the same objects as at install, or the wrapper hooksecurefunc put
+-- there (`hooked`); no foreign global may have appeared.
+local function globalViolations(snapshot, hooked)
   local found = {}
   for name, value in pairs(snapshot) do
-    if not isOwnGlobal(name) and rawget(_G, name) ~= value then
+    local current = rawget(_G, name)
+    local hookedNow = current ~= nil and current == hooked[name]
+    if not isOwnGlobal(name) and current ~= value and not hookedNow then
       found[#found + 1] = "existing global " .. tostring(name) .. " was overwritten or removed (rule 3)"
     end
   end
@@ -190,6 +194,20 @@ local function globalViolations(snapshot)
     end
   end
   return found
+end
+
+-- Rule 3 touches Blizzard code through hooksecurefunc: on a global, the client replaces it with
+-- its wrapper. → the wrapper of each hooked global name.
+local function recordGlobalHooks()
+  local hooked = {}
+  local hook = rawget(_G, "hooksecurefunc")
+  Wow.stub("hooksecurefunc", function(owner, ...)
+    hook(owner, ...)
+    if type(owner) == "string" then
+      hooked[owner] = rawget(_G, owner)
+    end
+  end)
+  return hooked
 end
 
 function RuntimeTraps.install(opts)
@@ -202,13 +220,14 @@ function RuntimeTraps.install(opts)
     end
   end
   guardCreateFrame(opts)
+  local hooked = recordGlobalHooks()
   local restore = guardGlobals()
   local snapshot = {}
   for name, value in pairs(_G) do
     snapshot[name] = value
   end
   local function verify()
-    local found = globalViolations(snapshot)
+    local found = globalViolations(snapshot, hooked)
     for _, violation in ipairs(proxyViolations()) do
       found[#found + 1] = violation
     end

@@ -261,6 +261,14 @@ local function testTrapsCatchViolations()
     Assert.raises(verify, "new global Foo")
     rawset(_G, "Foo", nil)
     verify()
+    -- hooksecurefunc(name, hook) replaces the global with the client's wrapper: the sanctioned
+    -- path, so verify() accepts that one value; a later plain overwrite still traps.
+    G("hooksecurefunc")("ChatFrame_OpenChat", function() end)
+    verify()
+    rawset(_G, "ChatFrame_OpenChat", function() end) -- an existing key: no __newindex either way
+    Assert.raises(verify, "existing global ChatFrame_OpenChat was overwritten")
+    rawset(_G, "ChatFrame_OpenChat", openChat)
+    verify()
 
     -- Raw writes skip a proxy's __newindex; verify() finds what landed in it. The leads window's
     -- frame name in UISpecialFrames is the one sanctioned insert (rule 3): any other name traps,

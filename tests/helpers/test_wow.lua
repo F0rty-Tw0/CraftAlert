@@ -77,4 +77,18 @@ return function()
   Assert.equal(type(classic.PortraitContainer.portrait.SetTexture), "function")
   local inset = rawget(_G, "CreateFrame")("Frame", nil, parent, "InsetFrameTemplate")
   Assert.equal(inset.Bg.layer, "BACKGROUND")
+  -- hooksecurefunc(name, hook) on a global: the hook runs after the original, with its arguments,
+  -- also when Blizzard code calls the global by name; the original's results are returned.
+  local calls = {}
+  Wow.stub("CraftAlertHookProbe", function(value)
+    calls[#calls + 1] = "original " .. value
+    return value + 1
+  end)
+  rawget(_G, "hooksecurefunc")("CraftAlertHookProbe", function(value)
+    calls[#calls + 1] = "hook " .. value
+  end)
+  Assert.equal(rawget(_G, "CraftAlertHookProbe")(1), 2)
+  Assert.same(calls, { "original 1", "hook 1" })
+  Wow.reset()
+  Assert.equal(rawget(_G, "CraftAlertHookProbe"), nil, "the reset removes the hooked global")
 end
