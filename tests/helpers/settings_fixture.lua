@@ -1,8 +1,8 @@
 -- The settings pane in the leads window over UiFixture, with the refreshes a setting may trigger recorded instead
 -- of run: Index.RequestRebuild(reason) → "rebuild:<reason>", ScanGate.Evaluate → "evaluate",
 -- Leads.Rearm → "rearm", Launcher.Refresh → "launcher", LeadsWindow.Refresh → "leadsWindow",
--- ModernRows.Refresh → "markers". The Alerts page calls launcher and leadsWindow as Bootstrap wires them
--- (PageAlerts.SetOnLauncherToggle, SetOnOpacity).
+-- ModernRows.Refresh → "markers", ClassicRows.Refresh → "classicMarkers". The Alerts page calls
+-- launcher and leadsWindow as Bootstrap wires them (PageAlerts.SetOnLauncherToggle, SetOnOpacity).
 --   local ns, db, refreshes = SettingsFixture.load(opts)   -- opts as UiFixture.load
 --   SettingsFixture.open(ns, "Alerts")                     -- opens the window on that page
 --   SettingsFixture.row("Lead timeout").input              -- the shown control with that label
@@ -34,6 +34,7 @@ function SettingsFixture.load(opts)
     { ns.Launcher, "Refresh", "launcher" },
     { ns.LeadsWindow, "Refresh", "leadsWindow" },
     { ns.ModernRows, "Refresh", "markers" },
+    { ns.ClassicRows, "Refresh", "classicMarkers" },
   }
   for _, entry in ipairs(names) do
     spy(entry[1], entry[2], function()
