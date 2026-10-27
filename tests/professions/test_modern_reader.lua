@@ -316,6 +316,123 @@ local function jobCases()
   Assert.same(recipesOf(db), {})
 end
 
+-- The re-open skip: a window re-open whose last read of the profession was settled (a loaded
+-- answer named it, every stored recipe has its line) and has the same count walks nothing and
+-- only queues reach for the stored recipes.
+local function reopenCases()
+  local lined = { professionID = 2918, parentProfessionID = BS }
+  local api = _G["C_TradeSkillUI"]
+  local function sorted(ids)
+    local copy = {}
+    for i, id in ipairs(ids) do
+      copy[i] = id
+    end
+    table.sort(copy)
+    return copy
+  end
+  -- Counts the recipe getters a read would call.
+  local function countGetters()
+    local count = { n = 0 }
+    for _, name in ipairs({ "GetRecipeInfo", "GetRecipeSchematic", "GetProfessionInfoByRecipeID" }) do
+      local original = api[name]
+      rawset(api, name, function(...)
+        count.n = count.n + 1
+        return original(...)
+      end)
+    end
+    return count
+  end
+  local function readSettled(state, Slicer)
+    state.recipes = { belt(1, 100, { profession = lined }), belt(2, 200, { profession = lined }) }
+    Wow.fireEvent("TRADE_SKILL_SHOW")
+    Slicer.Drain()
+    Wow.runTimers()
+  end
+
+  -- Settled and unchanged: no read job, no getter call, no index rebuild, reach for the stored IDs.
+  local state, ModernReader, _, _, Slicer = setup()
+  readSettled(state, Slicer)
+  local lastRead = ModernReader.lastRead
+  queued = {}
+  local getters = countGetters()
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(Slicer.IsRunning("read"), false, "no read job on the re-open")
+  Assert.equal(Slicer.IsRunning("index"), false, "no index rebuild on the re-open")
+  Assert.equal(getters.n, 0, "no recipe getter is called")
+  Assert.equal(#queued, 1)
+  Assert.same(sorted(queued[1]), { 1, 2 }, "reach gets the stored IDs")
+  Assert.equal(ModernReader.lastRead, lastRead, "a skip leaves the last read")
+
+  -- Not settled: no loaded answer (nil, or an unloaded 0 line) → the re-open reads, and the
+  -- line arrives once the answer is loaded.
+  for name, answer in pairs({ none = false, unloaded = { professionID = 0, parentProfessionID = BS } }) do
+    local unsettled, _, db, _, unsettledSlicer = setup()
+    unsettled.recipes = { belt(1, 100, { profession = answer or nil }), belt(2, 200, { profession = lined }) }
+    Wow.fireEvent("TRADE_SKILL_SHOW")
+    unsettledSlicer.Drain()
+    Wow.runTimers()
+    Assert.equal(recipesOf(db)[1].line, nil, name)
+    Wow.fireEvent("TRADE_SKILL_SHOW")
+    Assert.equal(unsettledSlicer.IsRunning("read"), true, name .. ": the re-open reads")
+    unsettled.recipes[1].profession = lined
+    unsettledSlicer.Drain()
+    Wow.runTimers()
+    Assert.equal(recipesOf(db)[1].line, 2918, name .. ": the line is filled in")
+    Wow.fireEvent("TRADE_SKILL_SHOW")
+    Assert.equal(unsettledSlicer.IsRunning("read"), false, name .. ": settled now")
+  end
+
+  -- Per profession: Blacksmithing, then Enchanting, then Blacksmithing again with the same count.
+  local ench = { professionID = 2909, parentProfessionID = ENCH }
+  state, _, _, _, Slicer = setup()
+  readSettled(state, Slicer)
+  state.base = ENCH
+  state.recipes = { belt(5, 500, { profession = ench }), belt(6, 600, { profession = ench }) }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Slicer.Drain()
+  Wow.runTimers()
+  state.base = BS
+  state.recipes = { belt(1, 100, { profession = lined }), belt(2, 200, { profession = lined }) }
+  queued = {}
+  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  Assert.equal(Slicer.IsRunning("read"), false, "a same-count update skips after another profession was read")
+  Assert.same(queued, {}, "an update queues no reach")
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(Slicer.IsRunning("read"), false, "the re-open skips")
+  Assert.same(sorted(queued[1]), { 1, 2 }, "reach gets Blacksmithing's IDs only")
+
+  -- A dropped profession (ProfessionList's drop) is read again.
+  local db
+  state, _, db, _, Slicer = setup()
+  readSettled(state, Slicer)
+  for recipeID in pairs(recipesOf(db)) do
+    recipesOf(db)[recipeID] = nil
+  end
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(Slicer.IsRunning("read"), true, "no stored recipe: read")
+  Slicer.Drain()
+  Assert.truthy(recipesOf(db)[1])
+
+  -- A kept job for the same profession and count resumes; it outranks the skip.
+  state, _, db, _, Slicer = setup()
+  state.recipes = { belt(1, 100, { profession = lined }), belt(2, 200, { profession = lined }), belt(3, 300, { profession = lined }) }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Slicer.Drain()
+  Wow.runTimers()
+  for recipeID in pairs(recipesOf(db)) do
+    recipesOf(db)[recipeID] = nil
+  end
+  local calls = logRecipeReads()
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  runOneTick()
+  Wow.fireEvent("TRADE_SKILL_CLOSE")
+  Wow.runTimers()
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(Slicer.IsRunning("read"), true, "the kept job resumes, one stored recipe does not skip")
+  Slicer.Drain()
+  Assert.same(calls, { 1, 2, 3 })
+end
+
 -- §10.2: FieldsOf reads an alt's recipe the logged-in character never learned, with the §5.2
 -- drops, its expansion line and its profession answer; it stores nothing.
 local function fieldsOfAnyRecipe()
@@ -429,7 +546,8 @@ return function()
   Assert.equal(recipesOf(db)[1].bind, nil, "a new output item has an unknown bind")
   Assert.equal(recipesOf(db)[1].muted, true)
 
-  -- Updates re-read only when the recipe count changed; opening the window always reads.
+  -- Updates re-read only when the recipe count changed; opening the window reads unless the last
+  -- read of that profession was settled and the count is the same.
   state, _, db, _, Slicer = setup()
   state.recipes = { belt(1, 100) }
   Wow.fireEvent("TRADE_SKILL_SHOW")
@@ -592,6 +710,7 @@ return function()
   Wow.runTimers()
   local builds = run.builds
   recipesOf(db)[7] = { item = 700, name = "Belt 7", prof = BS }
+  state.recipes[3] = belt(13, 1300) -- a new count: the settled read above would skip the re-open
   Wow.fireEvent("TRADE_SKILL_SHOW")
   Slicer.Drain()
   Assert.equal(recipesOf(db)[7], nil)
@@ -637,5 +756,6 @@ return function()
 
   lineCases()
   jobCases()
+  reopenCases()
   isBlockedCases()
 end

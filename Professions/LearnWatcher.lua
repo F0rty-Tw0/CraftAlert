@@ -28,8 +28,10 @@ LearnWatcher.lastStored = nil
 -- The name the last Classic learn added to the pending list, for the sim.
 LearnWatcher.lastPending = nil
 
--- In an instance nothing runs: no profession API is asked and lastStored stays as it was.
+-- In an instance nothing runs: no profession API is asked and lastStored stays as it was. Any
+-- learn makes the next window open read again, so a recipe stored here, or missed, is read there.
 local function onLearned(recipeID)
+  ModernReader.ForgetReads()
   if FlavorCompat.InInstance() then
     return
   end

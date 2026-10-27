@@ -49,6 +49,16 @@ local function trapProfessionApi(message)
   end
 end
 
+-- Each recipe read costs 3 ms of the frame budget, so a read spans several Slicer ticks.
+local function slowReads()
+  local api = _G["C_TradeSkillUI"]
+  local original = api.GetRecipeInfo
+  rawset(api, "GetRecipeInfo", function(id)
+    Wow.clock.profile = Wow.clock.profile + 3
+    return original(id)
+  end)
+end
+
 return function()
   for _, flavor in ipairs({ "retail", "forever" }) do
     local ns, state, LearnWatcher, db, run = setup(flavor)
@@ -165,4 +175,71 @@ return function()
   Assert.same(db.characters[CHAR].recipes, {})
   Assert.equal(run.builds, 0)
   Wow.stub("IsInInstance", nil)
+
+  -- A learn the reader could not store (its data not loaded yet) is stored by the next open
+  -- of the window: a learn keeps the count the same, so it must not let that open skip the walk.
+  local ns
+  ns, state, LearnWatcher, db = setup()
+  state.base = BS
+  state.recipes = { recipe(1), recipe(2) }
+  state.recipes[1].learned = true
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  ns.Slicer.Drain()
+  Assert.truthy(db.characters[CHAR].recipes[1])
+  Assert.equal(db.characters[CHAR].recipes[2], nil, "not learned yet")
+  state.recipes[2].learned = true
+  state.recipes[2].name = nil
+  Wow.fireEvent(EVENT, 2)
+  Assert.equal(LearnWatcher.lastStored, false, "no name yet")
+  state.recipes[2].name = "Recipe 2"
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(ns.Slicer.IsRunning("read"), true, "the open after a learn reads")
+  ns.Slicer.Drain()
+  Assert.truthy(db.characters[CHAR].recipes[2])
+
+  -- A learn while a read runs, after the walk passed that recipe: the read that finishes after
+  -- the learn must not let the next open skip the walk.
+  ns, state, LearnWatcher, db = setup()
+  state.base = BS
+  state.recipes = { recipe(1), recipe(2), recipe(3), recipe(4) }
+  for _, id in ipairs({ 1, 3, 4 }) do
+    state.recipes[id].learned = true
+  end
+  slowReads()
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  for _ = 1, 3 do
+    table.remove(Wow.timers, 1).fn()
+  end
+  Assert.equal(ns.Slicer.IsRunning("read"), true, "the read is still walking")
+  state.recipes[2].learned = true
+  state.recipes[2].name = nil
+  Wow.fireEvent(EVENT, 2)
+  Assert.equal(LearnWatcher.lastStored, false, "no name yet")
+  ns.Slicer.Drain()
+  Assert.equal(db.characters[CHAR].recipes[2], nil, "the walk passed it before the learn")
+  state.recipes[2].name = "Recipe 2"
+  Wow.fireEvent("TRADE_SKILL_CLOSE")
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(ns.Slicer.IsRunning("read"), true, "the open after a learn mid-read reads")
+  ns.Slicer.Drain()
+  Assert.truthy(db.characters[CHAR].recipes[2])
+
+  -- A learn in an instance stores nothing, so the next open outside reads.
+  ns, state, _, db = setup()
+  state.base = BS
+  state.recipes = { recipe(1), recipe(2) }
+  state.recipes[1].learned = true
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  ns.Slicer.Drain()
+  Wow.fireEvent("TRADE_SKILL_CLOSE")
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  state.recipes[2].learned = true
+  Wow.fireEvent(EVENT, 2)
+  Wow.stub("IsInInstance", nil)
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(ns.Slicer.IsRunning("read"), true, "the open after a learn in an instance reads")
+  ns.Slicer.Drain()
+  Assert.truthy(db.characters[CHAR].recipes[2])
 end

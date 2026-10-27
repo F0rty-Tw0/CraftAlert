@@ -13,7 +13,8 @@ local ReadJob = {}
 local pairs = pairs
 
 -- base: { db, charKey, key, recipeIDs, ops = { usableInfo, storeKey, readFields, store,
--- professionInfo } }. → the base table, with the walk's counters added.
+-- professionInfo } }. → the base table, with the walk's counters added (`lineless`: a stored
+-- recipe had no expansion line).
 function ReadJob.New(base)
   base.phase = 1
   base.cursor = 1
@@ -22,13 +23,14 @@ function ReadJob.New(base)
   base.anyChanged = false
   base.readKeys = {}
   base.named = false
+  base.lineless = false
   base.storedIDs = {}
   base.ms = 0
   base.steps = 0
   return base
 end
 
--- The recipe IDs saved under the window's profession, copied so the walk never reads the live table.
+-- The recipe IDs saved under a profession, copied so the walk never reads the live table.
 local function recipeIDsOf(character, key)
   local ids = {}
   for recipeID, recipe in pairs(character.recipes) do
@@ -38,6 +40,8 @@ local function recipeIDsOf(character, key)
   end
   return ids
 end
+
+ReadJob.RecipeIDsOf = recipeIDsOf
 
 -- Phase 1 unit: stores the recipe at the cursor when it is worth storing. Marks the job
 -- `named` when the recipe's own lookup named the window's profession.
@@ -53,7 +57,9 @@ local function readRecipe(job, api, character)
   if not professionKey then
     return
   end
-  local changed, unknownBind = ops.store(character.recipes, recipeID, ops.readFields(api, recipeID, info, profInfo), professionKey)
+  local fields = ops.readFields(api, recipeID, info, profInfo)
+  job.lineless = job.lineless or fields.line == nil
+  local changed, unknownBind = ops.store(character.recipes, recipeID, fields, professionKey)
   job.stored = job.stored + 1
   job.anyChanged = job.anyChanged or changed
   job.pendingBind = job.pendingBind + (unknownBind and 1 or 0)
