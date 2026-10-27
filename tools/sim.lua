@@ -12,6 +12,7 @@ local Toc = require("tests.helpers.toc")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
 local ProfessionsClassic = require("tests.helpers.professions_classic")
 local RecipeListStub = require("tests.helpers.recipe_list_stub")
+local ClassicRowsStub = require("tests.helpers.classic_rows_stub")
 
 local DEFAULT_SENDER = "Customer-OtherRealm"
 local SIM_CLASS_GUID = "Player-0-SIMCLASS"
@@ -254,7 +255,7 @@ end
 -- Blizzard's profession recipe list for the recipe markers (ModernRows): Blizzard_Professions
 -- is not loaded until `--event ADDON_LOADED Blizzard_Professions`, which registers the row
 -- callback and prints `markers: installed modern`. The list has no rows. It is stubbed on every
--- flavor, so a Classic run without that line shows Bootstrap skips the markers there.
+-- flavor, so a Classic run without that line shows Bootstrap skips the Retail markers there.
 local function stubRecipeList(out)
   RecipeListStub.install({
     loaded = false,
@@ -262,6 +263,26 @@ local function stubRecipeList(out)
       out[#out + 1] = "markers: installed modern"
     end,
   })
+end
+
+-- The Classic windows for the recipe markers (ClassicRows): their row buttons and update
+-- functions exist, but their addons are not loaded until `--event ADDON_LOADED
+-- Blizzard_TradeSkillUI` (or Blizzard_CraftUI on Era and TBC), which hooks the window's update and
+-- prints `markers: installed tradeskill` (or `craft`).
+local CLASSIC_MARKERS = { TradeSkillFrame_Update = "tradeskill", CraftFrame_Update = "craft" }
+local function stubClassicWindows(out, flavor)
+  local windows = ClassicRowsStub.install({ craft = CRAFT_FRAME_FLAVORS[flavor], loaded = false })
+  windows.tradeSkill:define()
+  if windows.craft then
+    windows.craft:define()
+  end
+  local hook = rawget(_G, "hooksecurefunc")
+  Wow.stub("hooksecurefunc", function(owner, ...)
+    if CLASSIC_MARKERS[owner] then
+      out[#out + 1] = "markers: installed " .. CLASSIC_MARKERS[owner]
+    end
+    return hook(owner, ...)
+  end)
 end
 
 local function newContext(plan, out)
@@ -312,6 +333,7 @@ local function newContext(plan, out)
       autoCache = true,
     })
     Wow.stub("ERR_LEARN_RECIPE_S", LEARN_FORMAT)
+    stubClassicWindows(out, plan.flavor)
     return ctx
   end
   ProfessionsRetail.install({

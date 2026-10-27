@@ -9,6 +9,7 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local ModernRows = ns.ModernRows or require("CraftAlert.UI.RecipeMarkers.ModernRows")
+local ClassicRows = ns.ClassicRows or require("CraftAlert.UI.RecipeMarkers.ClassicRows")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
@@ -52,6 +53,12 @@ local function rebuildChannels()
   ScanGate.Evaluate()
 end
 
+-- Both marker variants; the one this flavor did not install is a no-op.
+local function refreshMarkers()
+  ModernRows.Refresh()
+  ClassicRows.Refresh()
+end
+
 function PageGeneral.Create(parent)
   local column = Controls.Column(parent, Theme.LAYOUT.PAGE_PADDING)
   local add, refresh = Controls.Refresher()
@@ -70,7 +77,7 @@ function PageGeneral.Create(parent)
   end
   Controls.Section(column, Localization.Text("Matching"))
   toggle("Profession-word alerts", settings, "professionWordAlerts", rebuild("professionWordAlerts"))
-  toggle("Bell markers on recipe rows", settings, "recipeMarkers", ModernRows.Refresh)
+  toggle("Bell markers on recipe rows", settings, "recipeMarkers", refreshMarkers)
   return { Refresh = refresh }
 end
 

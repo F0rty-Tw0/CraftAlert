@@ -291,14 +291,21 @@ local function installDefaults()
     return secrets[value] == true
   end)
   -- As the client: the hook runs after the original, with the same arguments; the original's
-  -- results are returned. Only the (table, name, hook) form.
-  Wow.stub("hooksecurefunc", function(owner, name, hook)
-    local original = owner[name]
-    owner[name] = function(...)
+  -- results are returned. (table, name, hook), or (name, hook) for a global, which is replaced
+  -- with the wrapper as the client does (Wow.stub, so the next reset restores it).
+  local function hooked(original, hook)
+    return function(...)
       local results = { original(...) }
       hook(...)
       return unpack(results)
     end
+  end
+  Wow.stub("hooksecurefunc", function(owner, name, hook)
+    if type(owner) == "string" then
+      Wow.stub(owner, hooked(rawget(_G, owner), name))
+      return
+    end
+    owner[name] = hooked(owner[name], hook)
   end)
   Wow.stub("InCombatLockdown", function()
     return Wow.combat

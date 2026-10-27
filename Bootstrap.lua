@@ -32,6 +32,7 @@ local WhisperBridge = ns.WhisperBridge or require("CraftAlert.UI.WhisperBridge")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local CraftScanPrompt = ns.CraftScanPrompt or require("CraftAlert.UI.CraftScanPrompt")
 local ModernRows = ns.ModernRows or require("CraftAlert.UI.RecipeMarkers.ModernRows")
+local ClassicRows = ns.ClassicRows or require("CraftAlert.UI.RecipeMarkers.ClassicRows")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
 local PageAlerts = ns.PageAlerts or require("CraftAlert.UI.Settings.PageAlerts")
 local Perf = ns.Perf or require("CraftAlert.Core.Perf")
@@ -167,15 +168,13 @@ local function installScanGate()
   ScanGate.Install(db)
 end
 
--- Retail and Forever only: the mute switches on Blizzard's recipe rows repaint on every rebuild
--- and gate change.
+-- The mute switches on Blizzard's recipe rows (the Classic TradeSkill and Craft windows, else
+-- Retail and Forever's profession window) repaint on every rebuild and gate change.
 local function installMarkers()
-  if FlavorCompat.isClassic then
-    return
-  end
-  ModernRows.Install(db)
-  Index.OnRebuilt(ModernRows.Refresh)
-  ScanGate.OnChange(ModernRows.Refresh)
+  local rows = FlavorCompat.isClassic and ClassicRows or ModernRows
+  rows.Install(db)
+  Index.OnRebuilt(rows.Refresh)
+  ScanGate.OnChange(rows.Refresh)
 end
 
 local function createLauncher()

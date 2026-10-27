@@ -12,7 +12,7 @@ local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 -- window rows: the speaker, crossed out while muted, greyed for an untracked recipe, and its house
 -- tooltip (gold title, white text, green instruction) saying what the recipe does now and what a
 -- click changes. The caller owns the row, what a click mutes and when to repaint
--- (UI/Settings/RecipeList.lua, UI/RecipeMarkers/ModernRows.lua).
+-- (UI/Settings/RecipeList.lua, UI/RecipeMarkers/MarkerSwitch.lua).
 local RecipeMute = {}
 
 -- A recipe whose item has no binding is not indexed while "Track unbound items" is off (Index).
