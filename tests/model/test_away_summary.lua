@@ -97,6 +97,15 @@ local function testNothingYet()
   Assert.same(state.shown, { { 2, 0 } }, "kept counting through the secret answer")
 end
 
+-- A client without UnitIsAFK: the event raises nothing and shows nothing, as Leads' afkNow.
+local function testNoUnitIsAfk()
+  local _, state = setup()
+  state.arrive({ id = 1, arrivedWhileAfk = true })
+  Wow.stub("UnitIsAFK", nil)
+  state.flags()
+  Assert.same(state.shown, {})
+end
+
 -- In an instance the flag clearing resets the count and shows nothing; the next period starts at 0.
 local function testInstanceResets()
   local _, state = setup()
@@ -126,6 +135,7 @@ end
 return function()
   testCountsAndExpired()
   testNothingYet()
+  testNoUnitIsAfk()
   testInstanceResets()
   testText()
   Wow.reset()
