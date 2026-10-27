@@ -36,6 +36,18 @@ local function testPreviewAndClick()
   Assert.equal(rawget(_G, "CraftAlertLeadsWindow"):IsShown(), true)
 end
 
+-- WM's ShowPanel on a panel already shown runs no onShow: a click while the panel shows the
+-- settings goes back to the list itself, as the own window's Open does.
+local function testClickLeavesSettings()
+  local ns, _, _, wm = boot()
+  wm.showPanel("CraftAlert")
+  ns.BridgePanel.ShowSettings()
+  Assert.equal(ns.BridgePanel.InSettings(), true)
+  ns.WhisperBridge.ShowSummary(4, 1)
+  wm.preview.CraftAlert.onClick()
+  Assert.same({ ns.BridgePanel.InSettings(), wm.shown.CraftAlert }, { false, true }, "back on the list, still open")
+end
+
 local function testRefusedFallsBackToToast()
   local ns, _, _, wm = boot()
   wm.refuse.ShowPreview = true
@@ -80,6 +92,7 @@ end
 
 return function()
   testPreviewAndClick()
+  testClickLeavesSettings()
   testRefusedFallsBackToToast()
   testTimersAndLeads()
   testInstance()

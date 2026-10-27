@@ -170,8 +170,13 @@ function WhisperBridge.Activate()
     return ask("TogglePanel", KEY)
   end)
   LeadsWindow.SetSettingsRouter(toggleSettings)
+  -- ShowPanel on a shown panel runs no onShow, so the panel leaves the settings itself.
   LeadsWindow.SetOpenRouter(function()
-    return ask("ShowPanel", KEY)
+    local opened = ask("ShowPanel", KEY)
+    if opened and BridgePanel.InSettings() then
+      BridgePanel.ToggleSettings()
+    end
+    return opened
   end)
   GreetAction.SetOpener(open)
   -- "greeted" and "replied" are always followed by a "change", which syncs the info lines.
@@ -232,9 +237,9 @@ function WhisperBridge.ShowLead(lead)
 end
 
 -- The away summary (Model/AwaySummary.lua, wired by Bootstrap when Activate returned true): WM's
--- preview, a click opens the panel (LeadsWindow.Open, never a toggle), hidden after the toast
--- duration. WM refusing falls back to CraftAlert's own toast. It and a lead's preview replace each
--- other (WM keeps one per key). Nothing in an instance.
+-- preview, a click opens the panel on the list (LeadsWindow.Open, never a toggle), hidden after the
+-- toast duration. WM refusing falls back to CraftAlert's own toast. It and a lead's preview replace
+-- each other (WM keeps one per key). Nothing in an instance.
 function WhisperBridge.ShowSummary(count, expired)
   if FlavorCompat.InInstance() then
     return

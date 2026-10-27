@@ -18,8 +18,10 @@
 --                                          then panel.onSplit(host, listWidth) when both exist; wm.hosts[key] = host
 --   wm.split(key, listWidth)               runs panel.onSplit on the host showPanel last used
 --   wm.hidePanel(key)                      clears it, runs panel.onHide()
--- ShowPanel (not refused) shows; TogglePanel (not refused) shows when hidden, hides when shown, and
--- returns true. An unknown panel key returns false, as the real one does.
+-- ShowPanel (not refused) shows; on a panel already shown it returns true without running onShow, as
+-- WM's does (UI/MessengerWindow/MessengerWindow/WindowVisibility.lua:116-117, WM). TogglePanel (not
+-- refused) shows when hidden, hides when shown, and returns true. An unknown panel key returns
+-- false, as the real one does.
 local Wow = require("tests.helpers.wow")
 
 local FakeWm = {}
@@ -133,7 +135,9 @@ function FakeWm.install(opts)
     if wm.panels[key] == nil then
       return false
     end
-    wm.showPanel(key)
+    if not wm.shown[key] then
+      wm.showPanel(key)
+    end
     return true
   end)
   define("TogglePanel", function(key)
