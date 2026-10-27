@@ -229,7 +229,9 @@ function PARSE.p(state, record)
   local character = state.current
   local key = f and ExportFields.ReadKey(f[2])
   local name = f and ExportFields.ReadText(f[3])
-  if character == nil or not ExportFields.IsFlavorKey(key, state.flavorKey) or name == nil or character.professions[key] ~= nil then
+  if character == nil or key == nil or name == nil or character.professions[key] ~= nil then
+    return "profession"
+  elseif not ExportFields.IsFlavorKey(key, state.flavorKey) then
     return "profession"
   end
   state.professionCount = state.professionCount + 1
