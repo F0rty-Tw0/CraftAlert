@@ -58,9 +58,10 @@ local function store(recipes, recipeKey, fields, professionKey)
 end
 
 -- The open window's profession when the current character stores it: nil for another player's
--- list, Beast Training, Cooking, or a window not loaded yet ("UNKNOWN").
-local function windowProfession(reader)
-  local source = reader.source
+-- list, Beast Training, Cooking, or a window not loaded yet ("UNKNOWN"). `source` names the
+-- window's calls: `line`, and `linked` when the window can show another player's list. The
+-- recipe markers gate their rows on it too (ClassicRows).
+function ClassicReader.WindowProfession(source, accountDb)
   local linked = source.linked and _G[source.linked]
   if type(linked) == "function" and linked() then
     return nil
@@ -68,7 +69,7 @@ local function windowProfession(reader)
   local getLine = _G[source.line]
   local name = type(getLine) == "function" and getLine() or nil
   local key = type(name) == "string" and lower(name) or nil
-  if key ~= nil and ProfessionList.IsStored(reader.db, PlayerName.Own(), key) then
+  if key ~= nil and ProfessionList.IsStored(accountDb, PlayerName.Own(), key) then
     return key
   end
   return nil
@@ -109,7 +110,7 @@ end
 -- One Slicer step. A window that closed or switched profession cancels the job. → whether the
 -- job is done.
 local function runStep(reader, job)
-  if not reader.windowOpen or windowProfession(reader) ~= job.key then
+  if not reader.windowOpen or ClassicReader.WindowProfession(reader.source, reader.db) ~= job.key then
     Slicer.Cancel(job.source.job)
     return false
   end
@@ -153,7 +154,7 @@ local function onWindowEvent(reader, force)
     return
   end
   local getCount = _G[reader.source.count]
-  local key = type(getCount) == "function" and windowProfession(reader) or nil
+  local key = type(getCount) == "function" and ClassicReader.WindowProfession(reader.source, reader.db) or nil
   if key == nil then
     return
   end
