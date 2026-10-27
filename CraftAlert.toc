@@ -105,6 +105,7 @@ UI/Settings/RecipeMute.lua
 UI/RecipeMarkers/MarkerState.lua
 UI/RecipeMarkers/MarkerSwitch.lua
 UI/RecipeMarkers/ModernRows.lua
+UI/RecipeMarkers/ClassicRows.lua
 UI/Settings/PageGeneral.lua
 UI/Settings/PageAlerts.lua
 UI/Settings/PageGreetings.lua

@@ -43,25 +43,30 @@ local function onClick(switch)
   Index.RequestRebuild("mute")
 end
 
--- The switch on `row`, created on first use, 14 × 14 at the row's right end.
-local function switchOf(row)
+-- The switch on `row`, created on first use, 14 × 14 at the row's right end, or with its right
+-- edge on `anchor`'s left when given (a Classic row's skill-up count, R2).
+local function switchOf(row, anchor)
   local switch = markers[row]
   if switch == nil then
     switch = RecipeMute.Create(row, onClick)
     switch:SetSize(SWITCH_SIZE, SWITCH_SIZE)
+    if anchor then
+      switch:ClearAllPoints()
+      switch:SetPoint("RIGHT", anchor, "LEFT", 0, 0)
+    end
     markers[row] = switch
   end
   return switch
 end
 
 -- Shows the switch of `row` for the stored rank chain `chain` (lowest rank first) and the record
--- of the rank the row shows, or hides it when the chain is empty.
-function MarkerSwitch.Show(row, chain, shown)
+-- of the rank the row shows, or hides it when the chain is empty. `anchor`: as switchOf.
+function MarkerSwitch.Show(row, chain, shown, anchor)
   if MarkerState.Of(chain, shown) == "hidden" then
     MarkerSwitch.Hide(row)
     return
   end
-  local switch = switchOf(row)
+  local switch = switchOf(row, anchor)
   switch.chain, switch.recipe = chain, shown
   paintSwitch(switch)
   switch:Show()

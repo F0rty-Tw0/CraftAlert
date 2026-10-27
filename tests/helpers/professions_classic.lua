@@ -11,7 +11,8 @@
 -- state.craft: the open CraftFrame window (Era, TBC), { line = "Enchanting", rows = {...} }. Set
 -- it before loading FlavorCompat: hasCraftFrame looks for GetCraftDisplaySkillLine at load.
 -- A row: { name, kind = "header" | "subheader" | "optimal" (default), item = itemID, link }; the
--- item link is built from `item` unless `link` gives one (an enchant's |Henchant: link).
+-- item link is built from `item` unless `link` gives one (an enchant's |Henchant: link). An index
+-- past the list (a row button's stale or unset ID) has no info, as in the client.
 -- state.items, bind, cached, requests, autoCache: C_Item data as in ProfessionsRetail.installItems.
 --   local ns, db, run = ProfessionsClassic.login("tbc", { craft = { line = "Enchanting", rows = ProfessionsClassic.shapeRows() } })
 local Wow = require("tests.helpers.wow")
@@ -59,6 +60,9 @@ local function installTradeSkill(window)
   end)
   Wow.stub("GetTradeSkillInfo", function(index)
     local row = window.rows[index]
+    if row == nil then
+      return nil
+    end
     local kind = row.kind or "optimal"
     return row.name, kind, 0, kind == "header"
   end)
@@ -80,6 +84,9 @@ local function installCraft(window)
   end)
   Wow.stub("GetCraftInfo", function(index)
     local row = window.rows[index]
+    if row == nil then
+      return nil
+    end
     local kind = row.kind or "optimal"
     return row.name, "", kind, 0, kind == "header", 0, 1
   end)
