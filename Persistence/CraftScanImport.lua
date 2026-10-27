@@ -278,14 +278,15 @@ function CraftScanImport.Run(db, src, pause)
   return counts
 end
 
--- Slicer job "craftscan" → onDone(counts) once the import ended and the index rebuild is requested.
-function CraftScanImport.Start(db, src, onDone)
+-- Slicer job "craftscan" → onDone(counts) once the import ended and the index rebuild is requested,
+-- or onCancel() when the job errors or a new CraftScan import replaces it.
+function CraftScanImport.Start(db, src, onDone, onCancel)
   Slicer.Run(JOB, function(pause)
     return CraftScanImport.Run(db, src, pause)
   end, function(counts)
     Index.RequestRebuild("craftscan")
     onDone(counts)
-  end)
+  end, onCancel)
 end
 
 ns.CraftScanImport = CraftScanImport

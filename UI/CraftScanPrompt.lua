@@ -29,13 +29,13 @@ local BUTTON_GAP = 8
 local frame = nil -- made on the first show
 
 -- Runs the CraftScan import of `db` → onLine(result line) when it ends, after
--- `craftScanImported` is set.
-function CraftScanPrompt.Import(db, onLine)
+-- `craftScanImported` is set; onCancel() (optional) when the job errors or another import replaces it.
+function CraftScanPrompt.Import(db, onLine, onCancel)
   CraftScanImport.Start(db, _G["CraftScan_DB"], function(c)
     db.settings.craftScanImported = _G["time"]()
     local line = "CraftScan import: %d characters, %d recipes (%d muted) and %d greetings (%d skipped)."
     onLine(Localization.Text(line, c.characters, c.recipes, c.muted, c.greetings, c.skipped))
-  end)
+  end, onCancel)
 end
 
 local function answer(db, accepted)

@@ -105,6 +105,30 @@ local function testCraftScan()
   Assert.truthy(texts:find("CraftScan import: 3 characters, 1 recipes (0 muted) and 2 greetings (9 skipped).", 1, true), texts)
 end
 
+-- A job that errors or is replaced (Slicer cancels it): the button comes back and no
+-- "Importing..." or "Making the string..." stays behind; reopening restarts the export cleanly.
+local function testCancelRecovers()
+  local ns = load()
+  local export = box("Export string")
+  SettingsFixture.open(ns, "General")
+  SettingsFixture.open(ns, TITLE)
+  Assert.equal(export:GetText(), "Making the string...", "the restart's own placeholder stays")
+  ns.Slicer.Cancel("export")
+  Assert.equal(export:GetText(), "")
+  box("Import string"):SetText(otherAccount(ns, "retail"))
+  Widgets.click(button("Import"))
+  ns.Slicer.Cancel("import")
+  Assert.equal(button("Import"):IsEnabled(), true)
+  ProfessionsRetail.install({ recipes = {} })
+  Wow.stub("CraftScan_DB", dofile("tests/fixtures/craftscan_db.lua"))
+  SettingsFixture.open(ns, "General")
+  SettingsFixture.open(ns, TITLE)
+  Widgets.click(button("Import from CraftScan"))
+  ns.Slicer.Cancel("craftscan")
+  Assert.equal(button("Import from CraftScan"):IsEnabled(), true)
+  Assert.falsy(SettingsFixture.texts():find("Importing...", 1, true), SettingsFixture.texts())
+end
+
 -- Classic: no CraftScan section; the string names the client.
 local function testClassic()
   local ns = load("tbc")
@@ -117,6 +141,7 @@ return function()
   testExport()
   testImport()
   testCraftScan()
+  testCancelRecovers()
   testClassic()
   Wow.reset()
 end

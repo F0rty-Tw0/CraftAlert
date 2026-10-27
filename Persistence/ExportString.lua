@@ -282,16 +282,18 @@ function ExportString.Apply(db, data, pause)
   return counts
 end
 
--- Slicer job "export": onDone(the export string of the db's local characters).
-function ExportString.StartExport(db, onDone)
+-- Slicer job "export": onDone(the export string of the db's local characters), or onCancel()
+-- when the job errors or a new export replaces it.
+function ExportString.StartExport(db, onDone, onCancel)
   Slicer.Run("export", function(pause)
     return ExportString.Encode(db, FlavorCompat.flavorKey, pause)
-  end, onDone)
+  end, onDone, onCancel)
 end
 
 -- Slicer job "import": decodes and applies `text`, then requests the index rebuild →
--- onDone(counts), or onDone(nil, error message) with nothing written.
-function ExportString.StartImport(db, text, onDone)
+-- onDone(counts), or onDone(nil, error message) with nothing written; onCancel() when the job
+-- errors or a new import replaces it.
+function ExportString.StartImport(db, text, onDone, onCancel)
   Slicer.Run("import", function(pause)
     local data, err = ExportString.Decode(text, FlavorCompat.flavorKey, pause)
     if data == nil then
@@ -303,7 +305,7 @@ function ExportString.StartImport(db, text, onDone)
       Index.RequestRebuild("import")
     end
     onDone(counts, err)
-  end)
+  end, onCancel)
 end
 
 ns.ExportString = ExportString
