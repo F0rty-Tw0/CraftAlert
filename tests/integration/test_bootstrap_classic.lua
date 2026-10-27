@@ -248,20 +248,21 @@ local function testFoldedHeader()
   state.skillLines = {
     { name = "Professions", header = true, collapsed = true },
     { name = "Languages", header = true },
-    { name = "Common" },
+    { name = "Common" }, -- a visible line: the read is not partial, so Refresh keeps rather than seeds
   }
   Wow.fireEvent("SKILL_LINES_CHANGED")
   Assert.truthy(character.professions.blacksmithing, "folded: Blacksmithing stays stored")
   Assert.truthy(character.professions.enchanting, "folded: Enchanting stays stored")
   Assert.equal(character.professions.blacksmithing.read, true, "folded: its read flag is kept")
   Assert.truthy(recipes["sim plate belt"], "folded: its recipes stay")
-  Assert.same(ns.ProfessionList.Order(), { "blacksmithing", "enchanting" })
+  Assert.same(ns.ProfessionList.Order(), { "blacksmithing", "enchanting" }, "folded: the order holds")
   Assert.equal(Wow.pendingTimers(0), 0, "folded: same order, no rebuild")
+  runFrame()
   Assert.truthy(ns.Index.Current().size > 0, "folded: the index still listens")
 
   state.skillLines = SKILL_LINES
   Wow.fireEvent("SKILL_LINES_CHANGED")
-  Assert.same(ns.ProfessionList.Order(), { "blacksmithing", "enchanting" })
+  Assert.same(ns.ProfessionList.Order(), { "blacksmithing", "enchanting" }, "unfolded: the order holds")
   Assert.equal(Wow.pendingTimers(0), 0, "unfolded: no rebuild")
   Assert.truthy(recipes["sim plate belt"], "unfolded: the recipes stay")
 end
