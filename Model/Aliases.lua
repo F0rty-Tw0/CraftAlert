@@ -306,7 +306,7 @@ function Aliases.Build(index, names, pause)
     end
     pause()
   end
-  StatSlot.Finish(index)
+  StatSlot.Finish(index, pause)
   addJoins(index, records, pause)
   shareEntryLists(index, records, pause)
 end

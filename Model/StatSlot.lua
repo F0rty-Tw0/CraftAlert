@@ -142,10 +142,13 @@ local function better(a, b)
   return a.character < b.character
 end
 
-function StatSlot.Finish(index)
+-- pause = fn(weight) from Aliases.Build: a comparator can't yield, so it runs between sorts,
+-- weighed by the sorted list's length.
+function StatSlot.Finish(index, pause)
   for _, byStat in pairs(index.statSlotIndex) do
     for _, list in pairs(byStat) do
       sort(list, better)
+      pause(#list)
     end
   end
   ranks = {}

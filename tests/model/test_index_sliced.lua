@@ -176,6 +176,42 @@ local function testWordGroupsWeighsLists()
   Assert.equal(heavy, 2 * words, "pauses weighted by the longest list")
 end
 
+-- StatSlot.Finish pauses after each stat list it sorts, weighed by the list's length: with
+-- several enchanters the sorts alone outlast a tick.
+local function testStatSlotSortsPause()
+  local ns, db = setup()
+  local finish, sorting, weights = ns.StatSlot.Finish, false, {}
+  ns.StatSlot.Finish = function(...)
+    sorting = true
+    finish(...)
+    sorting = false
+  end
+  local index = ns.Index.Build(db, db.settings, {
+    ownKey = "Me-Realm",
+    professionOrder = function()
+      return Synthetic.PROFESSIONS
+    end,
+    pause = function(weight)
+      if sorting then
+        weights[#weights + 1] = weight
+      end
+    end,
+  })
+  ns.StatSlot.Finish = finish
+  local lists, entries, paused = 0, 0, 0
+  for _, byStat in pairs(index.statSlotIndex) do
+    for _, list in pairs(byStat) do
+      lists, entries = lists + 1, entries + #list
+    end
+  end
+  for _, weight in ipairs(weights) do
+    paused = paused + weight
+  end
+  Assert.truthy(lists > 1, "the fixture has stat lists, " .. lists)
+  Assert.equal(#weights, lists, "one pause per sorted list")
+  Assert.equal(paused, entries, "pauses weighted by the list lengths")
+end
+
 -- Before Configure a request starts nothing (Rebuild returns nil there too).
 local function testNoJobBeforeConfigure()
   local ns = Fixture.load()
@@ -195,5 +231,6 @@ return function()
   testNoJobBeforeConfigure()
   testHeavyWordsYieldOnBudget()
   testWordGroupsWeighsLists()
+  testStatSlotSortsPause()
   Wow.reset()
 end
