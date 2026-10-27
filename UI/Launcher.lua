@@ -29,7 +29,9 @@ local ipairs = ipairs
 local FRAME_NAME = "CraftAlertLauncher"
 local UI_KEY = "launcher"
 local FALLBACK_POSITION = { "RIGHT", -60, 120 }
-local BADGE_OFFSET = 6
+-- The badge's centre BADGE_INSET px in from the button's top-right corner, on the ring's edge;
+-- its dark rim BADGE_RIM px wide.
+local BADGE_INSET, BADGE_RIM = 8, 2
 
 ---@type table
 local launcher = nil -- the button, nil until Create
@@ -75,20 +77,40 @@ local function onLeave(frame)
   Tooltip.HideIfOwned(frame)
 end
 
+local function circleTexture(badge, layer, color)
+  local texture = badge:CreateTexture(nil, layer)
+  texture:SetTexture(Theme.BADGE_TEXTURE)
+  texture:SetVertexColor(color[1], color[2], color[3], color[4])
+  return texture
+end
+
+-- Gold like the unseen dots it counts (LeadRow), a dark number, a dark rim where it sits on the
+-- ring.
 local function createBadge(frame)
-  local size = Theme.LAYOUT.ICON_BADGE_SIZE
+  local size, colors = Theme.LAYOUT.ICON_BADGE_SIZE, Theme.COLORS
   local badge = _G["CreateFrame"]("Frame", nil, frame)
   badge:SetSize(size, size)
-  badge:SetPoint("TOPRIGHT", frame, "TOPRIGHT", BADGE_OFFSET, BADGE_OFFSET)
-  local circle = badge:CreateTexture(nil, "ARTWORK")
-  circle:SetAllPoints(badge)
-  circle:SetTexture(Theme.BADGE_TEXTURE)
-  local accent = Theme.COLORS.accent
-  circle:SetVertexColor(accent[1], accent[2], accent[3], accent[4])
-  local count = FrameKit.Text(badge, Theme.FONTS.badge, Theme.COLORS.badgeText)
+  badge:SetPoint("CENTER", frame, "TOPRIGHT", -BADGE_INSET, -BADGE_INSET)
+  badge.rim = circleTexture(badge, "BACKGROUND", colors.badgeRim)
+  badge.rim:SetPoint("TOPLEFT", badge, "TOPLEFT", -BADGE_RIM, BADGE_RIM)
+  badge.rim:SetPoint("BOTTOMRIGHT", badge, "BOTTOMRIGHT", BADGE_RIM, -BADGE_RIM)
+  badge.circle = circleTexture(badge, "ARTWORK", colors.gold)
+  badge.circle:SetAllPoints(badge)
+  local count = FrameKit.Text(badge, Theme.FONTS.badge, colors.badgeText)
   count:SetPoint("CENTER", badge, "CENTER", 0, 0)
   count:SetJustifyH("CENTER")
   return badge, count
+end
+
+-- Listed leads neither greeted nor seen, the WhisperMessenger tab's rule (UI/BridgePanel.lua).
+local function unseenCount()
+  local count = 0
+  for _, lead in ipairs(Leads.List()) do
+    if Leads.IsUnseen(lead) then
+      count = count + 1
+    end
+  end
+  return count
 end
 
 local function create()
@@ -173,7 +195,7 @@ end
 
 -- Lit or dim from ScanGate.IsActive(), badge and visibility from the leads; hidden in an
 -- instance. Arguments are ignored (Bootstrap subscribes it to ScanGate.OnChange and
--- Leads.On("change")).
+-- Leads.On("change") and "seen").
 function Launcher.Refresh()
   if launcher == nil then
     return
@@ -188,7 +210,7 @@ function Launcher.Refresh()
   local lit = ScanGate.IsActive()
   launcher.icon:SetDesaturated(not lit)
   launcher:SetAlpha(lit and 1 or Theme.DIM_ALPHA)
-  local count = #Leads.List()
+  local count = unseenCount()
   launcher.badgeText:SetText(tostring(count))
   if count > 0 then
     launcher.badge:Show()

@@ -255,7 +255,10 @@ local function testFreshInstall()
   for _, event in ipairs(WHISPER_EVENTS) do
     Assert.truthy(isRegistered(event), event .. " registered with a lead")
   end
-  Assert.equal(rawget(_G, "CraftAlertLauncher").badgeText:GetText(), "1", "the launcher counts the lead")
+  -- The open window showed the lead in its details, so it is seen; Bootstrap refreshes the
+  -- launcher on "seen" (its "change" refresh ran before the window's), and the badge leaves it out.
+  Assert.equal(lead.seen, true)
+  Assert.equal(rawget(_G, "CraftAlertLauncher").badge:IsShown(), false, "a seen lead leaves the badge")
 
   -- Left-click on the toast once it has been seen: the disclosure, then the whisper.
   Wow.clock.gettime = Wow.clock.gettime + 1
