@@ -179,20 +179,27 @@ function TypoPass.Run(index, tokens, count, companion, aside)
   local typoBuckets = index.typoBuckets
   local tried = 0
   local dropped, dropRun = PhraseMatch.dropped, PhraseMatch.dropRun
+  -- The last token `eligible` rejected: an ineligible word does not count toward MAX_TOKENS,
+  -- so a line repeating one ("enchant enchant ...") would ask for every repeat.
+  local ineligible = nil
   for i = 1, count do
     local token = tokens[i]
     local length = #token
     -- User ruling 2026-10-24 (R4): the tokens of a hit step 4.2 dropped are not typo targets,
     -- tested before eligible so such a token does not count toward MAX_TOKENS. The length test
     -- runs first too: most chat words are short, and it saves them the call.
-    if length >= MIN_LETTERS and dropped[i] ~= dropRun and eligible(index, token, length) then
-      tried = tried + 1
-      local byLength = typoBuckets[byte(token, 1)]
-      if byLength and nearest(token, length, byLength) > 0 then
-        keep(token, index.needsSecondWord, companion, aside)
-      end
-      if tried == MAX_TOKENS then
-        break
+    if length >= MIN_LETTERS and dropped[i] ~= dropRun and token ~= ineligible then
+      if eligible(index, token, length) then
+        tried = tried + 1
+        local byLength = typoBuckets[byte(token, 1)]
+        if byLength and nearest(token, length, byLength) > 0 then
+          keep(token, index.needsSecondWord, companion, aside)
+        end
+        if tried == MAX_TOKENS then
+          break
+        end
+      else
+        ineligible = token
       end
     end
   end

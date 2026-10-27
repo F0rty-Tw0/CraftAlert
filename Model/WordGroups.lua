@@ -407,6 +407,7 @@ local function firstWords(wordIndex, tokens, count, breakBefore)
       first = token
     elseif word and other == nil and token ~= first then
       other = token
+      break -- both found: later tokens change neither
     end
   end
   return first, other

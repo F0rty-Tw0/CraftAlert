@@ -175,6 +175,9 @@ end
 local lineKeys, lineKeyTokens, lineKeyCount = {}, {}, 0
 local triedStamp = setmetatable({}, { __mode = "k" })
 local stamp = 0
+-- The last digit-led token and its stat key (nil: none): chat repeats such a token ("1x"),
+-- and statWords never changes, so the key holds across lines.
+local digitToken, digitKey = nil, nil
 
 local function collectStatKeys(tokens, count)
   lineKeyCount = 0
@@ -184,9 +187,14 @@ local function collectStatKeys(tokens, count)
     local token = tokens[j]
     local key = statWords[token]
     if key == nil then
-      local first = byte(token, 1)
-      if first >= DIGIT_0 and first <= DIGIT_9 then
-        key = digitStatOf(token)
+      if token == digitToken then
+        key = digitKey
+      else
+        local first = byte(token, 1)
+        if first >= DIGIT_0 and first <= DIGIT_9 then
+          key = digitStatOf(token)
+          digitToken, digitKey = token, key
+        end
       end
     end
     if key then
@@ -206,13 +214,19 @@ end
 -- Step 4.3: the first slot word with entries, with the first stat word that has some for
 -- it. → the best-first entry list, the slot token and the stat token; nil when none. Each
 -- token's stat key is read once and each slot word tried once, so a line costs O(tokens).
+-- The first slot word with entries is found first: most lines have none, and then no
+-- token's stat key (a byte read per token) is read at all.
 function StatSlot.Find(index, tokens, count)
-  if collectStatKeys(tokens, count) == 0 then
+  local statSlotIndex = index.statSlotIndex
+  local from = 1
+  while from <= count and statSlotIndex[tokens[from]] == nil do
+    from = from + 1
+  end
+  if from > count or collectStatKeys(tokens, count) == 0 then
     return nil
   end
   stamp = stamp + 1
-  local statSlotIndex = index.statSlotIndex
-  for i = 1, count do
+  for i = from, count do
     local byStat = statSlotIndex[tokens[i]]
     if byStat and triedStamp[byStat] ~= stamp then
       triedStamp[byStat] = stamp
