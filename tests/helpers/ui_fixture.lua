@@ -64,6 +64,7 @@ local UI = {
   "UI.AlertToast",
   "UI.Settings.Column",
   "UI.Settings.Controls",
+  "UI.CraftScanPrompt",
   "UI.Settings.PageGeneral",
   "UI.Settings.PageAlerts",
   "UI.Settings.PageGreetings",

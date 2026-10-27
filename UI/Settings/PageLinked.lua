@@ -7,14 +7,14 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 local ExportString = ns.ExportString or require("CraftAlert.Persistence.ExportString")
-local CraftScanImport = ns.CraftScanImport or require("CraftAlert.Persistence.CraftScanImport")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
+local CraftScanPrompt = ns.CraftScanPrompt or require("CraftAlert.UI.CraftScanPrompt")
 
 -- Spec §9 Linked accounts, §10.1: this account's export string to copy, a box to paste another
 -- account's string into, and the characters imported so far with their import date. On Retail a
 -- button imports CraftScan's data (§10.2), enabled while CraftScan's saved data is loaded. The
--- jobs run sliced (ExportString, CraftScanImport) and rebuild the index when they end. No box caps
+-- jobs run sliced (ExportString, CraftScanPrompt.Import) and rebuild the index when they end. No box caps
 -- its letters: a large account's string is about 100 KB.
 local PageLinked = { id = "linked", title = Localization.Text("Linked accounts") }
 
@@ -127,17 +127,14 @@ local function createCraftScan(column, page)
   local result
   local button
   button = Controls.Button(column.parent, Localization.Text("Import from CraftScan"), CRAFTSCAN_WIDTH, function()
-    local src = _G["CraftScan_DB"]
-    if type(src) ~= "table" then
+    if type(_G["CraftScan_DB"]) ~= "table" then
       return
     end
     button:Disable()
     result:SetText(Localization.Text("Importing..."))
-    CraftScanImport.Start(db(), src, function(c)
+    CraftScanPrompt.Import(db(), function(line)
       button:Enable()
-      db().settings.craftScanImported = _G["time"]()
-      local line = "Imported %d characters, %d recipes (%d muted) and %d greetings (%d skipped)."
-      result:SetText(Localization.Text(line, c.characters, c.recipes, c.muted, c.greetings, c.skipped))
+      result:SetText(line)
       page.ShowImported()
     end)
   end)

@@ -102,7 +102,7 @@ local function testCraftScan()
   Assert.equal(db.settings.craftScanImported, 1000)
   Assert.truthy(db.characters["Scanalt-OwnRealm"].recipes[9004])
   local texts = SettingsFixture.texts()
-  Assert.truthy(texts:find("Imported 3 characters, 1 recipes (0 muted) and 2 greetings (9 skipped).", 1, true), texts)
+  Assert.truthy(texts:find("CraftScan import: 3 characters, 1 recipes (0 muted) and 2 greetings (9 skipped).", 1, true), texts)
 end
 
 -- Classic: no CraftScan section; the string names the client.

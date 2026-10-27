@@ -100,6 +100,7 @@ UI/ToastChrome.lua
 UI/AlertToast.lua
 UI/Settings/Column.lua
 UI/Settings/Controls.lua
+UI/CraftScanPrompt.lua
 UI/Settings/PageGeneral.lua
 UI/Settings/PageAlerts.lua
 UI/Settings/PageGreetings.lua
