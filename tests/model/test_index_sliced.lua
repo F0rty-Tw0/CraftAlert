@@ -154,26 +154,32 @@ local function testHeavyWordsYieldOnBudget()
   Assert.truthy(longest <= ns.Slicer.BUDGET_MS + 1, "a tick holds at most one heavy word past the budget, longest " .. longest)
 end
 
--- Both WordGroups loops over wordIndex weigh a word by its list's length.
-local function testWordGroupsWeighsLists()
+-- WordGroups pauses inside one word list's work, not only between words: the longest list's
+-- entries are read a few walks' worth at most between two pauses, never all its walks at once.
+local function testWordGroupsPausesWithinList()
   local ns, db = setup()
   local index = Synthetic.build(ns, db)
-  local longest, words = 0, 0
+  local longest = {}
   for _, list in pairs(index.wordIndex) do
-    if #list > longest then
-      longest, words = #list, 1
-    elseif #list == longest then
-      words = words + 1
+    if #list > #longest then
+      longest = list
     end
   end
-  local heavy = 0
-  ns.WordGroups.Build(index, function(weight)
-    if weight == longest then
-      heavy = heavy + 1
-    end
+  local reads, most = 0, 0
+  for k, entry in ipairs(longest) do
+    longest[k] = setmetatable({}, {
+      __index = function(_, key)
+        reads = reads + 1
+        return entry[key]
+      end,
+    })
+  end
+  ns.WordGroups.Build(index, function()
+    most, reads = math.max(most, reads), 0
   end)
-  Assert.truthy(longest > 8, "the longest list outweighs a clock read, " .. longest)
-  Assert.equal(heavy, 2 * words, "pauses weighted by the longest list")
+  most = math.max(most, reads)
+  Assert.truthy(#longest > 64, "the fixture has a long list, " .. #longest)
+  Assert.truthy(most <= 4 * #longest, "entry reads between two pauses, " .. most .. " of a " .. #longest .. "-entry list")
 end
 
 -- StatSlot.Finish pauses after each stat list it sorts, weighed by the list's length: with
@@ -230,7 +236,7 @@ return function()
   testRebuildCancelsJob()
   testNoJobBeforeConfigure()
   testHeavyWordsYieldOnBudget()
-  testWordGroupsWeighsLists()
+  testWordGroupsPausesWithinList()
   testStatSlotSortsPause()
   Wow.reset()
 end

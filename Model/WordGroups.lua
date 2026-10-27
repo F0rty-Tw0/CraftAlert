@@ -67,6 +67,11 @@ local NO_WORDS = {}
 
 local function noPause() end
 
+-- A long word list's walks pause between one walk and the next (weighted by the list's
+-- length), and byProfession's split of it, the longest walk, every LIST_CHUNK entries too: the
+-- sliced build never runs a whole list's step 4.4 work without a pause.
+local LIST_CHUNK = 64
+
 -- groupWords by inversion of wordIndex: each group walks a trie of word sets in pairs()
 -- order (the same order for every group), so groups with equal word sets end on one node and
 -- share its set.
@@ -136,8 +141,8 @@ local function markSetsWithAll(sets, words, n, mark)
 end
 
 -- Step 4.4 on one list: one recipe → its entries; several → the best profession's entries.
--- seenIn[group] == list: the group was already met in this list.
-local function infoFor(list, rank, seenIn)
+-- seenIn[group] == list: the group was already met in this list. pause: between its walks.
+local function infoFor(list, rank, seenIn, pause)
   local firstOfGroup = {}
   for _, entry in ipairs(list) do
     if seenIn[entry.group] ~= list then
@@ -148,6 +153,7 @@ local function infoFor(list, rank, seenIn)
   if #firstOfGroup == 1 then
     return { groupCount = 1, prof = list[1].prof, entries = list }
   end
+  pause(#list)
   local prof = Candidates.BestProfession(firstOfGroup, #firstOfGroup, rank)
   local entries = {}
   for _, entry in ipairs(list) do
@@ -176,7 +182,7 @@ end
 -- of list has entries of several professions (or of one and of none), so its soleInfo counts
 -- add up to more than the step 4.4 tie-break counts (firstIn[group] == list: profOf[group] is
 -- its first entry's profession, false for none).
-local function byProfession(list, seenIn, firstIn, profOf)
+local function byProfession(list, seenIn, firstIn, profOf, pause)
   local only = list[1] and list[1].prof
   for _, entry in ipairs(list) do
     if entry.prof ~= only then
@@ -188,7 +194,10 @@ local function byProfession(list, seenIn, firstIn, profOf)
     return nil, nil, false
   end
   local byProf, profs, split = {}, {}, false
-  for _, entry in ipairs(list) do
+  for k, entry in ipairs(list) do
+    if k % LIST_CHUNK == 0 then
+      pause(LIST_CHUNK)
+    end
     local prof, group = entry.prof, entry.group
     if firstIn[group] ~= list then
       firstIn[group], profOf[group] = list, prof or false
@@ -204,6 +213,7 @@ local function byProfession(list, seenIn, firstIn, profOf)
       entries[#entries + 1] = entry
     end
   end
+  pause(#list)
   for _, prof in ipairs(profs) do
     byProf[prof] = soleInfo(byProf[prof], prof, seenIn)
   end
@@ -267,7 +277,7 @@ for subclass = 1, #Slang.armor do
   ARMOR_WORDS[subclass] = Slang.armor[subclass][1]
 end
 
-local function buildArmorInfo(index, rank, seenIn)
+local function buildArmorInfo(index, rank, seenIn, pause)
   local wordIndex, groupWords, armorInfo = index.wordIndex, index.groupWords, {}
   for _, armor in ipairs(ARMOR_WORDS) do
     local byWord, infoOf = {}, {}
@@ -282,7 +292,7 @@ local function buildArmorInfo(index, rank, seenIn)
               both[#both + 1] = entry
             end
           end
-          info = #both > 0 and infoFor(both, rank, seenIn) or false
+          info = #both > 0 and infoFor(both, rank, seenIn, pause) or false
           infoOf[list] = info
         end
         byWord[word] = info or nil
@@ -295,7 +305,8 @@ end
 
 -- Index build (also after a test adds wordIndex words): fills slotsOf, groupWords, wordInfo and
 -- the profession key of every profession word (professionKeys). pause (optional) runs inside
--- the long loops, weighted by a word's list length: Index's sliced build yields there.
+-- the long loops, weighted by a word's list length, and between the walks of one list
+-- (LIST_CHUNK): Index's sliced build yields there.
 function WordGroups.Build(index, pause)
   pause = pause or noPause
   buildSlotsOf(index)
@@ -319,8 +330,9 @@ function WordGroups.Build(index, pause)
   for word, list in pairs(index.wordIndex) do
     local info = infoOf[list]
     if info == nil then
-      info = infoFor(list, rank, seenIn)
-      local byProf, profs, split = byProfession(list, seenIn, firstIn, profOf)
+      info = infoFor(list, rank, seenIn, pause)
+      pause(#list)
+      local byProf, profs, split = byProfession(list, seenIn, firstIn, profOf, pause)
       if byProf ~= nil and info.groupCount > 1 and info.prof ~= nil then
         info.entries = byProf[info.prof].entries -- the same entries in the same order, held once
       end
@@ -333,7 +345,7 @@ function WordGroups.Build(index, pause)
     index.wordInfo[word] = info
     pause(#list)
   end
-  buildArmorInfo(index, rank, seenIn)
+  buildArmorInfo(index, rank, seenIn, pause)
 end
 
 -- §6.4: an ambiguous word counts only when another wordIndex word or a step 4.2 phrase match
