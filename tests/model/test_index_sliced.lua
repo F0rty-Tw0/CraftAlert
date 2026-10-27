@@ -154,26 +154,71 @@ local function testHeavyWordsYieldOnBudget()
   Assert.truthy(longest <= ns.Slicer.BUDGET_MS + 1, "a tick holds at most one heavy word past the budget, longest " .. longest)
 end
 
--- Both WordGroups loops over wordIndex weigh a word by its list's length.
-local function testWordGroupsWeighsLists()
+-- WordGroups pauses inside one word list's work, not only between words: the longest list's
+-- entries are read a few walks' worth at most between two pauses, never all its walks at once.
+local function testWordGroupsPausesWithinList()
   local ns, db = setup()
   local index = Synthetic.build(ns, db)
-  local longest, words = 0, 0
+  local longest = {}
   for _, list in pairs(index.wordIndex) do
-    if #list > longest then
-      longest, words = #list, 1
-    elseif #list == longest then
-      words = words + 1
+    if #list > #longest then
+      longest = list
     end
   end
-  local heavy = 0
+  local reads, most, heavy = 0, 0, 0
+  for k, entry in ipairs(longest) do
+    longest[k] = setmetatable({}, {
+      __index = function(_, key)
+        reads = reads + 1
+        return entry[key]
+      end,
+    })
+  end
   ns.WordGroups.Build(index, function(weight)
-    if weight == longest then
+    most, reads = math.max(most, reads), 0
+    if weight == #longest then
       heavy = heavy + 1
     end
   end)
-  Assert.truthy(longest > 8, "the longest list outweighs a clock read, " .. longest)
-  Assert.equal(heavy, 2 * words, "pauses weighted by the longest list")
+  most = math.max(most, reads)
+  Assert.truthy(#longest > 64, "the fixture has a long list, " .. #longest)
+  Assert.truthy(most <= 4 * #longest, "entry reads between two pauses, " .. most .. " of a " .. #longest .. "-entry list")
+  -- buildGroupWords and the word-info loop each weigh the word by its list's length.
+  Assert.truthy(heavy >= 2, "pauses weighted by the longest list, " .. heavy)
+end
+
+-- byProfession splits a list of several professions with a pause every 64 entries: the pauses
+-- right after reads of such a list weigh 64, which no whole-list pause of it does.
+local function testWordGroupsChunksProfessionSplit()
+  local ns, db = setup()
+  local index = Synthetic.build(ns, db)
+  local split = {}
+  for _, list in pairs(index.wordIndex) do
+    local first = list[1] and list[1].prof
+    for _, entry in ipairs(list) do
+      if entry.prof ~= first and #list > #split then
+        split = list
+        break
+      end
+    end
+  end
+  local touched, chunks = false, 0
+  for k, entry in ipairs(split) do
+    split[k] = setmetatable({}, {
+      __index = function(_, key)
+        touched = true
+        return entry[key]
+      end,
+    })
+  end
+  ns.WordGroups.Build(index, function(weight)
+    if touched and weight == 64 then
+      chunks = chunks + 1
+    end
+    touched = false
+  end)
+  Assert.truthy(#split > 128, "the fixture has a long split list, " .. #split)
+  Assert.truthy(chunks >= math.floor(#split / 64), "chunk pauses in the split, " .. chunks .. " for " .. #split .. " entries")
 end
 
 -- StatSlot.Finish pauses after each stat list it sorts, weighed by the list's length: with
@@ -230,7 +275,8 @@ return function()
   testRebuildCancelsJob()
   testNoJobBeforeConfigure()
   testHeavyWordsYieldOnBudget()
-  testWordGroupsWeighsLists()
+  testWordGroupsPausesWithinList()
+  testWordGroupsChunksProfessionSplit()
   testStatSlotSortsPause()
   Wow.reset()
 end
