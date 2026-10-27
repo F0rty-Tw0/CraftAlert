@@ -143,8 +143,9 @@ local function testClassicNameKeys()
   })
 end
 
--- Records go out numbers ascending, then string keys ascending, sorted without a Lua comparator
--- (one took 20 ms in one slice for 5000 keys).
+-- Records go out keys ascending, sorted without a Lua comparator (one took 20 ms in one slice for
+-- 5000 keys). The Schema keeps both kinds of key; only the flavor's kind is written (numbers on
+-- Retail, text on Classic), so a string never holds a key its reader refuses.
 local function testKeyOrder()
   local sort, comparators = table.sort, 0
   rawset(table, "sort", function(list, comparator)
@@ -154,13 +155,20 @@ local function testKeyOrder()
   local ExportString = load()
   local recipes = {}
   for _, key in ipairs({ 100, "b", 5, "a", 30 }) do
-    recipes[key] = { name = "R" .. key, prof = BS }
+    recipes[key] = { name = "R" .. key, prof = type(key) == "number" and BS or "bs" }
   end
-  local db = { characters = { ["Smith-Realm"] = { source = "local", realms = {}, professions = { [BS] = { name = "BS" } }, recipes = recipes } } }
-  local text = ExportString.Encode(db, "retail")
+  recipes[7] = { name = "Classic prof", prof = "bs" }
+  local professions = { [BS] = { name = "BS" }, bs = { name = "BS" } }
+  local db = { characters = { ["Smith-Realm"] = { source = "local", realms = {}, professions = professions, recipes = recipes } } }
+  local retail, classic = ExportString.Encode(db, "retail"), ExportString.Encode(db, "tbc")
   rawset(table, "sort", sort)
   Assert.equal(comparators, 0)
-  Assert.truthy(text:find("r,5,4k,R5,,,,;r,p,4k,R30,,,,;r,1y,4k,R100,,,,;r,~a,4k,Ra,,,,;r,~b,4k,Rb,,,,", 1, true), text)
+  Assert.truthy(retail:find(",;p,4k,BS;r,5,4k,R5,,,,;r,p,4k,R30,,,,;r,1y,4k,R100,,,,:", 1, true), retail)
+  Assert.truthy(classic:find(",;p,~bs,BS;r,~a,~bs,Ra,,,,;r,~b,~bs,Rb,,,,:", 1, true), classic)
+  for _, case in ipairs({ { retail, "retail", 3 }, { classic, "tbc", 2 } }) do
+    local counts = ExportString.Apply({ characters = {} }, assert(ExportString.Decode(case[1], case[2])))
+    Assert.same(counts, { characters = 1, recipes = case[3], skipped = 0 })
+  end
 end
 
 -- A text field holds at most MAX.text bytes, each escaped in 3: a longer field is refused before
@@ -248,11 +256,16 @@ local function testRejected()
     { seal("CA1:retail:c,Smith-Realm,,;x,1"), "record 2" },
     { seal("CA1:retail:c,Smith-Realm,,;p,4k,B,S"), "profession 2" }, -- field count
     { seal("CA1:retail:c," .. string.rep("y", Fields.MAX.record) .. ",,"), "record 1" }, -- refused unsplit
+    -- The other flavor's kind of key: text on Retail, a number on Classic.
+    { seal("CA1:retail:c,Smith-Realm,,;p,~bs,BS"), "profession 2" },
+    { seal("CA1:retail:c,Smith-Realm,,;p,4k,BS;r,~a,4k,A,,,,"), "recipe 3" },
+    { seal("CA1:tbc:c,Smith-Realm,,;p,4k,BS"), "profession 2", "tbc" },
+    { seal("CA1:tbc:c,Smith-Realm,,;p,~bs,BS;r,1,~bs,A,,,,"), "recipe 3", "tbc" },
   }
   local db = { characters = { ["Mine-Realm"] = { source = "local", enabled = true, realms = {}, professions = {}, recipes = {} } } }
   local before = copy(db)
   for i, case in ipairs(cases) do
-    local data, err = ExportString.Decode(case[1], "retail")
+    local data, err = ExportString.Decode(case[1], case[3] or "retail")
     Assert.equal(data, nil, "case " .. i)
     Assert.truthy(err:find(case[2], 1, true), "case " .. i .. ": " .. err)
   end

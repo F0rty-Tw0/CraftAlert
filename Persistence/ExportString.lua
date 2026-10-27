@@ -87,8 +87,9 @@ local function sortedKeys(map)
   return numbers
 end
 
--- The character record and its profession records, or nil when the key cannot be written.
-local function characterRecords(key, character, parts)
+-- The character record and its profession records, or nil when the key cannot be written. Only
+-- this flavor's kind of key is written; recipes of a profession left out are left out too.
+local function characterRecords(key, character, parts, flavorKey)
   if not Fields.IsCharacterKey(key) then
     return nil
   end
@@ -97,7 +98,8 @@ local function characterRecords(key, character, parts)
   local professions = {}
   for _, prof in ipairs(sortedKeys(character.professions)) do
     local name = character.professions[prof].name
-    if #professions < MAX.professions and Fields.KeyField(prof) and Fields.IsText(name, true) then
+    local writable = Fields.IsFlavorKey(prof, flavorKey) and Fields.KeyField(prof) and Fields.IsText(name, true)
+    if #professions < MAX.professions and writable then
       professions[prof] = true
       parts[#parts + 1] = concat({ "p", Fields.KeyField(prof), Fields.Text(name) }, ",")
     end
@@ -116,12 +118,14 @@ local function recipeRecord(keyField, recipe)
   return concat({ "r", keyField, Fields.KeyField(recipe.prof), Fields.Text(recipe.name), item, ranks, line, muted }, ",")
 end
 
-local function recipeRecords(character, professions, parts, pause)
+local function recipeRecords(character, professions, parts, flavorKey, pause)
   local written, previous = 0, 0
   for _, key in ipairs(sortedKeys(character.recipes)) do
     local recipe = character.recipes[key]
     local keyField
-    if type(key) == "number" then
+    if not Fields.IsFlavorKey(key, flavorKey) then
+      keyField = nil
+    elseif type(key) == "number" then
       keyField = Fields.IsId(key) and Base36.Encode(key - previous) or nil
     else
       keyField = Fields.KeyField(key)
@@ -143,10 +147,10 @@ function ExportString.Encode(db, flavorKey, pause)
   for _, key in ipairs(sortedKeys(db.characters)) do
     local character = db.characters[key]
     if character.source ~= "import" and characters < MAX.characters then
-      local professions = characterRecords(key, character, parts)
+      local professions = characterRecords(key, character, parts, flavorKey)
       if professions then
         characters = characters + 1
-        recipeRecords(character, professions, parts, pause)
+        recipeRecords(character, professions, parts, flavorKey, pause)
       end
     end
   end
@@ -214,7 +218,7 @@ function ExportString.Decode(text, flavorKey, pause)
   -- Records split with a plain find: a "[^;]*" match took 6 ms in one slice over a 590 KB record.
   -- Each record weighs one pause per 256 bytes, so the clock is read before a long one (eight
   -- 10 KB records, about 3 ms each, once ran between two clock reads).
-  local state = Fields.NewState()
+  local state = Fields.NewState(flavor)
   local start, number = 1, 0
   while body ~= "" and start <= #body + 1 do
     local stop = find(body, ";", start, true) or #body + 1

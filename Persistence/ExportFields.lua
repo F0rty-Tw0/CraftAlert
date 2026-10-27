@@ -9,7 +9,7 @@ local Base36 = ns.Base36 or require("CraftAlert.Persistence.Base36")
 -- contract. Writers return the field, or nil for a value the readers would refuse (the caller
 -- leaves that value out); readers return the value, or nil/false for a field they refuse.
 --   number = an ID, 1..MAX_ID, in base 36 (Persistence/Base36.lua); "" for none
---   key    = a number, or "~" text for a string key (Classic names)
+--   key    = a number on Retail and Forever, "~" text on Classic (names); the other kind is refused
 --   text   = 1..MAX.text bytes, no "|" (a UI escape) and no control byte; "%" ":" ";" "," "."
 --            "~" written as "%" and two hex digits
 --   list   = items joined by "." (realms: texts; ranks: numbers); "" for none
@@ -90,6 +90,13 @@ function ExportFields.ReadText(field)
   end
   local text = gsub(field, "%%(%x%x)", unescape)
   return ExportFields.IsText(text, true) and text or nil
+end
+
+-- Whether a recipe or profession key is the kind this flavor stores (ProfessionList's keyType):
+-- the Schema keeps both kinds, and only one is written or read.
+function ExportFields.IsFlavorKey(key, flavorKey)
+  local classic = flavorKey ~= "retail" and flavorKey ~= "forever"
+  return type(key) == (classic and "string" or "number")
 end
 
 function ExportFields.KeyField(key)
@@ -219,7 +226,7 @@ function PARSE.p(state, record)
   local character = state.current
   local key = f and ExportFields.ReadKey(f[2])
   local name = f and ExportFields.ReadText(f[3])
-  if character == nil or key == nil or name == nil or character.professions[key] ~= nil then
+  if character == nil or not ExportFields.IsFlavorKey(key, state.flavorKey) or name == nil or character.professions[key] ~= nil then
     return "profession"
   end
   state.professionCount = state.professionCount + 1
@@ -230,17 +237,19 @@ function PARSE.p(state, record)
   return nil
 end
 
+-- → the recipe key, or nil for a refused one or the other flavor's kind.
 local function readRecipeKey(state, field)
+  local key
   if find(field, "^~") then
-    return ExportFields.ReadKey(field)
+    key = ExportFields.ReadKey(field)
+  else
+    local step = Base36.Decode(field)
+    local id = step and step > 0 and state.lastId + step or nil
+    if id and ExportFields.IsId(id) then
+      state.lastId, key = id, id
+    end
   end
-  local step = Base36.Decode(field)
-  local id = step and step > 0 and state.lastId + step or nil
-  if id and ExportFields.IsId(id) then
-    state.lastId = id
-    return id
-  end
-  return nil
+  return ExportFields.IsFlavorKey(key, state.flavorKey) and key or nil
 end
 
 function PARSE.r(state, record)
@@ -266,9 +275,10 @@ function PARSE.r(state, record)
   return nil
 end
 
--- The parse state: decoded characters in string order, the one the next records belong to.
-function ExportFields.NewState()
-  return { characters = {}, seen = {}, current = nil, lastId = 0, professionCount = 0, recipeCount = 0 }
+-- The parse state of a string from `flavorKey`: decoded characters in string order, the one the
+-- next records belong to.
+function ExportFields.NewState(flavorKey)
+  return { flavorKey = flavorKey, characters = {}, seen = {}, current = nil, lastId = 0, professionCount = 0, recipeCount = 0 }
 end
 
 -- Adds one record to `state` → nil, or a word naming what was refused.
