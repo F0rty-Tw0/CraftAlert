@@ -118,6 +118,17 @@ local function testNonAscii()
   Assert.equal(Tokenizer.normalized, "lf verzauberer für brust ask zoë kel'thuzad")
 end
 
+-- WORD spells its class as byte ranges (a class like %w calls the C library per byte): every
+-- byte is a word byte exactly when it is an ASCII letter or digit, the apostrophe or >= 128,
+-- uppercase too, since Aliases.Normalize reads names with the same pattern.
+local function testWordBytes()
+  local Tokenizer = load()
+  for b = 0, 255 do
+    local isWord = (b >= 65 and b <= 90) or (b >= 97 and b <= 122) or (b >= 48 and b <= 57) or b == 39 or b >= 128
+    Assert.equal(string.find(string.char(b), "^" .. Tokenizer.WORD .. "$") ~= nil, isWord, "byte " .. b)
+  end
+end
+
 -- Escapes that are not links: textures, raw pipes, newlines; digits stay in words.
 local function testOtherEscapes()
   local Tokenizer = load()
@@ -125,6 +136,8 @@ local function testOtherEscapes()
   Assert.same(tokensOf(Tokenizer, count), { "lf", "8stam", "to", "chest", "1h", "sword" })
   Assert.equal(Tokenizer.Tokenize("!!! ..."), 0)
   Assert.equal(Tokenizer.normalized, "")
+  Tokenizer.Tokenize("|qlf a|xb") -- unknown escapes drop only the bar
+  Assert.equal(Tokenizer.normalized, "qlf a xb")
 end
 
 -- No table per line: the same buffers every call, and a shorter line clears the old tail.
@@ -221,6 +234,7 @@ return function()
   testRecipeLinks()
   testBareLinkAndText()
   testNonAscii()
+  testWordBytes()
   testOtherEscapes()
   testBuffersReused()
   testRealLines()

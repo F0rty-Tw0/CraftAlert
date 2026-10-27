@@ -209,8 +209,11 @@ local function phrasesAt(i, token, id, found)
       end
       local keyed = phraseKeys[base + stop * LENGTH_UNIT + wordCount * WORDS_UNIT + byte(padded, stop)]
       base = moreWords -- only the first span can be one word
-      if keyed and keyed.phrase then
-        tryRecord(keyed, at, wordCount, i)
+      local phrase = keyed and keyed.phrase
+      if phrase then -- tryRecord inline: most shapes hold one record, and most lookups hit
+        if find(padded, phrase, at, true) == at then
+          addHit(keyed, wordCount, phrase, nil, i)
+        end
       elseif keyed then
         for k = 1, #keyed do
           tryRecord(keyed[k], at, wordCount, i)

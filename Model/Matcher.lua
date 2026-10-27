@@ -58,6 +58,8 @@ local WHISPER_ME = "/w me"
 local WHISPER_ME_END = #WHISPER_ME
 -- Words only a buyer writes, so "/w me" beside one is no ad.
 local buyerWords = Constants.buyerWords
+-- The tokens intentStop reads an ad shape from.
+local adShapeWords = { crafting = true, pst = true, craft = true, work = true }
 
 -- A byte of Tokenizer.WORD (letters, digits, apostrophe, bytes 128-255) in lowercase text.
 local function isWordByte(b)
@@ -82,26 +84,29 @@ end
 local function intentStop(lower)
   local intentSet, blockerSet = index.intentSet, index.blockerSet
   local blocked, crafting, pst, ad, canCraft, buyer = false, false, false, false, false, false
-  intentToken = nil
+  local intent = nil
   for i = 1, tokenCount do
     local token = tokens[i]
-    if intentToken == nil and intentSet[token] then
-      intentToken = token
+    if intent == nil and intentSet[token] then
+      intent = token
     end
     buyer = buyer or buyerWords[token] == true
     if blockerSet[token] then
       blocked = true
-    elseif token == "crafting" then
-      crafting = true
-    elseif token == "pst" then
-      pst = true
-      ad = ad or crafting -- "crafting ... pst"
-    elseif token == "craft" and tokens[i - 1] == "can" then
-      canCraft = true
-    elseif token == "work" and tokens[i - 1] == "lf" and tokens[i + 1] ~= "order" then
-      ad = true -- "Enchanter LF work /w me" (user ruling 2026-10-24); "LF work order" is a buyer
+    elseif adShapeWords[token] then -- one lookup for most tokens, not four compares
+      if token == "crafting" then
+        crafting = true
+      elseif token == "pst" then
+        pst = true
+        ad = ad or crafting -- "crafting ... pst"
+      elseif token == "craft" and tokens[i - 1] == "can" then
+        canCraft = true
+      elseif token == "work" and tokens[i - 1] == "lf" and tokens[i + 1] ~= "order" then
+        ad = true -- "Enchanter LF work /w me" (user ruling 2026-10-24); "LF work order" is a buyer
+      end
     end
   end
+  intentToken = intent
   if intentToken == nil then
     return "intent"
   end

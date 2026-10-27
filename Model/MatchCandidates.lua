@@ -184,30 +184,33 @@ end
 
 -- The entries of list whose group's word set is marked (marks[set] == mark, WordGroups).
 function MatchCandidates.FromListMarked(list, groupWords, marks, mark)
-  count = 0
+  local kept = 0
   for k = 1, #list do
     local entry = list[k]
     if marks[groupWords[entry.group]] == mark then
-      count = count + 1
-      candidates[count] = entry
+      kept = kept + 1
+      candidates[kept] = entry
     end
   end
-  MatchCandidates.count = count
+  count = kept
+  MatchCandidates.count = kept
 end
 
 -- → the number of distinct recipes among the candidates.
 function MatchCandidates.GroupCount()
   local current = nextStamp()
-  groupCount = 0
+  local groups = 0
   for k = 1, count do
-    local group = candidates[k].group
+    local entry = candidates[k]
+    local group = entry.group
     if groupStamp[group] ~= current then
       groupStamp[group] = current
-      groupCount = groupCount + 1
-      groupFirst[groupCount] = candidates[k]
+      groups = groups + 1
+      groupFirst[groups] = entry
     end
   end
-  return groupCount
+  groupCount = groups
+  return groups
 end
 
 local function pushWhy(token)
@@ -217,9 +220,11 @@ end
 MatchCandidates.Why = pushWhy
 
 function MatchCandidates.WhyList(list, n)
+  local why = result.why
   for k = 1, n do
-    pushWhy(list[k])
+    why[whyCount + k] = list[k]
   end
+  whyCount = whyCount + n
 end
 
 local function begin(kind, group, prof, intentToken)
@@ -294,12 +299,15 @@ function MatchCandidates.Decide(intentToken, list1, n1, list2, n2)
       return false
     end
     begin("profession", nil, prof, intentToken)
+    local entries, kept = result.entries, 0
     for k = 1, count do
-      if candidates[k].prof == prof then
-        entryCount = entryCount + 1
-        result.entries[entryCount] = candidates[k]
+      local entry = candidates[k]
+      if entry.prof == prof then
+        kept = kept + 1
+        entries[kept] = entry
       end
     end
+    entryCount = kept
   end
   MatchCandidates.WhyList(list1, n1)
   MatchCandidates.WhyList(list2, n2)

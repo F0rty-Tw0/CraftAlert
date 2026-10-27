@@ -18,8 +18,12 @@ local STEP_MS = 5 -- longest Slicer tick of the sliced rebuild (spec 2026-10-26-
 local INDEX_KB = 3200 -- §4.4 idle memory; was 3 MB, raised for recipe-link IDs (user ruling 2026-10-24)
 local LINES = 10000
 local RUNS = 3 -- the 10,000-line mean: median of 3 (plan A4)
-local BEST_OF = 5 -- build and each worst line: the fastest of 5, since noise only adds time
-local WORST_REPS = 300
+local BEST_OF = 5 -- the build: the fastest of 5, since noise only adds time
+-- Each worst line: the fastest of 15 bursts of 15 ms. Short bursts dodge the preemption a
+-- loaded machine adds to Windows' wall-clock os.clock (5 bursts of 300 calls flaked at
+-- 197-210 us while the fastest burst of the slowest line was about 145 us).
+local WORST_ROUNDS = 15
+local WORST_BURST_MS = 15
 local SENDER = "Customer-Other"
 local GUID = "Player-1-PERF"
 
@@ -161,30 +165,57 @@ local function slicedStepMs(ns, db)
   return best, ns.Index.Current()
 end
 
--- Fastest of BEST_OF timings of WORST_REPS calls on one line; → microseconds per call.
-local function worstMicros(Matcher, line)
-  local best = math.huge
-  for _ = 1, BEST_OF do
-    local started = os.clock()
-    for _ = 1, WORST_REPS do
-      Matcher.Match("trade", line, SENDER, GUID)
-    end
-    best = math.min(best, (os.clock() - started) * 1e6 / WORST_REPS)
+-- os.clock right after it ticks (on Windows it is wall time in 1 ms steps).
+local function nextTick()
+  local started = os.clock()
+  local now = started
+  while now == started do
+    now = os.clock()
   end
-  return best
+  return now
+end
+
+-- One burst of calls on one line, from a clock tick until WORST_BURST_MS have passed;
+-- → microseconds per call. Both ends sit on a tick, so 1 ms steps cost at most one call of
+-- error, where a fixed call count read up to one step (10 us a call at 100 calls) short.
+local function burstMicros(Matcher, line)
+  local started = nextTick()
+  local calls = 0
+  local elapsed
+  repeat
+    Matcher.Match("trade", line, SENDER, GUID)
+    calls = calls + 1
+    elapsed = os.clock() - started
+  until elapsed * 1000 >= WORST_BURST_MS
+  return elapsed * 1e6 / calls
 end
 
 -- Each case of WorstLines.cases on each { name, index, items } (the cases depend on the
--- index); → { name, micros, index name } per case, the costlier index's timing.
+-- index): the fastest of WORST_ROUNDS bursts. Each round times one burst of every case, so a
+-- load spike of a few seconds slows one burst per case, not every burst of one case.
+-- → { name, micros, index name } per case, the costlier index's timing.
 local function worstCases(Matcher, indexes)
-  local worst = {}
-  for _, built in ipairs(indexes) do
-    Matcher.SetIndex(built[2])
-    Synthetic.stubItems(built[3])
+  local best = {}
+  for i, built in ipairs(indexes) do
+    best[i] = {}
     for k, case in ipairs(WorstLines.cases(built[2])) do
-      local micros = worstMicros(Matcher, case[2])
-      if worst[k] == nil or micros > worst[k][2] then
-        worst[k] = { case[1], micros, built[1] }
+      best[i][k] = { case[1], math.huge, built[1], case[2] }
+    end
+  end
+  for _ = 1, WORST_ROUNDS do
+    for i, built in ipairs(indexes) do
+      Matcher.SetIndex(built[2])
+      Synthetic.stubItems(built[3])
+      for _, case in ipairs(best[i]) do
+        case[2] = math.min(case[2], burstMicros(Matcher, case[4]))
+      end
+    end
+  end
+  local worst = {}
+  for _, cases in ipairs(best) do
+    for k, case in ipairs(cases) do
+      if worst[k] == nil or case[2] > worst[k][2] then
+        worst[k] = case
       end
     end
   end
