@@ -171,6 +171,23 @@ local function testKeyOrder()
   end
 end
 
+-- A character writes at most MAX.professions professions, as many as its reader takes. Keys are
+-- sparse, like skill lines: `#` on them counts nothing.
+local function testProfessionCap()
+  local ExportString, _, Fields = load()
+  local professions = {}
+  for i = 1, Fields.MAX.professions + 1 do
+    professions[100 + i] = { name = "P" .. i }
+  end
+  local db = { characters = { ["Smith-Realm"] = { source = "local", realms = {}, professions = professions, recipes = {} } } }
+  local data = assert(ExportString.Decode(ExportString.Encode(db, "retail"), "retail"))
+  local written = 0
+  for _ in pairs(data.characters[1].professions) do
+    written = written + 1
+  end
+  Assert.equal(written, Fields.MAX.professions)
+end
+
 -- A text field holds at most MAX.text bytes, each escaped in 3: a longer field is refused before
 -- any pattern scan (a 32.7 KB one took 6.6 ms in one slice).
 local function testLongFieldRefusedUnscanned()
@@ -427,6 +444,7 @@ return function()
   testRoundTrip()
   testClassicNameKeys()
   testKeyOrder()
+  testProfessionCap()
   testLongFieldRefusedUnscanned()
   testReimportKeepsChoices()
   testLocalCharacterSkipped()

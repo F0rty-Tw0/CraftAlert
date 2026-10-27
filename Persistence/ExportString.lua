@@ -95,12 +95,12 @@ local function characterRecords(key, character, parts, flavorKey)
   end
   local class = Fields.IsClass(character.class) and character.class or ""
   parts[#parts + 1] = concat({ "c", Fields.Text(key), class, Fields.TextList(character.realms) }, ",")
-  local professions = {}
+  local professions, written = {}, 0
   for _, prof in ipairs(sortedKeys(character.professions)) do
     local name = character.professions[prof].name
     local writable = Fields.IsFlavorKey(prof, flavorKey) and Fields.KeyField(prof) and Fields.IsText(name, true)
-    if #professions < MAX.professions and writable then
-      professions[prof] = true
+    if written < MAX.professions and writable then
+      professions[prof], written = true, written + 1
       parts[#parts + 1] = concat({ "p", Fields.KeyField(prof), Fields.Text(name) }, ",")
     end
   end
