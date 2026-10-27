@@ -208,6 +208,20 @@ local function testLegacyAllEnabled()
   Assert.equal(recipes[9003].muted, nil)
 end
 
+-- A parent profession switched off for the character (character_disabled) mutes its recipes,
+-- even with scanning on and the recipe scanned.
+local function testCharacterDisabledMutes()
+  local CraftScanImport, ns = load()
+  local db = ns.Defaults.Db()
+  local record = {
+    parent_professions = { [BS] = { scanning_enabled = true, character_disabled = true } },
+    professions = { [2872] = { parentProfID = BS, recipes = { [9004] = { scan_state = 2 } } } },
+  }
+  local counts = CraftScanImport.Run(db, { realms = { OwnRealm = { characters = { ["Off-OwnRealm"] = record } } } })
+  Assert.equal(counts.muted, 1)
+  Assert.equal(db.characters["Off-OwnRealm"].recipes[9004].muted, true)
+end
+
 -- A long greeting is cut at 255 bytes without splitting a UTF-8 character ("é" is 2 bytes).
 local function testGreetingCutWholeCharacters()
   local CraftScanImport, ns = load()
@@ -284,6 +298,7 @@ return function()
   testUnnamedProfessionTakesClientName()
   testKeysAddedDuringTheWalk()
   testLegacyAllEnabled()
+  testCharacterDisabledMutes()
   testBareKeyTakesItsRealm()
   testGreetingCutWholeCharacters()
   testClockReadPerRecipe()
