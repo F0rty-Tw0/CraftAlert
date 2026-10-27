@@ -358,6 +358,14 @@ return function()
   -- updates the lead (no second "seen"), the click greets it once.
   local ledger = Sim.Run({ "LF plate belt", "LF plate belt", "--click", "left" })
   Assert.equal(ledger[#ledger], "ledger: seen=1 greeted=1 replied=0 filled=0")
+  -- The greeted customer's order filled: the event names them without a realm (5 arguments, so a
+  -- chat line may follow).
+  local fill = { "--event", "CRAFTINGORDERS_DISPLAY_CRAFTER_FULFILLED_MSG", "Public", "Belt", "Customer", "0", "1" }
+  local filled = Sim.Run({ "LF plate belt", "--click", "left", unpack(fill) })
+  Assert.equal(filled[#filled], "ledger: seen=1 greeted=1 replied=0 filled=1")
+  local stranger = Sim.Run({ "LF plate belt", "--click", "left", fill[1], fill[2], "Public", "Belt", "Stranger", "0", "1", "WTS belt" })
+  Assert.equal(stranger[#stranger], "ledger: seen=1 greeted=1 replied=0 filled=0")
+  Assert.equal(#senderLines(stranger), 2, "the line after the event's 5 arguments is a chat line")
   local quiet = Sim.Run({ "WTS plate belt" })
   Assert.falsy(string.find(quiet[#quiet], "^ledger: "), "no counter changed: no ledger line")
 

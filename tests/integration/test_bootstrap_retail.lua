@@ -31,6 +31,7 @@ local INSTALLED_EVENTS = {
   "PLAYER_LOGOUT",
 }
 local WHISPER_EVENTS = { "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM" }
+local ORDER_FILLED = "CRAFTINGORDERS_DISPLAY_CRAFTER_FULFILLED_MSG"
 -- The customer's realm is connected, so the lead carries no "can't order" tag.
 local CONNECTED_REALMS = { "OwnRealm", "Other Realm" }
 local DIM_ALPHA = 0.5
@@ -49,11 +50,11 @@ local ITEMS = {
 local BIND = { [190001] = 2, [190004] = 2, [190006] = 2 }
 
 -- The client before the addon loads: the player Crafter-OwnRealm resting in a city with
--- Blacksmithing, `db` as the saved CraftAlertDB (nil: a fresh install). → session, the
--- profession stub state.
-local function startClient(db, slots)
+-- Blacksmithing, `db` as the saved CraftAlertDB (nil: a fresh install), on `flavor` (default
+-- Retail). → session, the profession stub state.
+local function startClient(db, slots, flavor)
   Wow.reset()
-  Wow.flavor("retail")
+  Wow.flavor(flavor or "retail")
   Wow.clock.time = START_TIME
   local session = { sent = {}, toasts = 0, db = db, categories = {}, addOnCategories = {} }
   local function record(api)
@@ -266,6 +267,10 @@ local function testFreshInstall()
   Assert.equal(lead.greeted, true)
   -- Bootstrap installed the ledger: the new lead and its greeting are today's counters.
   Assert.same(ns.Ledger.Today(), { seen = 1, greeted = 1, replied = 0, filled = 0 }, "Ledger.Install subscribed")
+  -- Retail: the greeted customer's order filled (the event names them without a realm) counts.
+  Assert.truthy(isRegistered(ORDER_FILLED), ORDER_FILLED .. " registered on Retail")
+  Wow.fireEvent(ORDER_FILLED, 0, "Sim Plate Belt", "Customer", 0, 1)
+  Assert.equal(ns.Ledger.Today().filled, 1)
 
   -- Selling is not asking: nothing.
   trade("WTS plate belt, cheap", "Seller-OtherRealm")
@@ -599,6 +604,15 @@ local function testAlertsPageRepaints(db)
   Assert.equal(window:GetAlpha(), 0.5)
 end
 
+-- Forever has no crafting orders: no orders-filled listener there.
+local function testNoOrdersOffRetail(db)
+  local session = startClient(db, nil, "forever")
+  local errors = recordErrors()
+  login(session)
+  Assert.same(errors, {})
+  Assert.equal(isRegistered(ORDER_FILLED), false, ORDER_FILLED .. " not registered on Forever")
+end
+
 local function deepCopy(value)
   if type(value) ~= "table" then
     return value
@@ -629,5 +643,6 @@ return function()
   testInstanceHidesUi(deepCopy(saved))
   testLoginInInstanceIsSilent(deepCopy(saved))
   testAlertsPageRepaints(deepCopy(saved))
+  testNoOrdersOffRetail(deepCopy(saved))
   Wow.reset()
 end

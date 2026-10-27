@@ -15,6 +15,7 @@ local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Ledger = ns.Ledger or require("CraftAlert.Model.Ledger")
+local OrdersFilled = ns.OrdersFilled or require("CraftAlert.Model.OrdersFilled")
 local WhisperTracker = ns.WhisperTracker or require("CraftAlert.Model.WhisperTracker")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local ModernReader = ns.ModernReader or require("CraftAlert.Professions.ModernReader")
@@ -95,6 +96,13 @@ local function installLedger()
   Ledger.Install(db)
 end
 
+-- Retail only: the other flavors have no crafting orders.
+local function installOrdersFilled()
+  if FlavorCompat.isRetail then
+    OrdersFilled.Install(db)
+  end
+end
+
 -- AlertToast and WhisperTracker subscribe themselves to "change", TestReport to "new" and "change".
 local function wireLeads()
   Leads.Restore(db)
@@ -167,6 +175,7 @@ local LOGIN_STEPS = {
   wireIndex,
   activateBridge,
   installLedger,
+  installOrdersFilled,
   wireLeads,
   WhisperBridge.SyncInfo,
   installReaders,

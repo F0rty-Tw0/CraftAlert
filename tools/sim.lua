@@ -53,6 +53,7 @@ local EVENT_ARITY = {
   CHAT_MSG_WHISPER_INFORM = 2, -- text, target
   PLAYER_UPDATE_RESTING = 0,
   ZONE_CHANGED_NEW_AREA = 0,
+  CRAFTINGORDERS_DISPLAY_CRAFTER_FULFILLED_MSG = 5, -- orderType, itemName, playerName, tip, quantity
 }
 -- How long the toast counts as shown (seconds) when --click acts on the newest lead (§7.5 rule 3).
 local SHOWN_FOR_SECONDS = 1

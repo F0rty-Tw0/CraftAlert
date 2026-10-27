@@ -50,6 +50,7 @@ Model/SendGuard.lua
 Model/GreetAction.lua
 Model/WhisperTracker.lua
 Model/Ledger.lua
+Model/OrdersFilled.lua
 Professions/ProfessionList.lua
 Professions/BindLookup.lua
 Professions/ReadJob.lua
