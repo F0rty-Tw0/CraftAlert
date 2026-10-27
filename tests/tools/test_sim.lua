@@ -315,8 +315,17 @@ return function()
   Assert.same(
     stepLines(Sim.Run({ "--flavor", "tbc", "--event", "ADDON_LOADED", "Blizzard_Professions" })),
     booted({ "professions: blacksmithing,enchanting" }, "Trade"),
-    "no markers on Classic"
+    "no Retail markers on Classic"
   )
+  -- On Classic, the window's update is hooked once its addon loads; the Craft window on Era and TBC only.
+  local function classicMarkers(flavor, addon)
+    return stepLines(Sim.Run({ "--flavor", flavor, "--event", "ADDON_LOADED", addon }))
+  end
+  local professions = "professions: blacksmithing,enchanting"
+  Assert.same(classicMarkers("tbc", "Blizzard_TradeSkillUI"), booted({ professions, "markers: installed tradeskill" }, "Trade"))
+  Assert.same(classicMarkers("tbc", "Blizzard_CraftUI"), booted({ professions, "markers: installed craft" }, "Trade"))
+  Assert.same(classicMarkers("mop", "Blizzard_TradeSkillUI"), booted({ professions, "markers: installed tradeskill" }, "Trade"))
+  Assert.same(classicMarkers("mop", "Blizzard_CraftUI"), booted({ professions }, "Trade"), "no Craft window on MoP")
 
   -- A recipe read from the window keeps Blizzard's spelling, so the greeting names it as the game does.
   local greeted = {}
