@@ -45,6 +45,10 @@ local function testLayout()
   Assert.equal(strip:GetHeight(), STRIP_HEIGHT)
   Assert.same(view.listPane.points[1], { "TOPLEFT", host, "TOPLEFT", 0, -STRIP_HEIGHT })
   Assert.equal(strip.text.font, ns.Theme.FONTS.body)
+  -- Bound on both sides, one line: a narrow host cuts the text instead of overflowing.
+  local padding = ns.Theme.LAYOUT.PADDING
+  Assert.same(strip.text.points, { { "LEFT", strip, "LEFT", padding, 0 }, { "RIGHT", strip, "RIGHT", -padding, 0 } })
+  Assert.equal(strip.text.wordWrap, false)
   -- (496 - 20 - 2 * 4) / 48 → 9 rows, not the 10 the whole height holds.
   local leads = {}
   for id = 12, 1, -1 do
@@ -70,6 +74,25 @@ local function testRepaintsOnAdd()
   local ns, view = open()
   ns.Ledger.Add("filled")
   Assert.equal(view.strip.text:GetText(), "Today: 3 seen · 2 greeted · 1 replied · 2 filled")
+end
+
+-- WhisperMessenger's panel builds a new view when its host changes: one strip per host repaints,
+-- the newest, so the repaint list does not grow with every build.
+local function testOneStripPerHost()
+  local ns, view = open()
+  local host = view.frame:GetParent()
+  local rebuilt = ns.LeadsView.New(host, {
+    getHeight = function()
+      return 496
+    end,
+    getListWidth = function()
+      return 260
+    end,
+  })
+  ns.LeadsView.Refresh(rebuilt, ns.Leads.List())
+  ns.Ledger.Add("filled")
+  Assert.equal(rebuilt.strip.text:GetText(), "Today: 3 seen · 2 greeted · 1 replied · 2 filled")
+  Assert.equal(view.strip.text:GetText(), "Today: 3 seen · 2 greeted · 1 replied · 1 filled", "the replaced strip is dropped")
 end
 
 -- Gold title, then one white line per day, today first.
@@ -113,6 +136,7 @@ return function()
   testLayout()
   testTodayLine()
   testRepaintsOnAdd()
+  testOneStripPerHost()
   testTooltip()
   testHiddenInInstance()
   Wow.reset()

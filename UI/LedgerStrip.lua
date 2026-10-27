@@ -18,7 +18,7 @@ local LedgerStrip = {}
 
 local WEEK = 7
 
-local strips = {} -- every strip made, at most one per host
+local strips = {} -- host → the strip last made on it; a rebuilt view replaces its host's strip
 local subscribed = false
 
 -- `label`: "Today", or a day key. → the counters as one line.
@@ -62,7 +62,7 @@ function LedgerStrip.Refresh(strip)
 end
 
 local function refreshAll()
-  for _, strip in ipairs(strips) do
+  for _, strip in pairs(strips) do
     if strip:IsVisible() then
       LedgerStrip.Refresh(strip)
     end
@@ -81,8 +81,10 @@ function LedgerStrip.New(parent, host)
   strip:SetScript("OnEnter", showTooltip)
   strip:SetScript("OnLeave", Tooltip.HideIfOwned)
   strip.text = FrameKit.Text(strip, Theme.FONTS.body, Theme.COLORS.textSecondary)
+  -- Both sides, one line (FrameKit.Text turns word wrap off): a narrow host cuts the text short.
   strip.text:SetPoint("LEFT", strip, "LEFT", layout.PADDING, 0)
-  strips[#strips + 1] = strip
+  strip.text:SetPoint("RIGHT", strip, "RIGHT", -layout.PADDING, 0)
+  strips[host] = strip
   if not subscribed then
     subscribed = true
     Ledger.OnChange(refreshAll)
