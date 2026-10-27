@@ -96,9 +96,25 @@ local function testOncePerEvent()
   Assert.same({ filled(ns), changes }, { 1, 1 })
 end
 
+-- recentGreeted is pruned only at login: in a session longer than a day an older greeting is
+-- still there and must not count. Exactly 24 hours ago still does.
+local function testOnlyTheLastDay()
+  local ns, db = setup()
+  local DAY = 24 * 60 * 60
+  db.recentGreeted["Old-Realm"] = NOON - DAY - 1
+  db.recentGreeted["Edge-Realm"] = NOON - DAY
+  fulfilled("Old")
+  fulfilled("Old-Realm")
+  Assert.equal(filled(ns), 0, "greeted more than a day ago: nothing")
+  fulfilled("Edge")
+  fulfilled("Edge-Realm")
+  Assert.equal(filled(ns), 2, "greeted exactly a day ago: counts")
+end
+
 return function()
   testNameMatches()
   testUnusableNames()
   testOncePerEvent()
+  testOnlyTheLastDay()
   Wow.reset()
 end

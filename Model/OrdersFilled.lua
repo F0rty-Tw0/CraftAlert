@@ -19,16 +19,24 @@ local find = string.find
 local pairs = pairs
 
 local EVENT = "CRAFTINGORDERS_DISPLAY_CRAFTER_FULFILLED_MSG"
+local GREETED_SECONDS = 24 * 60 * 60
 
 ---@type table
 local db = nil
 
+-- recentGreeted is pruned only at login (Persistence/SavedState.lua), so a session longer than a
+-- day still holds older greetings: each one is checked against the clock.
+local function isRecent(greetedAt, now)
+  return greetedAt ~= nil and now - greetedAt <= GREETED_SECONDS
+end
+
 local function wasGreeted(playerName)
+  local now = _G["time"]()
   if find(playerName, "-", 1, true) then
-    return db.recentGreeted[PlayerName.Normalize(playerName)] ~= nil
+    return isRecent(db.recentGreeted[PlayerName.Normalize(playerName)], now)
   end
-  for key in pairs(db.recentGreeted) do
-    if PlayerName.NameOf(key) == playerName then
+  for key, greetedAt in pairs(db.recentGreeted) do
+    if PlayerName.NameOf(key) == playerName and isRecent(greetedAt, now) then
       return true
     end
   end
