@@ -1,6 +1,7 @@
 -- CLI sim: feeds chat lines, events, slash commands and clicks through the real addon
 -- modules with stubbed WoW APIs and returns what happened as text lines.
 --   python scripts/sim.py [--flavor retail|forever|era|tbc|wrath|cata|mop] [--db FILE] [--class TOKEN] ...
+--   [--export] [--import STRING]
 --   lua5.1 tools/sim.lua ...   (from the repo root)
 -- Output lines are `<area>: <fact>`; the first is always `sim: flavor=<key> modules=<n>`.
 local ROOT = rawget(_G, "CRAFTALERT_ROOT") or "."
@@ -108,7 +109,7 @@ local Sim = {}
 Sim.lastNs = nil
 
 -- Flags taking exactly one value; the parser checks the value where it is not free text.
-local ONE_VALUE = { "--flavor", "--db", "--sender", "--class", "--cmd", "--click", "--afk", "--resting" }
+local ONE_VALUE = { "--flavor", "--db", "--sender", "--class", "--cmd", "--click", "--afk", "--resting", "--import" }
 
 local function isOneValueFlag(flag)
   for _, name in ipairs(ONE_VALUE) do
@@ -144,6 +145,8 @@ local function acceptOption(plan, flag, value)
     plan.steps[#plan.steps + 1] = { kind = "class", token = value }
   elseif flag == "--cmd" then
     plan.steps[#plan.steps + 1] = { kind = "cmd", text = value }
+  elseif flag == "--import" then
+    plan.steps[#plan.steps + 1] = { kind = "import", text = value }
   end
   return nil
 end
@@ -167,6 +170,8 @@ local function parse(argv)
         i = i + 1
       end
       plan.steps[#plan.steps + 1] = { kind = "event", name = name, args = args }
+    elseif token == "--export" then
+      plan.steps[#plan.steps + 1] = { kind = "export" }
     elseif isOneValueFlag(token) then
       local value = argv[i + 1]
       if value == nil then
@@ -583,6 +588,30 @@ function STEPS.cmd(ctx, step)
   end
   local args = string.match(step.text, "^/%S+%s*(.*)$") or step.text
   handler(args)
+end
+
+-- --export: `export: <string>`, the export string of the db's local characters (spec §10.1).
+function STEPS.export(ctx)
+  start(ctx)
+  ctx.ns.ExportString.StartExport(ctx.db, function(text)
+    ctx.out[#ctx.out + 1] = "export: " .. text
+  end)
+  ctx.ns.Slicer.Drain()
+end
+
+-- --import STRING: `import: characters=<n> recipes=<n> skipped=<n>` or `import: error <message>`,
+-- printed when the import job ends, so the `index:` line of the rebuild it requests follows.
+function STEPS.import(ctx, step)
+  start(ctx)
+  ctx.ns.ExportString.StartImport(ctx.db, step.text, function(counts, err)
+    if counts == nil then
+      ctx.out[#ctx.out + 1] = "import: error " .. err
+      return
+    end
+    local line = string.format("import: characters=%d recipes=%d skipped=%d", counts.characters, counts.recipes, counts.skipped)
+    ctx.out[#ctx.out + 1] = line
+  end)
+  ctx.ns.Slicer.Drain()
 end
 
 -- The mouse button and modifier each --click value stands for (the §7.1 table).

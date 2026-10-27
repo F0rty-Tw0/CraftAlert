@@ -435,6 +435,18 @@ return function()
   local away = Sim.Run({ "--afk", "on", "LF plate belt", "--afk", "off" })
   Assert.same({ away[#away - 1], away[#away] }, { "away: summary count=1 expired=0", "ledger: seen=1 greeted=0 replied=0 filled=0" })
 
+  -- Spec §10.1: --export prints the fixture's export string; --import of it into a second account's
+  -- db stores Alt-OwnRealm (the player's own character is skipped) and the index rebuild follows.
+  local exported = Sim.Run({ "--export" })
+  local text = string.match(exported[#exported], "^export: (CA1:retail:.+)$")
+  assert(text, exported[#exported])
+  local imported = table.concat(Sim.Run({ "--db", "tests/fixtures/db_export_target.lua", "--import", text, "LF plate belt" }), " / ")
+  Assert.truthy(imported:find("import: characters=1 recipes=3 skipped=1 / index: size=4", 1, true), imported)
+  Assert.truthy(imported:find("crafter=Alt-OwnRealm", 1, true), imported)
+  local refused = Sim.Run({ "--import", (string.gsub(text, "Sim Plate Belt", "Sim Plate Bolt")) })
+  Assert.equal(refused[#refused], "import: error The string is damaged (checksum).")
+  Assert.equal(Sim.Run({ "--import" })[1], "error: --import needs a value")
+
   -- Run from the command line, any `error:` line makes the sim exit 1, so a Proof run notices a
   -- broken invocation: a bad flag (the only line) or a step that fails after others printed.
   local printed, code = runMain({ "--nope" })
