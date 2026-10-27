@@ -18,6 +18,7 @@ local ExportFields = {}
 local byte = string.byte
 local char = string.char
 local find = string.find
+local floor = math.floor
 local format = string.format
 local gmatch = string.gmatch
 local gsub = string.gsub
@@ -174,8 +175,9 @@ function ExportFields.TextList(list)
   return table.concat(fields, ".")
 end
 
--- → the texts ({} for ""), or nil for an empty or refused item or more than `max` items.
-function ExportFields.ReadTextList(field, max)
+-- → the texts ({} for ""), or nil for an empty or refused item or more than `max` items. Each item
+-- weighs one pause per 256 bytes: 50 realms of 200 escaped bytes took 11 ms.
+function ExportFields.ReadTextList(field, max, pause)
   local list = {}
   if field == "" then
     return list
@@ -186,6 +188,7 @@ function ExportFields.ReadTextList(field, max)
       return nil
     end
     list[#list + 1] = text
+    pause(1 + floor(#item / 256))
   end
   return list
 end
@@ -207,7 +210,7 @@ function PARSE.c(state, record)
   if f == nil then
     return "character"
   end
-  local key, realms = ExportFields.ReadText(f[2]), ExportFields.ReadTextList(f[4], ExportFields.MAX.realms)
+  local key, realms = ExportFields.ReadText(f[2]), ExportFields.ReadTextList(f[4], ExportFields.MAX.realms, state.pause)
   if not (key and ExportFields.IsCharacterKey(key) and realms and (f[3] == "" or ExportFields.IsClass(f[3]))) then
     return "character"
   end
@@ -276,9 +279,9 @@ function PARSE.r(state, record)
 end
 
 -- The parse state of a string from `flavorKey`: decoded characters in string order, the one the
--- next records belong to.
-function ExportFields.NewState(flavorKey)
-  return { flavorKey = flavorKey, characters = {}, seen = {}, current = nil, lastId = 0, professionCount = 0, recipeCount = 0 }
+-- next records belong to. pause: Slicer.Run's, called in long fields (a character's realms).
+function ExportFields.NewState(flavorKey, pause)
+  return { flavorKey = flavorKey, pause = pause, characters = {}, seen = {}, current = nil, lastId = 0, professionCount = 0, recipeCount = 0 }
 end
 
 -- Adds one record to `state` → nil, or a word naming what was refused.

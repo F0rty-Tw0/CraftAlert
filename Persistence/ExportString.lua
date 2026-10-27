@@ -218,7 +218,7 @@ function ExportString.Decode(text, flavorKey, pause)
   -- Records split with a plain find: a "[^;]*" match took 6 ms in one slice over a 590 KB record.
   -- Each record weighs one pause per 256 bytes, so the clock is read before a long one (eight
   -- 10 KB records, about 3 ms each, once ran between two clock reads).
-  local state = Fields.NewState(flavor)
+  local state = Fields.NewState(flavor, pause)
   local start, number = 1, 0
   while body ~= "" and start <= #body + 1 do
     local stop = find(body, ";", start, true) or #body + 1

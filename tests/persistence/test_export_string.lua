@@ -358,7 +358,19 @@ local function testLongRecordWeighsMore()
     weights[#weights + 1] = weight
   end)
   Assert.same(data.characters[2].realms, realms)
-  Assert.same({ weights[#weights - 1], weights[#weights] }, { 1, 1 + math.floor(#record / 256) })
+  -- The record's realms pause after it, one each.
+  Assert.same({ weights[#weights - #realms - 1], weights[#weights - #realms] }, { 1, 1 + math.floor(#record / 256) })
+end
+
+-- A character's realms pause while read, one per 256 bytes each: 50 realms of 200 escaped bytes
+-- took 11 ms.
+local function testRealmsReadPausePerRealm()
+  local ExportString = load()
+  local weights = {}
+  assert(ExportString.Decode(seal("CA1:retail:c,Smith-Realm,,A.B%2EC." .. string.rep("%2E", 200)), "retail", function(weight)
+    weights[#weights + 1] = weight
+  end))
+  Assert.same(weights, { 8, 3, 1, 1, 3 }, "the checksum, the record, three realms")
 end
 
 -- Storing a character pauses per realm too: 19 characters of 50 long realms and no recipes once
@@ -421,6 +433,7 @@ return function()
   testRejected()
   testDamagedIsCheap()
   testLongRecordWeighsMore()
+  testRealmsReadPausePerRealm()
   testApplyPausesPerRealm()
   testLargeExportIsSliced()
   Wow.reset()
