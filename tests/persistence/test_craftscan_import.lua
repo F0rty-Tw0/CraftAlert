@@ -227,22 +227,24 @@ local function testBareKeyTakesItsRealm()
 end
 
 -- CraftScan writes its data while the sliced import pauses: keys it adds then are left for the
--- next import, never walked by a `pairs` they were added under.
+-- next import, never walked by a `pairs` they were added under. 64 keys per pause force a rehash
+-- of both tables.
 local function testKeysAddedDuringTheWalk()
   local CraftScanImport, ns = load()
   local recipes = { [9004] = { scan_state = 2 }, [9005] = { scan_state = 2 } }
   local characters = { ["Busy-OwnRealm"] = { professions = { [2872] = { parentProfID = BS, recipes = recipes } } } }
-  local pauses = 0
-  local counts = CraftScanImport.Run(ns.Defaults.Db(), { realms = { OwnRealm = { characters = characters } } }, function()
+  local db, pauses = ns.Defaults.Db(), 0
+  local counts = CraftScanImport.Run(db, { realms = { OwnRealm = { characters = characters } } }, function()
     pauses = pauses + 1
     if pauses <= 3 then
-      for id = 1, 64 do
-        recipes[500000 + pauses * 100 + id] = { scan_state = 2 }
+      for n = 1, 64 do
+        recipes[500000 + pauses * 100 + n] = { scan_state = 2 }
+        characters["New" .. pauses .. "x" .. n .. "-OwnRealm"] = { professions = {} }
       end
-      characters["New" .. pauses .. "-OwnRealm"] = { professions = {} }
     end
   end)
   Assert.same(counts, { characters = 1, recipes = 2, muted = 0, greetings = 0, skipped = 0 })
+  Assert.equal(db.characters["New1x1-OwnRealm"], nil, "a character added during the walk")
 end
 
 -- Each recipe weighs a full Slicer.Run clock check (8): its client calls take up to ~500 us, so
