@@ -171,6 +171,17 @@ local function testProfessionNamedByAnyExpansion()
   end
 end
 
+-- A legacy profession (before scan_state) with all_enabled listens to every recipe, enabled or not.
+local function testLegacyAllEnabled()
+  local CraftScanImport, ns = load()
+  local db = ns.Defaults.Db()
+  local legacy = { parentProfID = BS, all_enabled = true, recipes = { [9005] = {}, [9003] = { enabled = false } } }
+  CraftScanImport.Run(db, { realms = { OwnRealm = { characters = { ["Old-OwnRealm"] = { professions = { legacy } } } } } })
+  local recipes = db.characters["Old-OwnRealm"].recipes
+  Assert.equal(recipes[9005].muted, nil)
+  Assert.equal(recipes[9003].muted, nil)
+end
+
 -- CraftScan writes its data while the sliced import pauses: keys it adds then are left for the
 -- next import, never walked by a `pairs` they were added under.
 local function testKeysAddedDuringTheWalk()
@@ -210,6 +221,7 @@ return function()
   testMalformed()
   testProfessionNamedByAnyExpansion()
   testKeysAddedDuringTheWalk()
+  testLegacyAllEnabled()
   testClockReadPerRecipe()
   Wow.reset()
 end
