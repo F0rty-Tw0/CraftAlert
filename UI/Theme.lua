@@ -14,7 +14,9 @@ Theme.COLORS = {
   textTimestamp = { 1.0, 1.0, 1.0, 0.40 },
   accent = { 0.12, 0.72, 0.96, 1.0 },
   badgeText = { 0.98, 0.99, 1.00, 1.0 },
-  greeted = { 0.30, 0.82, 0.40, 1.0 },
+  -- Lead states: the dots, the "replied" tag and the ledger counts.
+  greeted = { 0.12, 0.72, 0.96, 1.0 },
+  replied = { 0.30, 0.82, 0.40, 1.0 },
   warning = { 0.90, 0.72, 0.20, 1.0 },
   -- Blizzard's HIGHLIGHT_FONT_COLOR, NORMAL_FONT_COLOR, GRAY_FONT_COLOR and GREEN_FONT_COLOR (the
   -- tooltips' instruction lines), for colour codes and texts.

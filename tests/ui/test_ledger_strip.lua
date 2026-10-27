@@ -65,32 +65,47 @@ local function testLayout()
   Assert.equal(shown, 9)
 end
 
--- Gold "Today", white non-zero numbers; the opaque grey base colours words, dots and zeros (a
--- 0.55-alpha base would dim the colour codes too).
+local SEP = " · "
+
+-- `text` in a Theme colour's code, built here from the colour's values (gold → ffd100).
+local function code(color, text)
+  return string.format("|cff%02x%02x%02x", color[1] * 255, color[2] * 255, color[3] * 255) .. text .. "|r"
+end
+
+-- Today's counters (3/2/1/filled) in the lead dots' colours: gold seen, blue greeted, green
+-- replied, white filled.
+local function counts(colors, filled)
+  return code(colors.gold, "3 seen")
+    .. SEP
+    .. code(colors.greeted, "2 greeted")
+    .. SEP
+    .. code(colors.replied, "1 replied")
+    .. SEP
+    .. code(colors.white, filled .. " filled")
+end
+
+-- Gold "Today", each non-zero counter (number and word) in its dot's colour; the opaque grey base
+-- colours the dots between and the zeros (a 0.55-alpha base would dim the colour codes too).
 local function testTodayLine()
   local ns, view = open()
-  Assert.equal(
-    view.strip.text:GetText(),
-    "|cffffd100Today|r  |cffffffff3|r seen · |cffffffff2|r greeted · |cffffffff1|r replied · |cffffffff1|r filled"
-  )
-  Assert.same(view.strip.text.textColor, ns.Theme.COLORS.grey)
+  local colors = ns.Theme.COLORS
+  Assert.equal(view.strip.text:GetText(), "|cffffd100Today|r  " .. counts(colors, 1))
+  Assert.same(view.strip.text.textColor, colors.grey)
   local foreverNs, foreverView, foreverDb = open("forever")
   foreverDb.ledger["2026-10-27"] = { seen = 3, greeted = 0, replied = 1, filled = 0 }
   foreverNs.LedgerStrip.Refresh(foreverView.strip)
   Assert.equal(
     foreverView.strip.text:GetText(),
-    "|cffffd100Today|r  |cffffffff3|r seen · 0 greeted · |cffffffff1|r replied",
+    "|cffffd100Today|r  " .. code(colors.gold, "3 seen") .. " · 0 greeted · " .. code(colors.replied, "1 replied"),
     "no orders off Retail; a zero stays grey"
   )
 end
-
-local AFTER_FILL = "|cffffd100Today|r  |cffffffff3|r seen · |cffffffff2|r greeted · |cffffffff1|r replied · |cffffffff2|r filled"
 
 -- A fill fires no leads "change": the shown strip repaints from the ledger itself.
 local function testRepaintsOnAdd()
   local ns, view = open()
   ns.Ledger.Add("filled")
-  Assert.equal(view.strip.text:GetText(), AFTER_FILL)
+  Assert.equal(view.strip.text:GetText(), "|cffffd100Today|r  " .. counts(ns.Theme.COLORS, 2))
 end
 
 -- WhisperMessenger's panel builds a new view when its host changes: one strip per host repaints,
@@ -109,17 +124,23 @@ local function testOneStripPerHost()
   ns.LeadsView.Refresh(rebuilt, ns.Leads.List())
   local before = view.strip.text:GetText()
   ns.Ledger.Add("filled")
-  Assert.equal(rebuilt.strip.text:GetText(), AFTER_FILL)
+  Assert.equal(rebuilt.strip.text:GetText(), "|cffffd100Today|r  " .. counts(ns.Theme.COLORS, 2))
   Assert.equal(view.strip.text:GetText(), before, "the replaced strip is dropped")
 end
 
--- Gold title, one unwrapped row per day (day left, its non-zero counters right, or a grey
--- "no leads"), a blank line, then the gold week line with every counter.
+-- Gold title, one unwrapped row per day (day left, its non-zero counters right in the strip's
+-- colours over a grey base, or a grey "no leads"), a blank line, then the gold week line with
+-- every counter, its zeros grey.
 local function testTooltip()
   local ns, view = open()
   local strip, tip = view.strip, ns.Tooltip.Get()
-  local grey = ns.Theme.COLORS.grey
+  local colors = ns.Theme.COLORS
+  local grey = colors.grey
   local none = { "no leads", grey[1], grey[2], grey[3] }
+  local function right(text)
+    return { text, grey[1], grey[2], grey[3] }
+  end
+  local week = code(colors.gold, "8 seen") .. SEP .. code(colors.greeted, "2 greeted") .. SEP .. code(colors.replied, "1 replied")
   strip.scripts.OnEnter(strip)
   Assert.same({ tip.owner, tip.shown }, { strip, true })
   Assert.same(tip.lines, {
@@ -136,22 +157,29 @@ local function testTooltip()
   })
   Assert.same(tip.colors, { GOLD, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, {}, GOLD })
   Assert.same(tip.rights, {
-    [2] = { "3 seen · 2 greeted · 1 replied · 1 filled", 1, 1, 1 },
-    [3] = { "5 seen · 2 filled", 1, 1, 1 },
+    [2] = right(counts(colors, 1)),
+    [3] = right(code(colors.gold, "5 seen") .. SEP .. code(colors.white, "2 filled")),
     [4] = none,
     [5] = none,
     [6] = none,
     [7] = none,
     [8] = none,
-    [10] = { "8 seen · 2 greeted · 1 replied · 3 filled", 1, 1, 1 },
+    [10] = right(week .. SEP .. code(colors.white, "3 filled")),
   })
   strip.scripts.OnLeave(strip)
   Assert.equal(tip.shown, false)
-  local foreverNs, foreverView = open("forever")
+  local foreverNs, foreverView, foreverDb = open("forever")
   foreverView.strip.scripts.OnEnter(foreverView.strip)
   local foreverTip = foreverNs.Tooltip.Get()
-  Assert.equal(foreverTip.rights[3][1], "5 seen", "a day with only fills reads as its seen count off Retail")
-  Assert.equal(foreverTip.rights[10][1], "8 seen · 2 greeted · 1 replied")
+  Assert.equal(foreverTip.rights[3][1], code(colors.gold, "5 seen"), "a day with only fills reads as its seen count off Retail")
+  Assert.equal(foreverTip.rights[10][1], week)
+  foreverDb.ledger["2026-10-27"] = { seen = 3, greeted = 0, replied = 1, filled = 0 }
+  foreverView.strip.scripts.OnEnter(foreverView.strip)
+  Assert.equal(
+    foreverTip.rights[10][1],
+    code(colors.gold, "8 seen") .. " · 0 greeted · " .. code(colors.replied, "1 replied"),
+    "the week keeps its zero counters, grey"
+  )
 end
 
 -- Nothing shows in an instance (WhisperMessenger's panel stays open there, with no leads).

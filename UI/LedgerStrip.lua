@@ -23,46 +23,52 @@ local subscribed = false
 
 local SECONDS_PER_DAY = 24 * 60 * 60
 local NOON = 12 * 60 * 60
--- Inline colour codes: a code replaces the FontString's rgb, never its alpha, so the strip's base
--- colour is the opaque Theme grey.
+-- Inline colour codes: a code replaces the FontString's rgb, never its alpha, so the strip's and
+-- the tooltip's base colour is the opaque Theme grey.
 local GOLD_CODE = "|cffffd100"
-local WHITE_CODE = "|cffffffff"
 local CODE_END = "|r"
 local SEPARATOR = " · "
+-- Each counter in its lead dot's colour (UI/LeadText.lua); filled has no dot.
+local COUNTER_COLORS = {
+  seen = Theme.COLORS.gold,
+  greeted = Theme.COLORS.greeted,
+  replied = Theme.COLORS.replied,
+  filled = Theme.COLORS.white,
+}
 
 -- The counters this flavor shows, in order: `filled` on Retail only (no crafting orders
--- elsewhere). → { { count, word } ... }.
+-- elsewhere). → { { count, word, field } ... }.
 local function parts(counters)
   local shown = {
-    { counters.seen, Localization.Text("seen") },
-    { counters.greeted, Localization.Text("greeted") },
-    { counters.replied, Localization.Text("replied") },
+    { counters.seen, Localization.Text("seen"), "seen" },
+    { counters.greeted, Localization.Text("greeted"), "greeted" },
+    { counters.replied, Localization.Text("replied"), "replied" },
   }
   if FlavorCompat.isRetail then
-    shown[#shown + 1] = { counters.filled, Localization.Text("filled") }
+    shown[#shown + 1] = { counters.filled, Localization.Text("filled"), "filled" }
   end
   return shown
 end
 
--- "3 seen · 2 filled"; skipZeros leaves out the zero counters. → the line, or "" when none is left.
-local function plainLine(counters, skipZeros)
+-- "3 seen · 2 filled", each non-zero counter (number and word) in its colour, zeros in the base
+-- colour; skipZeros leaves out the zero counters. → the line, or "" when none is left.
+local function countsLine(counters, skipZeros)
   local words = {}
   for _, part in ipairs(parts(counters)) do
-    if part[1] ~= 0 or not skipZeros then
-      words[#words + 1] = Localization.Text("%d %s", part[1], part[2])
+    local text = Localization.Text("%d %s", part[1], part[2])
+    if part[1] ~= 0 then
+      local color = COUNTER_COLORS[part[3]]
+      words[#words + 1] = FrameKit.ColorCode(text, color[1], color[2], color[3])
+    elseif not skipZeros then
+      words[#words + 1] = text
     end
   end
   return table.concat(words, SEPARATOR)
 end
 
--- Gold "Today", then every counter with its non-zero numbers in white.
+-- Gold "Today", then every counter.
 local function stripLine(counters)
-  local words = {}
-  for _, part in ipairs(parts(counters)) do
-    local count = part[1] == 0 and "0" or WHITE_CODE .. part[1] .. CODE_END
-    words[#words + 1] = count .. " " .. part[2]
-  end
-  return GOLD_CODE .. Localization.Text("Today") .. CODE_END .. "  " .. table.concat(words, SEPARATOR)
+  return GOLD_CODE .. Localization.Text("Today") .. CODE_END .. "  " .. countsLine(counters, false)
 end
 
 -- Row `i` (1 = today): "Today", "Yesterday", then "Sun 25 Oct". Stepped from today's noon, as
@@ -86,7 +92,8 @@ local function todayNoon()
 end
 
 -- Blizzard's tooltip hierarchy: gold title, one unwrapped row per day (today first) with its
--- non-zero counters or a grey "no leads", a blank line, then the gold week line.
+-- non-zero counters or a grey "no leads", a blank line, then the gold week line. The counters
+-- take the strip's colours over a grey base.
 local function showTooltip(strip)
   local tooltip = Tooltip.Get()
   local gold, grey = _G["NORMAL_FONT_COLOR"], Theme.COLORS.grey
@@ -98,16 +105,15 @@ local function showTooltip(strip)
     for field in pairs(week) do
       week[field] = week[field] + counters[field]
     end
-    local line = plainLine(counters, true)
+    local line = countsLine(counters, true)
     if line == "" then
-      tooltip:AddDoubleLine(dayLabel(i, noon), Localization.Text("no leads"), 1, 1, 1, grey[1], grey[2], grey[3])
-    else
-      tooltip:AddDoubleLine(dayLabel(i, noon), line, 1, 1, 1, 1, 1, 1)
+      line = Localization.Text("no leads")
     end
+    tooltip:AddDoubleLine(dayLabel(i, noon), line, 1, 1, 1, grey[1], grey[2], grey[3])
   end
   _G["GameTooltip_AddBlankLineToTooltip"](tooltip)
   local goldR, goldG, goldB = gold:GetRGB()
-  tooltip:AddDoubleLine(Localization.Text("Week"), plainLine(week, false), goldR, goldG, goldB, 1, 1, 1)
+  tooltip:AddDoubleLine(Localization.Text("Week"), countsLine(week, false), goldR, goldG, goldB, grey[1], grey[2], grey[3])
   tooltip:Show()
 end
 

@@ -93,7 +93,7 @@ local function testMarks()
   local tag = row.repliedTag
   local tagWidth = tag:GetStringWidth()
   Assert.truthy(tagWidth > 0, "the tag has a width to make room for")
-  Assert.same({ tag:IsShown(), tag:GetText(), tag.textColor }, { true, "replied", ns.Theme.COLORS.accent })
+  Assert.same({ tag:IsShown(), tag:GetText(), tag.textColor }, { true, "replied", ns.Theme.COLORS.replied })
   Assert.same(tag.points, { { "BOTTOMRIGHT", greeted, "BOTTOMLEFT", -MARK_GAP, 0 } })
   Assert.same(row.what.points[2], { "RIGHT", row, "RIGHT", -(EDGE + MARK_SIZE + MARK_GAP + tagWidth + MARK_GAP), 0 })
 
@@ -400,7 +400,7 @@ local function testCompact()
 end
 
 -- Every row's icon carries a status dot, as WM's contacts: gold while the lead is unseen and
--- ungreeted (spec B), else the details header's colour: grey new, green greeted, accent replied.
+-- ungreeted (spec B), else the details header's colour: grey new, blue greeted, green replied.
 -- The row paints it on every Show, compact or not.
 local function testStatusDot()
   local ns, row, _, lead = load()
@@ -420,7 +420,7 @@ local function testStatusDot()
   Assert.same(dot(), { true, colors.greeted }, "greeted")
   lead.replied = true
   ns.LeadRow.Show(row, lead)
-  Assert.same(dot(), { true, colors.accent }, "replied")
+  Assert.same(dot(), { true, colors.replied }, "replied")
   lead.greeted, lead.replied = nil, nil
   ns.LeadRow.SetCompact(row, true)
   ns.LeadRow.Show(row, lead)
