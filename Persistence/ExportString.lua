@@ -175,8 +175,9 @@ end
 
 -- → { flavor, characters = { { key, class, realms, professions = { [key] = name }, recipes =
 -- { [key] = { name, prof, item, ranks, line, muted } } }... } }, or nil and one error message.
--- Leading and trailing spaces (a paste's newline) are ignored, up to TRIM_SLACK bytes past
--- MAX.length. The trim is linear: an unanchored "%s+$" is quadratic on a run of spaces.
+-- Leading and trailing spaces (a paste's newline) are ignored, up to TRIM_SLACK bytes at each
+-- end, which may push the string past MAX.length. Only TRIM_SLACK + 1 bytes at each end are
+-- looked at: a scan over a 509 KB run of spaces took 45 ms in one slice.
 function ExportString.Decode(text, flavorKey, pause)
   pause = pause or noPause
   if type(text) ~= "string" then
@@ -185,8 +186,12 @@ function ExportString.Decode(text, flavorKey, pause)
   if #text > MAX.length + TRIM_SLACK then
     return nil, Localization.Text("The string is too long.")
   end
-  local first = find(text, "%S")
-  text = first and match(text, "^.*%S", first) or ""
+  local tail = sub(text, -(TRIM_SLACK + 1))
+  local first, last = find(sub(text, 1, TRIM_SLACK + 1), "%S"), match(tail, "^.*()%S")
+  if #text > TRIM_SLACK + 1 and not (first and last) then
+    return nil, Localization.Text("The string has too many spaces around it.")
+  end
+  text = first and sub(text, first, #text - #tail + last) or ""
   if #text > MAX.length then
     return nil, Localization.Text("The string is too long.")
   end

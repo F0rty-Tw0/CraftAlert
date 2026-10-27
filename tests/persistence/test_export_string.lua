@@ -279,6 +279,15 @@ local function testDamagedIsCheap()
   local seconds = os.clock() - started
   Assert.truthy(err:find("incomplete", 1, true), err)
   Assert.truthy(seconds < 0.5, "trim took " .. seconds .. " s")
+  -- The trim reads 65 bytes at each end: 64 spaces pass, a longer run around the string is
+  -- refused instead of scanned (509k trailing spaces once took 45 ms in one slice).
+  Assert.truthy(ExportString.Decode(string.rep(" ", 64) .. good .. string.rep("\n", 64), "retail"))
+  local refused =
+    { good .. string.rep(" ", 509000), string.rep(" ", 599000) .. good, "\t" .. string.rep(" ", 64) .. good, good .. string.rep(" ", 65) }
+  for _, text in ipairs(refused) do
+    _, err = ExportString.Decode(text, "retail")
+    Assert.truthy(err and err:find("too many spaces", 1, true), tostring(err))
+  end
   -- A string cut before its checksum: the header is read without backtracking over the body.
   local cut = "CA1:retail:" .. string.rep("x", Fields.MAX.length - 20)
   started = os.clock()
