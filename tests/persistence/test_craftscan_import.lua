@@ -187,6 +187,15 @@ local function testLegacyAllEnabled()
   Assert.equal(recipes[9003].muted, nil)
 end
 
+-- A key without a realm takes the one realm it is stored under, not the player's.
+local function testBareKeyTakesItsRealm()
+  local CraftScanImport, ns = load()
+  local db = ns.Defaults.Db()
+  CraftScanImport.Run(db, { realms = { Legacyrealm = { characters = { Bare = { professions = {} } } } } })
+  Assert.truthy(db.characters["Bare-Legacyrealm"])
+  Assert.equal(db.characters["Bare-OwnRealm"], nil)
+end
+
 -- CraftScan writes its data while the sliced import pauses: keys it adds then are left for the
 -- next import, never walked by a `pairs` they were added under.
 local function testKeysAddedDuringTheWalk()
@@ -227,6 +236,7 @@ return function()
   testProfessionNamedByAnyExpansion()
   testKeysAddedDuringTheWalk()
   testLegacyAllEnabled()
+  testBareKeyTakesItsRealm()
   testClockReadPerRecipe()
   Wow.reset()
 end

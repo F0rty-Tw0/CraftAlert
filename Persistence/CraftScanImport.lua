@@ -88,7 +88,8 @@ local function realmsOf(lists, realmID)
 end
 
 -- The Craft Alert key of a CraftScan key, compared without apostrophes (legacy CraftScan keys lack
--- them): an existing character's key, else the realm spelled as a known realm of the group.
+-- them): an existing character's key, else the realm spelled as a known realm of the group; a
+-- bare name in a group of several realms gets the player's realm.
 local function keyOf(db, csKey, realms)
   csKey = gsub(csKey, "|", "")
   local bare = PlayerName.StripApostrophes(csKey)
@@ -96,6 +97,10 @@ local function keyOf(db, csKey, realms)
     if PlayerName.StripApostrophes(key) == bare then
       return key
     end
+  end
+  -- A key without a realm takes the realm it is stored under, when that is one realm.
+  if not string.find(csKey, "-", 1, true) and #realms == 1 then
+    return PlayerName.Normalize(csKey .. "-" .. realms[1])
   end
   local name, realm = PlayerName.NameOf(csKey), PlayerName.RealmOf(csKey)
   for _, known in ipairs(realms) do
