@@ -45,6 +45,7 @@ local SIM_RECIPES = {
 -- GetProfessions, the older three through the skill-line list.
 local CLASSIC = { era = true, tbc = true, wrath = true, cata = true, mop = true }
 local PROFESSION_SLOT_FLAVORS = { cata = true, mop = true }
+local CRAFT_FRAME_FLAVORS = { era = true, tbc = true }
 local CLASSIC_SKILL_LINES = {
   { name = "Professions", header = true },
   { name = "Blacksmithing" },
@@ -52,6 +53,28 @@ local CLASSIC_SKILL_LINES = {
   { name = "Secondary Skills", header = true },
   { name = "Cooking" },
 }
+-- The open Classic windows: Blacksmithing (TradeSkill) with the fixture's belt and reagent and a
+-- new Iron Bar, and on Era and TBC Enchanting's Craft window with the fixture's enchant and a new one.
+local function classicWindows(flavor)
+  local tradeSkill = {
+    line = "Blacksmithing",
+    rows = {
+      { name = "Sim Armor", kind = "header" },
+      { name = "Sim Plate Belt", item = 190001 },
+      { name = "Sim Iron Reagent", item = 190003 },
+      { name = "Sim Iron Bar", item = 190005 },
+    },
+  }
+  local craft = {
+    line = "Enchanting",
+    rows = {
+      { name = "Sim Bracer", kind = "header" },
+      { name = "Enchant Bracer - Sim Health", link = "|cffffd000|Henchant:90002|h[Enchant Bracer - Sim Health]|h|r" },
+      { name = "Enchant Boots - Sim Agility", link = "|cffffd000|Henchant:90006|h[Enchant Boots - Sim Agility]|h|r" },
+    },
+  }
+  return tradeSkill, CRAFT_FRAME_FLAVORS[flavor] and craft or nil
+end
 local SIM_SLOTS = { { name = "Blacksmithing", skillLine = 164 }, { name = "Enchanting", skillLine = 333 } }
 local BIND_DEBOUNCE_SECONDS = 1
 local ON_OFF = { on = true, off = false }
@@ -60,6 +83,11 @@ local ON_OFF = { on = true, off = false }
 local EVENT_ARITY = {
   TRADE_SKILL_SHOW = 0,
   TRADE_SKILL_LIST_UPDATE = 0,
+  TRADE_SKILL_UPDATE = 0,
+  TRADE_SKILL_CLOSE = 0,
+  CRAFT_SHOW = 0,
+  CRAFT_UPDATE = 0,
+  CRAFT_CLOSE = 0,
   NEW_RECIPE_LEARNED = 1,
   GET_ITEM_INFO_RECEIVED = 2,
   CHAT_MSG_WHISPER = 2, -- text, sender
@@ -248,8 +276,11 @@ local function newContext(plan, out)
     return OWN_REALM
   end)
   if CLASSIC[plan.flavor] then
+    local tradeSkill, craft = classicWindows(plan.flavor)
     ProfessionsClassic.install({
       skillLines = CLASSIC_SKILL_LINES,
+      tradeSkill = tradeSkill,
+      craft = craft,
       slots = PROFESSION_SLOT_FLAVORS[plan.flavor] and SIM_SLOTS or nil,
       items = SIM_ITEMS,
       bind = SIM_BIND,
@@ -268,12 +299,18 @@ local function newContext(plan, out)
   return ctx
 end
 
--- `read: prof=<key> stored=<n> pendingBind=<n>` after a profession window read.
+-- The readers whose window reads the sim reports: Retail/Forever's, then Classic's two windows.
+local READERS = { "ModernReader", "ClassicReader", "CraftReader" }
+
+-- `read: prof=<key> stored=<n> pendingBind=<n>` after each profession window read.
 local function reportRead(ctx)
-  local read = ctx.ns.ModernReader.lastRead
-  if read then
-    ctx.ns.ModernReader.lastRead = nil
-    ctx.out[#ctx.out + 1] = string.format("read: prof=%s stored=%d pendingBind=%d", tostring(read.prof), read.stored, read.pendingBind)
+  for _, name in ipairs(READERS) do
+    local reader = ctx.ns[name]
+    local read = reader.lastRead
+    if read then
+      reader.lastRead = nil
+      ctx.out[#ctx.out + 1] = string.format("read: prof=%s stored=%d pendingBind=%d", tostring(read.prof), read.stored, read.pendingBind)
+    end
   end
 end
 
@@ -500,7 +537,9 @@ function STEPS.event(ctx, step)
   for i, text in ipairs(step.args) do
     args[i] = eventArg(text)
   end
-  ctx.ns.ModernReader.lastRead = nil
+  for _, name in ipairs(READERS) do
+    ctx.ns[name].lastRead = nil
+  end
   ctx.ns.LearnWatcher.lastStored = nil
   ctx.ns.BindLookup.lastStored = nil
   Wow.fireEvent(step.name, unpack(args, 1, #step.args))

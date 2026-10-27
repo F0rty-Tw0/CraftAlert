@@ -4,6 +4,7 @@ Player-friendly release notes for Craft Alert.
 
 ## [Unreleased]
 
+- On Classic (Era to Mists of Pandaria), Craft Alert now knows your crafting professions and learns your recipes when you open a profession window, Enchanting's craft window on Era and TBC included.
 - Your main crafter for a profession now wins ties over the character you're playing.
 - Choose the main crafter from a lead card: left-click its Crafters row.
 - Settings → Crafters has Mute all and Unmute all for the recipes listed.

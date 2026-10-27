@@ -272,7 +272,30 @@ return function()
     stepLines(Sim.Run({ "--event", "TRADE_SKILL_SHOW", "--event", "GET_ITEM_INFO_RECEIVED", "190005", "true" })),
     booted({ "read: prof=164 stored=3 pendingBind=1", "index: size=5", "bind: stored=1", "index: size=4" })
   )
-  Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "TRADE_SKILL_SHOW" })), booted({ "professions: blacksmithing,enchanting" }, "Trade"))
+  -- Classic: the TradeSkill window (every Classic flavor) and Enchanting's Craft window (Era, TBC)
+  -- are read into name keys; the new recipe matches by name, the greeting keeps the client's spelling.
+  local classicWindow =
+    booted({ "professions: blacksmithing,enchanting", "read: prof=blacksmithing stored=3 pendingBind=1", "index: size=5" }, "Trade")
+  for _, key in ipairs({ "era", "tbc", "wrath", "cata", "mop" }) do
+    Assert.same(stepLines(Sim.Run({ "--flavor", key, "--event", "TRADE_SKILL_SHOW" })), classicWindow, key)
+  end
+  local craftWindow = booted({ "professions: blacksmithing,enchanting", "read: prof=enchanting stored=2 pendingBind=0", "index: size=5" }, "Trade")
+  Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "CRAFT_SHOW" })), craftWindow)
+  Assert.same(stepLines(Sim.Run({ "--flavor", "era", "--event", "CRAFT_SHOW" })), craftWindow)
+  Assert.same(stepLines(Sim.Run({ "--flavor", "wrath", "--event", "CRAFT_SHOW" })), booted({ "professions: blacksmithing,enchanting" }, "Trade"))
+  Assert.same(
+    stepLines(Sim.Run({ "--flavor", "tbc", "--event", "CRAFT_SHOW", "--event", "CRAFT_CLOSE", "LF enchant boots sim agility" })),
+    booted({
+      "professions: blacksmithing,enchanting",
+      "read: prof=enchanting stored=2 pendingBind=0",
+      "index: size=5",
+      "sender: Customer-OtherRealm",
+      "match: item group=enchant boots - sim agility prof=enchanting why=lf+enchant boots sim agility",
+      "toast: shown lead=1 more=0",
+      "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=false",
+      "greeting: Hi! I can craft Enchant Boots - Sim Agility.",
+    }, "Trade")
+  )
 
   -- Classic flavors log in on the Classic fixture (name keys): Bootstrap reads the professions
   -- (skill lines on Era/TBC/Wrath, GetProfessions on Cata/MoP) and listens for skill-line changes.

@@ -54,7 +54,10 @@ Model/OrdersFilled.lua
 Model/AwaySummary.lua
 Professions/ProfessionList.lua
 Professions/BindLookup.lua
+Professions/RecipeStore.lua
 Professions/ReadJob.lua
+Professions/ClassicReader.lua
+Professions/CraftReader.lua
 Professions/ReachQuery.lua
 Professions/QualityReach.lua
 Professions/ModernReader.lua

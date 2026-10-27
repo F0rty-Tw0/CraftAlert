@@ -20,6 +20,8 @@ local AwaySummary = ns.AwaySummary or require("CraftAlert.Model.AwaySummary")
 local WhisperTracker = ns.WhisperTracker or require("CraftAlert.Model.WhisperTracker")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local ModernReader = ns.ModernReader or require("CraftAlert.Professions.ModernReader")
+local ClassicReader = ns.ClassicReader or require("CraftAlert.Professions.ClassicReader")
+local CraftReader = ns.CraftReader or require("CraftAlert.Professions.CraftReader")
 local QualityReach = ns.QualityReach or require("CraftAlert.Professions.QualityReach")
 local LearnWatcher = ns.LearnWatcher or require("CraftAlert.Professions.LearnWatcher")
 local Status = ns.Status or require("CraftAlert.Core.Status")
@@ -68,8 +70,12 @@ local function installProfessions()
   EventRouter.On(SKILL_LINES_CHANGED, onSkillLinesChanged)
 end
 
+-- Classic reads the TradeSkill window and, on Era and TBC, Enchanting's Craft window; its learn
+-- path arrives with its task.
 local function installReaders()
   if FlavorCompat.isClassic then
+    ClassicReader.Install(db)
+    CraftReader.Install(db)
     return
   end
   ModernReader.Install(db)
