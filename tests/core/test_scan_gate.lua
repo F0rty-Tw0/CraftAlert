@@ -227,6 +227,18 @@ return function()
   ns.Slicer.Drain()
   Assert.equal(ns.ScanGate.State().reason, nil, "the build landed")
   Assert.equal(ns.ScanGate.IsActive(), true)
+  -- An unread profession is named only once the build shows the index empty, not while it runs.
+  ns, db = setup("retail", function(d)
+    d.characters["Smith-Realm"] = nil
+    d.characters["Me-Realm"] = Fixture.character({ BS }, {})
+    d.characters["Me-Realm"].professions[BS] = { name = "Blacksmithing", primary = true, read = false }
+  end)
+  ns.ScanGate.Install(db)
+  ns.Index.RequestRebuild("login")
+  Assert.equal(ns.ScanGate.State().unreadProfession, nil, "building names no profession to open")
+  ns.Slicer.Drain()
+  Assert.equal(ns.ScanGate.State().reason, "empty")
+  Assert.equal(ns.ScanGate.State().unreadProfession, "Blacksmithing")
 
   -- Settings pages and Bootstrap evaluate before Install ran: paused, no error.
   ns = setup("retail")
