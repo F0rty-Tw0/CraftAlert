@@ -35,14 +35,28 @@ local NAME_LEFT = Theme.LAYOUT.DETAILS_PADDING + Theme.LAYOUT.HEADER_ICON_SIZE +
 local LINE_SEPARATOR, STRIP_SEPARATOR = "  -  ", " · "
 -- The strip's text wraps to at most STRIP_LINES lines.
 local STRIP_LINES = 2
--- The strip's plain words: textSecondary with its alpha folded into the colour, so the link,
--- the profession and the crafter keep their full colour.
-local STRIP_COLOR = FrameKit.Opaque(Theme.COLORS.textSecondary)
+-- The header lines' and the strip's plain words: textSecondary with its alpha folded into the
+-- colour, so the status words, the link, the profession and the crafter keep their full colour.
+local PLAIN_COLOR = FrameKit.Opaque(Theme.COLORS.textSecondary)
+
+-- The status words in the dots' colours, as the ledger: blue "Greeted", green "replied"; a new
+-- lead's words stay plain.
+local function stateText(lead)
+  local colors = Theme.COLORS
+  if not lead.greeted and not lead.replied then
+    return Localization.Text((LeadText.State(lead)))
+  end
+  local greeted = FrameKit.ThemeCode(Localization.Text("Greeted"), colors.greeted)
+  if not lead.replied then
+    return greeted
+  end
+  return greeted .. ", " .. FrameKit.ThemeCode(Localization.Text("replied"), colors.replied)
+end
 
 -- Line 1: "Class  -  status  -  age"; a customer of unknown class leaves the class part out.
 function DetailsHeader.LineOne(lead)
   local parts = { FrameKit.ClassName(FlavorCompat.ClassOf(lead.guid)) }
-  parts[#parts + 1] = Localization.Text((LeadText.State(lead)))
+  parts[#parts + 1] = stateText(lead)
   parts[#parts + 1] = LeadText.Age(_G["time"]() - lead.time)
   return table.concat(parts, LINE_SEPARATOR)
 end
@@ -119,7 +133,7 @@ local function createStrip(details)
   fill:SetColorTexture(unpack(Theme.COLORS.headerFill))
   divider(strip, "TOP")
   divider(strip, "BOTTOM")
-  local text = FrameKit.Text(strip, Theme.FONTS.body, STRIP_COLOR)
+  local text = FrameKit.Text(strip, Theme.FONTS.body, PLAIN_COLOR)
   text:SetPoint("LEFT", strip, "LEFT", padding, 0)
   text:SetWordWrap(true)
   if text.SetMaxLines then
@@ -148,7 +162,7 @@ function DetailsHeader.Create(details)
   details.name:SetPoint("TOPLEFT", header, "TOPLEFT", NAME_LEFT, NAME_TOP)
   local previous = details.name
   for _, key in ipairs({ "lineOne", "lineTwo" }) do
-    local line = FrameKit.Text(header, fonts.body, Theme.COLORS.textSecondary)
+    local line = FrameKit.Text(header, fonts.body, PLAIN_COLOR)
     line:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, LINE_GAP)
     line:SetPoint("RIGHT", header, "RIGHT", -layout.DETAILS_PADDING, 0)
     details[key], previous = line, line

@@ -209,7 +209,7 @@ local function testRowFields()
   Assert.same({ realmLabel:IsShown(), realm:IsShown(), realm:GetText() }, { true, true, "Can't send an order (other realm)" })
   Widgets.click(shown[2], "LeftButton")
   local status = details.lineOne:GetText()
-  Assert.truthy(string.find(status, "Greeted, replied", 1, true), status)
+  Assert.truthy(string.find(status, "Greeted|r, |cff4cd166replied", 1, true), status)
   Assert.same({ realmLabel:IsShown(), realm:IsShown() }, { false, false })
   -- Ages are refreshed on each refresh (window open or lead event), never by a ticker.
   Wow.clock.time = UiFixture.T0 + 60

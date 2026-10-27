@@ -45,25 +45,30 @@ local function testHeader()
   Wow.stub("GameFontNormalLarge", {})
   local large = ns.LeadDetails.New(_G["CreateFrame"]("Frame")).name
   Assert.same({ large.font, large.fontSize }, { "GameFontNormalLarge", 17 })
-  -- Lines 1 and 2 in 55 % white under the name: class, status and age; channel and time.
+  -- Lines 1 and 2 in 55 % white, folded opaque so the status colour codes keep their full colour,
+  -- under the name: class, status and age; channel and time.
   local at = os.date("%H:%M", lead.time)
+  local grey = ns.FrameKit.Opaque(colors.textSecondary)
   Assert.same(
     { d.lineOne:GetText(), d.lineOne.font, d.lineOne.textColor },
-    { "Warrior" .. SEP .. "New lead" .. SEP .. "30s", "GameFontHighlightSmall", colors.textSecondary }
+    { "Warrior" .. SEP .. "New lead" .. SEP .. "30s", "GameFontHighlightSmall", grey }
   )
-  Assert.same({ d.lineTwo:GetText(), d.lineTwo.font, d.lineTwo.textColor }, { "Trade" .. SEP .. at, "GameFontHighlightSmall", colors.textSecondary })
+  Assert.same({ d.lineTwo:GetText(), d.lineTwo.font, d.lineTwo.textColor }, { "Trade" .. SEP .. at, "GameFontHighlightSmall", grey })
   Assert.same(
     { d.lineOne.points[1], d.lineTwo.points[1] },
     { { "TOPLEFT", d.name, "BOTTOMLEFT", 0, -3 }, { "TOPLEFT", d.lineOne, "BOTTOMLEFT", 0, -3 } }
   )
-  -- The dot by status: grey new, blue greeted, green replied.
+  -- The dot by status: grey new, blue greeted, green replied; the status words in the dots' colours.
   Assert.same({ d.dot:IsShown(), d.dot.texture.vertexColor }, { true, colors.grey })
+  local greeted = ns.FrameKit.ThemeCode("Greeted", colors.greeted)
   lead.greeted = true
   ns.LeadDetails.Show(d, lead)
-  Assert.same({ d.dot.texture.vertexColor, d.lineOne:GetText() }, { colors.greeted, "Warrior" .. SEP .. "Greeted" .. SEP .. "30s" })
+  Assert.same({ d.dot.texture.vertexColor, d.lineOne:GetText() }, { colors.greeted, "Warrior" .. SEP .. greeted .. SEP .. "30s" })
   lead.replied = true
   ns.LeadDetails.Show(d, lead)
-  Assert.same({ d.dot.texture.vertexColor, d.lineOne:GetText() }, { colors.replied, "Warrior" .. SEP .. "Greeted, replied" .. SEP .. "30s" })
+  local replied = greeted .. ", " .. ns.FrameKit.ThemeCode("replied", colors.replied)
+  Assert.same({ d.dot.texture.vertexColor, d.lineOne:GetText() }, { colors.replied, "Warrior" .. SEP .. replied .. SEP .. "30s" })
+  Assert.equal(replied, "|cff1eb7f4Greeted|r, |cff4cd166replied|r", "blue and green codes")
   for _, text in ipairs({ d.name, d.lineOne, d.lineTwo }) do
     Assert.equal(text.parent, header, "header texts are the header's regions")
   end
