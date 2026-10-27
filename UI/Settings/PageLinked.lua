@@ -110,7 +110,9 @@ local function createImport(column, page)
         return
       end
       box:SetText("")
-      result:SetText(Localization.Text("Imported %d characters, %d recipes (%d skipped).", counts.characters, counts.recipes, counts.skipped))
+      local characters = Localization.Plural(counts.characters, "%d character", "%d characters")
+      local recipes = Localization.Plural(counts.recipes, "%d recipe", "%d recipes")
+      result:SetText(Localization.Text("Imported %s, %s (%d skipped).", characters, recipes, counts.skipped))
       page.ShowImported()
     end, function()
       button:Enable()

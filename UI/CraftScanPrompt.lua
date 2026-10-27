@@ -33,8 +33,11 @@ local frame = nil -- made on the first show
 function CraftScanPrompt.Import(db, onLine, onCancel)
   CraftScanImport.Start(db, _G["CraftScan_DB"], function(c)
     db.settings.craftScanImported = _G["time"]()
-    local line = "CraftScan import: %d characters, %d recipes (%d muted) and %d greetings (%d skipped)."
-    onLine(Localization.Text(line, c.characters, c.recipes, c.muted, c.greetings, c.skipped))
+    local characters = Localization.Plural(c.characters, "%d character", "%d characters")
+    local recipes = Localization.Plural(c.recipes, "%d recipe", "%d recipes")
+    local greetings = Localization.Plural(c.greetings, "%d greeting", "%d greetings")
+    local line = "CraftScan import: %s, %s (%d muted) and %s (%d skipped)."
+    onLine(Localization.Text(line, characters, recipes, c.muted, greetings, c.skipped))
   end, onCancel)
 end
 

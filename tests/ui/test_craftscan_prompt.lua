@@ -50,7 +50,7 @@ local function testAccept()
   Assert.equal(db.settings.craftScanImported, 1000)
   Assert.same(SettingsFixture.take(refreshes), { "rebuild:craftscan" })
   Assert.truthy(db.characters["Scanalt-OwnRealm"].recipes[9004])
-  local result = "CraftScan import: 3 characters, 1 recipes (0 muted) and 2 greetings (9 skipped)."
+  local result = "CraftScan import: 3 characters, 1 recipe (0 muted) and 2 greetings (9 skipped)."
   Assert.same(chatSince(before), { OFFER, result, ADVICE })
   -- Answered: never again.
   ns.CraftScanPrompt.MaybeShow(db)
