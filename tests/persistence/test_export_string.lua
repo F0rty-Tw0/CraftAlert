@@ -425,16 +425,16 @@ local function testRealmsReadPausePerRealm()
   Assert.same(weights, { 8, 3, 1, 1, 3 }, "the checksum, the record, three realms")
 end
 
--- Storing a character pauses per realm too: 19 characters of 50 long realms and no recipes once
--- took 9 ms between two clock reads.
+-- Storing a character pauses per realm and once for the character: 19 characters of 50 long
+-- realms once took 9 ms between two clock reads, 200 characters of 20 professions 5 ms.
 local function testApplyPausesPerRealm()
   local ExportString = load()
-  local data = assert(ExportString.Decode(seal("CA1:retail:c,Smith-Realm,,A.B.C"), "retail"))
+  local data = assert(ExportString.Decode(seal("CA1:retail:c,Smith-Realm,,A.B.C;c,Bare-Realm,,"), "retail"))
   local pauses = 0
   ExportString.Apply({ characters = {} }, data, function()
     pauses = pauses + 1
   end)
-  Assert.equal(pauses, 3)
+  Assert.equal(pauses, 5, "three realms and two characters")
 end
 
 -- The user's Retail account is 6 characters and 2,983 recipes: 3,000 synthetic recipes export

@@ -294,6 +294,8 @@ function ExportString.Apply(db, data, pause)
       db.characters[incoming.key] = record
       counts.characters, counts.recipes = counts.characters + 1, counts.recipes + recipes
     end
+    -- A character without recipes or realms pauses nowhere else: 200 of them took 5 ms.
+    pause(1)
   end
   return counts
 end
