@@ -62,18 +62,32 @@ local function testLayout()
   Assert.equal(shown, 9)
 end
 
+-- Gold "Today", white non-zero numbers; the opaque grey base colours words, dots and zeros (a
+-- 0.55-alpha base would dim the colour codes too).
 local function testTodayLine()
-  local _, view = open()
-  Assert.equal(view.strip.text:GetText(), "Today: 3 seen · 2 greeted · 1 replied · 1 filled")
-  local _, foreverView = open("forever")
-  Assert.equal(foreverView.strip.text:GetText(), "Today: 3 seen · 2 greeted · 1 replied", "no orders off Retail")
+  local ns, view = open()
+  Assert.equal(
+    view.strip.text:GetText(),
+    "|cffffd100Today|r  |cffffffff3|r seen · |cffffffff2|r greeted · |cffffffff1|r replied · |cffffffff1|r filled"
+  )
+  Assert.same(view.strip.text.textColor, ns.Theme.COLORS.grey)
+  local foreverNs, foreverView, foreverDb = open("forever")
+  foreverDb.ledger["2026-10-27"] = { seen = 3, greeted = 0, replied = 1, filled = 0 }
+  foreverNs.LedgerStrip.Refresh(foreverView.strip)
+  Assert.equal(
+    foreverView.strip.text:GetText(),
+    "|cffffd100Today|r  |cffffffff3|r seen · 0 greeted · |cffffffff1|r replied",
+    "no orders off Retail; a zero stays grey"
+  )
 end
+
+local AFTER_FILL = "|cffffd100Today|r  |cffffffff3|r seen · |cffffffff2|r greeted · |cffffffff1|r replied · |cffffffff2|r filled"
 
 -- A fill fires no leads "change": the shown strip repaints from the ledger itself.
 local function testRepaintsOnAdd()
   local ns, view = open()
   ns.Ledger.Add("filled")
-  Assert.equal(view.strip.text:GetText(), "Today: 3 seen · 2 greeted · 1 replied · 2 filled")
+  Assert.equal(view.strip.text:GetText(), AFTER_FILL)
 end
 
 -- WhisperMessenger's panel builds a new view when its host changes: one strip per host repaints,
@@ -90,33 +104,51 @@ local function testOneStripPerHost()
     end,
   })
   ns.LeadsView.Refresh(rebuilt, ns.Leads.List())
+  local before = view.strip.text:GetText()
   ns.Ledger.Add("filled")
-  Assert.equal(rebuilt.strip.text:GetText(), "Today: 3 seen · 2 greeted · 1 replied · 2 filled")
-  Assert.equal(view.strip.text:GetText(), "Today: 3 seen · 2 greeted · 1 replied · 1 filled", "the replaced strip is dropped")
+  Assert.equal(rebuilt.strip.text:GetText(), AFTER_FILL)
+  Assert.equal(view.strip.text:GetText(), before, "the replaced strip is dropped")
 end
 
--- Gold title, then one white line per day, today first.
+-- Gold title, one unwrapped row per day (day left, its non-zero counters right, or a grey
+-- "no leads"), a blank line, then the gold week line with every counter.
 local function testTooltip()
   local ns, view = open()
   local strip, tip = view.strip, ns.Tooltip.Get()
+  local grey = ns.Theme.COLORS.grey
+  local none = { "no leads", grey[1], grey[2], grey[3] }
   strip.scripts.OnEnter(strip)
   Assert.same({ tip.owner, tip.shown }, { strip, true })
   Assert.same(tip.lines, {
     "Last 7 days",
-    "Today: 3 seen · 2 greeted · 1 replied · 1 filled",
-    "2026-10-26: 5 seen · 0 greeted · 0 replied · 2 filled",
-    "2026-10-25: 0 seen · 0 greeted · 0 replied · 0 filled",
-    "2026-10-24: 0 seen · 0 greeted · 0 replied · 0 filled",
-    "2026-10-23: 0 seen · 0 greeted · 0 replied · 0 filled",
-    "2026-10-22: 0 seen · 0 greeted · 0 replied · 0 filled",
-    "2026-10-21: 0 seen · 0 greeted · 0 replied · 0 filled",
+    "Today",
+    "Yesterday",
+    "Sun 25 Oct",
+    "Sat 24 Oct",
+    "Fri 23 Oct",
+    "Thu 22 Oct",
+    "Wed 21 Oct",
+    " ",
+    "Week",
   })
-  Assert.same(tip.colors, { GOLD, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE })
+  Assert.same(tip.colors, { GOLD, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, WHITE, {}, GOLD })
+  Assert.same(tip.rights, {
+    [2] = { "3 seen · 2 greeted · 1 replied · 1 filled", 1, 1, 1 },
+    [3] = { "5 seen · 2 filled", 1, 1, 1 },
+    [4] = none,
+    [5] = none,
+    [6] = none,
+    [7] = none,
+    [8] = none,
+    [10] = { "8 seen · 2 greeted · 1 replied · 3 filled", 1, 1, 1 },
+  })
   strip.scripts.OnLeave(strip)
   Assert.equal(tip.shown, false)
   local foreverNs, foreverView = open("forever")
   foreverView.strip.scripts.OnEnter(foreverView.strip)
-  Assert.equal(foreverNs.Tooltip.Get().lines[3], "2026-10-26: 5 seen · 0 greeted · 0 replied")
+  local foreverTip = foreverNs.Tooltip.Get()
+  Assert.equal(foreverTip.rights[3][1], "5 seen", "a day with only fills reads as its seen count off Retail")
+  Assert.equal(foreverTip.rights[10][1], "8 seen · 2 greeted · 1 replied")
 end
 
 -- Nothing shows in an instance (WhisperMessenger's panel stays open there, with no leads).
