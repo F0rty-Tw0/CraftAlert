@@ -41,7 +41,7 @@ end
 
 -- Me-Realm's stored records, by lowercase name: Sim Plate Boots is not stored, the helm and the
 -- mail boots are muted, the iron bar has no binding, the bracer enchant is Enchanting's, and
--- "Plate" and "Mail" share a header's and a subheader's name.
+-- "Plate", "Mail" and Enchanting's "Bracer" share a header's and a subheader's name.
 local function stored()
   local function record(name, prof, fields)
     fields = fields or {}
@@ -58,6 +58,7 @@ local function stored()
     ["sim mail chest"] = record("Sim Mail Chest", "blacksmithing"),
     ["plate"] = record("Plate", "blacksmithing"),
     ["mail"] = record("Mail", "blacksmithing"),
+    ["bracer"] = record("Bracer", "enchanting"),
   }
 end
 
@@ -268,13 +269,13 @@ local function testSettingOffHooksNothing()
   Assert.truthy(rawget(_G, "TradeSkillFrame_Update") ~= blizzardUpdate, "hooked")
 end
 
--- No Craft window off Era and TBC: Blizzard_CraftUI's update is never hooked. On Wrath to MoP the
--- switch sits left of the row's skill-up count (R2).
-local function testWrath()
-  local ns, db, stub = load({ flavor = "wrath", skillUps = true })
+-- No Craft window off Era and TBC: Blizzard_CraftUI's update is never hooked. On MoP the switch
+-- sits left of the row's skill-up count (R2).
+local function testMists()
+  local ns, db, stub = load({ flavor = "mop", skillUps = true })
   local craftUpdate = rawget(_G, "CraftFrame_Update")
   ns.ClassicRows.Install(db)
-  Assert.equal(rawget(_G, "CraftFrame_Update"), craftUpdate, "no Craft hook on Wrath")
+  Assert.equal(rawget(_G, "CraftFrame_Update"), craftUpdate, "no Craft hook on MoP")
   stub.tradeSkill:update(0)
   local switch = assert(switchOf(stub.tradeSkill.rows[2]))
   Assert.same(switch.points[1], { "RIGHT", stub.tradeSkill.skillUps[2], "LEFT", 0, 0 })
@@ -287,6 +288,6 @@ return function()
   testGates()
   testInstall()
   testSettingOffHooksNothing()
-  testWrath()
+  testMists()
   Wow.reset()
 end

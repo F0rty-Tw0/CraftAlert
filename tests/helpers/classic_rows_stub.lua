@@ -10,7 +10,7 @@
 -- opts.craft: the Craft window exists too. opts.loaded: what IsAddOnLoaded answers for both
 -- windows' addons. Before `defined` (set by opts.loaded, or by stub:define() as the addon's load
 -- would), the update globals and the row buttons are missing. opts.skillUps: each row has its
--- <row name>NumSkillUps frame (Wrath to MoP).
+-- <row name>NumSkillUps frame (MoP only).
 -- As the client: update shows list rows offset + 1 .. on the buttons by SetID and hides the
 -- buttons past the list, which keep their old ID; the hooks run after it. The globals are called
 -- by name, so a hook installed with hooksecurefunc(name, hook) runs on every update.

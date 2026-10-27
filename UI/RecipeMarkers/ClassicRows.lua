@@ -81,8 +81,8 @@ local function recordOf(source, index, recipes, profession)
 end
 
 -- Shows, paints or hides the switch of each row button. A hidden button is past the end of the
--- list and keeps an old ID, so it gets none. On Wrath to MoP the switch sits left of the row's
--- skill-up count (R2).
+-- list and keeps an old ID, so it gets none. On MoP the switch sits left of the row's skill-up
+-- count (R2); Wrath and Cata rows have no such frame, so it sits at the row's right end.
 local function walk(source)
   local profession = shownProfession(source)
   local character = profession and db.characters[PlayerName.Own()]
