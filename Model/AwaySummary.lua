@@ -34,6 +34,7 @@ end
 local function expiredCount()
   local expired = 0
   for id, lead in pairs(period) do
+    -- A lead the MAX_LEADS cap pushed out counts too: it left without the player acting.
     if not lead.dismissed and not Leads.IsActive(id) then
       expired = expired + 1
     end
