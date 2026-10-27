@@ -32,8 +32,7 @@ local JOB_NAME = "read"
 local GUARDS = { "IsNPCCrafting", "IsTradeSkillGuild", "IsTradeSkillGuildMember", "IsTradeSkillLinked", "IsRuneforging" }
 
 local db = nil
-local readKey = nil -- profession and recipe count of the window as last read
-local readCount = nil
+local reads = {} -- by profession: { count, settled } of the last read that stored a recipe for it
 local windowOpen = false
 local activeJob = nil -- the job last started; running only while Slicer.IsRunning(JOB_NAME)
 local keptJob = nil -- a job its window cut off; the same key and recipe count resume it
@@ -214,7 +213,7 @@ end
 local function finishRead(job)
   ModernReader.lastRead = ReadJob.Finish(job)
   if job.readKeys[job.key] then
-    readKey, readCount = job.key, #job.recipeIDs
+    reads[job.key] = { count = #job.recipeIDs, settled = job.named and not job.lineless }
   end
   if job.anyChanged then
     Index.RequestRebuild("read")
@@ -267,8 +266,10 @@ end
 
 -- force: the window was just opened. An update starts a read only when the profession or the
 -- recipe count differs from the running job, or from the last read that stored a recipe for
--- the window. A kept job with the same profession and count resumes instead of starting over.
--- Nothing is read in an instance.
+-- that profession. An open skips the walk too when that read was settled (a loaded answer named
+-- the profession and every stored recipe has its line) and the character still stores recipes
+-- for it; the reach job is queued instead. A kept job with the same profession and count
+-- resumes instead of starting over. Nothing is read in an instance.
 local function onWindowEvent(force)
   if FlavorCompat.InInstance() then
     return
@@ -291,9 +292,19 @@ local function onWindowEvent(force)
     return
   end
   local resumable = matches(keptJob, key, count)
-  local lastReadAgain = key == readKey and count == readCount
-  if running == nil and not force and not resumable and lastReadAgain then
-    return
+  local last = reads[key]
+  local lastReadAgain = last ~= nil and last.count == count
+  if running == nil and not resumable and lastReadAgain then
+    if not force then
+      return
+    end
+    if last.settled then
+      local ids = ReadJob.RecipeIDsOf(db.characters[PlayerName.Own()], key)
+      if #ids > 0 then
+        QualityReach.Queue(ids)
+        return
+      end
+    end
   end
   local job = resumable and keptJob or newJob(key, recipeIDs)
   keptJob, activeJob = nil, job
