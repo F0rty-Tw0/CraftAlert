@@ -79,8 +79,12 @@ function ExportFields.Text(text)
   return (gsub(text, "[%%:;,%.~]", ESCAPES))
 end
 
--- → the text, or nil for a field holding a raw separator, a bad escape or a refused byte.
+-- → the text, or nil for a field holding a raw separator, a bad escape or a refused byte. A field
+-- longer than MAX.text bytes all escaped is refused unscanned (a 32.7 KB one took 6.6 ms).
 function ExportFields.ReadText(field)
+  if #field > 3 * ExportFields.MAX.text then
+    return nil
+  end
   if find(field, "[:;,%.~]") or find((gsub(field, "%%%x%x", "")), "%%") then
     return nil
   end

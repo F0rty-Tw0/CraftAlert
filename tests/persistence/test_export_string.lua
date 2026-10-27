@@ -163,6 +163,23 @@ local function testKeyOrder()
   Assert.truthy(text:find("r,5,4k,R5,,,,;r,p,4k,R30,,,,;r,1y,4k,R100,,,,;r,~a,4k,Ra,,,,;r,~b,4k,Rb,,,,", 1, true), text)
 end
 
+-- A text field holds at most MAX.text bytes, each escaped in 3: a longer field is refused before
+-- any pattern scan (a 32.7 KB one took 6.6 ms in one slice).
+local function testLongFieldRefusedUnscanned()
+  local find, scans = string.find, 0
+  rawset(string, "find", function(...)
+    scans = scans + 1
+    return find(...)
+  end)
+  local _, _, Fields = load()
+  rawset(string, "find", find)
+  local widest = string.rep("%2E", Fields.MAX.text)
+  Assert.equal(Fields.ReadText(widest), string.rep(".", Fields.MAX.text))
+  scans = 0
+  Assert.equal(Fields.ReadText(widest .. "y"), nil)
+  Assert.equal(scans, 0)
+end
+
 -- A re-import replaces recipes and realms, keeps A's enabled and main crafter choices, refreshes
 -- importedAt, keeps a known bind for an unchanged item, and queues the rest for the bind lookup.
 local function testReimportKeepsChoices()
@@ -356,6 +373,7 @@ return function()
   testRoundTrip()
   testClassicNameKeys()
   testKeyOrder()
+  testLongFieldRefusedUnscanned()
   testReimportKeepsChoices()
   testLocalCharacterSkipped()
   testRejected()
