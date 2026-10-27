@@ -166,7 +166,7 @@ local function testBridgedAwaySummary()
   end)
   Wow.fireEvent("PLAYER_FLAGS_CHANGED", "player")
   local preview = wm.preview.CraftAlert
-  Assert.same({ preview.sender, preview.text }, { "Craft Alert", "1 requests you could craft while you were away" })
+  Assert.same({ preview.sender, preview.text }, { "Craft Alert", "1 request you could craft while you were away" })
   Assert.equal(rawget(_G, "CraftAlertToast"), nil, "no own toast")
   Assert.same(errors, {})
 end

@@ -557,7 +557,7 @@ local function testAwaySummary(db)
   Wow.fireEvent("PLAYER_FLAGS_CHANGED", "player")
   local toast = rawget(_G, "CraftAlertToast")
   local face = table.concat(Widgets.texts(toast, Wow.frames), " / ")
-  Assert.truthy(toast:IsShown() and string.find(face, "1 requests you could craft while you were away", 1, true), face)
+  Assert.truthy(toast:IsShown() and string.find(face, "1 request you could craft while you were away", 1, true), face)
   Assert.same(errors, {})
 end
 

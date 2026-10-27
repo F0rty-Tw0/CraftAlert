@@ -113,11 +113,14 @@ local function testInstanceResets()
   Assert.same(state.shown, { { 1, 0 } }, "only the new period's lead")
 end
 
--- The toast's text: plural as the spec writes it, the expired part only when there is one.
+-- The toast's text: plural as the spec writes it, singular for one, the expired part only when
+-- there is one.
 local function testText()
   local AwaySummary = setup()
   Assert.equal(AwaySummary.Text(4, 1), "4 requests you could craft while you were away (1 expired)")
   Assert.equal(AwaySummary.Text(3, 0), "3 requests you could craft while you were away")
+  Assert.equal(AwaySummary.Text(1, 0), "1 request you could craft while you were away")
+  Assert.equal(AwaySummary.Text(1, 1), "1 request you could craft while you were away (1 expired)")
 end
 
 return function()
