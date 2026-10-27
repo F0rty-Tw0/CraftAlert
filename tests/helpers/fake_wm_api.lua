@@ -26,7 +26,8 @@
 -- ShowPanel (not refused) shows; on a panel already shown it returns true without running onShow, as
 -- WM's does (UI/MessengerWindow/MessengerWindow/WindowVisibility.lua:116-117, WM). TogglePanel (not
 -- refused) shows when hidden, hides when shown, and returns true. An unknown panel key returns
--- false, as the real one does.
+-- false, as the real one does. OpenConversation (not refused) hides every shown panel (wm.hidePanel)
+-- and returns true: WM shows the conversation in the panel's place (Core/PublicApi.lua:52, WM).
 local Wow = require("tests.helpers.wow")
 
 local FakeWm = {}
@@ -126,6 +127,11 @@ function FakeWm.install(opts)
   end
 
   define("OpenConversation", function()
+    for key, shown in pairs(wm.shown) do
+      if shown then
+        wm.hidePanel(key)
+      end
+    end
     return true
   end)
   define("ShowPreview", function(key, preview)

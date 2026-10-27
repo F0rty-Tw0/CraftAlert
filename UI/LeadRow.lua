@@ -142,7 +142,7 @@ local function createMarks(row)
   greeted:SetSize(size, size)
   greeted:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -EDGE, 4)
   greeted:SetTexture(Theme.GREETED_ICON)
-  local replied = FrameKit.Text(row, Theme.FONTS.detail, Theme.COLORS.accent)
+  local replied = FrameKit.Text(row, Theme.FONTS.detail, Theme.COLORS.replied)
   replied:SetText(Localization.Text("replied"))
   return greeted, replied
 end

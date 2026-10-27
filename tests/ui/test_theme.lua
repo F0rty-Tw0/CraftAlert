@@ -24,6 +24,8 @@ return function()
   Assert.equal(Theme.ART.SIZE_GRABBER_HIGHLIGHT, "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
   Assert.same(Theme.COLORS.headerFill, { 0.09, 0.08, 0.07, 0.60 })
   Assert.same(Theme.COLORS.divider, { 1, 1, 1, 0.08 })
+  -- Lead states, shared by the dots and the ledger counts: blue greeted, green replied.
+  Assert.same({ Theme.COLORS.greeted, Theme.COLORS.replied }, { { 0.12, 0.72, 0.96, 1.0 }, { 0.30, 0.82, 0.40, 1.0 } })
   Assert.equal(Theme.FONTS.heading, "GameFontNormalLarge")
   -- The recipe mute switch (atlases and files seen in the retail client, 2026-10-25); no bell left.
   local art = Theme.ART

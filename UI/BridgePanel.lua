@@ -8,15 +8,15 @@ local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local LeadsView = ns.LeadsView or require("CraftAlert.UI.LeadsView")
-local LeadDetails = ns.LeadDetails or require("CraftAlert.UI.LeadDetails")
+local LedgerStrip = ns.LedgerStrip or require("CraftAlert.UI.LedgerStrip")
 local SettingsGear = ns.SettingsGear or require("CraftAlert.UI.SettingsGear")
 local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.SettingsPane")
 
 -- Spec C.2, C.4: the leads in WhisperMessenger's panel. The RegisterPanel table the bridge hands
 -- over (UI/WhisperBridge.lua) and the split view WM's host frame shows: built once per host, sent
 -- back to the top with the newest lead selected on every show, refreshed on lead changes while
--- shown. A gear at the details header's right swaps the view for the settings pane inside the
--- host (Back returns; the mode is not saved, so every show starts on the leads). The tab's badge
+-- shown. A gear with a "Settings" label at the ledger line's right swaps the view for the settings
+-- pane inside the host (Back returns; the mode is not saved, so every show starts on the leads). The tab's badge
 -- counts the unseen leads; WM's Mark all read marks them all seen at once.
 local BridgePanel = {}
 
@@ -26,8 +26,6 @@ local min = math.min
 -- WM's CONTENT_MIN_WIDTH and CONTACTS_MIN_WIDTH (UI/Theme/Layout.lua:12-13, WM): the details keep
 -- at least 340 px of the host, the list takes the rest between 180 and the standalone 260.
 local DETAILS_MIN_WIDTH = 340
-local GEAR_INSET, GEAR_GAP = 6, 6
-local GEAR_LEVEL = 10 -- above the details frame's header, zones and buttons
 -- The settings pane's levels above the host: over WM's divider handle, which sits 50 above the
 -- contacts pane, a sibling of the host (UI/MessengerWindow/LayoutBuilder/ContactsSection.lua:115-121
 -- and UI/Theme/Layout.lua:17, WM), so its line never draws over the settings.
@@ -96,14 +94,13 @@ local function enterSettings()
   SettingsPane.Show()
 end
 
--- The gear sits on the details pane, not the details frame, so it stays when no lead is selected;
--- GEAR_INSET in from the header's right, centred on it vertically.
+-- The gear and its "Settings" label sit at the ledger line's right, centred on it vertically; the
+-- counts end before them.
 local function addGear()
-  local gear = SettingsGear.Build(view.detailsPane, BridgePanel.ToggleSettings)
-  gear:SetPoint("RIGHT", view.details.header, "RIGHT", -GEAR_INSET, 0)
-  gear:SetFrameLevel(view.details.frame:GetFrameLevel() + GEAR_LEVEL)
-  -- The customer's name and the header's lines end before the gear.
-  LeadDetails.SetRightInset(view.details, GEAR_INSET + Theme.LAYOUT.GEAR_SIZE + GEAR_GAP)
+  local padding = Theme.LAYOUT.PADDING
+  local link = SettingsGear.BuildLabeled(view.strip, BridgePanel.ToggleSettings)
+  link:SetPoint("RIGHT", view.strip, "RIGHT", -padding, 0)
+  LedgerStrip.SetRightInset(view.strip, padding + link:GetWidth() + padding)
 end
 
 local function build(host)

@@ -298,24 +298,43 @@ local function testGearAfterRailSplit()
   Assert.equal(nav:GetWidth(), 180)
 end
 
--- The gear sits on the details header's right, centred on it vertically (image 43), on the details
--- pane so it stays without a selected lead. Centred, it lies beside the status line too: the
--- header's lines end before it, as the name does (6 + 20 + 6).
-local function testGearCentredOnHeader()
+-- The gear and its "Settings" label sit at the ledger line's right, centred on it vertically; the
+-- counts end before them (8 + 72 + 8). The lead header keeps its default 16 px inset.
+local function testLinkOnLedgerLine()
   local ns, _, _, wm = boot()
   local captured = capture(ns)
   local host = showWith(wm)
-  local gear, details = gearOf(host), captured.view.details
-  Assert.same(gear.points, { { "RIGHT", details.header, "RIGHT", -6, 0 } })
-  Assert.equal(gear.parent, captured.view.detailsPane)
+  local link, strip, details = gearOf(host), captured.view.strip, captured.view.details
+  Assert.equal(link.parent, strip)
+  Assert.same(link.points, { { "RIGHT", strip, "RIGHT", -8, 0 } })
+  Assert.same(strip.text.points[2], { "RIGHT", strip, "RIGHT", -88, 0 })
   for _, line in ipairs({ details.lineOne, details.lineTwo }) do
-    Assert.same(line.points[2], { "RIGHT", details.header, "RIGHT", -32, 0 })
+    Assert.same(line.points[2], { "RIGHT", details.header, "RIGHT", -16, 0 })
   end
 end
 
--- The gear sits at the details header's right: a long customer is cut before it, and the
--- cut follows the host's width. The age is on line 1, under the name (details spec A.1).
-local function testNameEndsBeforeGear()
+-- A narrow panel cuts the counts, never the link: the strip text ends before it at any host width.
+local function testCountsEndBeforeLink()
+  local Layout = require("tests.helpers.layout")
+  local ns, _, _, wm = boot()
+  local captured = capture(ns)
+  local host = showWith(wm, 340)
+  local strip = captured.view.strip
+  local function check(message)
+    ns.BridgePanel.Refresh()
+    local _, textRight = Layout.edges(strip.text)
+    local linkLeft = Layout.edges(gearOf(host))
+    Assert.truthy(textRight <= linkLeft, message .. ": the counts end before the link")
+  end
+  check("narrow")
+  host:SetSize(600, 400)
+  Widgets.fire(host, "OnSizeChanged")
+  check("wide")
+end
+
+-- A long customer is cut at the header's default inset, and the cut follows the host's width.
+-- The age is on line 1, under the name (details spec A.1).
+local function testNameCutAtHeaderInset()
   local Layout = require("tests.helpers.layout")
   local ns, _, _, wm = boot()
   local captured = capture(ns)
@@ -326,8 +345,8 @@ local function testNameEndsBeforeGear()
     details.frame:SetWidth(width) -- the anchors would give it that
     ns.BridgePanel.Refresh()
     local _, nameRight = Layout.edges(details.name)
-    local gearLeft = Layout.edges(gearOf(host))
-    Assert.truthy(nameRight <= gearLeft, message .. ": the name ends before the gear")
+    local _, headerRight = Layout.edges(details.header)
+    Assert.truthy(nameRight <= headerRight - 16, message .. ": the name ends at the header's inset")
   end
   check(159, "narrow")
   local narrowWidth = details.name:GetWidth()
@@ -398,8 +417,9 @@ return function()
   testRebuildResetsSplit()
   testSplitInSettings()
   testGearAfterRailSplit()
-  testGearCentredOnHeader()
-  testNameEndsBeforeGear()
+  testLinkOnLedgerLine()
+  testCountsEndBeforeLink()
+  testNameCutAtHeaderInset()
   testSettingsCoverWmDivider()
   testStandaloneInSettingsThenWmGear()
   Wow.reset()

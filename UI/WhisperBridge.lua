@@ -208,6 +208,13 @@ function WhisperBridge.Activate()
   Leads.On("seen", function()
     ask("RefreshPanelBadge", KEY)
   end)
+  -- A greeting sent while the panel shows (its Greet, a keybind, the preview, or a whisper the
+  -- player typed) opens that chat; WM shows it in the panel's place. A test lead has no customer.
+  Leads.On("greeted", function(lead)
+    if BridgePanel.IsShown() and not lead.test then
+      ask("OpenConversation", GreetAction.Target(lead))
+    end
+  end)
   return true
 end
 

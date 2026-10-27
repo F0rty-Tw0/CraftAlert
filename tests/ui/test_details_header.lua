@@ -56,14 +56,14 @@ local function testHeader()
     { d.lineOne.points[1], d.lineTwo.points[1] },
     { { "TOPLEFT", d.name, "BOTTOMLEFT", 0, -3 }, { "TOPLEFT", d.lineOne, "BOTTOMLEFT", 0, -3 } }
   )
-  -- The dot by status: grey new, green greeted, accent replied.
+  -- The dot by status: grey new, blue greeted, green replied.
   Assert.same({ d.dot:IsShown(), d.dot.texture.vertexColor }, { true, colors.grey })
   lead.greeted = true
   ns.LeadDetails.Show(d, lead)
   Assert.same({ d.dot.texture.vertexColor, d.lineOne:GetText() }, { colors.greeted, "Warrior" .. SEP .. "Greeted" .. SEP .. "30s" })
   lead.replied = true
   ns.LeadDetails.Show(d, lead)
-  Assert.same({ d.dot.texture.vertexColor, d.lineOne:GetText() }, { colors.accent, "Warrior" .. SEP .. "Greeted, replied" .. SEP .. "30s" })
+  Assert.same({ d.dot.texture.vertexColor, d.lineOne:GetText() }, { colors.replied, "Warrior" .. SEP .. "Greeted, replied" .. SEP .. "30s" })
   for _, text in ipairs({ d.name, d.lineOne, d.lineTwo }) do
     Assert.equal(text.parent, header, "header texts are the header's regions")
   end

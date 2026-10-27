@@ -4,6 +4,7 @@ local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 local FakeWm = require("tests.helpers.fake_wm_api")
+local Fresh = require("tests.helpers.fresh")
 
 -- Spec C.3, the state x event table of the WhisperMessenger bridge: one function per row, all on
 -- the fake API (tests/helpers/fake_wm_api.lua). The oracle is the table's text, not the code.
@@ -116,6 +117,62 @@ local function testPreviewClickRows()
     { 0, 0, 0 },
     "nothing sent or opened"
   )
+end
+
+-- Greet spec (2026-10-27): a greeting sent while the panel shows opens that customer's chat in
+-- WM, which closes the panel; a blocked greet opens its draft through the opener only.
+local function testGreetWhilePanelShownOpensChat()
+  -- → ns, calls, wm, the panel's details, the newest lead (shown in them), its target
+  local function shown()
+    local ns, _, calls, _, wm = boot({ leads = 2 })
+    ns.WhisperBridge.Activate()
+    local captured
+    local newView = ns.LeadsView.New
+    ns.LeadsView.New = function(...)
+      captured = newView(...)
+      return captured
+    end
+    wm.showPanel("CraftAlert")
+    local lead = ns.Leads.Latest()
+    return ns, calls, wm, captured.details, lead, ns.GreetAction.Target(lead)
+  end
+  -- the panel's Greet, sent: one open with the target, the panel closed, the other lead unseen
+  local ns, calls, wm, details, _, target = shown()
+  Wow.clock.gettime = 51
+  Widgets.click(details.buttons.greet)
+  Assert.equal(#UiFixture.callsTo(calls, "chat"), 1, "the greeting went out")
+  Assert.same(wm.callsTo("OpenConversation"), { { "OpenConversation", target } })
+  Assert.equal(ns.BridgePanel.IsShown(), false, "WM shows the chat in the panel's place")
+  Assert.equal(ns.Leads.IsUnseen(ns.Leads.List()[2]), true, "the closed panel selected nothing")
+  -- panel hidden: no open
+  local ns2, _, _, _, wm2 = boot({ leads = 1 })
+  ns2.WhisperBridge.Activate()
+  ns2.Leads.MarkGreeted(ns2.Leads.Latest().id)
+  Assert.same(wm2.callsTo("OpenConversation"), {}, "panel hidden")
+  -- a test lead: no customer to open
+  local lead
+  ns, _, wm, _, lead = shown()
+  lead.test = true
+  ns.Leads.MarkGreeted(lead.id)
+  Assert.same({ wm.callsTo("OpenConversation"), ns.BridgePanel.IsShown() }, { {}, true }, "test lead")
+  -- blocked by the look rule: the opener's draft, nothing from the hook
+  _, calls, wm, details, _, target = shown()
+  Widgets.click(details.buttons.greet) -- 0 s after showing
+  Assert.same(UiFixture.callsTo(calls, "chat"), {})
+  Assert.same(wm.callsTo("OpenConversation"), { { "OpenConversation", target, GREETING } })
+  -- a whisper the player typed to a lead's customer
+  ns, _, wm, _, lead, target = shown()
+  ns.WhisperTracker = Fresh.require("Model.WhisperTracker")
+  ns.WhisperTracker.Install()
+  Wow.fireEvent("CHAT_MSG_WHISPER_INFORM", "hi there", lead.customer)
+  Assert.equal(lead.greeted, true)
+  Assert.same(wm.callsTo("OpenConversation"), { { "OpenConversation", target } }, "typed whisper")
+  -- the preview's greet while the panel shows: both opens name the same conversation
+  ns, _, wm, _, lead, target = shown()
+  ns.WhisperBridge.ShowLead(lead)
+  Wow.clock.gettime = 51
+  wm.preview.CraftAlert.onClick()
+  Assert.same(wm.callsTo("OpenConversation"), { { "OpenConversation", target }, { "OpenConversation", target } })
 end
 
 -- "/ca, Toggle keybind" and "/ca config".
@@ -237,6 +294,7 @@ local function testLeadChangeRow()
   end
   local lead = ns.Leads.Latest()
   ns.WhisperBridge.ShowLead(lead)
+  wm.refuse.OpenConversation = true -- WM's open would close the panel this case refreshes
   ns.Leads.MarkGreeted(lead.id)
   Assert.truthy(refreshed > 0, "view refreshed on a change")
   Assert.truthy(wm.badgeRefreshes > 0, "badge refreshed")
@@ -292,6 +350,7 @@ local function testKeybindsBridged()
   local ns5, _, calls5, _, wm5 = boot({ leads = 2 })
   ns5.WhisperBridge.Activate()
   wm5.showPanel("CraftAlert")
+  wm5.refuse.OpenConversation = true -- WM's open would close the panel this case times
   Wow.clock.gettime = 50.2
   G("CraftAlert_GreetLatest")()
   Assert.same(UiFixture.callsTo(calls5, "chat"), {}, "row up for 0.2 s")
@@ -370,6 +429,7 @@ end
 return function()
   testPreviewClickCombatRefusal()
   testPreviewClickRows()
+  testGreetWhilePanelShownOpensChat()
   testToggleAndConfigRows()
   testGearRow()
   testEnterInstanceRow()
