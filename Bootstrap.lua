@@ -30,6 +30,7 @@ local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
 local WhisperBridge = ns.WhisperBridge or require("CraftAlert.UI.WhisperBridge")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
+local CraftScanPrompt = ns.CraftScanPrompt or require("CraftAlert.UI.CraftScanPrompt")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
 local PageAlerts = ns.PageAlerts or require("CraftAlert.UI.Settings.PageAlerts")
 local Perf = ns.Perf or require("CraftAlert.Core.Perf")
@@ -146,6 +147,11 @@ local function printLoginLines()
   end
 end
 
+-- After the login lines: CraftScan's one-time offer (Retail; CraftScanPrompt checks the rest).
+local function promptCraftScan()
+  CraftScanPrompt.MaybeShow(db)
+end
+
 local function storeRealms()
   RealmTag.Store(db, ownKey)
 end
@@ -194,6 +200,7 @@ local LOGIN_STEPS = {
   createLauncher,
   buildIndex,
   printLoginLines,
+  promptCraftScan,
 }
 
 -- → whether the step ran without raising.

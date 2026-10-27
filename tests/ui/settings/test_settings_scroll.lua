@@ -9,7 +9,7 @@ local SettingsFixture = require("tests.helpers.settings_fixture")
 -- its OnSizeChanged, then the child's, which the client fires after the child's SetWidth.
 
 local PAGE = 240
-local TITLES = { "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" }
+local TITLES = { "General", "Alerts", "Greetings", "Keywords", "Crafters", "Linked accounts", "Test" }
 
 local function crafters(accountDb)
   local recipes = {}
@@ -76,6 +76,7 @@ local LABELS = {
   Greetings = "Note for",
   Keywords = "Intent words",
   Crafters = "Search recipes",
+  ["Linked accounts"] = "Export string",
   Test = "Test a line",
 }
 

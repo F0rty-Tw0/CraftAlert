@@ -37,7 +37,8 @@ local function describe(result, crafter)
     return Localization.Text("Item: %s", tostring(result.group))
   end
   local profession = character and character.professions[result.prof]
-  return Localization.Text("Profession: %s", profession and profession.name or tostring(result.prof))
+  local name = profession and profession.name
+  return Localization.Text("Profession: %s", name ~= "" and name or tostring(result.prof))
 end
 
 local function whyOf(result)

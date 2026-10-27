@@ -134,6 +134,50 @@ function Slicer.Start(name, job)
   end
 end
 
+-- A job that runs work(pause) in a coroutine, as Index's sliced build does: pause(weight) yields
+-- once BUDGET_MS has passed since the step began (the clock is read when the weights add up to
+-- PAUSE_EVERY). When work returns, onDone gets what it returned; it must not start a job of
+-- the same name (the Slicer would take that one for done). Pause only in plain Lua loop
+-- bodies: never in a sort comparator, a gsub callback or under pcall (Lua 5.1 cannot yield
+-- across those). A cancelled job is never resumed; onCancel (optional) runs instead.
+local PAUSE_EVERY = 8
+
+function Slicer.Run(name, work, onDone, onCancel)
+  local clock = _G["debugprofilestop"]
+  local resumedAt, weightSum = 0, 0
+  local function pause(weight)
+    weightSum = weightSum + (weight or 1)
+    if weightSum >= PAUSE_EVERY then
+      weightSum = 0
+      if clock() - resumedAt >= BUDGET_MS then
+        coroutine.yield()
+      end
+    end
+  end
+  local thread = coroutine.create(function()
+    return work(pause)
+  end)
+  local function finish(ok, ...)
+    if not ok then
+      local stack = _G["debugstack"]
+      local err = ...
+      error(type(stack) == "function" and tostring(err) .. "\n" .. stack(thread) or err, 0)
+    end
+    if coroutine.status(thread) ~= "dead" then
+      return false
+    end
+    onDone(...)
+    return true
+  end
+  Slicer.Start(name, {
+    step = function()
+      resumedAt = clock()
+      return finish(coroutine.resume(thread))
+    end,
+    onCancel = onCancel,
+  })
+end
+
 -- Tests and tools/sim.lua only: runs every job to the end, ignoring budget and debt.
 function Slicer.Drain()
   while #entries > 0 do

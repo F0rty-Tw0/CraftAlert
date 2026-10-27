@@ -14,5 +14,10 @@ function Localization.Text(text, ...)
   return string.format(text, ...)
 end
 
+-- `one` for a count of 1, else `other`, each formatted with the count: ("%d recipe", "%d recipes").
+function Localization.Plural(count, one, other)
+  return Localization.Text(count == 1 and one or other, count)
+end
+
 ns.Localization = Localization
 return Localization

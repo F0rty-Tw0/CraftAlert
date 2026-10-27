@@ -54,6 +54,9 @@ Model/OrdersFilled.lua
 Model/AwaySummary.lua
 Professions/ProfessionList.lua
 Professions/BindLookup.lua
+Persistence/Base36.lua
+Persistence/ExportFields.lua
+Persistence/ExportString.lua
 Professions/RecipeStore.lua
 Professions/ReadJob.lua
 Professions/ClassicReader.lua
@@ -62,6 +65,7 @@ Professions/ReachQuery.lua
 Professions/QualityReach.lua
 Professions/ModernReader.lua
 Professions/LearnWatcher.lua
+Persistence/CraftScanImport.lua
 Core/Status.lua
 Core/ScanGate.lua
 UI/Theme.lua
@@ -96,6 +100,7 @@ UI/ToastChrome.lua
 UI/AlertToast.lua
 UI/Settings/Column.lua
 UI/Settings/Controls.lua
+UI/CraftScanPrompt.lua
 UI/Settings/PageGeneral.lua
 UI/Settings/PageAlerts.lua
 UI/Settings/PageGreetings.lua
@@ -105,6 +110,7 @@ UI/Settings/RecipeRarity.lua
 UI/Settings/RecipeMute.lua
 UI/Settings/RecipeList.lua
 UI/Settings/PageCrafters.lua
+UI/Settings/PageLinked.lua
 UI/Settings/PageTest.lua
 UI/BridgePanel.lua
 UI/BridgeInfo.lua

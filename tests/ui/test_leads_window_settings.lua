@@ -7,7 +7,7 @@ local SettingsFixture = require("tests.helpers.settings_fixture")
 
 -- Native-HUD spec §7.1–7.2: the settings pane lives in the leads window behind a gear. One
 -- window, two modes (List and Settings), one size (min 720x420) and one position shared by both.
-local PAGES = { "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" }
+local PAGES = { "General", "Alerts", "Greetings", "Keywords", "Crafters", "Linked accounts", "Test" }
 
 local function frame()
   return rawget(_G, "CraftAlertLeadsWindow")
