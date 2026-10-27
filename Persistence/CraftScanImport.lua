@@ -46,6 +46,17 @@ local function tableOr(value)
   return type(value) == "table" and value or nil
 end
 
+-- The keys of a CraftScan_DB table, copied before a walk that pauses: CraftScan writes its data
+-- at runtime, and a key added during `pairs` is undefined in Lua 5.1. A key gone by the time it
+-- is read is skipped as malformed.
+local function keysOf(map)
+  local keys = {}
+  for key in pairs(map) do
+    keys[#keys + 1] = key
+  end
+  return keys
+end
+
 -- realmID ("_N" or a realm name) → its stripped realm names, from connected_realms, sorted.
 local function realmLists(src)
   local lists = {}
@@ -115,7 +126,8 @@ local function importProfession(ctx, character, parents, profession)
   local parent = tableOr(parents[prof]) or {}
   local parentOff = parent.scanning_enabled == false or parent.character_disabled == true
   local name = nil
-  for recipeID, recipe in pairs(recipes) do
+  for _, recipeID in ipairs(keysOf(recipes)) do
+    local recipe = recipes[recipeID]
     local muted, malformed = nil, true
     if isId(recipeID) and type(recipe) == "table" then
       muted, malformed = stateOf(recipe, profession, parentOff)
@@ -175,7 +187,8 @@ local function importCharacter(ctx, csKey, record, realms)
   end
   ctx.key = key
   local parents = tableOr(record.parent_professions) or {}
-  for _, profession in pairs(professions) do
+  for _, profID in ipairs(keysOf(professions)) do
+    local profession = professions[profID]
     if type(profession) == "table" then
       importProfession(ctx, character, parents, profession)
     else
@@ -220,13 +233,16 @@ function CraftScanImport.Run(db, src, pause)
   local settings = tableOr(src.settings) or {}
   local mine = settings.my_uuid
   local lists = realmLists(src)
-  for realmID, realm in pairs(tableOr(src.realms) or {}) do
+  local srcRealms = tableOr(src.realms) or {}
+  for _, realmID in ipairs(keysOf(srcRealms)) do
+    local realm = srcRealms[realmID]
     local characters = type(realmID) == "string" and type(realm) == "table" and tableOr(realm.characters) or nil
     if characters == nil then
       counts.skipped = counts.skipped + 1
     else
       local realms = realmsOf(lists, realmID)
-      for csKey, record in pairs(characters) do
+      for _, csKey in ipairs(keysOf(characters)) do
+        local record = characters[csKey]
         local own = type(record) == "table" and (record.sourceID == nil or record.sourceID == mine)
         if type(record) ~= "table" then
           counts.skipped = counts.skipped + 1
