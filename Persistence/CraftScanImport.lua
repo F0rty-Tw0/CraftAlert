@@ -7,6 +7,7 @@ local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 local Defaults = ns.Defaults or require("CraftAlert.Persistence.Defaults")
 local Index = ns.Index or require("CraftAlert.Model.Index")
+local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
 local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
 local MainCrafter = ns.MainCrafter or require("CraftAlert.Model.MainCrafter")
 local BindLookup = ns.BindLookup or require("CraftAlert.Professions.BindLookup")
@@ -35,6 +36,12 @@ local GREETINGS = {
   GREETING_ALT_HAS_PROF = "altProfession",
 }
 local MAX_GREETING = 255
+
+-- The professions Craft Alert listens for; CraftScan also scans Cooking (185).
+local crafting = {} -- skill-line ID -> true
+for _, entry in ipairs(ProfessionWords.entries) do
+  crafting[entry.skillLineID] = true
+end
 
 local function noPause() end
 
@@ -119,7 +126,7 @@ end
 local function importProfession(ctx, character, parents, profession)
   local prof = profession.parentProfID
   local recipes = tableOr(profession.recipes)
-  if not isId(prof) or recipes == nil then
+  if not crafting[prof] or recipes == nil then
     ctx.counts.skipped = ctx.counts.skipped + 1
     return
   end

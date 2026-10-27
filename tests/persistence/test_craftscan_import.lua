@@ -143,17 +143,22 @@ local function testMalformed()
           ["Nopro-Good"] = { professions = 7 },
           ["Junk-Good"] = 1,
           ["Ok-Good"] = {
-            professions = { { parentProfID = "x", recipes = {} }, { parentProfID = BS, recipes = { [9001] = { scan_state = 2 } } } },
+            professions = {
+              { parentProfID = "x", recipes = {} },
+              { parentProfID = BS, recipes = { [9001] = { scan_state = 2 } } },
+              { parentProfID = 185, recipes = { [9001] = { scan_state = 2 } } }, -- Cooking: not listened for
+            },
           },
         },
       },
     },
   }
   local counts = CraftScanImport.Run(db, src)
-  Assert.same(counts, { characters = 2, recipes = 1, muted = 0, greetings = 1, skipped = 7 })
+  Assert.same(counts, { characters = 2, recipes = 1, muted = 0, greetings = 1, skipped = 8 })
   Assert.equal(db.settings.templates.altProfession, string.sub("Hir there " .. string.rep("x", 300), 1, 255), "no escape, one line, capped")
   Assert.truthy(db.characters["Piper-Good"], "the pipe is dropped from the key")
   Assert.truthy(db.characters["Ok-Good"].recipes[9001])
+  Assert.equal(db.characters["Ok-Good"].professions[185], nil)
   local none = CraftScanImport.Run(ns.Defaults.Db(), {})
   Assert.same(none, { characters = 0, recipes = 0, muted = 0, greetings = 0, skipped = 0 })
 end
