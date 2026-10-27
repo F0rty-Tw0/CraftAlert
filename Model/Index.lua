@@ -104,7 +104,7 @@ local function shareLists(wordIndex, pause)
     elseif first ~= list and sameEntries(first, list) then
       wordIndex[word] = first
     end
-    pause()
+    pause(#list)
   end
 end
 
