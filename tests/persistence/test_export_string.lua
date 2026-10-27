@@ -288,6 +288,21 @@ local function testDamagedIsCheap()
   seconds = os.clock() - started
   Assert.truthy(err:find("incomplete", 1, true), err)
   Assert.truthy(seconds < 0.1, "10 headers took " .. seconds .. " s")
+  -- A sealed string with one 590 KB record: no stretch between two pauses (one Slicer step)
+  -- runs long; a "[^;]*" split took 6 ms there. Best of three runs, in CPU time.
+  local forged = seal("CA1:retail:c," .. string.rep("y", Fields.MAX.length - 100) .. ",,")
+  local best = math.huge
+  for _ = 1, 3 do
+    local longest, last = 0, os.clock()
+    local function stretch()
+      longest, last = math.max(longest, os.clock() - last), os.clock()
+    end
+    _, err = ExportString.Decode(forged, "retail", stretch)
+    stretch()
+    best = math.min(best, longest)
+  end
+  Assert.truthy(err:find("record 1", 1, true), err)
+  Assert.truthy(best < 0.003, "longest stretch " .. best .. " s")
 end
 
 -- The user's Retail account is 6 characters and 2,983 recipes: 3,000 synthetic recipes export
