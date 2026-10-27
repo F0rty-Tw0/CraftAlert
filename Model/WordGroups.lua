@@ -74,7 +74,7 @@ local function buildGroupWords(index, pause)
   local root = { set = {}, children = {} }
   local nodeOf = {}
   for word, list in pairs(index.wordIndex) do
-    pause()
+    pause(#list)
     for _, entry in ipairs(list) do
       local group = entry.group
       local node = nodeOf[group] or root
@@ -295,7 +295,7 @@ end
 
 -- Index build (also after a test adds wordIndex words): fills slotsOf, groupWords, wordInfo and
 -- the profession key of every profession word (professionKeys). pause (optional) runs inside
--- the long loops: Index's sliced build yields there.
+-- the long loops, weighted by a word's list length: Index's sliced build yields there.
 function WordGroups.Build(index, pause)
   pause = pause or noPause
   buildSlotsOf(index)
@@ -331,7 +331,7 @@ function WordGroups.Build(index, pause)
       infoOf[list] = info
     end
     index.wordInfo[word] = info
-    pause()
+    pause(#list)
   end
   buildArmorInfo(index, rank, seenIn)
 end

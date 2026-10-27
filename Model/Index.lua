@@ -34,7 +34,7 @@ local yield = coroutine.yield
 local status = coroutine.status
 
 local JOB = "index"
-local PAUSE_EVERY = 32 -- pause calls per clock read
+local PAUSE_EVERY = 8 -- pause weight per clock read
 
 local function noPause() end
 
@@ -104,7 +104,7 @@ local function shareLists(wordIndex, pause)
     elseif first ~= list and sameEntries(first, list) then
       wordIndex[word] = first
     end
-    pause()
+    pause(#list)
   end
 end
 
@@ -262,8 +262,9 @@ local function sortedKeys(map)
 end
 
 -- Pure: reads db and settings, writes neither. opts = { professionOrder = fn → key[],
--- ownKey = "Name-Realm", pending = { lowerName, ... }, pause = fn }. pause runs inside the long
--- loops (the sliced build yields there); a no-op when absent.
+-- ownKey = "Name-Realm", pending = { lowerName, ... }, pause = fn(weight) }. pause runs inside the
+-- long loops (the sliced build yields there); weight (default 1) is the loop body's work, such as
+-- a list's length; a no-op when absent.
 function Index.Build(db, settings, opts)
   opts = opts or {}
   local pause = opts.pause or noPause
@@ -361,7 +362,8 @@ function Index.Rebuild()
 end
 
 -- The sliced build: each step resumes the coroutine, which yields from pause once
--- Slicer.BUDGET_MS has passed since that resume (the clock is read every PAUSE_EVERY calls).
+-- Slicer.BUDGET_MS has passed since that resume (the clock is read once the weights passed to
+-- pause add up to PAUSE_EVERY, so a run of heavy loop bodies reads it after each).
 -- Pause runs only in plain Lua loop bodies: never in a sort comparator, a gsub callback, a
 -- metamethod or under pcall (Lua 5.1 cannot yield across those). An abandoned coroutine (the
 -- job restarted or cancelled) is never resumed, so StatSlot.Begin's reset holds for the next.
@@ -370,11 +372,11 @@ local function startJob(db, opts)
   generation = generation + 1
   local mine = generation
   local clock = _G["debugprofilestop"]
-  local resumedAt, calls, spent, steps = 0, 0, 0, 0
-  local function pause()
-    calls = calls + 1
-    if calls >= PAUSE_EVERY then
-      calls = 0
+  local resumedAt, work, spent, steps = 0, 0, 0, 0
+  local function pause(weight)
+    work = work + (weight or 1)
+    if work >= PAUSE_EVERY then
+      work = 0
       if clock() - resumedAt >= Slicer.BUDGET_MS then
         yield()
       end
