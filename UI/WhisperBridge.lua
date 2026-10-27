@@ -3,8 +3,10 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
+local AwaySummary = ns.AwaySummary or require("CraftAlert.Model.AwaySummary")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
@@ -46,6 +48,8 @@ local api = nil -- _G.WhisperMessengerAPI once Activate accepted it
 local active = nil -- nil until Activate ran, then whether it activated
 ---@type table|nil
 local shown = nil -- { lead, shownAt } of the preview on WM's widget, nil when none
+---@type table|nil
+local summary = nil -- the away summary's token while it is WM's preview (never with `shown`)
 
 local function now()
   return _G["GetTime"]()
@@ -104,8 +108,18 @@ local function open(target, text)
 end
 
 local function hidePreview()
-  shown = nil
+  shown, summary = nil, nil
   ask("HidePreview", KEY)
+end
+
+-- After the toast duration, hides the preview while `isCurrent()`: C_Timer.After cannot be
+-- cancelled, so a timer acts only while its own preview is the shown one.
+local function hideLater(isCurrent)
+  _G["C_Timer"].After(_G["CraftAlertDB"].settings.toastDuration or 20, function()
+    if isCurrent() then
+      hidePreview()
+    end
+  end)
 end
 
 -- The info lines go out through SetContactInfo (UI/BridgeInfo.lua), a refusal or raise as false.
@@ -156,6 +170,9 @@ function WhisperBridge.Activate()
     return ask("TogglePanel", KEY)
   end)
   LeadsWindow.SetSettingsRouter(toggleSettings)
+  LeadsWindow.SetOpenRouter(function()
+    return ask("ShowPanel", KEY)
+  end)
   GreetAction.SetOpener(open)
   -- "greeted" and "replied" are always followed by a "change", which syncs the info lines.
   Leads.On("change", onChange)
@@ -208,12 +225,30 @@ function WhisperBridge.ShowLead(lead)
     return
   end
   AlertToast.Alert(lead)
-  shown = entry
-  -- C_Timer.After cannot be cancelled: a timer acts only while its own preview is the shown one.
-  _G["C_Timer"].After(_G["CraftAlertDB"].settings.toastDuration or 20, function()
-    if shown == entry then
-      hidePreview()
-    end
+  shown, summary = entry, nil
+  hideLater(function()
+    return shown == entry
+  end)
+end
+
+-- The away summary (Model/AwaySummary.lua, wired by Bootstrap when Activate returned true): WM's
+-- preview, a click opens the panel (LeadsWindow.Open, never a toggle), hidden after the toast
+-- duration. WM refusing falls back to CraftAlert's own toast. It and a lead's preview replace each
+-- other (WM keeps one per key). Nothing in an instance.
+function WhisperBridge.ShowSummary(count, expired)
+  if FlavorCompat.InInstance() then
+    return
+  end
+  -- A click or dismissal keeps the token: its timer then hides an already hidden preview of this key.
+  local entry = {}
+  local preview = { sender = Localization.Text("Craft Alert"), text = AwaySummary.Text(count, expired), onClick = LeadsWindow.Open }
+  if not ask("ShowPreview", KEY, preview) then
+    AlertToast.ShowSummary(count, expired)
+    return
+  end
+  shown, summary = nil, entry
+  hideLater(function()
+    return summary == entry
   end)
 end
 
@@ -224,7 +259,7 @@ function WhisperBridge.OnGate()
   if not active then
     return
   end
-  if shown and FlavorCompat.InInstance() then
+  if (shown or summary) and FlavorCompat.InInstance() then
     hidePreview()
   end
   BridgePanel.Refresh()

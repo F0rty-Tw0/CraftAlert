@@ -313,14 +313,19 @@ local function reportMatches(ctx)
   end
 end
 
--- `toast: shown lead=<id> more=<n>` whenever AlertToast.Show runs. Wrapped before login, so
--- the Leads.On("new", AlertToast.Show) Bootstrap makes subscribes the wrapper.
+-- `toast: shown lead=<id> more=<n>` whenever AlertToast.Show runs, `away: summary count=<n>
+-- expired=<n>` whenever AlertToast.ShowSummary does (spec §7.6). Wrapped before login, so what
+-- Bootstrap subscribes (Leads.On("new"), AwaySummary.Install) is the wrapper.
 local function reportToasts(ctx)
   local AlertToast = ctx.ns.AlertToast
-  local show = AlertToast.Show
+  local show, showSummary = AlertToast.Show, AlertToast.ShowSummary
   AlertToast.Show = function(lead)
     show(lead)
     ctx.out[#ctx.out + 1] = string.format("toast: shown lead=%s more=%d", tostring(lead.id), AlertToast.more)
+  end
+  AlertToast.ShowSummary = function(count, expired)
+    showSummary(count, expired)
+    ctx.out[#ctx.out + 1] = string.format("away: summary count=%d expired=%d", count, expired)
   end
 end
 

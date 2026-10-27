@@ -154,6 +154,23 @@ local function testReloadSendsInfoLines()
   Assert.truthy(line and line:find("Craft Alert:", 1, true) and line:find("Blacksmithing", 1, true), "info line sent at login")
 end
 
+-- Spec §7.6, bridged: Bootstrap hands the away summary to WM's preview, not the own toast.
+local function testBridgedAwaySummary()
+  local _, errors, wm = boot(true)
+  Wow.stub("UnitIsAFK", function()
+    return true
+  end)
+  trade("LF " .. BELT_LINK .. " crafter", "Buyer-OtherRealm")
+  Wow.stub("UnitIsAFK", function()
+    return false
+  end)
+  Wow.fireEvent("PLAYER_FLAGS_CHANGED", "player")
+  local preview = wm.preview.CraftAlert
+  Assert.same({ preview.sender, preview.text }, { "Craft Alert", "1 requests you could craft while you were away" })
+  Assert.equal(rawget(_G, "CraftAlertToast"), nil, "no own toast")
+  Assert.same(errors, {})
+end
+
 local function testStandalone()
   local ns, errors = boot(false)
   Assert.equal(rawget(_G, "WhisperMessengerAPI"), nil)
@@ -171,6 +188,7 @@ end
 return function()
   testBridged()
   testReloadSendsInfoLines()
+  testBridgedAwaySummary()
   testStandalone()
   Wow.reset()
 end

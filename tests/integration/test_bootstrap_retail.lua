@@ -540,6 +540,27 @@ local function testIgnoreDropsLead(db)
   Wow.stub("C_FriendList", nil)
 end
 
+-- Spec §7.6: Bootstrap installs the away summary on the own toast. A request made while AFK, then
+-- the player's AFK flag clearing (PLAYER_FLAGS_CHANGED), shows one summary.
+local function testAwaySummary(db)
+  local session = startClient(db)
+  local errors = recordErrors()
+  login(session)
+  Assert.truthy(isRegistered("PLAYER_FLAGS_CHANGED"), "PLAYER_FLAGS_CHANGED registered")
+  Wow.stub("UnitIsAFK", function()
+    return true
+  end)
+  trade("LF " .. BELT_LINK .. " crafter", "Buyer-OtherRealm")
+  Wow.stub("UnitIsAFK", function()
+    return false
+  end)
+  Wow.fireEvent("PLAYER_FLAGS_CHANGED", "player")
+  local toast = rawget(_G, "CraftAlertToast")
+  local face = table.concat(Widgets.texts(toast, Wow.frames), " / ")
+  Assert.truthy(toast:IsShown() and string.find(face, "1 requests you could craft while you were away", 1, true), face)
+  Assert.same(errors, {})
+end
+
 -- Entering an instance after login (PLAYER_ENTERING_WORLD) takes down the launcher, the toast and
 -- the leads window through the gate's change listeners; leaving brings back only the launcher.
 local function testInstanceHidesUi(db)
@@ -644,5 +665,6 @@ return function()
   testLoginInInstanceIsSilent(deepCopy(saved))
   testAlertsPageRepaints(deepCopy(saved))
   testNoOrdersOffRetail(deepCopy(saved))
+  testAwaySummary(deepCopy(saved))
   Wow.reset()
 end

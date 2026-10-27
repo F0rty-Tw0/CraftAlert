@@ -369,6 +369,11 @@ return function()
   local quiet = Sim.Run({ "WTS plate belt" })
   Assert.falsy(string.find(quiet[#quiet], "^ledger: "), "no counter changed: no ledger line")
 
+  -- Spec §7.6: a request while AFK, then --afk off (PLAYER_FLAGS_CHANGED for the player): one away
+  -- summary, before the closing ledger line.
+  local away = Sim.Run({ "--afk", "on", "LF plate belt", "--afk", "off" })
+  Assert.same({ away[#away - 1], away[#away] }, { "away: summary count=1 expired=0", "ledger: seen=1 greeted=0 replied=0 filled=0" })
+
   -- Run from the command line, any `error:` line makes the sim exit 1, so a Proof run notices a
   -- broken invocation: a bad flag (the only line) or a step that fails after others printed.
   local printed, code = runMain({ "--nope" })

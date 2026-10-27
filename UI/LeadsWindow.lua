@@ -37,6 +37,7 @@ SIZE.minWidth, SIZE.minHeight = LAYOUT.WINDOW_MIN_WIDTH, LAYOUT.WINDOW_MIN_HEIGH
 ---@type table
 local router = nil -- fn() -> true when it handled the toggle (WhisperMessenger's panel), else nil
 local settingsRouter = nil -- the same for /ca config
+local openRouter = nil -- the same for Open
 ---@type table
 local window = nil -- { frame, view, mode = "list" | "settings" }, nil until the first open
 
@@ -192,9 +193,25 @@ function LeadsWindow.SetSettingsRouter(fn)
   settingsRouter = fn
 end
 
--- Opens the window on the list, at the top with the newest lead selected (every row and the
--- details count as shown from now), or closes it in either mode. X and Esc only hide: a window
--- closed in Settings comes back on the list here. Silent no-op in an instance.
+-- `fn()` runs first in every Open; true = handled. nil clears it.
+function LeadsWindow.SetOpenRouter(fn)
+  openRouter = fn
+end
+
+-- The window on the list, at the top with the newest lead selected (every row and the details
+-- count as shown from now).
+local function openOnList()
+  if window.mode == "settings" then
+    enterList()
+  end
+  LeadsView.ResetTop(window.view)
+  LeadsView.Clear(window.view)
+  window.frame:Show()
+  LeadsWindow.Refresh()
+end
+
+-- Opens the window on the list, or closes it in either mode. X and Esc only hide: a window closed
+-- in Settings comes back on the list here. Silent no-op in an instance.
 function LeadsWindow.Toggle()
   if FlavorCompat.InInstance() then
     return
@@ -203,18 +220,25 @@ function LeadsWindow.Toggle()
     return
   end
   window = window or create()
-  local frame = window.frame
-  if frame:IsShown() then
-    frame:Hide()
+  if window.frame:IsShown() then
+    window.frame:Hide()
     return
   end
-  if window.mode == "settings" then
-    enterList()
+  openOnList()
+end
+
+-- The away summary's left-click (§7.6): the window on the list, never a toggle (an open window
+-- stays open, back at the top). The open router (WhisperMessenger's panel) goes first. Silent
+-- no-op in an instance.
+function LeadsWindow.Open()
+  if FlavorCompat.InInstance() then
+    return
   end
-  LeadsView.ResetTop(window.view)
-  LeadsView.Clear(window.view)
-  frame:Show()
-  LeadsWindow.Refresh()
+  if openRouter and openRouter() then
+    return
+  end
+  window = window or create()
+  openOnList()
 end
 
 -- /ca config: opens the window on the settings pane (from the list too), or closes it when the

@@ -467,7 +467,30 @@ local function testRestoreAsksForLinks()
   Assert.same({ saved.itemLink, linked.itemLink }, { "|Hitem:501|h[Item 501]|h", "kept" })
 end
 
+-- Plan revision R5c: a lead the player dismissed, or whose customer they ignored, is marked, so the
+-- away summary tells it from one that timed out.
+local function testDismissedFlag()
+  local ns = setup()
+  local Leads = ns.Leads
+  local dismissed = newLead(ns, "LF plate belt")
+  local ignored = newLead(ns, "LF plate belt", "Carl-Draenor")
+  local expired = newLead(ns, "LF plate greaves", "Dan-Draenor")
+  Leads.Dismiss(dismissed.id)
+  Wow.stub("C_FriendList", {
+    IsIgnored = function(name)
+      return name == "Carl-Draenor"
+    end,
+  })
+  Leads.DismissIgnored()
+  Wow.stub("C_FriendList", nil)
+  Wow.clock.time = T0 + TIMEOUT + 1
+  fireTimer()
+  Assert.equal(Leads.IsActive(expired.id), false, "timed out")
+  Assert.same({ dismissed.dismissed, ignored.dismissed, expired.dismissed }, { true, true, nil })
+end
+
 return function()
+  testDismissedFlag()
   testLinkArrivesLater()
   testLinkLoadFails()
   testLinkWaitEndsWithLead()
