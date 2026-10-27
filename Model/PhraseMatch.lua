@@ -45,6 +45,11 @@ for word in pairs(wordGroupsOnly) do
 end
 ---@type table
 local index = nil
+-- The index's phraseKeys and phraseWordRange, read once per Run.
+---@type table
+local phraseKeys = nil
+---@type table
+local phraseWordRange = nil
 local tokenCount = 0
 local padded = ""
 local tokenAt = {} -- tokenAt[i]: position of token i in padded; [tokenCount + 1]: one past the end
@@ -73,6 +78,7 @@ local NO_INDEX = {} -- Run always sets the real one first
 -- New index: drop the hits (records) and the index the last Run kept.
 function PhraseMatch.Reset()
   index, hits, hitCount, hitLength = NO_INDEX, {}, 0, 0
+  phraseKeys, phraseWordRange = NO_INDEX, NO_INDEX
   hitStamp, PhraseMatch.setAside = {}, nil
 end
 
@@ -117,6 +123,7 @@ function PhraseMatch.Add(built, record, firstWord)
 end
 
 -- i: the hit's first token, nil for a link name. length: its span in tokens (2 for a join pair).
+-- isNew and its inline copy in phrasesAt mirror the two early returns: change all three together.
 local function addHit(record, length, why1, why2, i)
   if length < hitLength then
     return
@@ -153,6 +160,12 @@ local function addHit(record, length, why1, why2, i)
   end
 end
 
+-- Whether addHit would keep record as a hit of length tokens: none shorter than the longest,
+-- no record twice. A hit it would drop needs no byte compare.
+local function isNew(record, length)
+  return length > hitLength or (length == hitLength and hitStamp[record] ~= hitRun)
+end
+
 -- Whether padded holds phrase at `at`, given that its first `from - 1` bytes already match
 -- (the first word is token i itself). Byte compare: no scan past the first difference.
 local function phraseAt(phrase, at, from)
@@ -169,7 +182,7 @@ end
 -- than a byte loop in Lua; a miss scans at most the rest of the line.
 local function tryRecord(record, at, wordCount, i)
   local phrase = record.phrase
-  if find(padded, phrase, at, true) == at then
+  if isNew(record, wordCount) and find(padded, phrase, at, true) == at then
     addHit(record, wordCount, phrase, nil, i)
   end
 end
@@ -178,7 +191,7 @@ end
 -- token .. right spells.
 local function tryJoin(record, i, token, right)
   local from = #token + 1
-  if phraseAt(record.phrase, tokenAt[i + 1] - from + 1, from) then
+  if isNew(record, 2) and phraseAt(record.phrase, tokenAt[i + 1] - from + 1, from) then
     addHit(record, 2, token, right, i)
   end
 end
@@ -187,10 +200,10 @@ end
 -- must span exactly #phrase bytes, so only whole words match), then the join pair (i, i + 1).
 -- id = phraseIds[token], found = joinIndex[token] (Run looks them up: most tokens have neither).
 local function phrasesAt(i, token, id, found)
+  local right = tokens[i + 1]
   if id then
-    local phraseKeys = index.phraseKeys
     local at = tokenAt[i]
-    local range = index.phraseWordRange[id]
+    local range = phraseWordRange[id]
     local most = range % KEY_WORDS
     local fewest = (range - most) / KEY_WORDS
     if most > tokenCount - i + 1 then
@@ -198,20 +211,26 @@ local function phrasesAt(i, token, id, found)
     end
     -- Key terms but the span's: one word has no second-word term. A span of 2+ words holds the
     -- second word, so a second word of 256+ bytes never reaches a key (the break comes first).
+    -- The word-count term grows by WORDS_UNIT per span, so the loop adds it (all terms are
+    -- integers of magnitude below 2^53, so the sum is exact in any order).
     local oneWord = id * ID_UNIT + (1 - at) * LENGTH_UNIT
-    local moreWords = i < tokenCount and oneWord + #tokens[i + 1] * KEY_BYTES or oneWord
-    local base = fewest == 1 and oneWord or moreWords
+    local moreWords = i < tokenCount and oneWord + #right * KEY_BYTES or oneWord
+    local lengthUnit, wordsUnit = LENGTH_UNIT, WORDS_UNIT
+    local wordsTerm = fewest * wordsUnit
+    local base = (fewest == 1 and oneWord or moreWords) + wordsTerm
     local limit = at + KEY_LENGTHS - 1
     for wordCount = fewest, most do
       local stop = tokenAt[i + wordCount] - 2 -- last byte of the span
       if stop >= limit then
         break -- longer than any filed phrase (and the key would spill into the next id)
       end
-      local keyed = phraseKeys[base + stop * LENGTH_UNIT + wordCount * WORDS_UNIT + byte(padded, stop)]
-      base = moreWords -- only the first span can be one word
+      local keyed = phraseKeys[base + stop * lengthUnit + byte(padded, stop)]
+      wordsTerm = wordsTerm + wordsUnit
+      base = moreWords + wordsTerm -- only the first span can be one word
       local phrase = keyed and keyed.phrase
       if phrase then -- tryRecord inline: most shapes hold one record, and most lookups hit
-        if find(padded, phrase, at, true) == at then
+        local new = wordCount > hitLength or (wordCount == hitLength and hitStamp[keyed] ~= hitRun) -- isNew inline
+        if new and find(padded, phrase, at, true) == at then
           addHit(keyed, wordCount, phrase, nil, i)
         end
       elseif keyed then
@@ -221,7 +240,6 @@ local function phrasesAt(i, token, id, found)
       end
     end
   end
-  local right = tokens[i + 1]
   if found and right then
     -- The length check is inline: a short left side ("ca") is shared by many records, and a
     -- call per record would cost more than the check. A list is sorted shortest phrase first,
@@ -308,25 +326,36 @@ local function addSlotWhy()
   end
 end
 
--- Step 4.2 on the tokenized line (Tokenizer buffers). → "match", "set" (several recipes,
--- left in Candidates; PhraseMatch.why[1..whyCount] holds their why tokens) or nil.
-function PhraseMatch.Run(newIndex, count, intentToken)
-  index, tokenCount = newIndex, count
+-- padded and tokenAt for the line. Run fills them at the first token that starts a phrase
+-- or a join pair, so a line with none pays neither the copy nor the walk.
+local function fillSpans()
   padded = " " .. Tokenizer.normalized .. " "
-  hitCount, hitLength, hitWhyCount, hitRun = 0, 0, 0, hitRun + 1
-  dropRun = dropRun + 1
-  PhraseMatch.dropRun, PhraseMatch.setAside = dropRun, nil
   local at = 2 -- position of token 1 in padded
   for i = 1, tokenCount do
     tokenAt[i] = at
     at = at + #tokens[i] + 1
   end
   tokenAt[tokenCount + 1] = at
+end
+
+-- Step 4.2 on the tokenized line (Tokenizer buffers). → "match", "set" (several recipes,
+-- left in Candidates; PhraseMatch.why[1..whyCount] holds their why tokens) or nil.
+function PhraseMatch.Run(newIndex, count, intentToken)
+  index, tokenCount = newIndex, count
+  phraseKeys, phraseWordRange = newIndex.phraseKeys, newIndex.phraseWordRange
+  hitCount, hitLength, hitWhyCount, hitRun = 0, 0, 0, hitRun + 1
+  dropRun = dropRun + 1
+  PhraseMatch.dropRun, PhraseMatch.setAside = dropRun, nil
   local phraseIds, joinIndex = index.phraseIds, index.joinIndex
+  local spans = false
   for i = 1, tokenCount do
     local token = tokens[i]
     local id, found = phraseIds[token], joinIndex[token]
     if id or found then
+      if not spans then
+        fillSpans()
+        spans = true
+      end
       phrasesAt(i, token, id, found)
     end
   end

@@ -33,6 +33,7 @@ local ITEM_LINK = "^|hitem:(%d+)"
 local ENCHANT_LINK = "^|henchant:(%d*)"
 local ANY_LINK = "^|h%a+:"
 local MAX_TOKENS = 64 -- word tokens kept per line (§6.3 step 2; bounds the §4.4 per-line max)
+local HUGE = math.huge
 
 local BYTE_A, BYTE_C, BYTE_H, BYTE_K = 97, 99, 104, 107
 local BYTE_N, BYTE_R, BYTE_T, BYTE_BAR = 110, 114, 116, 124
@@ -222,13 +223,18 @@ function Tokenizer.Tokenize(lower)
       end
       bar = find(lower, "|", i, true) or afterEnd
     elseif first and (count < MAX_TOKENS or linkEnd) then -- link text leaves the buffer at its |h
-      -- The words before the next escape, without the escape checks above.
+      -- The words before the next escape, without the escape checks above. The loop runs per
+      -- token, so it keeps the count and buffers in locals (no upvalue access); linkEnd stays
+      -- as it is until the next escape, so the cap is fixed here.
+      local n, cap = count, linkEnd and HUGE or MAX_TOKENS
+      local tokenBuf, startBuf = tokens, starts
       repeat
-        count = count + 1
-        tokens[count], starts[count] = word, first
+        n = n + 1
+        tokenBuf[n], startBuf[n] = word, first
         i = last + 1
         first, last, word = find(lower, WORD_CAPTURE, i)
-      until not first or first > bar or (count >= MAX_TOKENS and not linkEnd)
+      until not first or first > bar or n >= cap
+      count = n
     elseif first and bar < afterEnd then
       i = bar -- full: skip the words up to the next escape, whose links still count
     else
