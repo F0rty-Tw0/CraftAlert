@@ -133,8 +133,10 @@ function LeadText.Channel(lead)
   return name and Localization.Text(name) or tostring(key)
 end
 
--- The lead's status word (unlocalized) and its dot colour, for the details header and the list
--- rows: grey new, blue greeted, green replied. A replied lead was greeted (Leads.MarkReplied).
+-- The lead's status word (unlocalized) and its dot colour: grey new, blue greeted, green replied.
+-- A replied lead was greeted (Leads.MarkReplied). The list rows and the details header's dot take
+-- the colour; the header writes its own coloured words (DetailsHeader stateText) and uses this
+-- word only for a new lead.
 function LeadText.State(lead)
   local colors = Theme.COLORS
   if lead.replied then

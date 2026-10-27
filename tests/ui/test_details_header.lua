@@ -69,6 +69,10 @@ local function testHeader()
   local replied = greeted .. ", " .. ns.FrameKit.ThemeCode("replied", colors.replied)
   Assert.same({ d.dot.texture.vertexColor, d.lineOne:GetText() }, { colors.replied, "Warrior" .. SEP .. replied .. SEP .. "30s" })
   Assert.equal(replied, "|cff1eb7f4Greeted|r, |cff4cd166replied|r", "blue and green codes")
+  -- Replied without greeted (only a hand-edited saved file has it): the words follow the green dot.
+  lead.greeted = false
+  ns.LeadDetails.Show(d, lead)
+  Assert.same({ d.dot.texture.vertexColor, d.lineOne:GetText() }, { colors.replied, "Warrior" .. SEP .. replied .. SEP .. "30s" })
   for _, text in ipairs({ d.name, d.lineOne, d.lineTwo }) do
     Assert.equal(text.parent, header, "header texts are the header's regions")
   end
