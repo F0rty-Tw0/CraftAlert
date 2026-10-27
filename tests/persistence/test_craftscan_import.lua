@@ -158,6 +158,19 @@ local function testMalformed()
   Assert.same(none, { characters = 0, recipes = 0, muted = 0, greetings = 0, skipped = 0 })
 end
 
+-- Two expansions of one profession: the one with only unlearned recipes names nothing, the other
+-- names it, in either walk order (both orders are run, so pairs cannot hide the bad one).
+local function testProfessionNamedByAnyExpansion()
+  local CraftScanImport, ns = load()
+  local unlearned = { parentProfID = BS, recipes = { [9001] = { scan_state = 4 } } }
+  local learned = { parentProfID = BS, recipes = { [9004] = { scan_state = 2 } } }
+  for _, professions in ipairs({ { unlearned, learned }, { learned, unlearned } }) do
+    local db = ns.Defaults.Db()
+    CraftScanImport.Run(db, { realms = { OwnRealm = { characters = { ["Two-OwnRealm"] = { professions = professions } } } } })
+    Assert.equal(db.characters["Two-OwnRealm"].professions[BS].name, "Blacksmithing")
+  end
+end
+
 -- Each recipe weighs a full Slicer.Run clock check (8): its client calls take up to ~500 us, so
 -- four of them between checks overran the frame budget.
 local function testClockReadPerRecipe()
@@ -176,6 +189,7 @@ return function()
   testFreshImport()
   testExistingDataWins()
   testMalformed()
+  testProfessionNamedByAnyExpansion()
   testClockReadPerRecipe()
   Wow.reset()
 end

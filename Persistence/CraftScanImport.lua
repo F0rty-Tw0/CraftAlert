@@ -141,9 +141,14 @@ local function importProfession(ctx, character, parents, profession)
     -- Up to three client calls per recipe: the Slicer reads its clock after each one.
     ctx.pause(8)
   end
+  -- One profession comes from several expansions; the first walked may name nothing (all
+  -- unlearned), so a later one fills the empty name.
   local stored = character.professions[prof]
+  name = type(name) == "string" and name or nil
   if stored == nil then
-    character.professions[prof] = { name = type(name) == "string" and name or "", primary = false, read = true }
+    character.professions[prof] = { name = name or "", primary = false, read = true }
+  elseif stored.name == "" and name then
+    stored.name = name
   end
   if parent.primary_crafter == true then
     ctx.primaries[prof] = ctx.primaries[prof] or {}
