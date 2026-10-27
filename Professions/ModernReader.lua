@@ -320,6 +320,12 @@ function ModernReader.OnClose()
   windowOpen = false
 end
 
+-- A learn keeps the window's recipe count the same, and the learn path may not have stored the
+-- recipe (its data not loaded yet, or in an instance): the next open of any window reads again.
+function ModernReader.ForgetReads()
+  reads = {}
+end
+
 function ModernReader.OnListUpdate()
   onWindowEvent(false)
 end

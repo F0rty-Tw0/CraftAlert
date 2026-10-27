@@ -165,4 +165,25 @@ return function()
   Assert.same(db.characters[CHAR].recipes, {})
   Assert.equal(run.builds, 0)
   Wow.stub("IsInInstance", nil)
+
+  -- A learn the reader could not store (its data not loaded yet) is stored by the next open
+  -- of the window: a learn keeps the count the same, so it must not let that open skip the walk.
+  local ns
+  ns, state, LearnWatcher, db = setup()
+  state.base = BS
+  state.recipes = { recipe(1), recipe(2) }
+  state.recipes[1].learned = true
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  ns.Slicer.Drain()
+  Assert.truthy(db.characters[CHAR].recipes[1])
+  Assert.equal(db.characters[CHAR].recipes[2], nil, "not learned yet")
+  state.recipes[2].learned = true
+  state.recipes[2].name = nil
+  Wow.fireEvent(EVENT, 2)
+  Assert.equal(LearnWatcher.lastStored, false, "no name yet")
+  state.recipes[2].name = "Recipe 2"
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Assert.equal(ns.Slicer.IsRunning("read"), true, "the open after a learn reads")
+  ns.Slicer.Drain()
+  Assert.truthy(db.characters[CHAR].recipes[2])
 end
