@@ -717,6 +717,15 @@ return function()
   Assert.equal(lead.recipeName, nil)
   Assert.equal(lead.profName, tostring(BS))
 
+  -- A profession stored without a name (CraftScan's unlearned-only expansion): no name, so a
+  -- greeting never says "I have , what do you need?".
+  ns = setup(nil, function(data)
+    data.characters["Alt-Realm"].professions[BS].name = ""
+  end)
+  lead = newLead(ns, "LF blacksmith")
+  Assert.equal(lead.crafter, "Alt-Realm")
+  Assert.equal(lead.profName, nil)
+
   -- Realm tag on the lead (Retail), and nothing on Forever.
   local function withRealms(data)
     data.characters["Alt-Realm"].realms = { "Realm" }

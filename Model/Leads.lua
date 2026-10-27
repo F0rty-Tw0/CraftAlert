@@ -411,7 +411,8 @@ local function describeCrafter(lead, kind, prof, crafter, recipeKey)
   lead.recipeKey = recipeKey
   local character = db.characters[crafter]
   local profession = character and character.professions and character.professions[prof]
-  lead.profName = profession and profession.name or (type(prof) == "string" and prof or nil)
+  local name = profession and profession.name
+  lead.profName = name ~= "" and name or (type(prof) == "string" and prof or nil)
   if kind ~= "item" or recipeKey == nil then
     return
   end
