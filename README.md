@@ -4,8 +4,9 @@ Craft Alert watches Trade chat for people asking for something one of your chara
 
 ## What it does
 
-- Listens in Trade and Services (General, LookingForGroup, Guild and Communities can be turned on) for requests such as "LF plate belt", "WTB [item link]" or "LF enchanter".
+- Listens in Trade and Services where the game has them (General, LookingForGroup, Guild and Communities can be turned on) for requests such as "LF plate belt", "WTB [item link]" or "LF enchanter".
 - Shows a toast beside its launcher ring with what the customer wants and which of your characters can craft it. Left-click greets, shift-click lets you edit the greeting first, ctrl-click opens an empty whisper, right-click dismisses.
+- Opens the greeting in the chat box for you to send instead when you are AFK, greet more than six times a minute, greet the same lead twice, or click a lead that just appeared.
 - Keeps every open request in a leads window: the list on the left, the selected request in full on the right, with Greet, Whisper and Dismiss buttons.
 - Counts the requests you saw, greeted and got a reply from each day, and tells you what came in while you were AFK.
 - Picks the best of your characters for each request, and lets you choose a main crafter per profession.
@@ -39,10 +40,10 @@ Craft Alert can name crafters from your other Battle.net account, so a request o
 ## Moving from CraftScan (Retail)
 
 1. Keep CraftScan enabled for one login.
-2. At login Craft Alert offers once to import this account's CraftScan characters, recipes and greetings. Click Import. Recipes you switched off in CraftScan come in muted, and anything Craft Alert already has stays as it is.
+2. At login Craft Alert offers once to import this account's CraftScan characters, recipes and greetings. Click Import. Recipes CraftScan isn't scanning come in muted, and anything Craft Alert already has stays as it is.
 3. Missed the offer or clicked Decline? Settings → Linked accounts → Import from CraftScan does the same.
 4. Once the import reports how many characters and recipes came in (in chat, or on the page), you can disable CraftScan.
 
 ## Privacy
 
-Craft Alert reads chat inside the game and keeps what it learns in its own saved variables on your computer. Nothing leaves the game except what you choose to send: the greeting whisper, and just before each greeting Craft Alert sends itself, a hidden addon message to the same player (`Q:CraftAlert`, under the `robots.txt` prefix) so their addons can tell the whisper came from an addon. The Linked accounts string goes only where you paste it.
+Craft Alert reads chat inside the game and keeps what it learns in its own saved variables on your computer. Nothing leaves the game except what you choose to send: the greeting whisper, and just before each greeting Craft Alert sends for you (not ones it opens in the chat box), a hidden addon message to the same player (`Q:CraftAlert`, under the `robots.txt` prefix) so their addons can tell the whisper came from an addon. The Linked accounts string goes only where you paste it.
