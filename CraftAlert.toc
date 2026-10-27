@@ -54,6 +54,9 @@ Model/OrdersFilled.lua
 Model/AwaySummary.lua
 Professions/ProfessionList.lua
 Professions/BindLookup.lua
+Persistence/Base36.lua
+Persistence/ExportFields.lua
+Persistence/ExportString.lua
 Professions/RecipeStore.lua
 Professions/ReadJob.lua
 Professions/ClassicReader.lua
