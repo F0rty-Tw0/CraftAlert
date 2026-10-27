@@ -30,6 +30,7 @@ local ExportString = {}
 
 local concat = table.concat
 local find = string.find
+local floor = math.floor
 local ipairs = ipairs
 local match = string.match
 local max = math.max
@@ -211,17 +212,19 @@ function ExportString.Decode(text, flavorKey, pause)
     return nil, damaged(Localization.Text("checksum"))
   end
   -- Records split with a plain find: a "[^;]*" match took 6 ms in one slice over a 590 KB record.
+  -- Each record weighs one pause per 256 bytes, so the clock is read before a long one (eight
+  -- 10 KB records, about 3 ms each, once ran between two clock reads).
   local state = Fields.NewState()
   local start, number = 1, 0
   while body ~= "" and start <= #body + 1 do
     local stop = find(body, ";", start, true) or #body + 1
     number = number + 1
+    pause(1 + floor((stop - start) / 256))
     local err = Fields.ParseRecord(state, sub(body, start, stop - 1))
     if err then
       return nil, damaged(Localization.Text("%s %d", err, number))
     end
     start = stop + 1
-    pause(1)
   end
   return { flavor = flavor, characters = state.characters }
 end

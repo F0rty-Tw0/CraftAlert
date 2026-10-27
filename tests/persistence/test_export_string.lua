@@ -331,6 +331,23 @@ local function testDamagedIsCheap()
   Assert.truthy(best < 0.003, "longest stretch " .. best .. " s")
 end
 
+-- A record weighs one pause per 256 bytes, read before it is parsed: eight valid 10 KB records,
+-- about 3 ms each, once ran between two clock reads.
+local function testLongRecordWeighsMore()
+  local ExportString = load()
+  local realms = {}
+  for i = 1, 50 do
+    realms[i] = "R" .. i .. string.rep("a", 197)
+  end
+  local record = "c,Smith-Realm,," .. table.concat(realms, ".")
+  local weights = {}
+  local data = ExportString.Decode(seal("CA1:retail:c,First-Realm,,;" .. record), "retail", function(weight)
+    weights[#weights + 1] = weight
+  end)
+  Assert.same(data.characters[2].realms, realms)
+  Assert.same({ weights[#weights - 1], weights[#weights] }, { 1, 1 + math.floor(#record / 256) })
+end
+
 -- The user's Retail account is 6 characters and 2,983 recipes: 3,000 synthetic recipes export
 -- under MAX.length, and the sliced export and import take many short steps.
 local function testLargeExportIsSliced()
@@ -378,6 +395,7 @@ return function()
   testLocalCharacterSkipped()
   testRejected()
   testDamagedIsCheap()
+  testLongRecordWeighsMore()
   testLargeExportIsSliced()
   Wow.reset()
 end
