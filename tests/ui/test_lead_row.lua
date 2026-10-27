@@ -431,6 +431,66 @@ local function testStatusDot()
   Assert.same(row.iconFrame.points, { { "CENTER", row, "CENTER", 0, 0 } })
 end
 
+-- Unread whispers from the customer (reply-unread-dot spec §2): the source's count > 0 turns the dot
+-- whisper pink, before the unseen gold and the state colour, on a greeted lead and on a compact row
+-- too. The pink is ChatTypeInfo.WHISPER read at paint time, {1, 0.5, 1, 1} without it; no source,
+-- a count of 0 or a non-number leaves today's colours.
+local function testUnreadDot()
+  local ns, row, _, lead = load()
+  local colors = ns.Theme.COLORS
+  local function dot()
+    return row.dot.texture.vertexColor
+  end
+  local unread = 2
+  local asked = {}
+  local function paint()
+    ns.LeadRow.Show(row, lead)
+    return dot()
+  end
+  Assert.same(paint(), colors.gold, "no source: unseen gold")
+  ns.LeadRow.SetUnreadSource(function(asking)
+    asked[#asked + 1] = asking
+    return unread
+  end)
+  Assert.same(paint(), { 1, 0.5, 1, 1 }, "ChatTypeInfo missing: the fallback pink")
+  Assert.same(asked, { lead }, "the source gets the lead, once per paint")
+  Wow.stub("ChatTypeInfo", { WHISPER = { r = 1, g = 0.5, b = 0.9 } })
+  Assert.same(paint(), { 1, 0.5, 0.9, 1 }, "WHISPER colour read at paint time")
+  Wow.stub("ChatTypeInfo", { WHISPER = { r = 0.2, g = 0.4, b = 0.6 } })
+  Assert.same(paint(), { 0.2, 0.4, 0.6, 1 }, "not cached")
+  Wow.stub("ChatTypeInfo", {})
+  Assert.same(paint(), { 1, 0.5, 1, 1 }, "no WHISPER entry: the fallback")
+  Wow.stub("ChatTypeInfo", { WHISPER = { r = 1, g = 0.5, b = 0.9 } })
+  local pink = { 1, 0.5, 0.9, 1 }
+
+  lead.seen, lead.greeted = nil, true
+  Assert.same(paint(), pink, "greeted and unread")
+  lead.replied = true
+  Assert.same(paint(), pink, "replied and unread")
+  lead.greeted, lead.replied = nil, nil
+  lead.seen = true
+  Assert.same(paint(), pink, "seen and unread")
+  ns.LeadRow.SetCompact(row, true)
+  Assert.same(paint(), pink, "a compact row too")
+  ns.LeadRow.SetCompact(row, false)
+
+  unread = 0
+  Assert.same(paint(), colors.grey, "0 unread, seen: the state colour")
+  lead.seen = nil
+  Assert.same(paint(), colors.gold, "0 unread, unseen: gold")
+  lead.seen, lead.greeted = nil, true
+  Assert.same(paint(), colors.greeted, "0 unread, greeted: its state colour")
+  lead.greeted = nil
+  for _, answer in ipairs({ "3", false, true }) do
+    unread = answer
+    Assert.same(paint(), colors.gold, "a non-number counts as 0: " .. tostring(answer))
+  end
+  unread = 1
+  Assert.same(paint(), pink, "1 is enough")
+  ns.LeadRow.SetUnreadSource(nil)
+  Assert.same(paint(), colors.gold, "cleared: never pink")
+end
+
 -- Review Focus 3: a compact row still shows its selection and selects on a left click.
 local function testCompactSelect()
   local ns, row, _, lead, selected = load()
@@ -481,6 +541,7 @@ end
 return function()
   testCompact()
   testStatusDot()
+  testUnreadDot()
   testCompactSelect()
   testCompactTooltip()
   testCompactTooltipRepaint()

@@ -8,9 +8,14 @@
 --   wm.refuse[name] = true                 that function records the call, changes nothing, returns false
 --   wm.raise[name] = true                  that function records the call, then raises
 --   wm.preview[key]                        the preview table while shown (ShowPreview sets it, HidePreview clears it)
---   wm.registered                          { { key, panel }, ... }; wm.panels[key] = panel
+--   wm.registered                          { { key, panel }, ... }; wm.panels[key] = a copy of the panel's
+--                                            fields taken at RegisterPanel, as WM's copyPanel does
 --   wm.shown[key]                          IsPanelShown
 --   wm.badgeRefreshes                      RefreshPanelBadge call count
+--   wm.unread[name]                        = the count GetUnreadCount answers for that name (0 for non-string,
+--                                            blank and unknown names, as WM's UnreadCount.lua does)
+--   wm.unreadChanged(key)                  runs the panel's onUnreadChanged when it has one (WM calls it
+--                                            with no arguments); RegisterPanel keeps it only when nil or a function
 --   wm.info[key][playerName]               = text (nil removes)
 --   wm.tips[key][playerName]               = the tooltip lines (nil clears); SetContactInfo returns false,
 --                                            changing nothing, unless lines is nil or 1-10 non-empty strings
@@ -61,6 +66,7 @@ function FakeWm.install(opts)
     info = {},
     tips = {},
     badgeRefreshes = 0,
+    unread = {},
   }
   ---@type table<string, any>
   local api = { version = opts.version or 1 }
@@ -91,6 +97,13 @@ function FakeWm.install(opts)
 
   function wm.split(key, listWidth)
     wm.panels[key].onSplit(wm.hosts[key], listWidth)
+  end
+
+  function wm.unreadChanged(key)
+    local callback = wm.panels[key].onUnreadChanged
+    if callback then
+      callback()
+    end
   end
 
   function wm.hidePanel(key)
@@ -127,8 +140,21 @@ function FakeWm.install(opts)
     return wm.preview[key] ~= nil
   end)
   define("RegisterPanel", function(key, panel)
+    -- WM's isOptionalFunction (Core/PublicApi/Panels.lua): anything but nil or a function is refused.
+    if panel.onUnreadChanged ~= nil and type(panel.onUnreadChanged) ~= "function" then
+      return false
+    end
     wm.registered[#wm.registered + 1] = { key, panel }
-    wm.panels[key] = panel
+    -- WM keeps a copy read once (copyPanel): fields the caller sets after registering never reach it.
+    wm.panels[key] = {
+      title = panel.title,
+      onShow = panel.onShow,
+      onHide = panel.onHide,
+      onSplit = panel.onSplit,
+      badge = panel.badge,
+      onMarkAllRead = panel.onMarkAllRead,
+      onUnreadChanged = panel.onUnreadChanged,
+    }
     return true
   end)
   define("ShowPanel", function(key)
@@ -167,6 +193,13 @@ function FakeWm.install(opts)
     wm.tips[key] = wm.tips[key] or {}
     wm.tips[key][name] = lines
     return true
+  end)
+
+  define("GetUnreadCount", function(name)
+    if type(name) ~= "string" or name:match("^%s*$") then
+      return 0
+    end
+    return wm.unread[name] or 0
   end)
 
   for _, name in ipairs(opts.without or {}) do
