@@ -63,12 +63,7 @@ end
 -- "4 requests you could craft while you were away (1 expired)", "1 request …" for one, the
 -- expired part only when > 0.
 function AwaySummary.Text(total, expired)
-  local text
-  if total == 1 then
-    text = Localization.Text("%d request you could craft while you were away", total)
-  else
-    text = Localization.Text("%d requests you could craft while you were away", total)
-  end
+  local text = Localization.Plural(total, "%d request you could craft while you were away", "%d requests you could craft while you were away")
   if expired > 0 then
     text = text .. Localization.Text(" (%d expired)", expired)
   end
