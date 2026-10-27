@@ -8,6 +8,9 @@ Player-friendly release notes for Craft Alert.
 - Choose the main crafter from a lead card: left-click its Crafters row.
 - Settings → Crafters has Mute all and Unmute all for the recipes listed.
 - Rebuilding the recipe index after a profession read or a settings change no longer freezes the game for a frame.
+- The top of the leads list counts today's requests seen, greeted and replied to (and, on Retail, orders filled); hover it for the last 7 days.
+- On Retail, filling a crafting order for someone you greeted in the last day counts as an order filled.
+- Back from AFK, one toast says how many requests you could craft came in while you were away and how many of them expired. Left-click it to open the leads, right-click to dismiss it.
 
 - A toast pops up beside the launcher, on the side facing the middle of the screen, when someone in Trade asks for something you can craft. It shows a plain headline ("Wants … — you can craft it"), their whole Trade message with item and recipe links you can hover, and what matched in its tooltip. Left-click to greet them, shift-click to edit the greeting first, ctrl-click for an empty whisper, right-click to dismiss; a click on a link only opens the link. Dragging the toast moves the launcher.
 - A leads window lists every open request, newest first, with the same clicks as the toast. Drag it, resize it, close it with Escape.

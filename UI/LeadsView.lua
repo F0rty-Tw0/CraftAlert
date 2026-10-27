@@ -8,11 +8,12 @@ local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadDetails = ns.LeadDetails or require("CraftAlert.UI.LeadDetails")
 local LeadsList = ns.LeadsList or require("CraftAlert.UI.LeadsList")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
+local LedgerStrip = ns.LedgerStrip or require("CraftAlert.UI.LedgerStrip")
 
 -- Spec A.2, A.6, assumption 2: the leads split view, built into any parent frame (the leads
--- window's content frame, or a WhisperMessenger panel host). The list pane (UI/LeadsList.lua) on
--- the left, the details pane (UI/LeadDetails.lua) of the selected lead on the right, a 1 px
--- divider between them. Each pane paints its atlas behind an InsetFrameTemplate art frame, as
+-- window's content frame, or a WhisperMessenger panel host). The ledger line (UI/LedgerStrip.lua,
+-- spec §8) across the top; under it the list pane (UI/LeadsList.lua) on the left, the details
+-- pane (UI/LeadDetails.lua) of the selected lead on the right, a 1 px divider between them. Each pane paints its atlas behind an InsetFrameTemplate art frame, as
 -- WhisperMessenger's panes do (RetailChrome.lua:56-58,70,85-88, WM). The selection follows the
 -- lead by id across refreshes; the root frame takes the mouse wheel and scrolls the list, as does
 -- a drag of the list's bar.
@@ -70,7 +71,8 @@ local function pick(view, leads)
 end
 
 -- Re-reads `leads` (newest first) into the list and the details of the selected lead, which is
--- seen first (the badge's count drops, and its row paints without the unseen dot).
+-- seen first (the badge's count drops, and its row paints without the unseen dot), and the ledger
+-- line. The list gets the height under that line.
 function LeadsView.Refresh(view, leads)
   local selected = pick(view, leads)
   view.selectedId = selected and selected.id
@@ -78,7 +80,9 @@ function LeadsView.Refresh(view, leads)
   if selected then
     Leads.MarkSeen(selected.id)
   end
-  LeadsList.Refresh(view.list, leads, LeadsList.Fit(view.getHeight()), view.selectedId)
+  LedgerStrip.Refresh(view.strip)
+  local height = view.getHeight() - Theme.LAYOUT.LEDGER_HEIGHT
+  LeadsList.Refresh(view.list, leads, LeadsList.Fit(height), view.selectedId)
   if selected then
     LeadDetails.Show(view.details, selected)
   else
@@ -104,8 +108,9 @@ function LeadsView.New(parent, opts)
     LeadsView.Scroll(view, delta)
   end)
   view.frame = frame
+  view.strip = LedgerStrip.New(frame, parent)
   view.listPane = createPane(frame, Theme.ART.PANEL_BACKGROUND)
-  view.listPane:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
+  view.listPane:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -Theme.LAYOUT.LEDGER_HEIGHT)
   view.listPane:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
   view.detailsPane = createPane(frame, Theme.ART.WIDE_PANEL_BACKGROUND)
   view.detailsPane:SetPoint("TOPLEFT", view.listPane, "TOPRIGHT", 1, 0)

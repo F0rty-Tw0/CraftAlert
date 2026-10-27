@@ -91,6 +91,14 @@ function PlayerName.RealmOf(key)
   return match(key, "^[^-]*%-(.+)$") or ownRealm
 end
 
+-- The name part of a key: everything before the first hyphen.
+function PlayerName.NameOf(key)
+  if type(key) ~= "string" then
+    return nil
+  end
+  return (match(key, "^[^-]*"))
+end
+
 -- The customer the Test page pretends to be: "Test" on the player's own realm.
 function PlayerName.TestCustomer()
   return "Test-" .. (PlayerName.RealmOf(ownKey or "") or "")

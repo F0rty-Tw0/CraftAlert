@@ -34,11 +34,18 @@ local function senderLines(lines)
   return senders
 end
 
--- The lines a run printed after its `db:` line: what the steps themselves produced.
+-- The lines a run printed after its `db:` line: what the steps themselves produced, without the
+-- closing `ledger:` and `away:` lines (asserted on their own).
 local function stepLines(lines)
   for index, line in ipairs(lines) do
     if string.find(line, "^db: ") then
-      return { unpack(lines, index + 1) }
+      local steps = {}
+      for i = index + 1, #lines do
+        if not string.find(lines[i], "^ledger: ") and not string.find(lines[i], "^away: ") then
+          steps[#steps + 1] = lines[i]
+        end
+      end
+      return steps
     end
   end
   error("no db: line in " .. table.concat(lines, " / "))
@@ -346,6 +353,26 @@ return function()
     end
   end
   Assert.equal(warnings, 1, "one newer-schema warning per load")
+
+  -- Spec §8: a run that changed a ledger counter ends with today's counters. The repeated request
+  -- updates the lead (no second "seen"), the click greets it once.
+  local ledger = Sim.Run({ "LF plate belt", "LF plate belt", "--click", "left" })
+  Assert.equal(ledger[#ledger], "ledger: seen=1 greeted=1 replied=0 filled=0")
+  -- The greeted customer's order filled: the event names them without a realm (5 arguments, so a
+  -- chat line may follow).
+  local fill = { "--event", "CRAFTINGORDERS_DISPLAY_CRAFTER_FULFILLED_MSG", "Public", "Belt", "Customer", "0", "1" }
+  local filled = Sim.Run({ "LF plate belt", "--click", "left", unpack(fill) })
+  Assert.equal(filled[#filled], "ledger: seen=1 greeted=1 replied=0 filled=1")
+  local stranger = Sim.Run({ "LF plate belt", "--click", "left", fill[1], fill[2], "Public", "Belt", "Stranger", "0", "1", "WTS belt" })
+  Assert.equal(stranger[#stranger], "ledger: seen=1 greeted=1 replied=0 filled=0")
+  Assert.equal(#senderLines(stranger), 2, "the line after the event's 5 arguments is a chat line")
+  local quiet = Sim.Run({ "WTS plate belt" })
+  Assert.falsy(string.find(quiet[#quiet], "^ledger: "), "no counter changed: no ledger line")
+
+  -- Spec §7.6: a request while AFK, then --afk off (PLAYER_FLAGS_CHANGED for the player): one away
+  -- summary, before the closing ledger line.
+  local away = Sim.Run({ "--afk", "on", "LF plate belt", "--afk", "off" })
+  Assert.same({ away[#away - 1], away[#away] }, { "away: summary count=1 expired=0", "ledger: seen=1 greeted=0 replied=0 filled=0" })
 
   -- Run from the command line, any `error:` line makes the sim exit 1, so a Proof run notices a
   -- broken invocation: a bad flag (the only line) or a step that fails after others printed.

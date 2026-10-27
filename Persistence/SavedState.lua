@@ -20,6 +20,7 @@ local unfinished = false
 local MAX_LEADS = 100
 local LEDGER_DAYS = 30
 local RECENT_GREETED_SECONDS = 24 * 60 * 60
+SavedState.RECENT_GREETED_SECONDS = RECENT_GREETED_SECONDS -- OrdersFilled counts within the same window
 local SECONDS_PER_DAY = 24 * 60 * 60
 
 local function byTime(a, b)

@@ -165,11 +165,13 @@ local function sweep(list, limit)
   return removed
 end
 
--- Drops the leads of every customer on Blizzard's ignore list. → whether any went.
+-- Drops the leads of every customer on Blizzard's ignore list, marked `dismissed` (the player's
+-- choice, as Leads.Dismiss). → whether any went.
 local function dropIgnored(list)
   local removed = false
   for i = #list, 1, -1 do
     if CrafterRank.IsIgnored(list[i].customer) then
+      list[i].dismissed = true
       remove(list, i)
       removed = true
     end
@@ -610,9 +612,11 @@ function Leads.IsActive(id)
   return find(id) ~= nil
 end
 
+-- The player's own removal: `dismissed` tells it from an expiry for the away summary (plan R5c).
 function Leads.Dismiss(id)
   local lead, position = find(id)
   if lead then
+    lead.dismissed = true
     remove(leads, position)
     fire("change")
   end

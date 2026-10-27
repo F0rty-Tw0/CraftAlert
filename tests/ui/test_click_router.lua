@@ -70,5 +70,16 @@ return function()
   Wow.stub("IsShiftKeyDown", nil)
   Wow.stub("IsControlKeyDown", nil)
   Assert.equal(ClickRouter.Handle("LeftButton", LEAD, 3), "greet")
+
+  -- Spec §7.6, the away summary's own table: left opens the leads, right dismisses (no look
+  -- rule: no lead to send to), shift or ctrl on the left button and other buttons do nothing.
+  ClickRouter, calls, keys = setup()
+  Assert.same({ ClickRouter.Summary("LeftButton"), ClickRouter.Summary("RightButton") }, { "open", "dismiss" })
+  Assert.equal(ClickRouter.Summary("MiddleButton"), nil)
+  keys.shift = true
+  Assert.equal(ClickRouter.Summary("LeftButton"), nil, "shift-click")
+  keys.shift, keys.ctrl = false, true
+  Assert.equal(ClickRouter.Summary("LeftButton"), nil, "ctrl-click")
+  Assert.same(calls, {}, "no lead acted on")
   Wow.reset()
 end

@@ -68,6 +68,10 @@ local function testOwnAndRealmOf()
   Assert.equal(PlayerName.RealmOf("Bob-Area52"), "Area52")
   Assert.equal(PlayerName.RealmOf("Bob"), "OwnRealm", "no realm means the own realm")
   Assert.equal(PlayerName.RealmOf(nil), nil)
+  -- The name part of a key, for an orders-filled event that names the customer without a realm.
+  Assert.equal(PlayerName.NameOf("Bob-Area52"), "Bob")
+  Assert.equal(PlayerName.NameOf("Bob"), "Bob")
+  Assert.equal(PlayerName.NameOf(nil), nil)
 
   -- Retail names on a realm that UnitName reports are not mistaken for surnames.
   local retailWithRealm = load("retail", "Hero", "SomeRealm")

@@ -141,19 +141,20 @@ local function testContentFrameAndBand()
   Assert.equal(status:GetText(), "")
 end
 
--- AC1: two panes over their atlases, 10 rows at the default size, refit on resize.
+-- AC1: two panes over their atlases under the ledger line, 9 rows at the default size, refit on
+-- resize.
 local function testPanesAndRows()
   local ns = load(customerNames(12))
   ns.LeadsWindow.Toggle()
   Assert.same({ window():GetWidth(), window():GetHeight() }, { 840, 560 })
-  Assert.equal(#rows(), 10) -- floor((560 - 64 - 8) / 48)
+  Assert.equal(#rows(), 9) -- floor((560 - 64 - 20 - 8) / 48)
   Assert.equal(rows()[1].parent, view().listPane)
   Assert.same({ view().listPane.bg.atlas, view().detailsPane.bg.atlas }, { LIST_ATLAS, DETAILS_ATLAS })
   Assert.equal(view().details.lead, ns.Leads.Latest())
   -- No footer hint: the details' buttons and the tooltips carry the clicks.
   Assert.falsy(string.find(textOf(window()), "Click: greet", 1, true), "no footer hint: " .. textOf(window()))
   resize(720, 420)
-  Assert.equal(#rows(), 7) -- floor((420 - 64 - 8) / 48)
+  Assert.equal(#rows(), 6) -- floor((420 - 64 - 20 - 8) / 48)
   -- The client may report 0 for the window's height on an open; no row then, and no error,
   -- until the size arrives.
   ns.LeadsWindow.Toggle()
@@ -165,7 +166,7 @@ local function testPanesAndRows()
   Assert.equal(#rows(), 0)
   window().GetHeight = getHeight
   resize(840, 560)
-  Assert.equal(#rows(), 10)
+  Assert.equal(#rows(), 9)
 
   -- Classic flavors: no atlas, the rows still draw.
   ns = load(customerNames(12))
@@ -176,7 +177,7 @@ local function testPanesAndRows()
   })
   ns.LeadsWindow.Toggle()
   Assert.same({ view().listPane.bg.atlas, view().detailsPane.bg.atlas }, { nil, nil })
-  Assert.equal(#rows(), 10)
+  Assert.equal(#rows(), 9)
 end
 
 local function testRowFields()
@@ -341,14 +342,14 @@ local function testResizeGrip()
   local grip = frame.resizeGrip
   Assert.truthy(grip, "the ghost grip")
   Assert.equal(frame.resizeButton, nil)
-  Assert.equal(#rows(), 10)
+  Assert.equal(#rows(), 9)
   -- Dragging sizes the ghost only: the window and its rows wait for the release.
   Widgets.fire(grip, "OnMouseDown", "LeftButton")
   grip.ghost:SetSize(1000, 640)
-  Assert.same({ frame:GetWidth(), frame:GetHeight(), #rows() }, { 840, 560, 10 })
+  Assert.same({ frame:GetWidth(), frame:GetHeight(), #rows() }, { 840, 560, 9 })
   Widgets.fire(grip, "OnMouseUp", "LeftButton")
   Assert.same({ frame:GetWidth(), frame:GetHeight() }, { 1000, 640 })
-  Assert.equal(#rows(), 11) -- floor((640 - 64 - 8) / 48)
+  Assert.equal(#rows(), 11) -- floor((640 - 64 - 20 - 8) / 48)
   Assert.same({ db.ui.window.width, db.ui.window.height }, { 1000, 640 })
   -- Closed and reopened: same size, rows refit.
   ns.LeadsWindow.Toggle()

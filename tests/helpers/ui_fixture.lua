@@ -19,6 +19,8 @@ local CHAIN = {
   "Model.RealmTag",
   "Model.CrafterRank",
   "Model.Leads",
+  "Model.Ledger",
+  "Model.AwaySummary",
   "Model.GreetAction",
   "Professions.ProfessionList",
   "Core.Status",
@@ -42,6 +44,7 @@ local UI = {
   "UI.DetailsHeader",
   "UI.LeadDetails",
   "UI.LeadsList",
+  "UI.LedgerStrip",
   "UI.LeadsView",
   "UI.WindowSize",
   "UI.GhostResize",
@@ -51,6 +54,7 @@ local UI = {
   "UI.LauncherArt",
   "UI.Launcher",
   "UI.ToastLayout",
+  "UI.ToastChrome",
   "UI.AlertToast",
   "UI.Settings.Column",
   "UI.Settings.Controls",
@@ -136,10 +140,11 @@ local function stubBlizzardUi()
 end
 
 -- opts.leads: how many lead records db.leads starts with; opts.db(db): edits before Restore;
--- opts.before(ns): runs after the chain loads and before the UI files do.
+-- opts.before(ns): runs after the chain loads and before the UI files do; opts.flavor: the client
+-- (default "retail").
 function UiFixture.load(opts)
   opts = opts or {}
-  local ns = Fixture.load("retail")
+  local ns = Fixture.load(opts.flavor or "retail")
   stubPlayer()
   local calls = {}
   stubSends(calls)

@@ -53,6 +53,7 @@ local EVENT_ARITY = {
   CHAT_MSG_WHISPER_INFORM = 2, -- text, target
   PLAYER_UPDATE_RESTING = 0,
   ZONE_CHANGED_NEW_AREA = 0,
+  CRAFTINGORDERS_DISPLAY_CRAFTER_FULFILLED_MSG = 5, -- orderType, itemName, playerName, tip, quantity
 }
 -- How long the toast counts as shown (seconds) when --click acts on the newest lead (§7.5 rule 3).
 local SHOWN_FOR_SECONDS = 1
@@ -312,14 +313,19 @@ local function reportMatches(ctx)
   end
 end
 
--- `toast: shown lead=<id> more=<n>` whenever AlertToast.Show runs. Wrapped before login, so
--- the Leads.On("new", AlertToast.Show) Bootstrap makes subscribes the wrapper.
+-- `toast: shown lead=<id> more=<n>` whenever AlertToast.Show runs, `away: summary count=<n>
+-- expired=<n>` whenever AlertToast.ShowSummary does (spec §7.6). Wrapped before login, so what
+-- Bootstrap subscribes (Leads.On("new"), AwaySummary.Install) is the wrapper.
 local function reportToasts(ctx)
   local AlertToast = ctx.ns.AlertToast
-  local show = AlertToast.Show
+  local show, showSummary = AlertToast.Show, AlertToast.ShowSummary
   AlertToast.Show = function(lead)
     show(lead)
     ctx.out[#ctx.out + 1] = string.format("toast: shown lead=%s more=%d", tostring(lead.id), AlertToast.more)
+  end
+  AlertToast.ShowSummary = function(count, expired)
+    showSummary(count, expired)
+    ctx.out[#ctx.out + 1] = string.format("away: summary count=%d expired=%d", count, expired)
   end
 end
 
@@ -349,6 +355,9 @@ local function watch(ctx)
     reportLearn(ctx)
     flushBind(ctx)
     ctx.out[#ctx.out + 1] = "index: size=" .. index.size
+  end)
+  ns.Ledger.OnChange(function()
+    ctx.ledgerChanged = true
   end)
   ns.ScanGate.OnChange(function(active, state)
     ctx.out[#ctx.out + 1] = "scan: " .. (active and "active" or string.format("paused (%s)", state.reason))
@@ -388,6 +397,15 @@ local function bindDb(ctx)
   end
   ctx.out[#ctx.out + 1] =
     string.format("db: schema=%s characters=%d recipes=%d leads=%d", tostring(db.schema), count(db.characters), recipes, #db.leads)
+end
+
+-- `ledger: seen=<n> greeted=<n> replied=<n> filled=<n>`, today's counters, as the last line of a
+-- run that changed one (spec §8).
+local function reportLedger(ctx)
+  if ctx.ledgerChanged then
+    local today = ctx.ns.Ledger.Today()
+    ctx.out[#ctx.out + 1] = string.format("ledger: seen=%d greeted=%d replied=%d filled=%d", today.seen, today.greeted, today.replied, today.filled)
+  end
 end
 
 local STEPS = {}
@@ -546,6 +564,7 @@ function Sim.Run(argv)
   for _, step in ipairs(plan.steps) do
     STEPS[step.kind](ctx, step)
   end
+  reportLedger(ctx)
   return out
 end
 
