@@ -213,7 +213,7 @@ end
 local function finishRead(job)
   ModernReader.lastRead = ReadJob.Finish(job)
   if job.readKeys[job.key] then
-    reads[job.key] = { count = #job.recipeIDs, settled = job.named and not job.lineless }
+    reads[job.key] = { count = #job.recipeIDs, settled = job.named and not job.lineless and not job.learnedDuring }
   end
   if job.anyChanged then
     Index.RequestRebuild("read")
@@ -322,8 +322,15 @@ end
 
 -- A learn keeps the window's recipe count the same, and the learn path may not have stored the
 -- recipe (its data not loaded yet, or in an instance): the next open of any window reads again.
+-- A running or kept job may have walked past that recipe, so its finish settles nothing.
 function ModernReader.ForgetReads()
   reads = {}
+  if activeJob ~= nil then
+    activeJob.learnedDuring = true
+  end
+  if keptJob ~= nil then
+    keptJob.learnedDuring = true
+  end
 end
 
 function ModernReader.OnListUpdate()
