@@ -234,6 +234,38 @@ local function testLearnSignalGate()
   Assert.truthy(isRegistered("TRADE_SKILL_SHOW"), "the readers still install")
 end
 
+-- The player folds the Professions header (TBC skill lines): SKILL_LINES_CHANGED then lists
+-- neither profession, yet both stay stored with their recipes, the order holds and nothing
+-- rebuilds; unfolding changes nothing either.
+local function testFoldedHeader()
+  local session, state = startClient("tbc")
+  local ns = login(session)
+  openWindow("TRADE_SKILL_SHOW")
+  local character = rawget(_G, "CraftAlertDB").characters[OWN_KEY]
+  local recipes = character.recipes
+  Assert.truthy(recipes["sim plate belt"], "the window read stored the belt")
+
+  state.skillLines = {
+    { name = "Professions", header = true, collapsed = true },
+    { name = "Languages", header = true },
+    { name = "Common" },
+  }
+  Wow.fireEvent("SKILL_LINES_CHANGED")
+  Assert.truthy(character.professions.blacksmithing, "folded: Blacksmithing stays stored")
+  Assert.truthy(character.professions.enchanting, "folded: Enchanting stays stored")
+  Assert.equal(character.professions.blacksmithing.read, true, "folded: its read flag is kept")
+  Assert.truthy(recipes["sim plate belt"], "folded: its recipes stay")
+  Assert.same(ns.ProfessionList.Order(), { "blacksmithing", "enchanting" })
+  Assert.equal(Wow.pendingTimers(0), 0, "folded: same order, no rebuild")
+  Assert.truthy(ns.Index.Current().size > 0, "folded: the index still listens")
+
+  state.skillLines = SKILL_LINES
+  Wow.fireEvent("SKILL_LINES_CHANGED")
+  Assert.same(ns.ProfessionList.Order(), { "blacksmithing", "enchanting" })
+  Assert.equal(Wow.pendingTimers(0), 0, "unfolded: no rebuild")
+  Assert.truthy(recipes["sim plate belt"], "unfolded: the recipes stay")
+end
+
 -- Recipe markers on Classic: nothing is hooked before the window's addon loads; then a stored
 -- row gets its switch on Blizzard's update, a rebuild and entering an instance repaint it. The
 -- Craft window gets them on TBC only.
@@ -278,5 +310,6 @@ return function()
   testFlow("tbc")
   testFlow("mop")
   testLearnSignalGate()
+  testFoldedHeader()
   Wow.reset()
 end
