@@ -116,6 +116,9 @@ local function testRoundTrip()
   Assert.equal(target.characters["First Last-OwnRealm"].enabled, true, "B's enabled flag is not exported")
   -- A pasted newline or space around the string is ignored.
   Assert.truthy(ExportString.Decode("  " .. text .. "\n", "retail"))
+  -- Realms are stored stripped, as RealmTag.CannotOrder compares them.
+  ExportString.Apply(target, assert(ExportString.Decode(seal("CA1:retail:c,Smith-Realm,,Area 52.Kel-Thuzad"), "retail")))
+  Assert.same(target.characters["Smith-Realm"].realms, { "Area52", "KelThuzad" })
 end
 
 local function testClassicNameKeys()
