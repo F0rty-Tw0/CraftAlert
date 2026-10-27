@@ -322,14 +322,12 @@ end
 
 -- A learn keeps the window's recipe count the same, and the learn path may not have stored the
 -- recipe (its data not loaded yet, or in an instance): the next open of any window reads again.
--- A running or kept job may have walked past that recipe, so its finish settles nothing.
+-- A running or kept job may have walked past that recipe, so its finish settles nothing. A kept
+-- job is always activeJob: only the running job keeps itself, and each start clears keptJob.
 function ModernReader.ForgetReads()
   reads = {}
   if activeJob ~= nil then
     activeJob.learnedDuring = true
-  end
-  if keptJob ~= nil then
-    keptJob.learnedDuring = true
   end
 end
 
