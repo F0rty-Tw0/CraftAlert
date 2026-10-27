@@ -256,17 +256,25 @@ local function imported(old, incoming, now, pause)
 end
 
 -- Stores decoded data → counts { characters, recipes, skipped }. A character this account has as
--- its own (`source = "local"`) is skipped and counted. The caller rebuilds the index.
+-- its own (`source = "local"`) is skipped and counted, checked again right before the write:
+-- another job (the CraftScan import) may have stored it in the pauses. The caller rebuilds the
+-- index.
 function ExportString.Apply(db, data, pause)
   pause = pause or noPause
   local counts = { characters = 0, recipes = 0, skipped = 0 }
   local now = _G["time"]()
+  local function isOwn(key)
+    local character = db.characters[key]
+    return character ~= nil and character.source ~= "import"
+  end
   for _, incoming in ipairs(data.characters) do
-    local old = db.characters[incoming.key]
-    if old ~= nil and old.source ~= "import" then
+    local record, recipes
+    if not isOwn(incoming.key) then
+      record, recipes = imported(db.characters[incoming.key], incoming, now, pause)
+    end
+    if record == nil or isOwn(incoming.key) then
       counts.skipped = counts.skipped + 1
     else
-      local record, recipes = imported(old, incoming, now, pause)
       db.characters[incoming.key] = record
       counts.characters, counts.recipes = counts.characters + 1, counts.recipes + recipes
     end

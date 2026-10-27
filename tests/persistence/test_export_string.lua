@@ -197,6 +197,14 @@ local function testLocalCharacterSkipped()
   local counts = ExportString.Apply(target, assert(ExportString.Decode(ExportString.Encode(sourceDb(), "retail"), "retail")))
   Assert.same(counts, { characters = 1, recipes = 0, skipped = 1 })
   Assert.same(target.characters["Smith-Area52"], before)
+  -- Stored as local while the import paused (the CraftScan job): still skipped, never replaced.
+  local data = assert(ExportString.Decode(ExportString.Encode(sourceDb(), "retail"), "retail"))
+  target = { characters = {} }
+  counts = ExportString.Apply(target, data, function()
+    target.characters["Smith-Area52"] = target.characters["Smith-Area52"] or mine
+  end)
+  Assert.same(counts, { characters = 1, recipes = 0, skipped = 1 })
+  Assert.equal(target.characters["Smith-Area52"], mine)
 end
 
 -- Every refused string leaves storage alone and gives one message.
