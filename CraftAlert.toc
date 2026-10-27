@@ -65,6 +65,7 @@ Professions/ReachQuery.lua
 Professions/QualityReach.lua
 Professions/ModernReader.lua
 Professions/LearnWatcher.lua
+Persistence/CraftScanImport.lua
 Core/Status.lua
 Core/ScanGate.lua
 UI/Theme.lua
