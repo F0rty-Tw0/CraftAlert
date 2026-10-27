@@ -165,7 +165,7 @@ local function testWordGroupsPausesWithinList()
       longest = list
     end
   end
-  local reads, most = 0, 0
+  local reads, most, heavy = 0, 0, 0
   for k, entry in ipairs(longest) do
     longest[k] = setmetatable({}, {
       __index = function(_, key)
@@ -174,12 +174,51 @@ local function testWordGroupsPausesWithinList()
       end,
     })
   end
-  ns.WordGroups.Build(index, function()
+  ns.WordGroups.Build(index, function(weight)
     most, reads = math.max(most, reads), 0
+    if weight == #longest then
+      heavy = heavy + 1
+    end
   end)
   most = math.max(most, reads)
   Assert.truthy(#longest > 64, "the fixture has a long list, " .. #longest)
   Assert.truthy(most <= 4 * #longest, "entry reads between two pauses, " .. most .. " of a " .. #longest .. "-entry list")
+  -- buildGroupWords and the word-info loop each weigh the word by its list's length.
+  Assert.truthy(heavy >= 2, "pauses weighted by the longest list, " .. heavy)
+end
+
+-- byProfession splits a list of several professions with a pause every 64 entries: the pauses
+-- right after reads of such a list weigh 64, which no whole-list pause of it does.
+local function testWordGroupsChunksProfessionSplit()
+  local ns, db = setup()
+  local index = Synthetic.build(ns, db)
+  local split = {}
+  for _, list in pairs(index.wordIndex) do
+    local first = list[1] and list[1].prof
+    for _, entry in ipairs(list) do
+      if entry.prof ~= first and #list > #split then
+        split = list
+        break
+      end
+    end
+  end
+  local touched, chunks = false, 0
+  for k, entry in ipairs(split) do
+    split[k] = setmetatable({}, {
+      __index = function(_, key)
+        touched = true
+        return entry[key]
+      end,
+    })
+  end
+  ns.WordGroups.Build(index, function(weight)
+    if touched and weight == 64 then
+      chunks = chunks + 1
+    end
+    touched = false
+  end)
+  Assert.truthy(#split > 128 and #split % 64 ~= 0, "the fixture has a long split list, " .. #split)
+  Assert.truthy(chunks >= math.floor(#split / 64), "chunk pauses in the split, " .. chunks .. " for " .. #split .. " entries")
 end
 
 -- StatSlot.Finish pauses after each stat list it sorts, weighed by the list's length: with
@@ -237,6 +276,7 @@ return function()
   testNoJobBeforeConfigure()
   testHeavyWordsYieldOnBudget()
   testWordGroupsPausesWithinList()
+  testWordGroupsChunksProfessionSplit()
   testStatSlotSortsPause()
   Wow.reset()
 end
