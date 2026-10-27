@@ -71,8 +71,7 @@ local function installProfessions()
   EventRouter.On(SKILL_LINES_CHANGED, onSkillLinesChanged)
 end
 
--- Classic reads the TradeSkill window and, on Era and TBC, Enchanting's Craft window; its learn
--- path arrives with its task.
+-- Classic reads the TradeSkill window and, on Era and TBC, Enchanting's Craft window.
 local function installReaders()
   if FlavorCompat.isClassic then
     ClassicReader.Install(db)
