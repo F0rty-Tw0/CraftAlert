@@ -220,6 +220,15 @@ local function setPrimaries(db, primaries)
   end
 end
 
+-- The first MAX_GREETING bytes, never ending inside a UTF-8 character.
+local function capped(text)
+  local cut = MAX_GREETING
+  while cut > 0 and cut < #text and string.byte(text, cut + 1) >= 128 and string.byte(text, cut + 1) < 192 do -- a continuation byte
+    cut = cut - 1
+  end
+  return string.sub(text, 1, cut)
+end
+
 local function importGreetings(db, settings, counts)
   local defaults = Defaults.Settings().templates
   for tag, text in pairs(tableOr(settings.greeting) or {}) do
@@ -230,7 +239,7 @@ local function importGreetings(db, settings, counts)
         counts.skipped = counts.skipped + 1
       elseif db.settings.templates[key] == defaults[key] then
         text = gsub(gsub(gsub(text, "{profession_link}", "{profession}"), "|", ""), "[\r\n]", " ")
-        db.settings.templates[key] = string.sub(text, 1, MAX_GREETING)
+        db.settings.templates[key] = capped(text)
         counts.greetings = counts.greetings + 1
       end
     end

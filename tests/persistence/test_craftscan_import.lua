@@ -187,6 +187,15 @@ local function testLegacyAllEnabled()
   Assert.equal(recipes[9003].muted, nil)
 end
 
+-- A long greeting is cut at 255 bytes without splitting a UTF-8 character ("é" is 2 bytes).
+local function testGreetingCutWholeCharacters()
+  local CraftScanImport, ns = load()
+  local db = ns.Defaults.Db()
+  local text = string.rep("x", 254) .. "é and more"
+  CraftScanImport.Run(db, { settings = { greeting = { GREETING_I_CAN_CRAFT_ITEM = text } } })
+  Assert.equal(#db.settings.templates.item, 254, 'the cut drops the whole "é"')
+end
+
 -- A key without a realm takes the one realm it is stored under, not the player's.
 local function testBareKeyTakesItsRealm()
   local CraftScanImport, ns = load()
@@ -237,6 +246,7 @@ return function()
   testKeysAddedDuringTheWalk()
   testLegacyAllEnabled()
   testBareKeyTakesItsRealm()
+  testGreetingCutWholeCharacters()
   testClockReadPerRecipe()
   Wow.reset()
 end
