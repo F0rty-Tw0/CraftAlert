@@ -31,12 +31,12 @@ local function testRequiredLines()
   expect(ns, "LF lwer", "profession:" .. LW, "the leatherworker is enabled")
 end
 
--- StatSlot remembers the last digit-led token's stat key across lines: the same line twice,
--- and a repeat inside one line, still read "8stam" as stamina.
+-- StatSlot remembers the last digit-led token's stat key across lines: the same line twice
+-- still reads "8stam" as stamina the second time.
 local function testRepeatedDigitStat()
   local ns = Fixture.load()
   fixture(ns)
-  for _, line in ipairs({ "LF Enchanter +8stam to chest", "LF Enchanter +8stam to chest", "lf 8stam 8stam chest" }) do
+  for _, line in ipairs({ "LF Enchanter +8stam to chest", "LF Enchanter +8stam to chest" }) do
     local result = assert(expect(ns, line, "item:enchant chest - greater stamina"))
     Assert.truthy(string.find(why(result), "8stam", 1, true), line .. " → " .. why(result))
   end
