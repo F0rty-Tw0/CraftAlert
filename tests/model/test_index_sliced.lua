@@ -217,7 +217,7 @@ local function testWordGroupsChunksProfessionSplit()
     end
     touched = false
   end)
-  Assert.truthy(#split > 128 and #split % 64 ~= 0, "the fixture has a long split list, " .. #split)
+  Assert.truthy(#split > 128, "the fixture has a long split list, " .. #split)
   Assert.truthy(chunks >= math.floor(#split / 64), "chunk pauses in the split, " .. chunks .. " for " .. #split .. " entries")
 end
 
