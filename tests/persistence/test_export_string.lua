@@ -368,6 +368,17 @@ local function testDamagedIsCheap()
   seconds = os.clock() - started
   Assert.truthy(err:find("incomplete", 1, true), err)
   Assert.truthy(seconds < 0.1, "10 headers took " .. seconds .. " s")
+  -- The header is read from the first 32 bytes: "CA" and a 600 KB run of digits once took 91 ms
+  -- in one slice, and with a ":" after it the run went into the message.
+  local digits = "CA" .. string.rep("1", Fields.MAX.length - 20)
+  started = os.clock()
+  for _ = 1, 10 do
+    _, err = ExportString.Decode(digits, "retail")
+  end
+  seconds = os.clock() - started
+  Assert.truthy(seconds < 0.1, "10 digit headers took " .. seconds .. " s")
+  _, err = ExportString.Decode(seal(digits .. ":retail:"), "retail")
+  Assert.truthy(#err < 100, "message of " .. #err .. " bytes")
   -- A sealed string with one 590 KB record: no stretch between two pauses (one Slicer step)
   -- runs long; a "[^;]*" split took 6 ms there. Best of three runs, in CPU time.
   local forged = seal("CA1:retail:c," .. string.rep("y", Fields.MAX.length - 100) .. ",,")

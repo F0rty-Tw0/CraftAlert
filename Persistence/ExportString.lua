@@ -43,6 +43,7 @@ local CHECKSUM_WIDTH = 7
 local ADLER_MOD = 65521
 local CHUNK = 4096 -- checksum bytes between pause calls
 local TRIM_SLACK = 64 -- spaces around a pasted string that may push it past MAX.length
+local HEADER_WIDTH = 32 -- bytes holding "CA<version>:<flavor>:"
 
 local Fields = ExportFields
 local MAX = Fields.MAX
@@ -164,9 +165,10 @@ end
 
 -- → head, version, flavor, body, checksum, or nil. The checksum's ":" is looked for in the last
 -- CHECKSUM_WIDTH + 1 bytes and the body checked with a plain find: one "[^:]*" pattern
--- backtracked over the whole string when its end was damaged.
+-- backtracked over the whole string when its end was damaged. The version and flavor are read from
+-- the first HEADER_WIDTH bytes: "CA" and a 600 KB run of digits took 91 ms in one slice.
 local function split(text)
-  local version, flavor, bodyAt = match(text, "^CA(%d+):(%l+):()")
+  local version, flavor, bodyAt = match(sub(text, 1, HEADER_WIDTH), "^CA(%d+):(%l+):()")
   local sumAt = bodyAt and find(text, ":%w+$", max(bodyAt, #text - CHECKSUM_WIDTH))
   if sumAt == nil then
     return nil
@@ -201,7 +203,7 @@ function ExportString.Decode(text, flavorKey, pause)
     return nil, Localization.Text("The string is too long.")
   end
   local head, version, flavor, body, sum = split(text)
-  if head == nil and find(text, "^CA%d+:") then
+  if head == nil and find(sub(text, 1, HEADER_WIDTH), "^CA%d+:") then
     return nil, damaged(Localization.Text("incomplete"))
   elseif head == nil then
     return nil, Localization.Text("Not a Craft Alert export string.")
