@@ -316,9 +316,24 @@ local function jobCases()
   Assert.same(recipesOf(db), {})
 end
 
+-- §10.2: FieldsOf reads an alt's recipe the logged-in character never learned, with the §5.2
+-- drops, its expansion line and its profession answer; it stores nothing.
+local function fieldsOfAnyRecipe()
+  local state, ModernReader, db = setup()
+  local line = { professionID = 2872, parentProfessionID = BS, parentProfessionName = "Blacksmithing" }
+  state.recipes = { belt(1, 100, { learned = false, ranks = { 101, 102 }, profession = line }), belt(2, 200, { isRecraft = true }) }
+  local fields, profInfo = ModernReader.FieldsOf(1)
+  Assert.same(fields, { item = 100, ranks = { 101, 102 }, name = "Belt 1", line = 2872 })
+  Assert.equal(profInfo, line)
+  Assert.equal(ModernReader.FieldsOf(2), nil, "recraft dropped")
+  Assert.equal(ModernReader.FieldsOf(3), nil, "unknown recipe")
+  Assert.same(recipesOf(db), {})
+end
+
 return function()
   readFlow("retail")
   readFlow("forever")
+  fieldsOfAnyRecipe()
 
   -- In an instance a profession window is never read, on show or on a list update.
   do

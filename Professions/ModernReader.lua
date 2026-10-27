@@ -307,6 +307,19 @@ function ModernReader.OnListUpdate()
   onWindowEvent(false)
 end
 
+-- §10.2 CraftScan import: the stored fields of any recipe, an alt's included (`learned` is not
+-- checked: it describes the logged-in character), after the §5.2 drops → { item, ranks, name,
+-- line } and its GetProfessionInfoByRecipeID answer, or nil.
+function ModernReader.FieldsOf(recipeID)
+  local api = tradeSkillApi()
+  local info = api and usableInfo(api, recipeID, false)
+  if info == nil then
+    return nil
+  end
+  local profInfo = professionInfo(recipeID)
+  return readFields(api, recipeID, info, profInfo), profInfo
+end
+
 -- Reads one learned recipe (§5.3), the window open or not → whether it is now stored.
 function ModernReader.ReadOne(recipeID, professionKey)
   local api = tradeSkillApi()
