@@ -136,6 +136,8 @@ local function testOtherEscapes()
   Assert.same(tokensOf(Tokenizer, count), { "lf", "8stam", "to", "chest", "1h", "sword" })
   Assert.equal(Tokenizer.Tokenize("!!! ..."), 0)
   Assert.equal(Tokenizer.normalized, "")
+  Tokenizer.Tokenize("|qlf a|xb") -- unknown escapes drop only the bar
+  Assert.equal(Tokenizer.normalized, "qlf a xb")
 end
 
 -- No table per line: the same buffers every call, and a shorter line clears the old tail.
