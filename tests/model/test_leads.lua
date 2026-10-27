@@ -139,6 +139,27 @@ local function testIgnoreList()
   Assert.equal(seen.change, 1, "nobody ignored: no change")
 end
 
+-- Restore drops the saved leads of a customer ignored since they were saved, with one "change":
+-- no IGNORELIST_UPDATE comes when the list loaded before the addon did.
+local function testRestoreDropsIgnored()
+  local ns, db = setup()
+  local Leads = ns.Leads
+  local ignored = { id = 1, customer = CUSTOMER, time = T0 - 20, kind = "item", greeted = false, replied = false }
+  local kept = { id = 2, customer = "Other-Draenor", time = T0 - 10, kind = "item", greeted = false, replied = false }
+  local expired = { id = 3, customer = "Third-Draenor", time = T0 - TIMEOUT - 1, kind = "item", greeted = false, replied = false }
+  db.leads = { expired, ignored, kept }
+  Wow.stub("C_FriendList", {
+    IsIgnored = function(name)
+      return name == CUSTOMER
+    end,
+  })
+  local seen = listen(Leads)
+  Leads.Restore(db)
+  Wow.stub("C_FriendList", nil)
+  Assert.same(db.leads, { kept }, "the ignored customer's lead went")
+  Assert.equal(seen.change, 1, "an expired and an ignored lead go in one change")
+end
+
 -- A guid under Leads.TEST_GUID_PREFIX marks a synthetic lead; nothing else does, whatever the name.
 local function testTestFlag()
   local ns = setup()
@@ -446,12 +467,36 @@ local function testRestoreAsksForLinks()
   Assert.same({ saved.itemLink, linked.itemLink }, { "|Hitem:501|h[Item 501]|h", "kept" })
 end
 
+-- Plan revision R5c: a lead the player dismissed, or whose customer they ignored, is marked, so the
+-- away summary tells it from one that timed out.
+local function testDismissedFlag()
+  local ns = setup()
+  local Leads = ns.Leads
+  local dismissed = newLead(ns, "LF plate belt")
+  local ignored = newLead(ns, "LF plate belt", "Carl-Draenor")
+  local expired = newLead(ns, "LF plate greaves", "Dan-Draenor")
+  Leads.Dismiss(dismissed.id)
+  Wow.stub("C_FriendList", {
+    IsIgnored = function(name)
+      return name == "Carl-Draenor"
+    end,
+  })
+  Leads.DismissIgnored()
+  Wow.stub("C_FriendList", nil)
+  Wow.clock.time = T0 + TIMEOUT + 1
+  fireTimer()
+  Assert.equal(Leads.IsActive(expired.id), false, "timed out")
+  Assert.same({ dismissed.dismissed, ignored.dismissed, expired.dismissed }, { true, true, nil })
+end
+
 return function()
+  testDismissedFlag()
   testLinkArrivesLater()
   testLinkLoadFails()
   testLinkWaitEndsWithLead()
   testRestoreAsksForLinks()
   testIgnoreList()
+  testRestoreDropsIgnored()
   testMarkAllSeen()
   testCraftersOnLead()
   testTestFlag()
@@ -671,6 +716,15 @@ return function()
   Assert.equal(lead.itemID, nil)
   Assert.equal(lead.recipeName, nil)
   Assert.equal(lead.profName, tostring(BS))
+
+  -- A profession stored without a name (CraftScan's unlearned-only expansion): no name, so a
+  -- greeting never says "I have , what do you need?".
+  ns = setup(nil, function(data)
+    data.characters["Alt-Realm"].professions[BS].name = ""
+  end)
+  lead = newLead(ns, "LF blacksmith")
+  Assert.equal(lead.crafter, "Alt-Realm")
+  Assert.equal(lead.profName, nil)
 
   -- Realm tag on the lead (Retail), and nothing on Forever.
   local function withRealms(data)

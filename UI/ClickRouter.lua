@@ -49,5 +49,17 @@ function ClickRouter.Handle(button, lead, shownAt)
   return "greet"
 end
 
+-- The away summary's own table (§7.6): left opens the leads, right dismisses the summary; a
+-- shift- or ctrl-click and other buttons do nothing. → "open", "dismiss" or nil.
+function ClickRouter.Summary(button)
+  if button == "RightButton" then
+    return "dismiss"
+  end
+  if button ~= "LeftButton" or isDown("IsShiftKeyDown") or isDown("IsControlKeyDown") then
+    return nil
+  end
+  return "open"
+end
+
 ns.ClickRouter = ClickRouter
 return ClickRouter

@@ -18,7 +18,7 @@ local ScrollView = ns.ScrollView or require("CraftAlert.UI.ScrollView")
 local SettingsPane = {}
 
 -- Module names under CraftAlert.UI.Settings, in nav order.
-local BUILT_IN = { "PageGeneral", "PageAlerts", "PageGreetings", "PageKeywords", "PageCrafters", "PageTest" }
+local BUILT_IN = { "PageGeneral", "PageAlerts", "PageGreetings", "PageKeywords", "PageCrafters", "PageLinked", "PageTest" }
 
 local added = {} -- pages from AddPage, after the built-ins
 local pages = {} -- every page in nav order, filled by the first Attach
@@ -122,8 +122,8 @@ local function addNavButton(page, index)
   pane.buttons[page.id] = button
 end
 
--- Adds a page to the navigation (Task 4.2: Linked accounts), after the built-in pages. Before the
--- first Attach it waits; after it the nav button comes at once.
+-- Adds a page to the navigation, after the built-in pages. Before the first Attach it waits; after
+-- it the nav button comes at once.
 function SettingsPane.AddPage(page)
   if pane == nil then
     added[#added + 1] = page

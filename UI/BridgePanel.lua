@@ -193,16 +193,23 @@ function BridgePanel.Build()
   }
 end
 
--- Re-reads the leads into the view. A no-op while the panel is hidden.
+-- Re-reads the leads into the view. A no-op while the panel is hidden; in an instance (the gate
+-- refreshes on entering one) settings go back to the leads, as LeadsWindow.OnGate closes its window.
 function BridgePanel.Refresh()
-  if panelShown then
-    refresh()
+  if not panelShown then
+    return
   end
+  if mode == "settings" and FlavorCompat.InInstance() then
+    enterLeads()
+    return
+  end
+  refresh()
 end
 
--- The gear: leads <-> settings in the shown panel. A no-op while hidden.
+-- The gear: leads <-> settings in the shown panel. A no-op while hidden; in an instance it only
+-- goes back to the leads.
 function BridgePanel.ToggleSettings()
-  if not panelShown then
+  if not panelShown or (mode ~= "settings" and FlavorCompat.InInstance()) then
     return
   end
   if mode == "settings" then

@@ -3,14 +3,17 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
+local AwaySummary = ns.AwaySummary or require("CraftAlert.Model.AwaySummary")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
 local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
+local LeadRow = ns.LeadRow or require("CraftAlert.UI.LeadRow")
 local BridgePanel = ns.BridgePanel or require("CraftAlert.UI.BridgePanel")
 local BridgeInfo = ns.BridgeInfo or require("CraftAlert.UI.BridgeInfo")
 
@@ -19,8 +22,8 @@ local BridgeInfo = ns.BridgeInfo or require("CraftAlert.UI.BridgeInfo")
 -- (UI/BridgePanel.lua), /ca config opens its settings, whisper boxes open as WM conversations and
 -- each customer's conversation gets an info line (UI/BridgeInfo.lua). The earlier modules never
 -- call this one: Activate plugs it in through their setters (Launcher.SetSuppressed,
--- LeadsWindow.SetRouter and SetSettingsRouter, GreetAction.SetOpener). Without the API nothing
--- here runs.
+-- LeadsWindow.SetRouter and SetSettingsRouter, GreetAction.SetOpener, LeadRow.SetUnreadSource).
+-- Without the API nothing here runs.
 local WhisperBridge = {}
 
 local ipairs = ipairs
@@ -46,6 +49,8 @@ local api = nil -- _G.WhisperMessengerAPI once Activate accepted it
 local active = nil -- nil until Activate ran, then whether it activated
 ---@type table|nil
 local shown = nil -- { lead, shownAt } of the preview on WM's widget, nil when none
+---@type table|nil
+local summary = nil -- the away summary's token while it is WM's preview (never with `shown`)
 
 local function now()
   return _G["GetTime"]()
@@ -104,8 +109,18 @@ local function open(target, text)
 end
 
 local function hidePreview()
-  shown = nil
+  shown, summary = nil, nil
   ask("HidePreview", KEY)
+end
+
+-- After the toast duration, hides the preview while `isCurrent()`: C_Timer.After cannot be
+-- cancelled, so a timer acts only while its own preview is the shown one.
+local function hideLater(isCurrent)
+  _G["C_Timer"].After(_G["CraftAlertDB"].settings.toastDuration or 20, function()
+    if isCurrent() then
+      hidePreview()
+    end
+  end)
 end
 
 -- The info lines go out through SetContactInfo (UI/BridgeInfo.lua), a refusal or raise as false.
@@ -134,6 +149,19 @@ local function onChange()
   syncInfo()
 end
 
+-- How many whispers of the lead's customer the player has not read in WM; a raise answers false,
+-- which LeadRow (like any non-number) counts as 0.
+local function unreadOf(lead)
+  return ask("GetUnreadCount", lead.customer)
+end
+
+-- WM's unread counts changed: repaint every view whose rows can be pink. CraftAlert's own window
+-- shows them too when WM refuses the panel (combat, M+ lockdown). Both are no-ops while hidden.
+local function onUnreadChanged()
+  BridgePanel.Refresh()
+  LeadsWindow.Refresh()
+end
+
 -- Activates once per session (spec C.2): → whether the bridge is on. A second call returns the
 -- first answer and wires nothing again. RegisterPanel, the one call out, comes before the wiring:
 -- a raise or a false answer (WM refuses, e.g. the key is taken) leaves CraftAlert standalone.
@@ -146,16 +174,34 @@ function WhisperBridge.Activate()
     active = false
     return false
   end
-  if candidate.RegisterPanel(KEY, BridgePanel.Build()) ~= true then
+  local panel = BridgePanel.Build()
+  -- An older WM has no GetUnreadCount: no unread callback, no pink dots. The callback goes on the
+  -- panel before RegisterPanel: WM copies the panel once and never reads it again.
+  local countsUnread = type(candidate.GetUnreadCount) == "function"
+  if countsUnread then
+    panel.onUnreadChanged = onUnreadChanged
+  end
+  if candidate.RegisterPanel(KEY, panel) ~= true then
     active = false
     return false
   end
   api, active = candidate, true
+  if countsUnread then
+    LeadRow.SetUnreadSource(unreadOf)
+  end
   Launcher.SetSuppressed(true)
   LeadsWindow.SetRouter(function()
     return ask("TogglePanel", KEY)
   end)
   LeadsWindow.SetSettingsRouter(toggleSettings)
+  -- ShowPanel on a shown panel runs no onShow, so the panel leaves the settings itself.
+  LeadsWindow.SetOpenRouter(function()
+    local opened = ask("ShowPanel", KEY)
+    if opened and BridgePanel.InSettings() then
+      BridgePanel.ToggleSettings()
+    end
+    return opened
+  end)
   GreetAction.SetOpener(open)
   -- "greeted" and "replied" are always followed by a "change", which syncs the info lines.
   Leads.On("change", onChange)
@@ -208,12 +254,30 @@ function WhisperBridge.ShowLead(lead)
     return
   end
   AlertToast.Alert(lead)
-  shown = entry
-  -- C_Timer.After cannot be cancelled: a timer acts only while its own preview is the shown one.
-  _G["C_Timer"].After(_G["CraftAlertDB"].settings.toastDuration or 20, function()
-    if shown == entry then
-      hidePreview()
-    end
+  shown, summary = entry, nil
+  hideLater(function()
+    return shown == entry
+  end)
+end
+
+-- The away summary (Model/AwaySummary.lua, wired by Bootstrap when Activate returned true): WM's
+-- preview, a click opens the panel on the list (LeadsWindow.Open, never a toggle), hidden after the
+-- toast duration. WM refusing falls back to CraftAlert's own toast. It and a lead's preview replace
+-- each other (WM keeps one per key). Nothing in an instance.
+function WhisperBridge.ShowSummary(count, expired)
+  if FlavorCompat.InInstance() then
+    return
+  end
+  -- A click or dismissal keeps the token: its timer then hides an already hidden preview of this key.
+  local entry = {}
+  local preview = { sender = Localization.Text("Craft Alert"), text = AwaySummary.Text(count, expired), onClick = LeadsWindow.Open }
+  if not ask("ShowPreview", KEY, preview) then
+    AlertToast.ShowSummary(count, expired)
+    return
+  end
+  shown, summary = nil, entry
+  hideLater(function()
+    return summary == entry
   end)
 end
 
@@ -224,7 +288,7 @@ function WhisperBridge.OnGate()
   if not active then
     return
   end
-  if shown and FlavorCompat.InInstance() then
+  if (shown or summary) and FlavorCompat.InInstance() then
     hidePreview()
   end
   BridgePanel.Refresh()

@@ -1,6 +1,7 @@
 -- CLI sim: feeds chat lines, events, slash commands and clicks through the real addon
 -- modules with stubbed WoW APIs and returns what happened as text lines.
 --   python scripts/sim.py [--flavor retail|forever|era|tbc|wrath|cata|mop] [--db FILE] [--class TOKEN] ...
+--   [--export] [--import STRING] [--craftscan FILE]
 --   lua5.1 tools/sim.lua ...   (from the repo root)
 -- Output lines are `<area>: <fact>`; the first is always `sim: flavor=<key> modules=<n>`.
 local ROOT = rawget(_G, "CRAFTALERT_ROOT") or "."
@@ -9,6 +10,7 @@ package.path = ROOT .. "/?.lua;" .. package.path
 local Wow = require("tests.helpers.wow")
 local Toc = require("tests.helpers.toc")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
+local ProfessionsClassic = require("tests.helpers.professions_classic")
 local RecipeListStub = require("tests.helpers.recipe_list_stub")
 
 local DEFAULT_SENDER = "Customer-OtherRealm"
@@ -41,6 +43,43 @@ local SIM_RECIPES = {
   { id = 9004, name = "Sim Plate Helm", item = 190004, profession = { professionID = 2872, parentProfessionID = 164 } },
   { id = 9005, name = "Sim Iron Bar", item = 190005, learned = true },
 }
+-- Classic flavors read the Classic fixture (name keys); Cata and MoP list professions through
+-- GetProfessions, the older three through the skill-line list.
+local CLASSIC = { era = true, tbc = true, wrath = true, cata = true, mop = true }
+local PROFESSION_SLOT_FLAVORS = { cata = true, mop = true }
+local CRAFT_FRAME_FLAVORS = { era = true, tbc = true }
+local CLASSIC_SKILL_LINES = {
+  { name = "Professions", header = true },
+  { name = "Blacksmithing" },
+  { name = "Enchanting" },
+  { name = "Secondary Skills", header = true },
+  { name = "Cooking" },
+}
+-- The open Classic windows: Blacksmithing (TradeSkill) with the fixture's belt and reagent and a
+-- new Iron Bar, and on Era and TBC Enchanting's Craft window with the fixture's enchant and a new one.
+local function classicWindows(flavor)
+  local tradeSkill = {
+    line = "Blacksmithing",
+    rows = {
+      { name = "Sim Armor", kind = "header" },
+      { name = "Sim Plate Belt", item = 190001 },
+      { name = "Sim Iron Reagent", item = 190003 },
+      { name = "Sim Iron Bar", item = 190005 },
+    },
+  }
+  local craft = {
+    line = "Enchanting",
+    rows = {
+      { name = "Sim Bracer", kind = "header" },
+      { name = "Enchant Bracer - Sim Health", link = "|cffffd000|Henchant:90002|h[Enchant Bracer - Sim Health]|h|r" },
+      { name = "Enchant Boots - Sim Agility", link = "|cffffd000|Henchant:90006|h[Enchant Boots - Sim Agility]|h|r" },
+    },
+  }
+  return tradeSkill, CRAFT_FRAME_FLAVORS[flavor] and craft or nil
+end
+local SIM_SLOTS = { { name = "Blacksmithing", skillLine = 164 }, { name = "Enchanting", skillLine = 333 } }
+-- ERR_LEARN_RECIPE_S as the TBC Anniversary client spells it (Phase 0): the Classic learn signal.
+local LEARN_FORMAT = "You have learned how to create a new item: %s."
 local BIND_DEBOUNCE_SECONDS = 1
 local ON_OFF = { on = true, off = false }
 -- Events with a known payload take exactly that many arguments, so a chat line may follow
@@ -48,12 +87,19 @@ local ON_OFF = { on = true, off = false }
 local EVENT_ARITY = {
   TRADE_SKILL_SHOW = 0,
   TRADE_SKILL_LIST_UPDATE = 0,
+  TRADE_SKILL_UPDATE = 0,
+  TRADE_SKILL_CLOSE = 0,
+  CRAFT_SHOW = 0,
+  CRAFT_UPDATE = 0,
+  CRAFT_CLOSE = 0,
   NEW_RECIPE_LEARNED = 1,
+  CHAT_MSG_SYSTEM = 1, -- text
   GET_ITEM_INFO_RECEIVED = 2,
   CHAT_MSG_WHISPER = 2, -- text, sender
   CHAT_MSG_WHISPER_INFORM = 2, -- text, target
   PLAYER_UPDATE_RESTING = 0,
   ZONE_CHANGED_NEW_AREA = 0,
+  CRAFTINGORDERS_DISPLAY_CRAFTER_FULFILLED_MSG = 5, -- orderType, itemName, playerName, tip, quantity
 }
 -- How long the toast counts as shown (seconds) when --click acts on the newest lead (§7.5 rule 3).
 local SHOWN_FOR_SECONDS = 1
@@ -64,7 +110,7 @@ local Sim = {}
 Sim.lastNs = nil
 
 -- Flags taking exactly one value; the parser checks the value where it is not free text.
-local ONE_VALUE = { "--flavor", "--db", "--sender", "--class", "--cmd", "--click", "--afk", "--resting" }
+local ONE_VALUE = { "--flavor", "--db", "--sender", "--class", "--cmd", "--click", "--afk", "--resting", "--import", "--craftscan" }
 
 local function isOneValueFlag(flag)
   for _, name in ipairs(ONE_VALUE) do
@@ -100,13 +146,17 @@ local function acceptOption(plan, flag, value)
     plan.steps[#plan.steps + 1] = { kind = "class", token = value }
   elseif flag == "--cmd" then
     plan.steps[#plan.steps + 1] = { kind = "cmd", text = value }
+  elseif flag == "--import" then
+    plan.steps[#plan.steps + 1] = { kind = "import", text = value }
+  elseif flag == "--craftscan" then
+    plan.steps[#plan.steps + 1] = { kind = "craftscan", path = value }
   end
   return nil
 end
 
 -- Turns argv into { flavor, dbPath, steps } or returns nil, "error: ...".
 local function parse(argv)
-  local plan = { flavor = DEFAULT_FLAVOR, dbPath = ROOT .. "/tools/sim_fixture.lua", steps = {} }
+  local plan = { flavor = DEFAULT_FLAVOR, steps = {} }
   local i = 1
   while i <= #argv do
     local token = argv[i]
@@ -123,6 +173,8 @@ local function parse(argv)
         i = i + 1
       end
       plan.steps[#plan.steps + 1] = { kind = "event", name = name, args = args }
+    elseif token == "--export" then
+      plan.steps[#plan.steps + 1] = { kind = "export" }
     elseif isOneValueFlag(token) then
       local value = argv[i + 1]
       if value == nil then
@@ -140,6 +192,7 @@ local function parse(argv)
     end
     i = i + 1
   end
+  plan.dbPath = plan.dbPath or (ROOT .. (CLASSIC[plan.flavor] and "/tools/sim_fixture_classic.lua" or "/tools/sim_fixture.lua"))
   return plan
 end
 
@@ -200,7 +253,8 @@ end
 
 -- Blizzard's profession recipe list for the recipe markers (ModernRows): Blizzard_Professions
 -- is not loaded until `--event ADDON_LOADED Blizzard_Professions`, which registers the row
--- callback and prints `markers: installed modern`. The list has no rows.
+-- callback and prints `markers: installed modern`. The list has no rows. It is stubbed on every
+-- flavor, so a Classic run without that line shows Bootstrap skips the markers there.
 local function stubRecipeList(out)
   RecipeListStub.install({
     loaded = false,
@@ -246,8 +300,22 @@ local function newContext(plan, out)
     return OWN_REALM
   end)
   stubRecipeList(out)
+  if CLASSIC[plan.flavor] then
+    local tradeSkill, craft = classicWindows(plan.flavor)
+    ProfessionsClassic.install({
+      skillLines = CLASSIC_SKILL_LINES,
+      tradeSkill = tradeSkill,
+      craft = craft,
+      slots = PROFESSION_SLOT_FLAVORS[plan.flavor] and SIM_SLOTS or nil,
+      items = SIM_ITEMS,
+      bind = SIM_BIND,
+      autoCache = true,
+    })
+    Wow.stub("ERR_LEARN_RECIPE_S", LEARN_FORMAT)
+    return ctx
+  end
   ProfessionsRetail.install({
-    slots = { { name = "Blacksmithing", skillLine = 164 }, { name = "Enchanting", skillLine = 333 } },
+    slots = SIM_SLOTS,
     base = WINDOW_PROFESSION,
     recipes = SIM_RECIPES,
     items = SIM_ITEMS,
@@ -255,6 +323,35 @@ local function newContext(plan, out)
     autoCache = true,
   })
   return ctx
+end
+
+-- The readers whose window reads the sim reports: Retail/Forever's, then Classic's two windows.
+local READERS = { "ModernReader", "ClassicReader", "CraftReader" }
+
+-- `read: prof=<key> stored=<n> pendingBind=<n>` after each profession window read.
+local function reportRead(ctx)
+  for _, name in ipairs(READERS) do
+    local reader = ctx.ns[name]
+    local read = reader.lastRead
+    if read then
+      reader.lastRead = nil
+      ctx.out[#ctx.out + 1] = string.format("read: prof=%s stored=%d pendingBind=%d", tostring(read.prof), read.stored, read.pendingBind)
+    end
+  end
+end
+
+-- `learn: stored=<bool>` after a NEW_RECIPE_LEARNED; `learn: pending=<name>` after a Classic
+-- learn message.
+local function reportLearn(ctx)
+  local LearnWatcher = ctx.ns.LearnWatcher
+  local stored, pending = LearnWatcher.lastStored, LearnWatcher.lastPending
+  LearnWatcher.lastStored, LearnWatcher.lastPending = nil, nil
+  if stored ~= nil then
+    ctx.out[#ctx.out + 1] = "learn: stored=" .. tostring(stored)
+  end
+  if pending ~= nil then
+    ctx.out[#ctx.out + 1] = "learn: pending=" .. pending
+  end
 end
 
 -- `bind: stored=<n>` once the 1 s timer has stored arrived bind types; printed just before
@@ -308,14 +405,19 @@ local function reportMatches(ctx)
   end
 end
 
--- `toast: shown lead=<id> more=<n>` whenever AlertToast.Show runs. Wrapped before login, so
--- the Leads.On("new", AlertToast.Show) Bootstrap makes subscribes the wrapper.
+-- `toast: shown lead=<id> more=<n>` whenever AlertToast.Show runs, `away: summary count=<n>
+-- expired=<n>` whenever AlertToast.ShowSummary does (spec §7.6). Wrapped before login, so what
+-- Bootstrap subscribes (Leads.On("new"), AwaySummary.Install) is the wrapper.
 local function reportToasts(ctx)
   local AlertToast = ctx.ns.AlertToast
-  local show = AlertToast.Show
+  local show, showSummary = AlertToast.Show, AlertToast.ShowSummary
   AlertToast.Show = function(lead)
     show(lead)
     ctx.out[#ctx.out + 1] = string.format("toast: shown lead=%s more=%d", tostring(lead.id), AlertToast.more)
+  end
+  AlertToast.ShowSummary = function(count, expired)
+    showSummary(count, expired)
+    ctx.out[#ctx.out + 1] = string.format("away: summary count=%d expired=%d", count, expired)
   end
 end
 
@@ -339,8 +441,15 @@ local function watch(ctx)
     ctx.out[#ctx.out + 1] = "lead: replied customer=" .. lead.customer
   end)
   ns.Index.OnRebuilt(function(index)
+    -- The read or learn that requested this build is reported first: Slicer.Drain runs the
+    -- index job right after it, before STEPS.event reports.
+    reportRead(ctx)
+    reportLearn(ctx)
     flushBind(ctx)
     ctx.out[#ctx.out + 1] = "index: size=" .. index.size
+  end)
+  ns.Ledger.OnChange(function()
+    ctx.ledgerChanged = true
   end)
   ns.ScanGate.OnChange(function(active, state)
     ctx.out[#ctx.out + 1] = "scan: " .. (active and "active" or string.format("paused (%s)", state.reason))
@@ -351,12 +460,16 @@ local function watch(ctx)
 end
 
 -- PLAYER_LOGIN, once, before the first chat line, event, command or click: Bootstrap installs
--- everything and builds the index.
+-- everything and builds the index. Classic flavors then print `professions: <keys>`, the
+-- name keys ProfessionList read at login.
 local function start(ctx)
   if not ctx.started then
     ctx.started = true
     ctx.ns.BindLookup.lastStored = nil
     Wow.fireEvent("PLAYER_LOGIN")
+    if CLASSIC[ctx.flavor] then
+      ctx.out[#ctx.out + 1] = "professions: " .. table.concat(ctx.ns.ProfessionList.Order(), ",")
+    end
   end
 end
 
@@ -380,6 +493,15 @@ local function bindDb(ctx)
   end
   ctx.out[#ctx.out + 1] =
     string.format("db: schema=%s characters=%d recipes=%d leads=%d", tostring(db.schema), count(db.characters), recipes, #db.leads)
+end
+
+-- `ledger: seen=<n> greeted=<n> replied=<n> filled=<n>`, today's counters, as the last line of a
+-- run that changed one (spec §8).
+local function reportLedger(ctx)
+  if ctx.ledgerChanged then
+    local today = ctx.ns.Ledger.Today()
+    ctx.out[#ctx.out + 1] = string.format("ledger: seen=%d greeted=%d replied=%d filled=%d", today.seen, today.greeted, today.replied, today.filled)
+  end
 end
 
 local STEPS = {}
@@ -420,26 +542,8 @@ local function eventArg(text)
   return tonumber(text) or text
 end
 
--- `read: prof=<key> stored=<n> pendingBind=<n>` after a profession window read.
-local function reportRead(ctx)
-  local read = ctx.ns.ModernReader.lastRead
-  if read then
-    ctx.ns.ModernReader.lastRead = nil
-    ctx.out[#ctx.out + 1] = string.format("read: prof=%s stored=%d pendingBind=%d", tostring(read.prof), read.stored, read.pendingBind)
-  end
-end
-
--- `learn: stored=<bool>` after a NEW_RECIPE_LEARNED.
-local function reportLearn(ctx)
-  local stored = ctx.ns.LearnWatcher.lastStored
-  if stored ~= nil then
-    ctx.ns.LearnWatcher.lastStored = nil
-    ctx.out[#ctx.out + 1] = "learn: stored=" .. tostring(stored)
-  end
-end
-
--- Runs the timers armed for `maxDelay` seconds or less (0: the same frame, index rebuild
--- coalescing); longer ones, such as the lead expiry, stay pending, as in the game where no
+-- Runs the timers armed for `maxDelay` seconds or less (0: the same frame, such as the Slicer
+-- tick that runs an index rebuild the bind timer requested); longer ones, such as the lead expiry, stay pending, as in the game where no
 -- second passes between two sim steps.
 local function runFrameTimers(maxDelay)
   local found = true
@@ -464,8 +568,10 @@ function STEPS.event(ctx, step)
   for i, text in ipairs(step.args) do
     args[i] = eventArg(text)
   end
-  ctx.ns.ModernReader.lastRead = nil
-  ctx.ns.LearnWatcher.lastStored = nil
+  for _, name in ipairs(READERS) do
+    ctx.ns[name].lastRead = nil
+  end
+  ctx.ns.LearnWatcher.lastStored, ctx.ns.LearnWatcher.lastPending = nil, nil
   ctx.ns.BindLookup.lastStored = nil
   Wow.fireEvent(step.name, unpack(args, 1, #step.args))
   ctx.ns.Slicer.Drain()
@@ -499,6 +605,68 @@ function STEPS.cmd(ctx, step)
   end
   local args = string.match(step.text, "^/%S+%s*(.*)$") or step.text
   handler(args)
+end
+
+-- --export: `export: <string>`, the export string of the db's local characters (spec §10.1).
+function STEPS.export(ctx)
+  start(ctx)
+  ctx.ns.ExportString.StartExport(ctx.db, function(text)
+    ctx.out[#ctx.out + 1] = "export: " .. text
+  end)
+  ctx.ns.Slicer.Drain()
+end
+
+-- --import STRING: `import: characters=<n> recipes=<n> skipped=<n>` or `import: error <message>`,
+-- printed when the import job ends, so the `index:` line of the rebuild it requests follows.
+function STEPS.import(ctx, step)
+  start(ctx)
+  ctx.ns.ExportString.StartImport(ctx.db, step.text, function(counts, err)
+    if counts == nil then
+      ctx.out[#ctx.out + 1] = "import: error " .. err
+      return
+    end
+    local line = string.format("import: characters=%d recipes=%d skipped=%d", counts.characters, counts.recipes, counts.skipped)
+    ctx.out[#ctx.out + 1] = line
+  end)
+  ctx.ns.Slicer.Drain()
+end
+
+-- "<character>:<recipe>" of every muted recipe in the db, sorted.
+local function mutedRecipes(db)
+  local list = {}
+  for key, character in pairs(db.characters) do
+    for recipeID, recipe in pairs(character.recipes) do
+      if recipe.muted then
+        list[#list + 1] = key .. ":" .. tostring(recipeID)
+      end
+    end
+  end
+  table.sort(list)
+  return list
+end
+
+-- --craftscan FILE: sets CraftScan_DB to what FILE returns (or the CraftScan_DB global it sets)
+-- and runs the CraftScan import (spec §10.2) → `craftscan: characters=<n> recipes=<n> muted=<n>
+-- greetings=<n> skipped=<n>` and `craftscan: muted <character>:<recipe>,...` (the db's muted
+-- recipes afterwards), printed before the `index:` line of the rebuild it requests.
+function STEPS.craftscan(ctx, step)
+  start(ctx)
+  -- Through Wow.stub, so the next run starts without a CraftScan_DB the file set as a global.
+  Wow.stub("CraftScan_DB", nil)
+  local chunk = loadfile(step.path)
+  local src = chunk and chunk()
+  src = type(src) == "table" and src or rawget(_G, "CraftScan_DB")
+  if type(src) ~= "table" then
+    ctx.out[#ctx.out + 1] = "error: --craftscan " .. step.path .. " holds no CraftScan_DB table"
+    return
+  end
+  Wow.stub("CraftScan_DB", src)
+  ctx.ns.CraftScanImport.Start(ctx.db, src, function(c)
+    local line = "craftscan: characters=%d recipes=%d muted=%d greetings=%d skipped=%d"
+    ctx.out[#ctx.out + 1] = string.format(line, c.characters, c.recipes, c.muted, c.greetings, c.skipped)
+    ctx.out[#ctx.out + 1] = "craftscan: muted " .. table.concat(mutedRecipes(ctx.db), ",")
+  end)
+  ctx.ns.Slicer.Drain()
 end
 
 -- The mouse button and modifier each --click value stands for (the §7.1 table).
@@ -556,6 +724,7 @@ function Sim.Run(argv)
   for _, step in ipairs(plan.steps) do
     STEPS[step.kind](ctx, step)
   end
+  reportLedger(ctx)
   return out
 end
 

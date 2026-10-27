@@ -89,15 +89,17 @@ local function commitOn(box, onCommit)
       onCommit(text)
     end
   end
-  box:SetScript("OnEnterPressed", function()
+  local function onEnter()
     commit()
     box:ClearFocus()
-  end)
-  box:HookScript("OnEditFocusLost", commit)
-  box:SetScript("OnEscapePressed", function()
+  end
+  local function onEscape()
     box:SetText(committed)
     box:ClearFocus()
-  end)
+  end
+  box:SetScript("OnEnterPressed", onEnter)
+  box:HookScript("OnEditFocusLost", commit)
+  box:SetScript("OnEscapePressed", onEscape)
   return function(text)
     committed = text or ""
     box:SetText(committed)
@@ -129,10 +131,11 @@ function Controls.Toggle(column, label, onChange)
   check:SetSize(size, size)
   check:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
   text:SetWordWrap(true)
-  Column.OnWidth(column, function(width)
+  local function fit(width)
     text:SetWidth(max(0, width - size - layout.PADDING))
     row:SetHeight(max(size, text:GetStringHeight() + 2 * LABEL_TOP))
-  end)
+  end
+  Column.OnWidth(column, fit)
   check:SetScript("OnClick", function()
     onChange(check:GetChecked() and true or false)
   end)
@@ -145,10 +148,11 @@ end
 
 -- A toggle that writes owner()[key] and then runs after(). → the fn that shows the db value
 function Controls.BoundToggle(column, label, owner, key, after)
-  local toggle = Controls.Toggle(column, label, function(value)
+  local function onChange(value)
     owner()[key] = value
     after()
-  end)
+  end
+  local toggle = Controls.Toggle(column, label, onChange)
   return function()
     toggle.Set(owner()[key])
   end
@@ -186,14 +190,15 @@ function Controls.Slider(column, spec)
       spec.onChange(value)
     end
   end
-  slider:RegisterCallback(slider.Event.OnValueChanged, function()
+  local function onValueChanged()
     if quiet then
       return
     end
     if not _G["IsMouseButtonDown"]("LeftButton") then
       commit()
     end
-  end, row)
+  end
+  slider:RegisterCallback(slider.Event.OnValueChanged, onValueChanged, row)
   slider.Slider:HookScript("OnMouseUp", commit)
   local function set(value)
     committed = value

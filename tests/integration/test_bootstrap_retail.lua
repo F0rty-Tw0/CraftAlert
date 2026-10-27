@@ -2,10 +2,11 @@
 -- ADDON_LOADED and PLAYER_LOGIN events, as the client does; Bootstrap does every install.
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
+local Widgets = require("tests.helpers.widgets")
+local SettingsFixture = require("tests.helpers.settings_fixture")
 local Toc = require("tests.helpers.toc")
 local ProfessionsRetail = require("tests.helpers.professions_retail")
 local RecipeListStub = require("tests.helpers.recipe_list_stub")
-local Widgets = require("tests.helpers.widgets")
 
 local OWN_KEY = "Crafter-OwnRealm"
 local CUSTOMER = "Customer-OtherRealm"
@@ -31,6 +32,7 @@ local INSTALLED_EVENTS = {
   "PLAYER_LOGOUT",
 }
 local WHISPER_EVENTS = { "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM" }
+local ORDER_FILLED = "CRAFTINGORDERS_DISPLAY_CRAFTER_FULFILLED_MSG"
 -- The customer's realm is connected, so the lead carries no "can't order" tag.
 local CONNECTED_REALMS = { "OwnRealm", "Other Realm" }
 local DIM_ALPHA = 0.5
@@ -49,8 +51,8 @@ local ITEMS = {
 local BIND = { [190001] = 2, [190004] = 2, [190006] = 2 }
 
 -- The client before the addon loads: the player Crafter-OwnRealm resting in a city with
--- Blacksmithing, `db` as the saved CraftAlertDB (nil: a fresh install). → session, the
--- profession stub state. `flavor` defaults to "retail".
+-- Blacksmithing, `db` as the saved CraftAlertDB (nil: a fresh install), on `flavor` (default
+-- Retail). → session, the profession stub state.
 local function startClient(db, slots, flavor)
   Wow.reset()
   Wow.flavor(flavor or "retail")
@@ -264,6 +266,12 @@ local function testFreshInstall()
     CUSTOMER,
   })
   Assert.equal(lead.greeted, true)
+  -- Bootstrap installed the ledger: the new lead and its greeting are today's counters.
+  Assert.same(ns.Ledger.Today(), { seen = 1, greeted = 1, replied = 0, filled = 0 }, "Ledger.Install subscribed")
+  -- Retail: the greeted customer's order filled (the event names them without a realm) counts.
+  Assert.truthy(isRegistered(ORDER_FILLED), ORDER_FILLED .. " registered on Retail")
+  Wow.fireEvent(ORDER_FILLED, 0, "Sim Plate Belt", "Customer", 0, 1)
+  Assert.equal(ns.Ledger.Today().filled, 1)
 
   -- Selling is not asking: nothing.
   trade("WTS plate belt, cheap", "Seller-OtherRealm")
@@ -533,6 +541,27 @@ local function testIgnoreDropsLead(db)
   Wow.stub("C_FriendList", nil)
 end
 
+-- Spec §7.6: Bootstrap installs the away summary on the own toast. A request made while AFK, then
+-- the player's AFK flag clearing (PLAYER_FLAGS_CHANGED), shows one summary.
+local function testAwaySummary(db)
+  local session = startClient(db)
+  local errors = recordErrors()
+  login(session)
+  Assert.truthy(isRegistered("PLAYER_FLAGS_CHANGED"), "PLAYER_FLAGS_CHANGED registered")
+  Wow.stub("UnitIsAFK", function()
+    return true
+  end)
+  trade("LF " .. BELT_LINK .. " crafter", "Buyer-OtherRealm")
+  Wow.stub("UnitIsAFK", function()
+    return false
+  end)
+  Wow.fireEvent("PLAYER_FLAGS_CHANGED", "player")
+  local toast = rawget(_G, "CraftAlertToast")
+  local face = table.concat(Widgets.texts(toast, Wow.frames), " / ")
+  Assert.truthy(toast:IsShown() and string.find(face, "1 request you could craft while you were away", 1, true), face)
+  Assert.same(errors, {})
+end
+
 -- Entering an instance after login (PLAYER_ENTERING_WORLD) takes down the launcher, the toast and
 -- the leads window through the gate's change listeners; leaving brings back only the launcher.
 local function testInstanceHidesUi(db)
@@ -577,6 +606,54 @@ local function testLoginInInstanceIsSilent(db)
   Assert.equal(ns.ScanGate.State().reason, "instance")
   Assert.same(chatSince(before), {}, "no login lines in an instance")
   Wow.stub("IsInInstance", nil)
+end
+
+-- Bootstrap hands Launcher.Refresh and LeadsWindow.Refresh to the Alerts page: with no leads,
+-- ticking "Hide the launcher when there are no leads" hides the launcher at once, and dragging
+-- Opacity repaints the window.
+local function testAlertsPageRepaints(db)
+  db.leads = {}
+  local session = startClient(db)
+  local ns = login(session)
+  SettingsFixture.open(ns, "Alerts")
+  local launcher = rawget(_G, "CraftAlertLauncher")
+  Assert.equal(launcher:IsShown(), true)
+  Widgets.click(SettingsFixture.row("Hide the launcher when there are no leads").input)
+  Assert.equal(launcher:IsShown(), false, "hidden at once")
+  local window = rawget(_G, "CraftAlertLeadsWindow")
+  Assert.equal(window:GetAlpha(), 1)
+  Widgets.slide(SettingsFixture.row("Opacity").input, 0.5)
+  Assert.equal(window:GetAlpha(), 0.5)
+end
+
+-- Forever has no crafting orders: no orders-filled listener there.
+local function testNoOrdersOffRetail(db)
+  local session = startClient(db, nil, "forever")
+  local errors = recordErrors()
+  login(session)
+  Assert.same(errors, {})
+  Assert.equal(isRegistered(ORDER_FILLED), false, ORDER_FILLED .. " not registered on Forever")
+end
+
+-- Spec §10.2: with CraftScan's data loaded, login asks once (after the login lines); once
+-- answered, never again.
+local function testCraftScanOffer(db)
+  local offer = "CraftScan data found. Import characters, recipes, and greetings?"
+  local session = startClient(db)
+  Wow.stub("CraftScan_DB", { settings = {}, realms = {} })
+  local before = #Wow.chat
+  login(session)
+  local lines = chatSince(before)
+  Assert.equal(count(lines, offer), 1, table.concat(lines, " / "))
+  Assert.equal(lines[#lines], offer, "after the login lines")
+  Assert.equal(rawget(_G, "CraftAlertCraftScanPrompt"):IsShown(), true)
+  db.settings.craftScanPrompted = true
+  session = startClient(db)
+  Wow.stub("CraftScan_DB", { settings = {}, realms = {} })
+  before = #Wow.chat
+  login(session)
+  Assert.equal(count(chatSince(before), offer), 0)
+  Assert.equal(rawget(_G, "CraftAlertCraftScanPrompt"), nil)
 end
 
 local SPEAKER, MUTED = RecipeListStub.SPEAKER, RecipeListStub.MUTED
@@ -649,6 +726,10 @@ return function()
   testIgnoreDropsLead(deepCopy(saved))
   testInstanceHidesUi(deepCopy(saved))
   testLoginInInstanceIsSilent(deepCopy(saved))
+  testAlertsPageRepaints(deepCopy(saved))
+  testNoOrdersOffRetail(deepCopy(saved))
+  testAwaySummary(deepCopy(saved))
+  testCraftScanOffer(deepCopy(saved))
   testRecipeMarkers(deepCopy(saved))
   testNoMarkersOnClassic(deepCopy(saved))
   Wow.reset()

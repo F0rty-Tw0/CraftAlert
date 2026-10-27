@@ -9,6 +9,7 @@ local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local BindLookup = ns.BindLookup or require("CraftAlert.Professions.BindLookup")
+local RecipeStore = ns.RecipeStore or require("CraftAlert.Professions.RecipeStore")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 local ReadJob = ns.ReadJob or require("CraftAlert.Professions.ReadJob")
 local QualityReach = ns.QualityReach or require("CraftAlert.Professions.QualityReach")
@@ -18,7 +19,7 @@ local QualityReach = ns.QualityReach or require("CraftAlert.Professions.QualityR
 -- §4.2). Guards skip other players' lists and special modes, a window of a profession the
 -- character does not store (Cooking, Smelting) stores nothing, and reads only add. A job cut
 -- off by a closed or switched window is kept and resumes when the same window reopens.
--- ReadOne serves the learn path (§5.3) with the window closed.
+-- LearnKey and ReadOne serve the learn path (§5.3), with or without the window open.
 local ModernReader = {}
 
 local ipairs = ipairs
@@ -80,21 +81,6 @@ local function copyList(list)
   return copy
 end
 
-local function sameList(a, b)
-  if a == nil or b == nil then
-    return a == b
-  end
-  if #a ~= #b then
-    return false
-  end
-  for i = 1, #a do
-    if a[i] ~= b[i] then
-      return false
-    end
-  end
-  return true
-end
-
 -- → the recipe info of a recipe worth storing, else nil. `learned` is checked by the window
 -- read only: it is still false inside NEW_RECIPE_LEARNED (§5.3).
 local function usableInfo(api, recipeID, requireLearned)
@@ -131,34 +117,9 @@ local function readFields(api, recipeID, info, profInfo)
   return { item = schematic and schematic.outputItemID, ranks = copyList(info.qualityItemIDs), name = info.name, line = lineOf(profInfo) }
 end
 
--- Adds the recipe or updates it in place (mute and bind survive; a read with no line keeps the
--- stored one) → whether storage changed.
-local function merge(recipes, recipeID, fields, professionKey)
-  local old = recipes[recipeID]
-  if old == nil then
-    fields.prof = professionKey
-    recipes[recipeID] = fields
-    return true
-  end
-  local lineChanged = fields.line ~= nil and old.line ~= fields.line
-  local changed = old.item ~= fields.item
-    or old.name ~= fields.name
-    or old.prof ~= professionKey
-    or not sameList(old.ranks, fields.ranks)
-    or lineChanged
-  if changed then
-    if old.item ~= fields.item then
-      old.bind = nil
-    end
-    old.item, old.name, old.prof, old.ranks = fields.item, fields.name, professionKey, fields.ranks
-    old.line = fields.line or old.line
-  end
-  return changed
-end
-
 -- → changed, and queues the bind lookup when the output item's bind is unknown.
 local function store(recipes, recipeID, fields, professionKey)
-  local changed = merge(recipes, recipeID, fields, professionKey)
+  local changed = RecipeStore.Merge(recipes, recipeID, fields, professionKey)
   local recipe = recipes[recipeID]
   if recipe.item and recipe.bind == nil then
     BindLookup.Queue(recipe.item)
@@ -185,13 +146,6 @@ local function professionInfo(recipeID)
   return type(info) == "table" and info or nil
 end
 
--- The base profession of a recipe: the parent skill line when there is one, else the skill
--- line itself; nil when the lookup gives nothing.
-function ModernReader.ProfessionOf(recipeID)
-  local info = professionInfo(recipeID)
-  return info and (info.parentProfessionID or info.professionID) or nil
-end
-
 -- Mid-switch the list may still hold another profession's recipes: each is stored under its
 -- own profession when the character stores that one, and skipped (nil) otherwise. A recipe
 -- with no profession info (nil, or 0 before the data loads) belongs to the window, and so
@@ -213,6 +167,31 @@ local function storeKey(charKey, recipeID, key)
     return own, false, info
   end
   return parent == nil and key or nil, false, info
+end
+
+local function inWindowList(api, recipeID)
+  for _, id in ipairs(api.GetAllRecipeIDs() or {}) do
+    if id == recipeID then
+      return true
+    end
+  end
+  return false
+end
+
+-- The key a learned recipe is stored under (nil: skip). When an unblocked window of a stored
+-- profession lists the recipe, storeKey's rule decides, so a parentless or unloaded answer
+-- belongs to the window as in a window read; otherwise the recipe's base profession: the parent
+-- skill line when there is one, else the skill line itself. A recipe the window does not list
+-- borrows nothing from it: a bare Cooking line or a 0 then stores nothing.
+function ModernReader.LearnKey(recipeID)
+  local api = tradeSkillApi()
+  local usable = windowOpen and db ~= nil and api ~= nil and not isBlocked(api)
+  local key = usable and windowProfession(api) or nil
+  if key ~= nil and inWindowList(api, recipeID) then
+    return (storeKey(PlayerName.Own(), recipeID, key))
+  end
+  local info = professionInfo(recipeID)
+  return info and (info.parentProfessionID or info.professionID) or nil
 end
 
 local OPS = {
@@ -334,7 +313,20 @@ function ModernReader.OnListUpdate()
   onWindowEvent(false)
 end
 
--- Reads one recipe with the window closed (§5.3) → whether it is now stored.
+-- §10.2 CraftScan import: the stored fields of any recipe, an alt's included (`learned` is not
+-- checked: it describes the logged-in character), after the §5.2 drops → { item, ranks, name,
+-- line } and its GetProfessionInfoByRecipeID answer, or nil.
+function ModernReader.FieldsOf(recipeID)
+  local api = tradeSkillApi()
+  local info = api and usableInfo(api, recipeID, false)
+  if info == nil then
+    return nil
+  end
+  local profInfo = professionInfo(recipeID)
+  return readFields(api, recipeID, info, profInfo), profInfo
+end
+
+-- Reads one learned recipe (§5.3), the window open or not → whether it is now stored.
 function ModernReader.ReadOne(recipeID, professionKey)
   local api = tradeSkillApi()
   if api == nil or db == nil or not ProfessionList.IsStored(db, PlayerName.Own(), professionKey) then

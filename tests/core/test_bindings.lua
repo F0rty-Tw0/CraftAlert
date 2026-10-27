@@ -30,7 +30,8 @@ local function testGlobalsMatchBindingsXml()
   end
 end
 
--- In an instance each key does nothing and prints nothing: nothing greeted, dismissed or opened.
+-- In an instance each key prints the off line once and does nothing else: nothing greeted,
+-- dismissed or opened.
 local function testOffInInstance()
   local ns, _, calls = UiFixture.load({ leads = 2 })
   Wow.stub("IsInInstance", function()
@@ -39,7 +40,7 @@ local function testOffInInstance()
   for _, name in ipairs({ "CraftAlert_GreetLatest", "CraftAlert_DismissLatest", "CraftAlert_ToggleLeads" }) do
     Wow.chat = {}
     G(name)()
-    Assert.same(Wow.chat, {}, name)
+    Assert.same(Wow.chat, { "|cffffd100Craft Alert:|r Off in instances; it works again when you leave." }, name)
   end
   Assert.same(calls, {}, "nothing sent or prefilled")
   Assert.equal(#ns.Leads.List(), 2, "not dismissed")

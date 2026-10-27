@@ -241,13 +241,21 @@ local function phrasesAt(i, token, id, found)
   end
 end
 
+-- → boolean, so two answers compare with ~=.
+local function isCompanion(wordIndex, enchantSlotWords, token)
+  return (wordIndex[token] ~= nil and not wordGroupsOnly[token]) or enchantSlotWords[token] == true
+end
+
 -- Whether a token of the last Run's line is a wordIndex word (except a Slang.wordGroupsOnly
 -- one) or an enchant slot word, the companions of §6.2 item 1. "off hand" counts as "offhand".
+-- HandWord costs a string search per "hand", so it is asked only when "offhand" and "hand"
+-- differ as companions in this index; otherwise either reading gives the same answer.
 function PhraseMatch.HasCompanionWord()
   local wordIndex, enchantSlotWords = index.wordIndex, index.enchantSlotWords
+  local handDiffers = isCompanion(wordIndex, enchantSlotWords, "offhand") ~= isCompanion(wordIndex, enchantSlotWords, "hand")
   for i = 1, tokenCount do
     local token = tokens[i]
-    if token == "hand" then
+    if handDiffers and token == "hand" then
       token = HandWord(tokens, i, BreakBefore) or token
     end
     if (wordIndex[token] and not wordGroupsOnly[token]) or enchantSlotWords[token] then

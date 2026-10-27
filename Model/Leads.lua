@@ -6,6 +6,7 @@ end
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
 local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
+local Index = ns.Index or require("CraftAlert.Model.Index")
 
 -- Spec §7.2: the leads (matched requests) the player can answer. Steps 5-7 of §6.3 run here
 -- on matched lines only. Leads live in `db.leads`, oldest first (an updated lead moves to the
@@ -22,7 +23,8 @@ local tostring = tostring
 local type = type
 
 local MAX_LEADS = 100
--- A lead whose guid starts with this is a synthetic `/ca test` lead: flagged `test`, never saved.
+-- A lead whose guid starts with this is a synthetic `/ca test` lead: flagged `test`. It reaches
+-- the saved data at logout and is dropped at the next load (SavedState.Load, Leads.Restore).
 Leads.TEST_GUID_PREFIX = FlavorCompat.TEST_GUID_PREFIX
 local EVENTS = { new = true, change = true, greeted = true, replied = true, seen = true }
 local ITEM_EVENT = "GET_ITEM_INFO_RECEIVED"
@@ -157,6 +159,20 @@ local function sweep(list, limit)
   local removed = false
   for i = #list, 1, -1 do
     if current - list[i].time > limit then
+      remove(list, i)
+      removed = true
+    end
+  end
+  return removed
+end
+
+-- Drops the leads of every customer on Blizzard's ignore list, marked `dismissed` (the player's
+-- choice, as Leads.Dismiss). → whether any went.
+local function dropIgnored(list)
+  local removed = false
+  for i = #list, 1, -1 do
+    if CrafterRank.IsIgnored(list[i].customer) then
+      list[i].dismissed = true
       remove(list, i)
       removed = true
     end
@@ -302,9 +318,10 @@ local function dropLiveFields()
 end
 
 -- Binds db.leads (Bootstrap, at PLAYER_LOGIN): repairs a hand-edited list (ids, times, order,
--- size), drops test leads and expired leads, starts the timer and asks again for the item links
--- the last session never got. The db is bound last: while a repair raises, Leads stays unbound
--- and makes no lead.
+-- size), drops test leads, expired leads and the leads of ignored customers (the ignore list may
+-- have loaded before the addon, so no IGNORELIST_UPDATE comes for it), starts the timer and asks
+-- again for the item links the last session never got. The db is bound before the ignore check,
+-- which calls Blizzard's API: while a repair raises, Leads stays unbound and makes no lead.
 function Leads.Restore(accountDb)
   local list = accountDb.leads
   dropTest(list)
@@ -317,6 +334,7 @@ function Leads.Restore(accountDb)
   armExpiry(list, limit)
   db, leads = accountDb, list
   EventRouter.On("PLAYER_LOGOUT", dropLiveFields)
+  removed = dropIgnored(list) or removed
   for i = 1, #list do
     if list[i].itemID ~= nil and list[i].itemLink == nil then
       fillLink(list[i])
@@ -388,17 +406,18 @@ end
 
 -- What the chosen crafter's own record says about the match: its recipe (item results) and
 -- the name of the profession. `recipeKey` is the entry Pick ranked; nil leaves the recipe
--- fields empty.
+-- fields empty. A Classic session learn has no record yet: the name the client spelled it with.
 local function describeCrafter(lead, kind, prof, crafter, recipeKey)
   lead.recipeKey = recipeKey
   local character = db.characters[crafter]
   local profession = character and character.professions and character.professions[prof]
-  lead.profName = profession and profession.name or (type(prof) == "string" and prof or nil)
+  local name = profession and profession.name
+  lead.profName = name ~= "" and name or (type(prof) == "string" and prof or nil)
   if kind ~= "item" or recipeKey == nil then
     return
   end
   local recipe = character and character.recipes and character.recipes[recipeKey]
-  lead.recipeName = recipe and recipe.name or (type(recipeKey) == "string" and recipeKey or nil)
+  lead.recipeName = recipe and recipe.name or Index.PendingName(recipeKey) or (type(recipeKey) == "string" and recipeKey or nil)
   lead.itemID = recipe and recipe.item or nil
   if lead.itemID then
     fillLink(lead)
@@ -595,9 +614,11 @@ function Leads.IsActive(id)
   return find(id) ~= nil
 end
 
+-- The player's own removal: `dismissed` tells it from an expiry for the away summary (plan R5c).
 function Leads.Dismiss(id)
   local lead, position = find(id)
   if lead then
+    lead.dismissed = true
     remove(leads, position)
     fire("change")
   end
@@ -605,14 +626,7 @@ end
 
 -- Blizzard's ignore list changed (IGNORELIST_UPDATE): drop the open leads of every ignored customer.
 function Leads.DismissIgnored()
-  local removed = false
-  for i = #leads, 1, -1 do
-    if CrafterRank.IsIgnored(leads[i].customer) then
-      remove(leads, i)
-      removed = true
-    end
-  end
-  if removed then
+  if dropIgnored(leads) then
     fire("change")
   end
 end

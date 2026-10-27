@@ -1,6 +1,7 @@
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
+local Fresh = require("tests.helpers.fresh")
 local UiFixture = require("tests.helpers.ui_fixture")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 
@@ -24,22 +25,22 @@ local function testLazyWindow()
   Assert.equal(window:IsShown(), false)
   ns.LeadsWindow.ToggleSettings()
   Assert.same(rawget(_G, "UISpecialFrames"), { "CraftAlertLeadsWindow" })
-  -- One nav button per §9 page, in order (Linked accounts comes with Task 4.2).
+  -- One nav button per §9 page, in order.
   local titles = {}
   for _, frame in ipairs(Wow.frames) do
     if frame.pageId then
       titles[#titles + 1] = frame.label:GetText()
     end
   end
-  Assert.same(titles, { "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" })
+  Assert.same(titles, { "General", "Alerts", "Greetings", "Keywords", "Crafters", "Linked accounts", "Test" })
 end
 
 local function testAddPage()
   local ns = SettingsFixture.load()
   local built = 0
   local page = {
-    id = "linked",
-    title = "Linked accounts",
+    id = "extra",
+    title = "Extra",
     Create = function(parent)
       built = built + 1
       local text = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -51,9 +52,9 @@ local function testAddPage()
   ns.SettingsPane.AddPage(page)
   ns.LeadsWindow.ToggleSettings()
   Assert.equal(built, 0, "a page is built when first shown")
-  open(ns, "Linked accounts")
+  open(ns, "Extra")
   open(ns, "General")
-  open(ns, "Linked accounts")
+  open(ns, "Extra")
   Assert.equal(built, 1)
   Assert.truthy(SettingsFixture.texts():find("export box", 1, true))
   Assert.falsy(SettingsFixture.texts():find("Enable Craft Alert", 1, true), "other pages hidden")
@@ -71,7 +72,7 @@ local function testNavHighlight()
   open(ns, "General")
   local function selectedPages()
     local shown = {}
-    for _, title in ipairs({ "General", "Alerts", "Greetings", "Keywords", "Crafters", "Test" }) do
+    for _, title in ipairs({ "General", "Alerts", "Greetings", "Keywords", "Crafters", "Linked accounts", "Test" }) do
       if SettingsFixture.navButton(title).selected:IsShown() then
         shown[#shown + 1] = title
       end
@@ -206,6 +207,18 @@ local function testAlertsPage()
   Assert.same(take(refreshes), { "leadsWindow" })
 end
 
+-- The Alerts page reaches the launcher and the leads window only through its setters: loading it
+-- loads neither (the window loads the settings pane, which lists the pages; the launcher needs
+-- the window).
+local function testAlertsPageNeedsNoWindow()
+  SettingsFixture.load()
+  package.loaded["UI.LeadsWindow"] = nil
+  package.loaded["UI.Launcher"] = nil
+  Fresh.require("UI.Settings.PageAlerts")
+  Assert.equal(package.loaded["UI.Launcher"], nil)
+  Assert.equal(package.loaded["UI.LeadsWindow"], nil)
+end
+
 local function character(professions)
   return { source = "local", enabled = true, realms = { "Realm" }, professions = professions, recipes = {} }
 end
@@ -267,5 +280,6 @@ return function()
   testGeneralPage()
   testChannelsPerFlavor()
   testAlertsPage()
+  testAlertsPageNeedsNoWindow()
   testGreetingsPage()
 end

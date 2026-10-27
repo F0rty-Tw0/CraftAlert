@@ -543,6 +543,11 @@ local function testTestPage()
   Assert.truthy(shown:find("Profession: 333", 1, true), shown)
   Assert.truthy(shown:find("Crafter: Ench-Realm", 1, true), shown)
   Assert.falsy(shown:find("Lionheart", 1, true), "the last result is replaced")
+  -- A profession stored without a name (a CraftScan import) shows its ID.
+  db.characters["Ench-Realm"].professions[333].name = ""
+  Widgets.type(row("Test a line").input, "Any Enchaters in ORG??")
+  shown = texts()
+  Assert.truthy(shown:find("Profession: 333", 1, true), shown)
   Widgets.type(row("Test a line").input, "hello there")
   Assert.truthy(texts():find("No match (stopped at: prefilter)", 1, true), texts())
   Assert.same(db.leads, {}, "no lead")

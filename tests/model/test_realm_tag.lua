@@ -94,4 +94,9 @@ return function()
   Assert.equal(RealmTag.CannotOrder(db, ME, nil), nil)
   db.characters[ME].realms = nil
   Assert.equal(RealmTag.CannotOrder(db, ME, "Bob-Draenor"), nil)
+
+  -- Strip is what the importers store realms through.
+  Assert.equal(RealmTag.Strip("Area 52"), "Area52")
+  Assert.equal(RealmTag.Strip("Azjol-Nerub"), "AzjolNerub")
+  Assert.equal(RealmTag.Strip("Kel'Thuzad"), "Kel'Thuzad")
 end

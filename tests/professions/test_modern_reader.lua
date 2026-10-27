@@ -39,7 +39,7 @@ local function setup(flavor)
   Fresh.require("Professions.QualityReach").Queue = function(recipeIDs)
     queued[#queued + 1] = recipeIDs
   end
-  local Slicer = Fresh.require("Core.Slicer")
+  local Slicer = ns.Slicer -- the one Index runs its build job on
   local ModernReader = Fresh.require("Professions.ModernReader")
   local db = ns.Defaults.Db()
   ProfessionList.Refresh(db, CHAR)
@@ -83,8 +83,7 @@ local function readFlow(flavor)
   Assert.same({ lastRead.prof, lastRead.stored, lastRead.pendingBind }, { BS, 3, 2 }, flavor)
   Assert.equal(type(lastRead.ms), "number", flavor)
   Assert.equal(type(lastRead.steps), "number", flavor)
-  Assert.equal(Wow.pendingTimers(0), 2, "the Slicer tick and one coalesced rebuild")
-  Wow.runTimers()
+  -- The finished read requests the rebuild, a Slicer job that Drain runs right after it.
   Assert.same(run.reasons, { "read" })
   Assert.equal(run.builds, 1)
   Assert.same(queued, { { 1, 2, 3 } }, "a finished read queues the stored IDs in read order")
@@ -317,6 +316,20 @@ local function jobCases()
   Assert.same(recipesOf(db), {})
 end
 
+-- §10.2: FieldsOf reads an alt's recipe the logged-in character never learned, with the §5.2
+-- drops, its expansion line and its profession answer; it stores nothing.
+local function fieldsOfAnyRecipe()
+  local state, ModernReader, db = setup()
+  local line = { professionID = 2872, parentProfessionID = BS, parentProfessionName = "Blacksmithing" }
+  state.recipes = { belt(1, 100, { learned = false, ranks = { 101, 102 }, profession = line }), belt(2, 200, { isRecraft = true }) }
+  local fields, profInfo = ModernReader.FieldsOf(1)
+  Assert.same(fields, { item = 100, ranks = { 101, 102 }, name = "Belt 1", line = 2872 })
+  Assert.equal(profInfo, line)
+  Assert.equal(ModernReader.FieldsOf(2), nil, "recraft dropped")
+  Assert.equal(ModernReader.FieldsOf(3), nil, "unknown recipe")
+  Assert.same(recipesOf(db), {})
+end
+
 local function isBlockedCases()
   local _, ModernReader = setup()
   local names = { "IsNPCCrafting", "IsTradeSkillGuild", "IsTradeSkillGuildMember", "IsTradeSkillLinked", "IsRuneforging" }
@@ -342,6 +355,7 @@ end
 return function()
   readFlow("retail")
   readFlow("forever")
+  fieldsOfAnyRecipe()
 
   -- In an instance a profession window is never read, on show or on a list update.
   do

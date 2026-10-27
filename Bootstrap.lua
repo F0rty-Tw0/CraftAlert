@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+local Constants = ns.Constants or require("CraftAlert.Core.Constants")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
 local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
@@ -14,9 +15,14 @@ local Index = ns.Index or require("CraftAlert.Model.Index")
 local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
+local Ledger = ns.Ledger or require("CraftAlert.Model.Ledger")
+local OrdersFilled = ns.OrdersFilled or require("CraftAlert.Model.OrdersFilled")
+local AwaySummary = ns.AwaySummary or require("CraftAlert.Model.AwaySummary")
 local WhisperTracker = ns.WhisperTracker or require("CraftAlert.Model.WhisperTracker")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local ModernReader = ns.ModernReader or require("CraftAlert.Professions.ModernReader")
+local ClassicReader = ns.ClassicReader or require("CraftAlert.Professions.ClassicReader")
+local CraftReader = ns.CraftReader or require("CraftAlert.Professions.CraftReader")
 local QualityReach = ns.QualityReach or require("CraftAlert.Professions.QualityReach")
 local LearnWatcher = ns.LearnWatcher or require("CraftAlert.Professions.LearnWatcher")
 local Status = ns.Status or require("CraftAlert.Core.Status")
@@ -24,8 +30,10 @@ local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
 local WhisperBridge = ns.WhisperBridge or require("CraftAlert.UI.WhisperBridge")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
+local CraftScanPrompt = ns.CraftScanPrompt or require("CraftAlert.UI.CraftScanPrompt")
 local ModernRows = ns.ModernRows or require("CraftAlert.UI.RecipeMarkers.ModernRows")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
+local PageAlerts = ns.PageAlerts or require("CraftAlert.UI.Settings.PageAlerts")
 local Perf = ns.Perf or require("CraftAlert.Core.Perf")
 local TestLine = ns.TestLine or require("CraftAlert.Core.TestLine")
 local SlashCommands = ns.SlashCommands or require("CraftAlert.Core.SlashCommands")
@@ -60,17 +68,17 @@ local function onSkillLinesChanged()
   end
 end
 
--- Retail and Forever only: the Classic profession keys and readers arrive with their task.
 local function installProfessions()
-  if FlavorCompat.isClassic then
-    return
-  end
   ProfessionList.Refresh(db, ownKey)
   EventRouter.On(SKILL_LINES_CHANGED, onSkillLinesChanged)
 end
 
+-- Classic reads the TradeSkill window and, on Era and TBC, Enchanting's Craft window.
 local function installReaders()
   if FlavorCompat.isClassic then
+    ClassicReader.Install(db)
+    CraftReader.Install(db)
+    LearnWatcher.InstallClassic(Constants.flavors[FlavorCompat.flavorKey].learnSignal)
     return
   end
   ModernReader.Install(db)
@@ -89,6 +97,23 @@ local function activateBridge()
   bridged = WhisperBridge.Activate()
 end
 
+-- Before wireLeads: Leads.Restore fires no "new", "greeted" or "replied".
+local function installLedger()
+  Ledger.Install(db)
+end
+
+-- Retail only: the other flavors have no crafting orders.
+local function installOrdersFilled()
+  if FlavorCompat.isRetail then
+    OrdersFilled.Install(db)
+  end
+end
+
+-- After activateBridge: the summary shows where the leads do (WM's preview, else the own toast).
+local function installAwaySummary()
+  AwaySummary.Install(bridged and WhisperBridge.ShowSummary or AlertToast.ShowSummary)
+end
+
 -- AlertToast and WhisperTracker subscribe themselves to "change", TestReport to "new" and "change".
 local function wireLeads()
   Leads.Restore(db)
@@ -96,6 +121,8 @@ local function wireLeads()
   Leads.On("new", bridged and WhisperBridge.ShowLead or AlertToast.Show)
   Leads.On("change", Launcher.Refresh)
   Leads.On("change", LeadsWindow.Refresh)
+  PageAlerts.SetOnLauncherToggle(Launcher.Refresh)
+  PageAlerts.SetOnOpacity(LeadsWindow.Refresh)
   WhisperTracker.Install()
   TestLine.Install()
 end
@@ -119,6 +146,11 @@ local function printLoginLines()
   if SavedState.isFirstRun then
     ChatPrint.Line(Localization.Text("After opening a profession, try /ca test LF <profession> crafter"))
   end
+end
+
+-- After the login lines: CraftScan's one-time offer (Retail; CraftScanPrompt checks the rest).
+local function promptCraftScan()
+  CraftScanPrompt.MaybeShow(db)
 end
 
 local function storeRealms()
@@ -169,6 +201,9 @@ local LOGIN_STEPS = {
   storeRealms,
   wireIndex,
   activateBridge,
+  installLedger,
+  installOrdersFilled,
+  installAwaySummary,
   wireLeads,
   WhisperBridge.SyncInfo,
   installReaders,
@@ -178,6 +213,7 @@ local LOGIN_STEPS = {
   createLauncher,
   buildIndex,
   printLoginLines,
+  promptCraftScan,
 }
 
 -- → whether the step ran without raising.

@@ -1,5 +1,6 @@
 local Assert = require("tests.helpers.assert")
 local Toc = require("tests.helpers.toc")
+local Wow = require("tests.helpers.wow")
 
 -- Runs tools/sim.lua as `python scripts/sim.py ...argv` would: its main block prints every line
 -- and exits. print and os.exit are captured, then restored. → the printed lines, the exit code
@@ -34,14 +35,30 @@ local function senderLines(lines)
   return senders
 end
 
--- The lines a run printed after its `db:` line: what the steps themselves produced.
+-- The lines a run printed after its `db:` line: what the steps themselves produced, without the
+-- closing `ledger:` and `away:` lines (asserted on their own).
 local function stepLines(lines)
   for index, line in ipairs(lines) do
     if string.find(line, "^db: ") then
-      return { unpack(lines, index + 1) }
+      local steps = {}
+      for i = index + 1, #lines do
+        if not string.find(lines[i], "^ledger: ") and not string.find(lines[i], "^away: ") then
+          steps[#steps + 1] = lines[i]
+        end
+      end
+      return steps
     end
   end
   error("no db: line in " .. table.concat(lines, " / "))
+end
+
+local function isRegistered(event)
+  for _, frame in ipairs(Wow.frames) do
+    if frame.events[event] then
+      return true
+    end
+  end
+  return false
 end
 
 -- The lines the first step prints before its own: the index build and scan activation
@@ -255,13 +272,51 @@ return function()
     stepLines(Sim.Run({ "--event", "TRADE_SKILL_SHOW", "--event", "GET_ITEM_INFO_RECEIVED", "190005", "true" })),
     booted({ "read: prof=164 stored=3 pendingBind=1", "index: size=5", "bind: stored=1", "index: size=4" })
   )
-  Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "TRADE_SKILL_SHOW" })), booted({}, "Trade"))
+  -- Classic: the TradeSkill window (every Classic flavor) and Enchanting's Craft window (Era, TBC)
+  -- are read into name keys; the new recipe matches by name, the greeting keeps the client's spelling.
+  local classicWindow =
+    booted({ "professions: blacksmithing,enchanting", "read: prof=blacksmithing stored=3 pendingBind=1", "index: size=5" }, "Trade")
+  for _, key in ipairs({ "era", "tbc", "wrath", "cata", "mop" }) do
+    Assert.same(stepLines(Sim.Run({ "--flavor", key, "--event", "TRADE_SKILL_SHOW" })), classicWindow, key)
+  end
+  local craftWindow = booted({ "professions: blacksmithing,enchanting", "read: prof=enchanting stored=2 pendingBind=0", "index: size=5" }, "Trade")
+  Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "CRAFT_SHOW" })), craftWindow)
+  Assert.same(stepLines(Sim.Run({ "--flavor", "era", "--event", "CRAFT_SHOW" })), craftWindow)
+  Assert.same(stepLines(Sim.Run({ "--flavor", "wrath", "--event", "CRAFT_SHOW" })), booted({ "professions: blacksmithing,enchanting" }, "Trade"))
+  Assert.same(
+    stepLines(Sim.Run({ "--flavor", "tbc", "--event", "CRAFT_SHOW", "--event", "CRAFT_CLOSE", "LF enchant boots sim agility" })),
+    booted({
+      "professions: blacksmithing,enchanting",
+      "read: prof=enchanting stored=2 pendingBind=0",
+      "index: size=5",
+      "sender: Customer-OtherRealm",
+      "match: item group=enchant boots - sim agility prof=enchanting why=lf+enchant boots sim agility",
+      "toast: shown lead=1 more=0",
+      "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=false",
+      "greeting: Hi! I can craft Enchant Boots - Sim Agility.",
+    }, "Trade")
+  )
+
+  -- Classic flavors log in on the Classic fixture (name keys): Bootstrap reads the professions
+  -- (skill lines on Era/TBC/Wrath, GetProfessions on Cata/MoP) and listens for skill-line changes.
+  for _, key in ipairs({ "era", "tbc", "wrath", "cata", "mop" }) do
+    Assert.same(
+      stepLines(Sim.Run({ "--flavor", key, "--event", "PLAYER_UPDATE_RESTING" })),
+      booted({ "professions: blacksmithing,enchanting" }, "Trade"),
+      key
+    )
+    Assert.truthy(isRegistered("SKILL_LINES_CHANGED"), key)
+  end
 
   -- Recipe markers: the row callback registers once Blizzard_Professions loads, on Retail and Forever.
   local markers = booted({ "markers: installed modern" })
   Assert.same(stepLines(Sim.Run({ "--event", "ADDON_LOADED", "Blizzard_Professions" })), markers)
   Assert.same(stepLines(Sim.Run({ "--flavor", "forever", "--event", "ADDON_LOADED", "Blizzard_Professions" })), markers)
-  Assert.same(stepLines(Sim.Run({ "--flavor", "tbc", "--event", "ADDON_LOADED", "Blizzard_Professions" })), booted({}, "Trade"))
+  Assert.same(
+    stepLines(Sim.Run({ "--flavor", "tbc", "--event", "ADDON_LOADED", "Blizzard_Professions" })),
+    booted({ "professions: blacksmithing,enchanting" }, "Trade"),
+    "no markers on Classic"
+  )
 
   -- A recipe read from the window keeps Blizzard's spelling, so the greeting names it as the game does.
   local greeted = {}
@@ -291,6 +346,23 @@ return function()
     })
   )
   Assert.same(stepLines(Sim.Run({ "--event", "NEW_RECIPE_LEARNED", "123" })), booted({ "learn: stored=false" }))
+
+  -- Classic: the learn message adds the name to the session's pending list; it matches by name at
+  -- once, crafted by the current character, and the greeting keeps the client's spelling.
+  local learnMessage = "You have learned how to create a new item: Enchant Boots - Sim Agility."
+  Assert.same(
+    stepLines(Sim.Run({ "--flavor", "tbc", "--event", "CHAT_MSG_SYSTEM", learnMessage, "LF enchant boots sim agility" })),
+    booted({
+      "professions: blacksmithing,enchanting",
+      "learn: pending=Enchant Boots - Sim Agility",
+      "index: size=5",
+      "sender: Customer-OtherRealm",
+      "match: item group=enchant boots - sim agility prof=nil why=lf+enchant boots sim agility",
+      "toast: shown lead=1 more=0",
+      "lead: new customer=Customer-OtherRealm crafter=Crafter-OwnRealm cannotOrder=false",
+      "greeting: Hi! I can craft Enchant Boots - Sim Agility.",
+    }, "Trade")
+  )
 
   Assert.equal(Sim.Run({ "--event" })[1], "error: --event needs an event name")
 
@@ -352,6 +424,47 @@ return function()
     end
   end
   Assert.equal(warnings, 1, "one newer-schema warning per load")
+
+  -- Spec §8: a run that changed a ledger counter ends with today's counters. The repeated request
+  -- updates the lead (no second "seen"), the click greets it once.
+  local ledger = Sim.Run({ "LF plate belt", "LF plate belt", "--click", "left" })
+  Assert.equal(ledger[#ledger], "ledger: seen=1 greeted=1 replied=0 filled=0")
+  -- The greeted customer's order filled: the event names them without a realm (5 arguments, so a
+  -- chat line may follow).
+  local fill = { "--event", "CRAFTINGORDERS_DISPLAY_CRAFTER_FULFILLED_MSG", "Public", "Belt", "Customer", "0", "1" }
+  local filled = Sim.Run({ "LF plate belt", "--click", "left", unpack(fill) })
+  Assert.equal(filled[#filled], "ledger: seen=1 greeted=1 replied=0 filled=1")
+  local stranger = Sim.Run({ "LF plate belt", "--click", "left", fill[1], fill[2], "Public", "Belt", "Stranger", "0", "1", "WTS belt" })
+  Assert.equal(stranger[#stranger], "ledger: seen=1 greeted=1 replied=0 filled=0")
+  Assert.equal(#senderLines(stranger), 2, "the line after the event's 5 arguments is a chat line")
+  local quiet = Sim.Run({ "WTS plate belt" })
+  Assert.falsy(string.find(quiet[#quiet], "^ledger: "), "no counter changed: no ledger line")
+
+  -- Spec §7.6: a request while AFK, then --afk off (PLAYER_FLAGS_CHANGED for the player): one away
+  -- summary, before the closing ledger line.
+  local away = Sim.Run({ "--afk", "on", "LF plate belt", "--afk", "off" })
+  Assert.same({ away[#away - 1], away[#away] }, { "away: summary count=1 expired=0", "ledger: seen=1 greeted=0 replied=0 filled=0" })
+
+  -- Spec §10.1: --export prints the fixture's export string; --import of it into a second account's
+  -- db stores Alt-OwnRealm (the player's own character is skipped) and the index rebuild follows.
+  local exported = Sim.Run({ "--export" })
+  local text = string.match(exported[#exported], "^export: (CA1:retail:.+)$")
+  assert(text, exported[#exported])
+  local imported = table.concat(Sim.Run({ "--db", "tests/fixtures/db_export_target.lua", "--import", text, "LF plate belt" }), " / ")
+  Assert.truthy(imported:find("import: characters=1 recipes=3 skipped=1 / index: size=4", 1, true), imported)
+  Assert.truthy(imported:find("crafter=Alt-OwnRealm", 1, true), imported)
+  local refused = Sim.Run({ "--import", (string.gsub(text, "Sim Plate Belt", "Sim Plate Bolt")) })
+  Assert.equal(refused[#refused], "import: error The string is damaged (checksum).")
+  Assert.equal(Sim.Run({ "--import" })[1], "error: --import needs a value")
+
+  -- Spec §10.2: --craftscan imports the CraftScan fixture; its alt answers the request.
+  local scanned = table.concat(Sim.Run({ "--craftscan", "tests/fixtures/craftscan_db.lua", "LF Sim Plate Helm" }), " / ")
+  local counts = "craftscan: characters=3 recipes=5 muted=3 greetings=2 skipped=5"
+  local muted = "craftscan: muted Nosource-Kel'Thuzad:9003,Old-Legacyrealm:9005,Scanalt-OwnRealm:9005"
+  Assert.truthy(scanned:find(counts .. " / " .. muted .. " / index: size=6", 1, true), scanned)
+  Assert.truthy(scanned:find("crafter=Scanalt-OwnRealm", 1, true), scanned)
+  local missing = Sim.Run({ "--craftscan", "tests/fixtures/no_such_file.lua" })
+  Assert.equal(missing[#missing], "error: --craftscan tests/fixtures/no_such_file.lua holds no CraftScan_DB table")
 
   -- Run from the command line, any `error:` line makes the sim exit 1, so a Proof run notices a
   -- broken invocation: a bad flag (the only line) or a step that fails after others printed.

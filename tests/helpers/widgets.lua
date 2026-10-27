@@ -366,6 +366,23 @@ local function addFrameState(frame)
     self.mouseWheelEnabled = enabled
   end
 
+  -- A button's enabled state; Widgets.click on a disabled one does nothing, as in the client.
+  function frame:SetEnabled(enabled)
+    self.disabled = not enabled
+  end
+
+  function frame:Enable()
+    self.disabled = false
+  end
+
+  function frame:Disable()
+    self.disabled = true
+  end
+
+  function frame:IsEnabled()
+    return not self.disabled
+  end
+
   function frame:SetMovable(movable)
     self.movable = movable
   end
@@ -657,6 +674,9 @@ end
 function Widgets.click(frame, button)
   local onClick = frame.scripts.OnClick
   assert(onClick, "frame has no OnClick script")
+  if frame.disabled then
+    return
+  end
   if frame.toggleOnClick then
     frame:SetChecked(not frame:GetChecked())
   end

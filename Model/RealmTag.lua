@@ -16,10 +16,13 @@ local gsub = string.gsub
 local ipairs = ipairs
 local type = type
 
--- Realms compare with spaces and hyphens removed.
-local function strip(realm)
+-- Realms compare with spaces and hyphens removed. Public for the importers (ExportString,
+-- CraftScanImport), whose realms CannotOrder compares as stored.
+function RealmTag.Strip(realm)
   return (gsub(realm, "[ %-]", ""))
 end
+
+local strip = RealmTag.Strip
 
 -- Call at PLAYER_LOGIN, after PlayerName.Init. Writes nothing when the list is unknown or the
 -- character is not in the db.
