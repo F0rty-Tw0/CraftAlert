@@ -177,6 +177,33 @@ local function testCloseCancels()
   Assert.equal(ns.ClassicReader.lastRead, nil, "a cancelled read is not a finished one")
 end
 
+-- Mid-read, the window switches to Cooking (not stored) or to another player's list: the show
+-- starts no read, so only the step's own check stops the running job storing the new rows.
+local function testSwitchCancels()
+  local cases = {
+    linked = function(state)
+      state.tradeSkill.linked = true
+    end,
+    cooking = function(state)
+      state.tradeSkill.line = "Cooking"
+    end,
+  }
+  for name, apply in pairs(cases) do
+    local state = { tradeSkill = enchanting({ wand(), rod(), oil() }) }
+    local ns, db = ProfessionsClassic.login("wrath", state)
+    logRowReads()
+    Wow.fireEvent("TRADE_SKILL_SHOW")
+    runOneTick()
+    state.tradeSkill.rows = { wand(), row("Spiced Wolf Meat", 2680), row("Other Guy Recipe", 9999) }
+    apply(state)
+    Wow.fireEvent("TRADE_SKILL_SHOW")
+    ns.Slicer.Drain()
+    Wow.runTimers()
+    Assert.equal(recipesOf(db)["spiced wolf meat"], nil, name)
+    Assert.equal(recipesOf(db)["other guy recipe"], nil, name)
+  end
+end
+
 return function()
   for _, flavor in ipairs(FLAVORS) do
     testShape(flavor)
@@ -186,4 +213,5 @@ return function()
   testPartialThenFull()
   testUpdates()
   testCloseCancels()
+  testSwitchCancels()
 end
