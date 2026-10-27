@@ -634,6 +634,27 @@ local function testNoOrdersOffRetail(db)
   Assert.equal(isRegistered(ORDER_FILLED), false, ORDER_FILLED .. " not registered on Forever")
 end
 
+-- Spec §10.2: with CraftScan's data loaded, login asks once (after the login lines); once
+-- answered, never again.
+local function testCraftScanOffer(db)
+  local offer = "CraftScan data found. Import characters, recipes, and greetings?"
+  local session = startClient(db)
+  Wow.stub("CraftScan_DB", { settings = {}, realms = {} })
+  local before = #Wow.chat
+  login(session)
+  local lines = chatSince(before)
+  Assert.equal(count(lines, offer), 1, table.concat(lines, " / "))
+  Assert.equal(lines[#lines], offer, "after the login lines")
+  Assert.equal(rawget(_G, "CraftAlertCraftScanPrompt"):IsShown(), true)
+  db.settings.craftScanPrompted = true
+  session = startClient(db)
+  Wow.stub("CraftScan_DB", { settings = {}, realms = {} })
+  before = #Wow.chat
+  login(session)
+  Assert.equal(count(chatSince(before), offer), 0)
+  Assert.equal(rawget(_G, "CraftAlertCraftScanPrompt"), nil)
+end
+
 local function deepCopy(value)
   if type(value) ~= "table" then
     return value
@@ -666,5 +687,6 @@ return function()
   testAlertsPageRepaints(deepCopy(saved))
   testNoOrdersOffRetail(deepCopy(saved))
   testAwaySummary(deepCopy(saved))
+  testCraftScanOffer(deepCopy(saved))
   Wow.reset()
 end
