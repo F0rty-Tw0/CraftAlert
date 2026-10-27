@@ -103,10 +103,27 @@ local function startClient(db, slots, flavor)
   return session, state
 end
 
+-- Runs the timers of this frame (delay 0: the coalesced index rebuild) and nothing later.
+local function runFrame()
+  local found = true
+  while found do
+    found = false
+    for i, timer in ipairs(Wow.timers) do
+      if timer.delay == 0 then
+        table.remove(Wow.timers, i)
+        timer.fn()
+        found = true
+        break
+      end
+    end
+  end
+end
+
 -- Every TOC file into one ns, then the two events the client fires. The toast is counted
 -- before login, so Bootstrap's Leads.On("new") subscribes the counting wrapper. `prepare(ns)`,
--- when given, runs between loading and the events.
-local function login(session, prepare)
+-- when given, runs between loading and the events. The login build is sliced, so the frame
+-- runs after PLAYER_LOGIN and the index is there; `keepSliced` leaves the build running.
+local function login(session, prepare, keepSliced)
   local ns = {}
   for _, path in ipairs(Toc.luaFiles()) do
     assert(loadfile(path))("CraftAlert", ns)
@@ -123,6 +140,9 @@ local function login(session, prepare)
   Assert.equal(rawget(_G, "CraftAlertDB"), session.db, "another addon's ADDON_LOADED loads nothing")
   Wow.fireEvent("ADDON_LOADED", "CraftAlert")
   Wow.fireEvent("PLAYER_LOGIN")
+  if not keepSliced then
+    runFrame()
+  end
   return ns
 end
 
@@ -173,22 +193,6 @@ local function isLit(launcher)
   return lit
 end
 
--- Runs the timers of this frame (delay 0: the coalesced index rebuild) and nothing later.
-local function runFrame()
-  local found = true
-  while found do
-    found = false
-    for i, timer in ipairs(Wow.timers) do
-      if timer.delay == 0 then
-        table.remove(Wow.timers, i)
-        timer.fn()
-        found = true
-        break
-      end
-    end
-  end
-end
-
 local function trade(text, sender)
   Wow.fireEvent("CHAT_MSG_CHANNEL", text, sender, "", "2. Trade - City", sender, "", 2, 2, "Trade - City", 0, 1, nil)
 end
@@ -200,7 +204,7 @@ local function testFreshInstall()
   local db = rawget(_G, "CraftAlertDB")
   Assert.truthy(db, "ADDON_LOADED created the account DB")
   Assert.equal(ns.SavedState.isFirstRun, true)
-  Assert.same(chatSince(0), { STATUS_UNREAD, UNREAD_LINE, FIRST_RUN_HINT }, "login lines on a fresh DB")
+  Assert.same(chatSince(0), { UNREAD_LINE, FIRST_RUN_HINT, STATUS_UNREAD }, "login lines on a fresh DB, the gate's line when the build lands")
   Assert.equal(type(ns.Perf.loginMs), "number")
 
   for _, event in ipairs(INSTALLED_EVENTS) do
@@ -509,9 +513,9 @@ local function testLoginTime(db)
   local ns = login(session, function(ns)
     ns.SavedState.Load = spend(ns.SavedState.Load, 7)
     ns.PlayerName.Init = spend(ns.PlayerName.Init, 1000)
-    ns.Index.Rebuild = spend(ns.Index.Rebuild, 3)
+    ns.Index.Build = spend(ns.Index.Build, 3)
   end)
-  Assert.equal(ns.Perf.loginMs, 10)
+  Assert.equal(ns.Perf.loginMs, 7, "the sliced build is not login time")
 end
 
 -- /ignore through the real wiring: IGNORELIST_UPDATE drops the ignored customer's leads, and
@@ -645,7 +649,11 @@ local function testCraftScanOffer(db)
   login(session)
   local lines = chatSince(before)
   Assert.equal(count(lines, offer), 1, table.concat(lines, " / "))
-  Assert.equal(lines[#lines], offer, "after the login lines")
+  Assert.same(
+    { lines[#lines - 1], lines[#lines] },
+    { offer, STATUS_ACTIVE },
+    "the offer after the other login lines, then the gate's line when the build lands"
+  )
   Assert.equal(rawget(_G, "CraftAlertCraftScanPrompt"):IsShown(), true)
   db.settings.craftScanPrompted = true
   session = startClient(db)
@@ -699,6 +707,119 @@ local function testNoMarkersOnClassic(db)
   Assert.equal(#list.callbacks, 0, "and none once Blizzard_Professions loads")
 end
 
+-- The login build is the sliced job: no index right after PLAYER_LOGIN, the stored one's
+-- outcome once the job ran.
+local function testLoginBuildIsSliced(db)
+  local session = startClient(db)
+  local ns = login(session, nil, true)
+  Assert.equal(ns.Index.Current(), nil, "no index right after PLAYER_LOGIN")
+  Assert.equal(ns.Slicer.IsRunning("index"), true, "the build is the sliced job")
+  Assert.equal(ns.ScanGate.IsActive(), false, "the gate waits for the index")
+  ns.Slicer.Drain()
+  Assert.truthy(ns.Index.Current(), "the build landed")
+  Assert.equal(ns.ScanGate.IsActive(), true, "the stored recipes activate the gate")
+end
+
+-- Combat lockdown at login (a /reload mid-fight): the one-frame build, so alerts work at once.
+local function testLoginInCombatBuildsAtOnce(db)
+  local session = startClient(db)
+  Wow.combat = true
+  local before = #Wow.chat
+  local ns = login(session, nil, true)
+  Assert.truthy(ns.Index.Current(), "the index is there before any frame")
+  Assert.equal(ns.Index.lastBuildSteps, 1, "one synchronous build")
+  Assert.equal(ns.Slicer.IsRunning("index"), false)
+  Assert.same(chatSince(before), { STATUS_ACTIVE }, "the gate's line as before")
+end
+
+-- An empty index: the paused line is owed until the build lands, then printed once, last.
+local function testEmptyIndexOwesStatusLine()
+  local session = startClient(nil)
+  local before = #Wow.chat
+  local ns = login(session, nil, true)
+  Assert.same(chatSince(before), { UNREAD_LINE, FIRST_RUN_HINT }, "no status line while the build runs")
+  ns.Slicer.Drain()
+  Assert.same(chatSince(before), { UNREAD_LINE, FIRST_RUN_HINT, STATUS_UNREAD }, "the line when the build lands")
+end
+
+-- Recipes: the gate's own "listening" line is the one status line; nothing paused is owed.
+local function testRecipesPrintOnlyTheListeningLine(db)
+  local session = startClient(db)
+  local before = #Wow.chat
+  local ns = login(session, nil, true)
+  ns.Slicer.Drain()
+  Assert.same(chatSince(before), { STATUS_ACTIVE }, "the gate's listening line once, no paused line")
+end
+
+-- An instance at login prints nothing, not even when the build lands.
+local function testInstanceAtLoginOwesNothing()
+  local session = startClient(nil)
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  local before = #Wow.chat
+  local ns = login(session, nil, true)
+  ns.Slicer.Drain()
+  Assert.same(chatSince(before), {}, "no line before or after the build")
+  Wow.stub("IsInInstance", nil)
+end
+
+-- Entering an instance while the build runs drops the owed line.
+local function testInstanceBeforeBuildDropsOwedLine()
+  local session = startClient(nil)
+  local before = #Wow.chat
+  local ns = login(session, nil, true)
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  ns.Slicer.Drain()
+  Assert.same(chatSince(before), { UNREAD_LINE, FIRST_RUN_HINT }, "the owed line is dropped")
+  Wow.stub("IsInInstance", nil)
+end
+
+-- A rebuild requested during the login build (SKILL_LINES_CHANGED) restarts the job; the owed
+-- line prints once, when the restarted build lands.
+local function testRestartedBuildPrintsOwedLineOnce()
+  local session = startClient(nil)
+  local before = #Wow.chat
+  local ns = login(session, nil, true)
+  ns.Index.RequestRebuild("profession")
+  Assert.equal(count(chatSince(before), STATUS_UNREAD), 0, "still owed while the job runs")
+  ns.Slicer.Drain()
+  Assert.equal(count(chatSince(before), STATUS_UNREAD), 1, "printed once")
+end
+
+-- The addon turned off at login: the "disabled" line still comes, once, after the build.
+local function testDisabledAtLoginPrintsAfterBuild()
+  local session = startClient(nil)
+  local before = #Wow.chat
+  local ns = login(session, function(ns)
+    local load = ns.SavedState.Load
+    ns.SavedState.Load = function()
+      local loaded = load()
+      loaded.settings.enable = false
+      return loaded
+    end
+  end, true)
+  Assert.equal(#chatSince(before), 2, "only the unread and first-run lines before the build")
+  ns.Slicer.Drain()
+  Assert.equal(ns.ScanGate.State().reason, "disabled")
+  local lines = chatSince(before)
+  Assert.equal(count(lines, ns.Status.Text(ns.ScanGate.State())), 1, "the disabled line once")
+  Assert.equal(lines[#lines], ns.Status.Text(ns.ScanGate.State()), "last")
+end
+
+-- A rebuild after the first one landed prints no login line.
+local function testLaterRebuildPrintsNothing()
+  local session = startClient(nil)
+  local ns = login(session, nil, true)
+  ns.Slicer.Drain()
+  local before = #Wow.chat
+  ns.Index.RequestRebuild("profession")
+  ns.Slicer.Drain()
+  Assert.same(chatSince(before), {}, "nothing is owed after the first build")
+end
+
 local function deepCopy(value)
   if type(value) ~= "table" then
     return value
@@ -725,6 +846,15 @@ return function()
   testRaisingPlayerName(deepCopy(saved), "Init")
   testRaisingPlayerName(deepCopy(saved), "Own")
   testLoginTime(deepCopy(saved))
+  testLoginBuildIsSliced(deepCopy(saved))
+  testLoginInCombatBuildsAtOnce(deepCopy(saved))
+  testEmptyIndexOwesStatusLine()
+  testRecipesPrintOnlyTheListeningLine(deepCopy(saved))
+  testInstanceAtLoginOwesNothing()
+  testInstanceBeforeBuildDropsOwedLine()
+  testRestartedBuildPrintsOwedLineOnce()
+  testDisabledAtLoginPrintsAfterBuild()
+  testLaterRebuildPrintsNothing()
   testIgnoreDropsLead(deepCopy(saved))
   testInstanceHidesUi(deepCopy(saved))
   testLoginInInstanceIsSilent(deepCopy(saved))

@@ -128,16 +128,22 @@ local function wireLeads()
   TestLine.Install()
 end
 
+-- The status line printLoginLines could not judge yet: the sliced login build was still running.
+local statusOwed = false
+
 -- §7.6 and §5.2: the newer-schema warning of the load, the status line, the professions not read
 -- yet, and on a fresh DB the first-run hint. The gate prints the status line on its first
 -- activation, so an active scan at login has printed it already. A login or /reload inside an
--- instance prints nothing (no addon line in the chat frame there).
+-- instance prints nothing (no addon line in the chat frame there). Before the index exists the
+-- line is owed to printOwedStatus.
 local function printLoginLines()
   if FlavorCompat.InInstance() then
     return
   end
   Schema.WarnNewer()
-  if not ScanGate.IsActive() then
+  if Index.Current() == nil then
+    statusOwed = true
+  elseif not ScanGate.IsActive() then
     ChatPrint.Line(Status.Text(ScanGate.State()))
   end
   local unread = ProfessionList.UnreadNames(db, ownKey)
@@ -158,10 +164,23 @@ local function storeRealms()
   RealmTag.Store(db, ownKey)
 end
 
+-- The login build has landed and the gate has judged it: print the status line printLoginLines
+-- owed, unless the gate's own first-activation line came or an instance was entered since.
+local function printOwedStatus()
+  if not statusOwed then
+    return
+  end
+  statusOwed = false
+  if not ScanGate.IsActive() and not FlavorCompat.InInstance() then
+    ChatPrint.Line(Status.Text(ScanGate.State()))
+  end
+end
+
 local function wireIndex()
   Index.Configure(db, { professionOrder = ProfessionList.Order, ownKey = ownKey })
   Index.OnRebuilt(Matcher.SetIndex)
   Index.OnRebuilt(ScanGate.Evaluate)
+  Index.OnRebuilt(printOwedStatus)
 end
 
 local function installScanGate()
@@ -187,14 +206,22 @@ local function createLauncher()
   ScanGate.OnChange(WhisperTracker.Refresh)
 end
 
+-- Sliced, so the login frame stays short; in combat lockdown the Slicer waits for the fight to
+-- end, so build at once and alerts work from the first frame.
 local function buildIndex()
-  Index.Rebuild()
+  local lockdown = _G["InCombatLockdown"]
+  if type(lockdown) == "function" and lockdown() == true then
+    Index.Rebuild()
+  else
+    Index.RequestRebuild("login")
+  end
 end
 
 -- In dependency order. Each step runs on its own: one that raises is reported and the rest
 -- still run. ScanGate and Leads bind the db last, so a raising install leaves its module
 -- unbound and fail-closed: only ScanGate.Evaluate registers the chat events, and only once the
--- resting events are registered, Leads holds its db and the index is built.
+-- resting events are registered, Leads holds its db and the index is built (in the background,
+-- or at once under combat lockdown).
 local LOGIN_STEPS = {
   installProfessions,
   storeRealms,

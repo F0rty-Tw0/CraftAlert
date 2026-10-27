@@ -482,13 +482,14 @@ local function watch(ctx)
 end
 
 -- PLAYER_LOGIN, once, before the first chat line, event, command or click: Bootstrap installs
--- everything and builds the index. Classic flavors then print `professions: <keys>`, the
--- name keys ProfessionList read at login.
+-- everything and starts the sliced index build, which the Slicer drains here. Classic flavors
+-- then print `professions: <keys>`, the name keys ProfessionList read at login.
 local function start(ctx)
   if not ctx.started then
     ctx.started = true
     ctx.ns.BindLookup.lastStored = nil
     Wow.fireEvent("PLAYER_LOGIN")
+    ctx.ns.Slicer.Drain()
     if CLASSIC[ctx.flavor] then
       ctx.out[#ctx.out + 1] = "professions: " .. table.concat(ctx.ns.ProfessionList.Order(), ",")
     end

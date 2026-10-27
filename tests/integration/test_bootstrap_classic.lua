@@ -123,6 +123,7 @@ local function login(session, prepare)
   end
   Wow.fireEvent("ADDON_LOADED", "CraftAlert")
   Wow.fireEvent("PLAYER_LOGIN")
+  ns.Slicer.Drain()
   return ns
 end
 

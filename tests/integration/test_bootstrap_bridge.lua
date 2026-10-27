@@ -70,6 +70,7 @@ local function login()
   end
   Wow.fireEvent("ADDON_LOADED", "CraftAlert")
   Wow.fireEvent("PLAYER_LOGIN")
+  ns.Slicer.Drain()
   return ns
 end
 

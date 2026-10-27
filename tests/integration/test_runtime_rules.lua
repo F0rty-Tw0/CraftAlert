@@ -368,6 +368,7 @@ local function testAddonObeysTheRules()
     db.characters = dofile("tools/sim_fixture.lua").characters
     Assert.same(publicChatEvents(), {}, "nothing listens before login")
     Wow.fireEvent("PLAYER_LOGIN")
+    ns.Slicer.Drain()
     Assert.equal(ns.Leads.HasActive(), false)
     Assert.same({ rawget(_G, "SLASH_CRAFTALERT1"), rawget(_G, "SLASH_CRAFTALERT2") }, { "/craftalert", "/ca" })
 
@@ -485,6 +486,7 @@ local function testMarkersObeyTheRules()
     Wow.fireEvent("ADDON_LOADED", "CraftAlert")
     rawget(_G, "CraftAlertDB").characters = dofile("tools/sim_fixture.lua").characters
     Wow.fireEvent("PLAYER_LOGIN")
+    ns.Slicer.Drain()
     local list = state.list
     local row = list:row(9001)
     Assert.equal(#list.callbacks, 0, "Blizzard_Professions is not loaded: nothing registered")
@@ -512,6 +514,7 @@ local function testClassicObeysTheRules()
     rawget(_G, "CraftAlertDB").characters = dofile("tools/sim_fixture_classic.lua").characters
     Assert.same(publicChatEvents(), {}, "nothing listens before login")
     Wow.fireEvent("PLAYER_LOGIN")
+    ns.Slicer.Drain()
     Assert.equal(ns.ScanGate.IsActive(), true)
     Assert.same(publicChatEvents(), { CHANNEL, "CHAT_MSG_SYSTEM" })
 
@@ -551,6 +554,7 @@ local function testClassicMarkersObeyTheRules()
     Wow.fireEvent("ADDON_LOADED", "CraftAlert")
     rawget(_G, "CraftAlertDB").characters = dofile("tools/sim_fixture_classic.lua").characters
     Wow.fireEvent("PLAYER_LOGIN")
+    ns.Slicer.Drain()
     state.windows.tradeSkill:update(0)
     state.windows.craft:update(0)
     local switch = assert(RecipeListStub.switchOf(G("TradeSkillSkill1")), "the stored TradeSkill row got its switch")
