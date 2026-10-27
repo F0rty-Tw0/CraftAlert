@@ -219,6 +219,7 @@ local function testRejected()
     { seal("CA1:retail:c,Smith-Realm,,;c,Smith-Realm,,"), "character count 2" },
     { seal("CA1:retail:c,Smith-Realm,,;x,1"), "record 2" },
     { seal("CA1:retail:c,Smith-Realm,,;p,4k,B,S"), "profession 2" }, -- field count
+    { seal("CA1:retail:c," .. string.rep("y", Fields.MAX.record) .. ",,"), "record 1" }, -- refused unsplit
   }
   local db = { characters = { ["Mine-Realm"] = { source = "local", enabled = true, realms = {}, professions = {}, recipes = {} } } }
   local before = copy(db)
@@ -244,6 +245,15 @@ local function testRejected()
   Slicer.Drain()
   Assert.same(result.counts, { characters = 2, recipes = 3, skipped = 0 })
   Assert.same(calls.rebuilds, { "import" })
+  -- The largest character record the writer makes fits MAX.record: every byte escaped.
+  local realms = {}
+  for i = 1, Fields.MAX.realms do
+    realms[i] = string.rep(".", Fields.MAX.text)
+  end
+  local key = string.rep(".", Fields.MAX.text - 6) .. "-Realm"
+  local widest = { characters = { [key] = { source = "local", class = "DEATHKNIGHT", realms = realms, professions = {}, recipes = {} } } }
+  local data = assert(ExportString.Decode(ExportString.Encode(widest, "retail"), "retail"))
+  Assert.same(data.characters[1].realms, realms)
 end
 
 -- Damaged pastes are refused in one cheap pass: the length before the trim (spaces count past

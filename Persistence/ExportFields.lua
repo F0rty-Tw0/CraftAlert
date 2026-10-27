@@ -38,6 +38,9 @@ ExportFields.MAX = {
   ranks = 5,
   realms = 50,
   text = 200,
+  -- Bytes in one record, refused before it is split into fields. The largest the writer makes
+  -- is a character with 50 realms of 200 escaped bytes each, about 30.7 KB.
+  record = 32768,
 }
 
 local ESCAPES = {}
@@ -267,7 +270,7 @@ end
 -- Adds one record to `state` → nil, or a word naming what was refused.
 function ExportFields.ParseRecord(state, record)
   local parse = PARSE[match(record, "^(%l),")]
-  if parse == nil then
+  if parse == nil or #record > ExportFields.MAX.record then
     return "record"
   end
   return parse(state, record)
