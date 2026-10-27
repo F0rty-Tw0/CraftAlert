@@ -376,6 +376,7 @@ local function testDamagedIsCheap()
     _, err = ExportString.Decode(digits, "retail")
   end
   seconds = os.clock() - started
+  Assert.truthy(err:find("Not a Craft Alert", 1, true), err)
   Assert.truthy(seconds < 0.1, "10 digit headers took " .. seconds .. " s")
   _, err = ExportString.Decode(seal(digits .. ":retail:"), "retail")
   Assert.truthy(#err < 100, "message of " .. #err .. " bytes")
