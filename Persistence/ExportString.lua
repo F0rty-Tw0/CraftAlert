@@ -250,13 +250,15 @@ local function imported(old, incoming, now, pause)
     count = count + 1
     pause(1)
   end
-  -- Stored stripped: RealmTag.CannotOrder compares them as they are.
+  -- Stored stripped: RealmTag.CannotOrder compares them as they are. One pause per realm: 19
+  -- characters of 50 long realms took 9 ms unpaused.
   local realms = {}
   for _, realm in ipairs(incoming.realms) do
     local stripped = RealmTag.Strip(realm)
     if stripped ~= "" then
       realms[#realms + 1] = stripped
     end
+    pause(1)
   end
   local record = { source = "import", importedAt = now, enabled = old == nil or old.enabled ~= false, class = incoming.class }
   record.realms, record.professions, record.recipes = realms, professions, recipes

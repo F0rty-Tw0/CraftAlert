@@ -348,6 +348,18 @@ local function testLongRecordWeighsMore()
   Assert.same({ weights[#weights - 1], weights[#weights] }, { 1, 1 + math.floor(#record / 256) })
 end
 
+-- Storing a character pauses per realm too: 19 characters of 50 long realms and no recipes once
+-- took 9 ms between two clock reads.
+local function testApplyPausesPerRealm()
+  local ExportString = load()
+  local data = assert(ExportString.Decode(seal("CA1:retail:c,Smith-Realm,,A.B.C"), "retail"))
+  local pauses = 0
+  ExportString.Apply({ characters = {} }, data, function()
+    pauses = pauses + 1
+  end)
+  Assert.equal(pauses, 3)
+end
+
 -- The user's Retail account is 6 characters and 2,983 recipes: 3,000 synthetic recipes export
 -- under MAX.length, and the sliced export and import take many short steps.
 local function testLargeExportIsSliced()
@@ -396,6 +408,7 @@ return function()
   testRejected()
   testDamagedIsCheap()
   testLongRecordWeighsMore()
+  testApplyPausesPerRealm()
   testLargeExportIsSliced()
   Wow.reset()
 end
