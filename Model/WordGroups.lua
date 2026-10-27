@@ -67,9 +67,9 @@ local NO_WORDS = {}
 
 local function noPause() end
 
--- A long word list's walks pause between one walk and the next (weighted by the list's
--- length), and byProfession's split of it, the longest walk, every LIST_CHUNK entries too: the
--- sliced build never runs a whole list's step 4.4 work without a pause.
+-- The sliced build pauses between the walks over one word list (weighted by its length), and
+-- every LIST_CHUNK entries inside byProfession's split, a list's longest walk, so no list's
+-- step 4.4 work runs whole without a pause.
 local LIST_CHUNK = 64
 
 -- groupWords by inversion of wordIndex: each group walks a trie of word sets in pairs()
