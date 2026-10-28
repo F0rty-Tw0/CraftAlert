@@ -32,7 +32,7 @@ local unpack = unpack
 -- LINE_GAP between the header's lines.
 local ICON_GAP, NAME_TOP, NAME_SIZE, LINE_GAP = 10, -8, 17, -3
 local NAME_LEFT = Theme.LAYOUT.DETAILS_PADDING + Theme.LAYOUT.HEADER_ICON_SIZE + ICON_GAP
-local LINE_SEPARATOR, STRIP_SEPARATOR = "  -  ", " · "
+local SEPARATOR = " · "
 -- The strip's text wraps to at most STRIP_LINES lines.
 local STRIP_LINES = 2
 -- The header lines' and the strip's plain words: textSecondary with its alpha folded into the
@@ -53,19 +53,19 @@ local function stateText(lead)
   return greeted .. ", " .. FrameKit.ThemeCode(Localization.Text("replied"), colors.replied)
 end
 
--- Line 1: "Class  -  status  -  age"; a customer of unknown class leaves the class part out.
+-- Line 1: "Class · status · age"; a customer of unknown class leaves the class part out.
 function DetailsHeader.LineOne(lead)
   local parts = { FrameKit.ClassName(FlavorCompat.ClassOf(lead.guid)) }
   parts[#parts + 1] = stateText(lead)
   parts[#parts + 1] = LeadText.Age(_G["time"]() - lead.time)
-  return table.concat(parts, LINE_SEPARATOR)
+  return table.concat(parts, SEPARATOR)
 end
 
--- Line 2: "Channel  -  HH:MM", the time alone for a lead without a channel.
+-- Line 2: "Channel · HH:MM", the time alone for a lead without a channel.
 function DetailsHeader.LineTwo(lead)
   local at = _G["date"]("%H:%M", lead.time)
   local channel = LeadText.Channel(lead)
-  return channel and (channel .. LINE_SEPARATOR .. at) or at
+  return channel and (channel .. SEPARATOR .. at) or at
 end
 
 -- The crafter's short name in the class saved for them, white when none is; nil without a crafter.
@@ -93,7 +93,7 @@ function DetailsHeader.Strip(lead, db)
   -- A nil part adds nothing.
   parts[#parts + 1] = profession
   parts[#parts + 1] = crafterText(lead, db)
-  return table.concat(parts, STRIP_SEPARATOR)
+  return table.concat(parts, SEPARATOR)
 end
 
 -- The profession's icon, else the item's, else the addon's.
