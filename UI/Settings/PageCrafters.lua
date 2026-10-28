@@ -15,8 +15,8 @@ local RecipeList = ns.RecipeList or require("CraftAlert.UI.Settings.RecipeList")
 
 -- Spec §9 Crafters: one character at a time (current, same-account, imported) with enable,
 -- remove (asks for a second click) and, per profession, the main crafter flag (stored as
--- `primary`) and the recipe list (RecipeList), then "Track unbound items" (`includeUnbound`).
--- Enable, remove, mute and unbound items rebuild the index (§6.2); the flag is read when a lead
+-- `primary`) and the recipe list (RecipeList).
+-- Enable, remove and mute rebuild the index (§6.2); the flag is read when a lead
 -- picks its crafter (§6.3 step 5), so it rebuilds nothing.
 local PageCrafters = { id = "crafters", title = Localization.Text("Crafters") }
 
@@ -24,10 +24,6 @@ local REMOVE_WIDTH = 140
 
 local function db()
   return _G["CraftAlertDB"]
-end
-
-local function settings()
-  return db().settings
 end
 
 local function characterOptions()
@@ -113,13 +109,6 @@ local function createProfessionRows(column, page)
     )
   )
   page.list = RecipeList.Create(column)
-  -- The list greys the recipes this leaves out, so it repaints after a change.
-  local function trackUnbound()
-    Index.RequestRebuild("includeUnbound")
-    page.list.Show(shownCharacter(page), page.profession.Value())
-  end
-  local label = Localization.Text("Track unbound items (materials, potions, gems)")
-  page.unbound = Controls.BoundToggle(column, label, settings, "includeUnbound", trackUnbound)
 end
 
 function PageCrafters.Create(parent)
@@ -147,7 +136,6 @@ function PageCrafters.Create(parent)
       current = PlayerName.Own()
     end
     page.character.SetOptions(characterOptions(), current)
-    page.unbound()
     page.ShowCharacter()
   end
   return page

@@ -14,9 +14,9 @@ local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
 -- Spec §9 General: enable, only where Trade chat exists, channels, profession-word alerts,
--- recipe markers (unbound items are on the Crafters page). Enable and "Only where Trade chat
+-- recipe markers, track unbound items. Enable and "Only where Trade chat
 -- exists" (saved as onlyResting) re-evaluate the scan gate
--- (§6.1); channels and profession-word alerts rebuild the index (§6.2), and a
+-- (§6.1); channels, profession-word alerts and unbound items rebuild the index (§6.2), and a
 -- channel also re-evaluates the gate, which owns the registered chat events. A channel the
 -- flavor does not have is not shown (§6.1).
 local PageGeneral = { id = "general", title = Localization.Text("General") }
@@ -86,6 +86,13 @@ function PageGeneral.Create(parent)
     "recipeMarkers",
     refreshMarkers,
     "Draws a mute switch on each recipe in the profession window. Click it to mute or unmute that recipe."
+  )
+  toggle(
+    "Track unbound items (materials, potions, gems)",
+    settings,
+    "includeUnbound",
+    rebuild("includeUnbound"),
+    "Also alerts for items that are not bound, such as materials, potions and gems. Off, those recipes never alert, muted or not."
   )
   return { Refresh = refresh }
 end

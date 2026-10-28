@@ -21,6 +21,11 @@ local TIPS = {
     "Bell markers on recipe rows",
     "Draws a mute switch on each recipe in the profession window. Click it to mute or unmute that recipe.",
   },
+  {
+    "General",
+    "Track unbound items (materials, potions, gems)",
+    "Also alerts for items that are not bound, such as materials, potions and gems. Off, those recipes never alert, muted or not.",
+  },
   { "Alerts", "Alert sound", "The sound played with each new lead. Play tries the chosen one; None is silent." },
   {
     "Alerts",

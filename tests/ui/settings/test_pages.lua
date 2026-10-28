@@ -115,7 +115,7 @@ end
 
 -- §6.1: enable and "Only where Trade chat exists" re-evaluate the gate; §6.2: channels and
 -- profession-word alerts rebuild the index (channels also re-evaluate the registered events).
--- Unbound items moved to the Crafters page, under the recipe list.
+-- Track unbound items sits in Matching (rebuilds the index) and is gone from the Crafters page.
 local function testGeneralPage()
   local ns, db, refreshes = SettingsFixture.load()
   local settings = db.settings
@@ -126,6 +126,7 @@ local function testGeneralPage()
     { "Only where Trade chat exists", "onlyResting", { "evaluate" } },
     { "Profession-word alerts", "professionWordAlerts", { "rebuild:professionWordAlerts" } },
     { "Bell markers on recipe rows", "recipeMarkers", { "markers", "classicMarkers" } },
+    { "Track unbound items (materials, potions, gems)", "includeUnbound", { "rebuild:includeUnbound" } },
   }
   Assert.raises(function()
     row("Include unbound items")
@@ -136,6 +137,11 @@ local function testGeneralPage()
     Assert.equal(settings[case[2]], not before, case[2])
     Assert.same(take(refreshes), case[3], case[2])
   end
+  open(ns, "Crafters")
+  Assert.raises(function()
+    row("Track unbound items (materials, potions, gems)")
+  end, "no visible row")
+  open(ns, "General")
   Widgets.click(row("General").input)
   Assert.equal(settings.channels.general, true)
   Assert.same(take(refreshes), { "rebuild:channels", "evaluate" })
