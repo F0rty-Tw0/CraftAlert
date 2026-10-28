@@ -16,7 +16,8 @@ local function testText()
   Assert.equal(H({ crafter = "Alt-Other", recipeName = "Plate Belt" }), "Wants Plate Belt — your alt Alt-Other can craft it")
   Assert.equal(H({ crafter = "Alt-Other", profName = "Blacksmithing" }), "Wants Blacksmithing — your alt Alt-Other has it")
   -- A lead's channel key as its word; an unknown key as itself; no key, nil.
-  local channels = { trade = "Trade", services = "Services", general = "General", lfg = "LookingForGroup", guild = "Guild", communities = "Communities" }
+  local channels =
+    { trade = "Trade", services = "Services", general = "General", lfg = "LookingForGroup", guild = "Guild", communities = "Communities" }
   for key, name in pairs(channels) do
     Assert.equal(ns.LeadText.Channel({ channel = key }), name, key)
   end
