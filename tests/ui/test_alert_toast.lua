@@ -425,6 +425,27 @@ local function testClassColor()
   Assert.same(looked, { "Player-1-0001" })
 end
 
+-- An alt's lead: the headline names the alt in its saved class (user, 2026-10-28), and the
+-- greeting the click whispers names it plain, with no colour code.
+local function testAltCrafterColor()
+  local ns, _, calls = UiFixture.load({
+    leads = 1,
+    db = function(accountDb)
+      accountDb.characters["Alt-Realm"] = { class = "MAGE" }
+      accountDb.leads[1].crafter = "Alt-Realm"
+    end,
+  })
+  Wow.stub("RAID_CLASS_COLORS", { MAGE = { r = 0.25, g = 0.78, b = 0.92 } })
+  ns.AlertToast.Show(ns.Leads.Latest())
+  fontStringWith("Wants Blacksmithing — your alt |cff3fc6eaAlt|r has it")
+  Wow.clock.gettime = 51
+  Widgets.click(toastFrame(), "LeftButton")
+  local sent = UiFixture.callsTo(calls, "chat")
+  Assert.equal(#sent, 1)
+  Assert.truthy(string.find(sent[1][2], "Alt", 1, true), sent[1][2])
+  Assert.falsy(string.find(sent[1][2], "|", 1, true), sent[1][2])
+end
+
 local ROWS = { -- launcher centre, toast point → launcher point, x
   { 100, 900, "TOPLEFT", "TOPRIGHT", 8 },
   { 100, 100, "BOTTOMLEFT", "BOTTOMRIGHT", 8 },
@@ -577,6 +598,7 @@ return function()
   testNoTestToast()
   testRealPathTestLead()
   testClassColor()
+  testAltCrafterColor()
   testDock()
   testHiddenLauncherAndPulse()
   testAlertExport()

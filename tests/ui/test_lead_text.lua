@@ -47,6 +47,32 @@ local function testText()
   Wow.reset()
 end
 
+-- The alt's name in the toast headline and WM's preview line wears the class saved for it, as in the
+-- details header (user, 2026-10-28); an alt with no saved class keeps the plain name.
+local MAGE_ALT = "|cff3fc6eaAlt|r"
+
+local function testCrafterColor()
+  local ns = UiFixture.load({
+    db = function(db)
+      db.characters["Alt-Realm"] = { class = "MAGE" }
+      db.characters["Alt-Other"] = {}
+    end,
+  })
+  Wow.stub("RAID_CLASS_COLORS", { MAGE = { r = 0.25, g = 0.78, b = 0.92 } })
+  local H, C = ns.LeadText.Headline, ns.LeadText.CrafterLine
+  Assert.equal(H({ crafter = "Alt-Realm", itemLink = LINK }), "Wants " .. LINK .. " — your alt " .. MAGE_ALT .. " can craft it")
+  Assert.equal(H({ crafter = "Alt-Realm", profName = "Blacksmithing" }), "Wants Blacksmithing — your alt " .. MAGE_ALT .. " has it")
+  Assert.equal(C({ crafter = "Alt-Realm", itemLink = LINK }), "Your alt " .. MAGE_ALT .. " can craft it")
+  Assert.equal(C({ crafter = "Alt-Realm", profName = "Blacksmithing" }), "Your alt " .. MAGE_ALT .. " has Blacksmithing")
+  Assert.equal(H({ crafter = "Alt-Other", recipeName = "Plate Belt" }), "Wants Plate Belt — your alt Alt-Other can craft it")
+  Assert.equal(C({ crafter = "Alt-Other", profName = "Blacksmithing" }), "Your alt Alt-Other has Blacksmithing")
+  -- An alt never saved, and your own lines, which name nobody.
+  Assert.equal(C({ crafter = "Gone-Realm", recipeName = "Plate Belt" }), "Your alt Gone can craft it")
+  Assert.equal(H({ crafter = "Me-Realm", recipeName = "Plate Belt" }), "Wants Plate Belt — you can craft it")
+  Assert.equal(C({ crafter = "Me-Realm", recipeName = "Plate Belt" }), "You can craft it")
+  Wow.reset()
+end
+
 -- Details spec A.4: the lines under Quality, from the crafter's recipe record.
 local CONC = 3168
 
@@ -121,5 +147,6 @@ end
 
 return function()
   testText()
+  testCrafterColor()
   testQuality()
 end

@@ -162,6 +162,12 @@ local function testPreviewRows()
   lead.crafter = nil
   ns.WhisperBridge.ShowLead(lead)
   Assert.equal(wm.preview.CraftAlert.detail, nil)
+  -- An alt with a saved class: its name in that class (user, 2026-10-28); WM sets the line as is.
+  _G["CraftAlertDB"].characters["Alt-Realm"] = { class = "MAGE" }
+  Wow.stub("RAID_CLASS_COLORS", { MAGE = { r = 0.25, g = 0.78, b = 0.92 } })
+  lead.crafter = "Alt-Realm"
+  ns.WhisperBridge.ShowLead(lead)
+  Assert.equal(wm.preview.CraftAlert.detail, "Your alt |cff3fc6eaAlt|r has Blacksmithing")
 end
 
 local function testPreviewClick()
