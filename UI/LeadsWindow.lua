@@ -268,11 +268,13 @@ function LeadsWindow.ToggleSettings()
 end
 
 -- ScanGate.OnChange (wired by Bootstrap): entering an instance closes the window in either mode;
--- leaving does not reopen it. Arguments are ignored.
+-- leaving does not reopen it. An open window refreshes, so its empty text follows the gate.
+-- Arguments are ignored.
 function LeadsWindow.OnGate()
   if window ~= nil and FlavorCompat.InInstance() then
     window.frame:Hide()
   end
+  LeadsWindow.Refresh()
 end
 
 -- The lead in the top row and GetTime() when it appeared there, or nil (closed, hidden by Alt+Z,

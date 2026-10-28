@@ -10,6 +10,8 @@ local LeadDetails = ns.LeadDetails or require("CraftAlert.UI.LeadDetails")
 local LeadsList = ns.LeadsList or require("CraftAlert.UI.LeadsList")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local LedgerStrip = ns.LedgerStrip or require("CraftAlert.UI.LedgerStrip")
+local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
+local Status = ns.Status or require("CraftAlert.Core.Status")
 
 -- Spec A.2, A.6, assumption 2: the leads split view, built into any parent frame (the leads
 -- window's content frame, or a WhisperMessenger panel host). The ledger line (UI/LedgerStrip.lua,
@@ -65,6 +67,16 @@ local function createEmpty(pane)
   return empty
 end
 
+-- Why the details pane is empty: the paused line when the addon is not listening, else the plain
+-- text (while listening, "Listening in Trade — ..." would not explain an empty list).
+local function emptyText()
+  local state = ScanGate.State()
+  if not state.active then
+    return Status.Text(state)
+  end
+  return Localization.Text("No leads right now. Requests you can craft show up here.")
+end
+
 local function positionOf(leads, id)
   for position, lead in ipairs(leads) do
     if lead.id == id then
@@ -102,6 +114,9 @@ function LeadsView.Refresh(view, leads)
   local height = view.getHeight() - Theme.LAYOUT.LEDGER_HEIGHT
   LeadsList.Refresh(view.list, leads, LeadsList.Fit(height), view.selectedId)
   view.empty:SetShown(#leads == 0)
+  if #leads == 0 then
+    view.empty.text:SetText(emptyText())
+  end
   if selected then
     LeadDetails.Show(view.details, selected)
   else

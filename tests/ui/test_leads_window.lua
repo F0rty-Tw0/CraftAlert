@@ -218,11 +218,29 @@ local function testRowFields()
 
   -- No leads: the empty text in the details pane, no rows, nothing selected.
   ns = load({})
+  ns.ScanGate.State = function()
+    return { active = true, channels = { "Trade" }, recipeCount = 4, crafterCount = 2 }
+  end
   ns.LeadsWindow.Toggle()
   Assert.equal(#rows(), 0)
   Assert.truthy(string.find(textOf(view().detailsPane), "No leads", 1, true), textOf(view().detailsPane))
   Assert.equal(ns.LeadsView.Selected(view()), nil)
   Assert.equal(view().details.frame:IsShown(), false)
+end
+
+-- The window follows the gate while empty: the paused line when it is not listening, the old text again when it is.
+local function testEmptyFollowsGate()
+  local ns = load({})
+  ns.LeadsWindow.Toggle()
+  local state = { active = false, reason = "noTrade", channels = {}, recipeCount = 0, crafterCount = 0 }
+  ns.ScanGate.State = function()
+    return state
+  end
+  ns.LeadsWindow.OnGate(false, state)
+  Assert.equal(view().empty.text:GetText(), "Paused — no Trade chat here")
+  state = { active = true, channels = { "Trade" }, recipeCount = 4, crafterCount = 2 }
+  ns.LeadsWindow.OnGate(true, state)
+  Assert.equal(view().empty.text:GetText(), "No leads right now. Requests you can craft show up here.")
 end
 
 -- AC2: a left click selects, a right click dismisses with the look rule, the details' buttons
@@ -471,6 +489,7 @@ return function()
   testContentFrameAndBand()
   testPanesAndRows()
   testRowFields()
+  testEmptyFollowsGate()
   testClicks()
   testWheel()
   testVisibleLatestAndScroll()

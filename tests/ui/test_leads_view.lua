@@ -9,6 +9,14 @@ local UiFixture = require("tests.helpers.ui_fixture")
 -- the selection rules: newest first, kept by id across refreshes, moved to the lead now at its
 -- place when it leaves.
 local WIDTH, HEIGHT = 830, 496
+
+-- The gate as the view reads it: ScanGate.State() (the fixture's has no db, so it reads notStarted).
+local function setScan(ns, state)
+  ns.ScanGate.State = function()
+    return state
+  end
+end
+local LISTENING = { active = true, channels = { "Trade" }, recipeCount = 4, crafterCount = 2 }
 local LIST_ATLAS, DETAILS_ATLAS = "Professions-background-summarylist", "auctionhouse-background-index"
 
 -- The fixture with `count` leads (ids 1..count, newest last) and a view over a bare host; the
@@ -154,6 +162,7 @@ end
 
 local function testEmpty()
   local ns, view = open(0)
+  setScan(ns, LISTENING)
   ns.LeadsView.Refresh(view, leadsDown(2))
   ns.LeadsView.Refresh(view, {})
   local empty = view.empty
@@ -169,6 +178,23 @@ local function testEmpty()
   ns.LeadsView.Refresh(view, {})
   ns.LeadsView.Refresh(view, leadsDown(1))
   Assert.equal(empty:IsShown(), false)
+end
+
+-- Not listening: the empty details pane says why, not "No leads right now".
+local function testEmptyStatus()
+  local ns, view = open(0)
+  setScan(ns, { active = false, reason = "noTrade", channels = {}, recipeCount = 4, crafterCount = 2 })
+  ns.LeadsView.Refresh(view, {})
+  Assert.same({ view.empty:IsShown(), view.empty.text:GetText() }, { true, "Paused — no Trade chat here" })
+  setScan(ns, { active = false, reason = "disabled", channels = {}, recipeCount = 0, crafterCount = 0 })
+  ns.LeadsView.Refresh(view, {})
+  Assert.equal(view.empty.text:GetText(), "Paused — Craft Alert is turned off")
+  setScan(ns, LISTENING)
+  ns.LeadsView.Refresh(view, {})
+  Assert.equal(view.empty.text:GetText(), "No leads right now. Requests you can craft show up here.", "listening: the old text")
+  setScan(ns, { active = false, reason = "noTrade", channels = {}, recipeCount = 0, crafterCount = 0 })
+  ns.LeadsView.Refresh(view, leadsDown(1))
+  Assert.equal(view.empty:IsShown(), false, "with leads the empty text is hidden whatever the gate says")
 end
 
 -- Spec 6a: a list narrower than LIST_MIN_WIDTH (WM's rail) is icon-only, rows made then and later,
@@ -371,6 +397,7 @@ return function()
   testLayout()
   testFit()
   testEmpty()
+  testEmptyStatus()
   testCompactLayout()
   testNewestSelected()
   testArrivalKeepsSelection()
