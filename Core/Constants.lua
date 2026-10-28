@@ -7,7 +7,7 @@ end
 -- "inferred" there (Era, Wrath, Cata, MoP) copy TBC Anniversary until a client is probed.
 local Constants = {}
 
-Constants.version = "0.1.0"
+Constants.version = "1.0.0"
 
 -- Sound kits valid on every probed flavor; 888 is invalid on Retail, so it is not shipped.
 local SOUND_KITS = { 8959, 3081, 5274, 12867, 8960 }
