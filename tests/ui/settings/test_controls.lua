@@ -10,6 +10,7 @@ local function load()
   Fresh.require("Core.FlavorCompat")
   local Theme = Fresh.require("UI.Theme")
   Fresh.require("UI.FrameKit")
+  Fresh.require("UI.Tooltip")
   local Controls = Fresh.require("UI.Settings.Controls")
   local parent = _G["CreateFrame"]("Frame", nil, _G["UIParent"])
   return Controls, Controls.Column(parent), parent, Theme
@@ -196,6 +197,80 @@ local function testButton()
   Assert.equal(clicks, 1)
 end
 
+local GOLD, WHITE = { 1, 0.82, 0 }, { 1, 1, 1 }
+
+-- A control's `tip` hangs on its whole row: the row and the control's own frames show the row's
+-- tooltip (gold label, white text) and hide it on leave. A control without one shows none.
+local function testTips()
+  local Controls, column, _, Theme = load()
+  local tip = require("CraftAlert.UI.Tooltip").Get()
+  local toggle = Controls.Toggle(column, "Enable", function() end, "Turns scanning on or off.")
+  Assert.equal(toggle.row.mouseEnabled, true, "the row takes the hover")
+  Widgets.fire(toggle.row, "OnEnter")
+  Assert.same(
+    { tip.owner, tip.anchor, tip.lines, tip.colors, tip.minWidth, tip.shown },
+    { toggle.row, "ANCHOR_RIGHT", { "Enable", "Turns scanning on or off." }, { GOLD, WHITE }, Theme.LAYOUT.TIP_WIDTH, true }
+  )
+  Widgets.fire(toggle.row, "OnLeave")
+  Assert.equal(tip.shown, false)
+  Widgets.fire(toggle.input, "OnEnter")
+  Assert.same({ tip.owner, tip.lines[1] }, { toggle.row, "Enable" }, "the check shows the row's tip")
+  Widgets.fire(toggle.input, "OnLeave")
+  Assert.equal(tip.shown, false, "and hides it")
+  local slider = Controls.Slider(column, {
+    label = "Timeout",
+    min = 1,
+    max = 60,
+    step = 1,
+    onChange = function() end,
+    tip = "How long.",
+  })
+  Widgets.fire(slider.input.Slider, "OnEnter")
+  Assert.same({ tip.owner, tip.lines }, { slider.row, { "Timeout", "How long." } })
+  Widgets.fire(slider.input.Slider, "OnLeave")
+  Widgets.fire(slider.input.Forward, "OnEnter")
+  Assert.same({ tip.owner, tip.shown }, { slider.row, true }, "a stepper shows the row's tip")
+  Widgets.fire(slider.input.Forward, "OnLeave")
+  local input = Controls.Input(column, "Item", function() end, nil, "Whispered.")
+  Widgets.fire(input.input, "OnEnter")
+  Assert.same({ tip.owner, tip.lines }, { input.row, { "Item", "Whispered." } })
+  Widgets.fire(input.input, "OnLeave")
+  local search = Controls.Search(column, "Search recipes", function() end, "Type a name.")
+  Widgets.fire(search.input, "OnEnter")
+  Assert.same({ tip.owner, tip.lines }, { search.row, { "Search recipes", "Type a name." } })
+  Widgets.fire(search.input, "OnLeave")
+  local choice = Controls.Choice(column, "Sound", { { value = 0, text = "None" } }, function() end, "Played.")
+  Widgets.fire(choice.input, "OnEnter")
+  Assert.same({ tip.owner, tip.lines }, { choice.row, { "Sound", "Played." } })
+  Widgets.fire(choice.input, "OnLeave")
+  local bound = { on = false }
+  Controls.BoundToggle(column, "Bound", function()
+    return bound
+  end, "on", function() end, "Forwarded.")
+  local boundRow = column.last
+  Widgets.fire(boundRow, "OnEnter")
+  Assert.same({ tip.owner, tip.lines }, { boundRow, { "Bound", "Forwarded." } }, "BoundToggle forwards the tip")
+  Widgets.fire(boundRow, "OnLeave")
+  local button = Controls.Button(column.parent, "Remove", 100, function() end, "Deletes it.")
+  Widgets.fire(button, "OnEnter")
+  Assert.same({ tip.owner, tip.lines }, { button, { "Remove", "Deletes it." } })
+  Widgets.fire(button, "OnLeave")
+  Assert.equal(tip.shown, false)
+  local plain = Controls.Toggle(column, "Plain", function() end)
+  Widgets.fire(plain.row, "OnEnter")
+  Widgets.fire(plain.input, "OnEnter")
+  Assert.equal(tip.shown, false, "no tip, no tooltip")
+  Assert.equal(plain.row.mouseEnabled, nil, "and the row keeps its mouse state")
+  local dynamic = "Before"
+  local other = Controls.Button(column.parent, "Only", 100, function() end)
+  Controls.Tip(other, function()
+    return dynamic
+  end, "Body.")
+  dynamic = "After"
+  Widgets.fire(other, "OnEnter")
+  Assert.equal(tip.lines[1], "After", "a function title is read at hover time")
+end
+
 local function testSectionKeepsFontColour()
   local Controls, column = load()
   local section = Controls.Section(column, "Sounds")
@@ -359,6 +434,7 @@ return function()
   testSearch()
   testChoice()
   testButton()
+  testTips()
   testSectionKeepsFontColour()
   testListPages()
   testFakeCheckButton()
