@@ -158,12 +158,31 @@ function LedgerStrip.New(parent, host)
   return strip
 end
 
+-- The text from PADDING right of `strip.leftEdge`'s right (the strip's own left when unset) to
+-- `strip.rightInset` before the strip's right.
+local function placeText(strip)
+  local padding = Theme.LAYOUT.PADDING
+  local edge = strip.leftEdge
+  strip.text:ClearAllPoints()
+  if edge then
+    strip.text:SetPoint("LEFT", edge, "RIGHT", padding, 0)
+  else
+    strip.text:SetPoint("LEFT", strip, "LEFT", padding, 0)
+  end
+  strip.text:SetPoint("RIGHT", strip, "RIGHT", -(strip.rightInset or padding), 0)
+end
+
 -- Ends the strip text `inset` px before the strip's right, clear of a control placed there.
 function LedgerStrip.SetRightInset(strip, inset)
-  local layout = Theme.LAYOUT
-  strip.text:ClearAllPoints()
-  strip.text:SetPoint("LEFT", strip, "LEFT", layout.PADDING, 0)
-  strip.text:SetPoint("RIGHT", strip, "RIGHT", -inset, 0)
+  strip.rightInset = inset
+  placeText(strip)
+end
+
+-- Starts the strip text right of `frame` (it follows the frame's width), clear of what the host
+-- draws down the strip at that frame's right edge.
+function LedgerStrip.SetLeftEdge(strip, frame)
+  strip.leftEdge = frame
+  placeText(strip)
 end
 
 ns.LedgerStrip = LedgerStrip
