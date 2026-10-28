@@ -350,6 +350,8 @@ end
 
 -- A newly learned recipe of an older line starts muted when the profession has a newestLine and
 -- the recipe's ID is at or below that line's median rank; a stray high-ID one stays unmuted.
+-- This differs from the window read on purpose: that mutes every newly stored older-line recipe
+-- (ReadJob muteNewOlder), so a stray high-ID learned one stays on until the next window read.
 local function muteIfOlder(character, recipeID, professionKey, line)
   local record = character.professions[professionKey]
   local newest = record and record.newestLine
@@ -377,7 +379,7 @@ function ModernReader.ReadOne(recipeID, professionKey)
   local recipes = character.recipes
   local isNew = recipes[recipeID] == nil
   local changed = store(recipes, recipeID, fields, professionKey)
-  if isNew and changed then
+  if isNew then
     muteIfOlder(character, recipeID, professionKey, fields.line)
   end
   if changed then
