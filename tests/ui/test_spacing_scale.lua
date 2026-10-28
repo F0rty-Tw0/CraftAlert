@@ -3,6 +3,8 @@ local Wow = require("tests.helpers.wow")
 local Fresh = require("tests.helpers.fresh")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 local CraftersFixture = require("tests.helpers.crafters_fixture")
+local UiFixture = require("tests.helpers.ui_fixture")
+local DetailsFixture = require("tests.helpers.details_fixture")
 
 local function layout()
   Wow.reset()
@@ -53,6 +55,14 @@ local function testMuteAllHalves()
   Assert.same({ mute.points[2][4], unmute.points[1][4] }, { -4, 4 }, "4 px each side of the bar's middle")
 end
 
+-- The details action bar: Whisper sits BUTTON_GAP (SPACE.S) right of Greet, every button 22 tall.
+local function testDetailsActionBar()
+  local _, d = DetailsFixture.open({ UiFixture.lead(1, "Buyer-Realm") })
+  local b = d.buttons
+  Assert.same(b.whisper.points[1], { "LEFT", b.greet, "RIGHT", 8, 0 })
+  Assert.same({ b.greet:GetHeight(), b.whisper:GetHeight(), b.dismiss:GetHeight() }, { 22, 22, 22 })
+end
+
 -- Later tasks add rows: GONE["UI/X.lua"] = { "old declaration text", ... }.
 local GONE = {
   ["UI/Settings/PageAlerts.lua"] = { 'Localization.Text("Play"), 48,' },
@@ -70,6 +80,11 @@ local GONE = {
     '"BOTTOMLEFT", nav, "BOTTOMLEFT", 4, 4',
   },
   ["UI/Settings/RecipeList.lua"] = { "Theme.LAYOUT.PADDING / 2" },
+  ["UI/DetailsBody.lua"] = {
+    "BLOCK_GAP, LABEL_HEIGHT, LABEL_GAP, BUBBLE_PAD_X, BUBBLE_PAD_Y = 18, 14, 5, 12, 10",
+    "LABEL_WIDTH, COLUMN_GAP, LINE_HEIGHT, ROW_GAP = 84, 12, 14, 9",
+  },
+  ["UI/DetailsHeader.lua"] = { "ICON_GAP, NAME_TOP, NAME_SIZE, LINE_GAP = 10, -8, 17, -3" },
 }
 
 local function source(path)
@@ -93,5 +108,6 @@ return function()
   testGapKeysKeepTheirPixels()
   testButtonWidthsKeepTheirPixels()
   testMuteAllHalves()
+  testDetailsActionBar()
   testNoMagicSpacingLeft()
 end

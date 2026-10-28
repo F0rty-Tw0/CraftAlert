@@ -34,10 +34,24 @@ local unpack = unpack
 
 local ANCHOR = "ANCHOR_RIGHT"
 local PAD = Theme.LAYOUT.DETAILS_PADDING
--- Between blocks; a label's height and its gap to the bubble under it; a bubble's text padding.
-local BLOCK_GAP, LABEL_HEIGHT, LABEL_GAP, BUBBLE_PAD_X, BUBBLE_PAD_Y = 18, 14, 5, 12, 10
--- The grid: its label column and the gap to the values, one value line, the gap between rows.
-local LABEL_WIDTH, COLUMN_GAP, LINE_HEIGHT, ROW_GAP = 84, 12, 14, 9
+local SPACE = Theme.LAYOUT.SPACE
+-- Between blocks.
+-- off-scale: details pane spacing, kept pixel-exact.
+local BLOCK_GAP = 18
+-- A label's height, and its gap to the bubble under it.
+local LABEL_HEIGHT = 14
+-- off-scale: details pane spacing, kept pixel-exact.
+local LABEL_GAP = 5
+-- A bubble's text padding, across and down.
+local BUBBLE_PAD_X = SPACE.M
+-- off-scale: details pane spacing, kept pixel-exact.
+local BUBBLE_PAD_Y = 10
+-- The grid: its label column, the gap to the values, one value line, the gap between rows.
+local LABEL_WIDTH = 84
+local COLUMN_GAP = SPACE.M
+local LINE_HEIGHT = 14
+-- off-scale: details pane spacing, kept pixel-exact.
+local ROW_GAP = 9
 local VALUE_LEFT = PAD + LABEL_WIDTH + COLUMN_GAP
 local HINT_HEIGHT, BUBBLE_LINES, CRAFTER_LINES = 12, 4, 3
 

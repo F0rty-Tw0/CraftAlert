@@ -30,7 +30,12 @@ local unpack = unpack
 
 -- The name ICON_GAP right of the icon and NAME_TOP below the header's top, NAME_SIZE px high;
 -- LINE_GAP between the header's lines.
-local ICON_GAP, NAME_TOP, NAME_SIZE, LINE_GAP = 10, -8, 17, -3
+-- off-scale: WhisperMessenger's header icon gap.
+local ICON_GAP = 10
+local NAME_TOP = -Theme.LAYOUT.SPACE.S
+local NAME_SIZE = 17
+-- off-scale: text leading, kept as is.
+local LINE_GAP = -3
 local NAME_LEFT = Theme.LAYOUT.DETAILS_PADDING + Theme.LAYOUT.HEADER_ICON_SIZE + ICON_GAP
 local SEPARATOR = " · "
 -- The strip's text wraps to at most STRIP_LINES lines.
