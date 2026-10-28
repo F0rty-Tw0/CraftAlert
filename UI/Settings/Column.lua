@@ -150,12 +150,12 @@ function Column.Note(column, font)
   return text
 end
 
--- An empty row as wide as the column, `height` tall, for controls side by side.
-function Column.Bar(column, height)
+-- An empty row as wide as the column, `height` tall, for controls side by side; `gap` as in Place.
+function Column.Bar(column, height, gap)
   local bar = create("Frame", column.parent)
   bar:SetHeight(height)
   Column.Span(column, bar)
-  Column.Place(column, bar)
+  Column.Place(column, bar, gap)
   return bar
 end
 

@@ -101,6 +101,27 @@ local function testHeadingGap()
   Assert.equal(-explicit.points[1][5], 4)
 end
 
+-- The recipe toolbar rows hang SPACE.S below each other; the list below them stays a block (16).
+local function below(frame)
+  for _, candidate in ipairs(Wow.frames) do
+    local point = candidate.points and candidate.points[1]
+    if point and point[2] == frame and point[3] == "BOTTOMLEFT" then
+      return candidate
+    end
+  end
+end
+
+local function testToolbarGaps()
+  local ns = SettingsFixture.load({ db = CraftersFixture.crafters })
+  SettingsFixture.open(ns, "Crafters")
+  local muteBar = SettingsFixture.button(SettingsFixture.window(), "Mute all").parent
+  local onlyBar = below(muteBar)
+  local list = below(onlyBar)
+  Assert.equal(-muteBar.points[1][5], 8, "search to Mute all: 8")
+  Assert.equal(-onlyBar.points[1][5], 8, "Mute all to Only: 8")
+  Assert.equal(-list.points[1][5], 16, "Only to the list: 16")
+end
+
 -- Later tasks add rows: GONE["UI/X.lua"] = { "old declaration text", ... }.
 local GONE = {
   ["UI/Settings/PageAlerts.lua"] = { 'Localization.Text("Play"), 48,' },
@@ -148,5 +169,6 @@ return function()
   testMuteAllHalves()
   testDetailsActionBar()
   testHeadingGap()
+  testToolbarGaps()
   testNoMagicSpacingLeft()
 end
