@@ -3,6 +3,9 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+
 -- Addon notices in the default chat frame, with the gold addon prefix.
 local ChatPrint = {}
 
@@ -15,6 +18,15 @@ function ChatPrint.Line(text)
     return false
   end
   frame:AddMessage(PREFIX .. text)
+  return true
+end
+
+-- In an instance, prints the off line and returns true for the caller to stop; false elsewhere.
+function ChatPrint.OffInInstance()
+  if not FlavorCompat.InInstance() then
+    return false
+  end
+  ChatPrint.Line(Localization.Text("Off in instances; it works again when you leave."))
   return true
 end
 
