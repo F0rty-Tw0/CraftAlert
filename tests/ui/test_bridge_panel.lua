@@ -313,6 +313,30 @@ local function testLinkOnLedgerLine()
   end
 end
 
+-- WM's divider hairline and its resize handle (above the host's children) run down the host at the
+-- split, through the ledger band: the counts start right of the split, on the rail and wide alike,
+-- so the bar never crosses them.
+local function testCountsStartRightOfSplit()
+  local Layout = require("tests.helpers.layout")
+  local ns, _, _, wm = boot()
+  local captured = capture(ns)
+  local host = showWith(wm, 1000, 50)
+  local view = captured.view
+  local function check(message)
+    local textLeft = Layout.edges(view.strip.text)
+    local _, splitX = Layout.edges(view.listPane)
+    Assert.equal(textLeft, splitX + ns.Theme.LAYOUT.PADDING, message)
+  end
+  check("rail")
+  wm.split("CraftAlert", 260)
+  check("wide")
+  Assert.same(
+    view.strip.points,
+    { { "TOPLEFT", host, "TOPLEFT", 0, 0 }, { "TOPRIGHT", host, "TOPRIGHT", 0, 0 } },
+    "the strip itself still spans the host"
+  )
+end
+
 -- A narrow panel cuts the counts, never the link: the strip text ends before it at any host width.
 local function testCountsEndBeforeLink()
   local Layout = require("tests.helpers.layout")
@@ -418,6 +442,7 @@ return function()
   testSplitInSettings()
   testGearAfterRailSplit()
   testLinkOnLedgerLine()
+  testCountsStartRightOfSplit()
   testCountsEndBeforeLink()
   testNameCutAtHeaderInset()
   testSettingsCoverWmDivider()
