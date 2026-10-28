@@ -438,19 +438,6 @@ local function buildLead(result, customerKey, text, channelKey, pick)
   return lead
 end
 
--- nil when the player is not AFK-flagged or the flag is secret (§7.6).
-local function afkNow()
-  local isAfk = _G["UnitIsAFK"]
-  if type(isAfk) ~= "function" then
-    return nil
-  end
-  local afk = isAfk("player")
-  if FlavorCompat.issecretvalue(afk) then
-    return nil
-  end
-  return afk == true
-end
-
 -- Steps 5-7 on a matched line. result: the Matcher's (reused) result; customerKey: the
 -- normalized sender. → lead, isNew; nil when no crafter qualifies (customer ignored, or none
 -- of the matched crafters is left).
@@ -489,7 +476,8 @@ function Leads.OnMatch(result, customerKey, text, channelKey, guid)
   if FlavorCompat.IsTestGuid(lead.guid) then
     lead.test = true
   end
-  lead.arrivedWhileAfk = afkNow()
+  -- §7.6: nil when the flag is secret or the API is missing.
+  lead.arrivedWhileAfk = FlavorCompat.IsAfk()
   nextId = nextId + 1
   leads[#leads + 1] = lead
   if #leads > MAX_LEADS then

@@ -320,6 +320,30 @@ local function testOwnClass()
   Assert.equal(FlavorCompat.OwnClass(), nil, "non-string token")
 end
 
+-- The player's AFK flag: the API is read per call; a missing API, a secret or a non-boolean is nil.
+local function testIsAfk()
+  local FlavorCompat = load("retail")
+  Assert.equal(FlavorCompat.IsAfk(), nil, "no UnitIsAFK")
+  local afk = true
+  Wow.stub("UnitIsAFK", function(unit)
+    Assert.equal(unit, "player")
+    return afk
+  end)
+  Assert.equal(FlavorCompat.IsAfk(), true, "stubbed after load: read per call")
+  afk = false
+  Assert.equal(FlavorCompat.IsAfk(), false)
+  local realSecret = FlavorCompat.issecretvalue
+  FlavorCompat.issecretvalue = function(value)
+    return value == false or realSecret(value)
+  end
+  Assert.equal(FlavorCompat.IsAfk(), nil, "secret flag that is a boolean")
+  FlavorCompat.issecretvalue = realSecret
+  Wow.stub("UnitIsAFK", function()
+    return 1
+  end)
+  Assert.equal(FlavorCompat.IsAfk(), nil, "non-boolean")
+end
+
 -- The instance test: the API is read per call; a missing API means not in an instance.
 local function testInInstance()
   local FlavorCompat = load("retail")
@@ -338,6 +362,7 @@ end
 return function()
   testOwnClass()
   testInInstance()
+  testIsAfk()
   testIsTestGuid()
   testTestClasses()
   testFlavorKeys()

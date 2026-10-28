@@ -3,6 +3,8 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+
 -- One hidden frame for all game events. An event is registered on it only while at least
 -- one handler wants it (spec §4.3 rule 4), and handlers receive the event's arguments
 -- without the event name.
@@ -89,6 +91,23 @@ function EventRouter.Off(event, fn)
   else
     handlers[event] = copy
   end
+end
+
+-- Runs fn() now when the addon `name` is loaded, else once at its ADDON_LOADED. Off inside the
+-- dispatch is safe: Dispatch walks the list it started with.
+function EventRouter.WhenAddOnLoaded(name, fn)
+  if FlavorCompat.IsAddOnLoaded(name) then
+    fn()
+    return
+  end
+  local function onAddonLoaded(loadedName)
+    if loadedName ~= name then
+      return
+    end
+    EventRouter.Off("ADDON_LOADED", onAddonLoaded)
+    fn()
+  end
+  EventRouter.On("ADDON_LOADED", onAddonLoaded)
 end
 
 ns.EventRouter = EventRouter

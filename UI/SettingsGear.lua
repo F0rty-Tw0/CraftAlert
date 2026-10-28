@@ -14,15 +14,10 @@ local SettingsGear = {}
 
 local LABEL_GAP = Theme.LAYOUT.SPACE.XS
 
--- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua): gold title, then
--- one green instruction line naming what a click does now (no body, so no gap above it).
+-- One green instruction line naming what a click does now (Tooltip.ShowHint, no body).
 local function showTooltip(gear)
-  local tooltip = Tooltip.Get()
-  tooltip:SetOwner(gear, "ANCHOR_BOTTOMLEFT")
-  _G["GameTooltip_SetTitle"](tooltip, Localization.Text("Settings"), _G["NORMAL_FONT_COLOR"])
   local instruction = gear.inSettings and "Click: back to leads" or "Click: open settings"
-  _G["GameTooltip_AddInstructionLine"](tooltip, Localization.Text(instruction))
-  tooltip:Show()
+  Tooltip.ShowHint(gear, "ANCHOR_BOTTOMLEFT", Localization.Text("Settings"), nil, { Localization.Text(instruction) })
 end
 
 -- The gear's art on `button`: its normal texture (button.normal) and an additive copy as its
@@ -74,16 +69,7 @@ function SettingsGear.BuildLabeled(parent, onClick)
   link:SetScript("OnClick", function()
     onClick()
   end)
-  link:SetScript("OnEnter", function(self)
-    local white = Theme.COLORS.white
-    self.label:SetTextColor(white[1], white[2], white[3], white[4])
-    showTooltip(self)
-  end)
-  link:SetScript("OnLeave", function(self)
-    local gold = Theme.COLORS.gold
-    self.label:SetTextColor(gold[1], gold[2], gold[3], gold[4])
-    Tooltip.HideIfOwned(self)
-  end)
+  Tooltip.GoldLink(link, showTooltip)
 
   return link
 end

@@ -29,8 +29,8 @@ local function printedLines()
   return Wow.chat
 end
 
-local function testValidDbIsUntouched()
-  local Schema, Defaults = load()
+-- A default db with one valid entry in every block.
+local function validDb(Defaults)
   local db = Defaults.Db()
   db.characters["Bob-Realm"] = {
     source = "local",
@@ -44,7 +44,23 @@ local function testValidDbIsUntouched()
   db.leads[1] = { id = 1, customer = "Cus-Realm", crafter = "Me-Realm", time = 100, message = "LF belt" }
   db.ui.toast = { point = "TOP", x = 10, y = -20 }
   db.ui.window = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 40, width = 640, height = 500 }
+  return db
+end
+
+local function testValidDbIsUntouched()
+  local Schema, Defaults = load()
+  local db = validDb(Defaults)
   local before = deepCopy(db)
+  Assert.same(Schema.Validate(db), before)
+  Assert.equal(#printedLines(), 0)
+end
+
+-- The chat probe's `_probe` block of older saves is dropped; nothing else changes.
+local function testProbeBlockDropped()
+  local Schema, Defaults = load()
+  local db = validDb(Defaults)
+  local before = deepCopy(db)
+  db._probe = { lines = { { text = "LF bs", channel = "Trade" } } }
   Assert.same(Schema.Validate(db), before)
   Assert.equal(#printedLines(), 0)
 end
@@ -555,6 +571,7 @@ end
 
 return function()
   testValidDbIsUntouched()
+  testProbeBlockDropped()
   testLegacySettingsSizeDropped()
   testBadTopLevelTypes()
   testSettingsTypesAndRanges()

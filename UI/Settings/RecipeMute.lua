@@ -34,13 +34,7 @@ local function showTooltip(mute)
     text = muted and "Requests for this recipe do not alert you" or "Requests for this recipe alert you"
     instruction = muted and "Click: unmute" or "Click: mute"
   end
-  local tooltip = Tooltip.Get()
-  tooltip:SetOwner(mute, "ANCHOR_RIGHT")
-  _G["GameTooltip_SetTitle"](tooltip, Localization.Text(title), _G["NORMAL_FONT_COLOR"])
-  _G["GameTooltip_AddHighlightLine"](tooltip, Localization.Text(text))
-  _G["GameTooltip_AddBlankLineToTooltip"](tooltip)
-  _G["GameTooltip_AddInstructionLine"](tooltip, Localization.Text(instruction))
-  tooltip:Show()
+  Tooltip.ShowHint(mute, "ANCHOR_RIGHT", Localization.Text(title), { Localization.Text(text) }, { Localization.Text(instruction) })
 end
 
 -- The switch on `row`, anchored at its right end; a click runs onClick(). The caller sets

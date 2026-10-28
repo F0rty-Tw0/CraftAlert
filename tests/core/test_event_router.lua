@@ -88,6 +88,38 @@ local function testChangesDuringDispatch()
   Assert.same(seen, { "second", "late" })
 end
 
+-- WhenAddOnLoaded: runs at once for a loaded addon; else at that addon's ADDON_LOADED only, once,
+-- and the listener leaves (the event is unregistered with no other handler).
+local function testWhenAddOnLoaded()
+  local EventRouter = newRouter()
+  local loaded = { Blizzard_Professions = true }
+  Wow.stub("C_AddOns", {
+    IsAddOnLoaded = function(name)
+      return loaded[name] == true
+    end,
+  })
+  local calls = {}
+  local function record(name)
+    return function()
+      calls[#calls + 1] = name
+    end
+  end
+  EventRouter.WhenAddOnLoaded("Blizzard_Professions", record("now"))
+  Assert.same(calls, { "now" }, "already loaded: runs at once")
+  Assert.equal(#Wow.frames, 0, "already loaded: no listener")
+
+  EventRouter.WhenAddOnLoaded("Blizzard_TradeSkillUI", record("later"))
+  Assert.same(calls, { "now" }, "not loaded yet: waits")
+  EventRouter.Dispatch("ADDON_LOADED", "Blizzard_Craft")
+  Assert.same(calls, { "now" }, "another addon: ignored")
+  Assert.truthy(routerFrame():IsEventRegistered("ADDON_LOADED"))
+  EventRouter.Dispatch("ADDON_LOADED", "Blizzard_TradeSkillUI")
+  Assert.same(calls, { "now", "later" }, "its addon: runs")
+  Assert.falsy(routerFrame():IsEventRegistered("ADDON_LOADED"), "the listener left")
+  EventRouter.Dispatch("ADDON_LOADED", "Blizzard_TradeSkillUI")
+  Assert.same(calls, { "now", "later" }, "once")
+end
+
 local function testFailingHandlerDoesNotBlockOthers()
   local EventRouter = newRouter()
   local reported = {}
@@ -192,6 +224,7 @@ return function()
   testDispatchOrderAndArguments()
   testSameHandlerRegistersOnce()
   testChangesDuringDispatch()
+  testWhenAddOnLoaded()
   testFailingHandlerDoesNotBlockOthers()
   testCallAll()
   Wow.reset()

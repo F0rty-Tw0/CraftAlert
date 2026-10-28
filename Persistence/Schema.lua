@@ -366,8 +366,10 @@ function Schema.Validate(db)
   db.leads = fixLeads(db.leads)
   db.ledger = fixRecords(db.ledger, isDay, fixDay)
   db.recentGreeted = fixMap(db.recentGreeted, isName, isNumber)
+  -- Dead top-level blocks of older saves: the block list, and the chat probe's recordings.
   if not keepUnknown then
     db.ignored = nil
+    db._probe = nil
   end
   db.ui = fixUi(db.ui)
   keepUnknown = false
