@@ -61,14 +61,17 @@ local function createCharacterRows(column, page)
   Controls.Section(column, Localization.Text("This character"))
   page.character = Controls.Choice(column, Localization.Text("Character"), {}, function()
     page.ShowCharacter()
-  end)
+  end, Localization.Text("Pick whose professions and recipes this page shows."))
   page.enabled = Controls.Toggle(column, Localization.Text("Listen for this character"), function(on)
     local character = shownCharacter(page)
     if character then
       character.enabled = on
       Index.RequestRebuild("crafter")
     end
-  end)
+  end, Localization.Text("Alerts for this character's recipes. Off, its recipes are left out of matching."))
+  local removeTip = Localization.Text(
+    "Deletes this character's saved professions and recipes. It asks for a second click. Your logged-in character comes back empty until you open a profession window."
+  )
   page.remove = Controls.Button(column.parent, Localization.Text("Remove character"), REMOVE_WIDTH, function()
     if shownCharacter(page) == nil then
       return
@@ -88,7 +91,7 @@ local function createCharacterRows(column, page)
     end
     Index.RequestRebuild("crafter")
     page.Refresh()
-  end)
+  end, removeTip)
   Controls.Place(column, page.remove)
 end
 
@@ -97,11 +100,18 @@ local function createProfessionRows(column, page)
   page.profession = Controls.Choice(column, Localization.Text("Profession"), {}, function()
     page.ShowProfession()
   end)
-  page.primary = Controls.Toggle(column, Localization.Text("Main crafter for this profession"), function(on)
-    if page.profession.Value() ~= nil then
-      MainCrafter.Set(db(), page.character.Value(), page.profession.Value(), on)
-    end
-  end)
+  page.primary = Controls.Toggle(
+    column,
+    Localization.Text("Main crafter for this profession"),
+    function(on)
+      if page.profession.Value() ~= nil then
+        MainCrafter.Set(db(), page.character.Value(), page.profession.Value(), on)
+      end
+    end,
+    Localization.Text(
+      "When several of your characters can craft a request, this one is chosen first and gets the greeting. One main crafter per profession."
+    )
+  )
   page.list = RecipeList.Create(column)
   -- The list greys the recipes this leaves out, so it repaints after a change.
   local function trackUnbound()

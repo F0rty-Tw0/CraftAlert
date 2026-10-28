@@ -107,12 +107,12 @@ local function createMuteAll(column, muteAll)
   local bar = Controls.Bar(column, Theme.LAYOUT.BUTTON_HEIGHT)
   local mute = Controls.Button(bar, Localization.Text("Mute all"), 0, function()
     muteAll(true)
-  end)
+  end, Localization.Text("Mutes every recipe the list shows. With a search typed, only the recipes it finds."))
   mute:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
   mute:SetPoint("TOPRIGHT", bar, "TOP", -gap, 0)
   local unmute = Controls.Button(bar, Localization.Text("Unmute all"), 0, function()
     muteAll(false)
-  end)
+  end, Localization.Text("Unmutes every recipe the list shows. With a search typed, only the recipes it finds."))
   unmute:SetPoint("TOPLEFT", bar, "TOP", gap, 0)
   unmute:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
 end
@@ -123,6 +123,10 @@ local function createOnlyCurrent(column, onClick)
   local button = Controls.Button(bar, "", 0, onClick)
   button:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
   button:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
+  local tip = Localization.Text("Alerts only for this expansion's recipes: all older ones are muted and your own picks are replaced.")
+  Controls.Tip(button, function()
+    return button:GetText()
+  end, tip)
   return button
 end
 
@@ -246,7 +250,12 @@ function RecipeList.Create(column)
     end
   end
 
-  list.search = Controls.Search(column, Localization.Text("Search recipes"), render)
+  list.search = Controls.Search(
+    column,
+    Localization.Text("Search recipes"),
+    render,
+    Localization.Text("Type part of a recipe's name. The list narrows as you type.")
+  )
   createMuteAll(column, muteAll)
   list.onlyCurrent = createOnlyCurrent(column, onlyCurrent)
   list.recipes = Controls.List(column, RECIPE_ROWS, createRecipeRow)

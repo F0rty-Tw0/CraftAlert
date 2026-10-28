@@ -1,6 +1,7 @@
 local Assert = require("tests.helpers.assert")
 local Widgets = require("tests.helpers.widgets")
 local SettingsFixture = require("tests.helpers.settings_fixture")
+local CraftersFixture = require("tests.helpers.crafters_fixture")
 
 -- { page title, row label, tip text }: the "Tip strings" table of the plan, row for row.
 local TIPS = {
@@ -72,6 +73,27 @@ local TIPS = {
   },
 }
 
+-- The Crafters page's rows and buttons ({ page, label, text, button? }), found on a page with recipes.
+local MUTE_TEXT = "%s every recipe the list shows. With a search typed, only the recipes it finds."
+local CRAFTERS = {
+  { "Crafters", "Character", "Pick whose professions and recipes this page shows." },
+  { "Crafters", "Listen for this character", "Alerts for this character's recipes. Off, its recipes are left out of matching." },
+  {
+    "Crafters",
+    "Remove character",
+    "Deletes this character's saved professions and recipes. It asks for a second click. Your logged-in character comes back empty until you open a profession window.",
+    true,
+  },
+  {
+    "Crafters",
+    "Main crafter for this profession",
+    "When several of your characters can craft a request, this one is chosen first and gets the greeting. One main crafter per profession.",
+  },
+  { "Crafters", "Search recipes", "Type part of a recipe's name. The list narrows as you type." },
+  { "Crafters", "Mute all", MUTE_TEXT:format("Mutes"), true },
+  { "Crafters", "Unmute all", MUTE_TEXT:format("Unmutes"), true },
+}
+
 local function hover(frame)
   Widgets.fire(frame, "OnEnter")
   local tip = _G["CraftAlertTooltip"]
@@ -80,15 +102,34 @@ local function hover(frame)
   return seen
 end
 
+local function check(ns, entry)
+  local page, label, text, isButton = entry[1], entry[2], entry[3], entry[4]
+  SettingsFixture.open(ns, page)
+  local frame = isButton and SettingsFixture.button(SettingsFixture.window(), label) or SettingsFixture.row(label)
+  local seen = hover(frame)
+  Assert.same(seen.lines, { label, text }, page .. " / " .. label)
+  Assert.same(seen.colors, { { 1, 0.82, 0 }, { 1, 1, 1 } }, label)
+  Assert.truthy(#text <= 240, label .. " tip is too long for a short tooltip")
+end
+
 return function()
   local ns = SettingsFixture.load()
   for _, entry in ipairs(TIPS) do
-    local page, label, text = entry[1], entry[2], entry[3]
-    SettingsFixture.open(ns, page)
-    local row = SettingsFixture.row(label)
-    local seen = hover(row)
-    Assert.same(seen.lines, { label, text }, page .. " / " .. label)
-    Assert.same(seen.colors, { { 1, 0.82, 0 }, { 1, 1, 1 } }, label)
-    Assert.truthy(#text <= 240, label .. " tip is too long for a short tooltip")
+    check(ns, entry)
   end
+
+  ns = SettingsFixture.load({ db = CraftersFixture.crafters })
+  for _, entry in ipairs(CRAFTERS) do
+    check(ns, entry)
+  end
+
+  -- C8: the Only button shows only for a profession with recipe lines; its title is its current text.
+  local only_ns, db = SettingsFixture.load({ db = CraftersFixture.crafters })
+  db.characters["Me-Realm"].recipes[9001].line = 2822
+  SettingsFixture.open(only_ns, "Crafters")
+  local only = SettingsFixture.button(SettingsFixture.window(), "Only current expansion")
+  local text = "Alerts only for this expansion's recipes: all older ones are muted and your own picks are replaced."
+  Assert.same(hover(only).lines, { "Only current expansion", text })
+  only.label:SetText("Only Dragonflight")
+  Assert.same(hover(only).lines, { "Only Dragonflight", text }, "title follows the button text")
 end
