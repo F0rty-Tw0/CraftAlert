@@ -46,17 +46,6 @@ local function pickedFirst(a, b)
   return a.name < b.name
 end
 
--- The class token saved with the character `key`, or nil.
-local function classOf(key)
-  local db = _G["CraftAlertDB"]
-  local characters = type(db) == "table" and db.characters
-  local character = type(characters) == "table" and characters[key]
-  if type(character) ~= "table" then
-    return nil
-  end
-  return character.class
-end
-
 -- The lead's crafters, the picked one first, then the rest by the name the greeting uses:
 -- { key, name, rank ("R2 (conc)" or nil), color (RAID_CLASS_COLORS entry or nil), picked }.
 function CardBody.Crafters(lead)
@@ -66,7 +55,7 @@ function CardBody.Crafters(lead)
       key = crafter.key,
       name = Greeting.CrafterName(crafter.key),
       rank = LeadText.Rank({ rank = crafter.rank, rankConc = crafter.byConc }),
-      color = FrameKit.ClassColor(classOf(crafter.key)),
+      color = FrameKit.ClassColor(LeadText.ClassOf(crafter.key)),
       picked = crafter.key == lead.crafter,
     }
   end

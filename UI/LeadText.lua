@@ -34,8 +34,26 @@ function LeadText.What(lead)
   return lead.itemLink or lead.recipeName or lead.profName or ""
 end
 
+-- The class token saved with the character `key`, or nil.
+function LeadText.ClassOf(key)
+  local db = _G["CraftAlertDB"]
+  local characters = type(db) == "table" and db.characters
+  local character = type(characters) == "table" and characters[key]
+  if type(character) ~= "table" then
+    return nil
+  end
+  return character.class
+end
+
+-- The alt's name as the greeting says it, in the class CraftAlertDB saved for it (user, 2026-10-28:
+-- the toast and WM's preview colour it too); plain, not white, when no class is saved. Display only:
+-- Greeting.Build names the alt itself, so no colour code reaches a whisper.
+local function altName(key)
+  return FrameKit.ClassCode(Greeting.CrafterName(key), FrameKit.ClassColor(LeadText.ClassOf(key)))
+end
+
 -- Native-HUD spec §4.2: "Wants <what> — you can craft it" / "— your alt <name> can craft it"; a lead without
--- an item or recipe says "you have it" / "your alt <name> has it".
+-- an item or recipe says "you have it" / "your alt <name> has it". The alt's name in its class colour.
 function LeadText.Headline(lead)
   local what = LeadText.What(lead)
   local craftable = lead.itemLink or lead.recipeName
@@ -43,7 +61,7 @@ function LeadText.Headline(lead)
   if isOwn then
     return Localization.Text(craftable and "Wants %s — you can craft it" or "Wants %s — you have it", what)
   end
-  local alt = Greeting.CrafterName(lead.crafter)
+  local alt = altName(lead.crafter)
 
   return Localization.Text(craftable and "Wants %s — your alt %s can craft it" or "Wants %s — your alt %s has it", what, alt)
 end
@@ -54,8 +72,8 @@ function LeadText.Message(lead)
 end
 
 -- WhisperMessenger's preview, third row: "You can craft it" / "Your alt <name> can craft it"; a
--- lead without an item or recipe "You have <profession>" / "Your alt <name> has <profession>". nil
--- without a crafter.
+-- lead without an item or recipe "You have <profession>" / "Your alt <name> has <profession>", the
+-- alt's name in its class colour (WM sets the line as given, so the code shows). nil without a crafter.
 function LeadText.CrafterLine(lead)
   if lead.crafter == nil then
     return nil
@@ -64,7 +82,7 @@ function LeadText.CrafterLine(lead)
   if lead.crafter == PlayerName.Own() then
     return craftable and Localization.Text("You can craft it") or Localization.Text("You have %s", LeadText.What(lead))
   end
-  local alt = Greeting.CrafterName(lead.crafter)
+  local alt = altName(lead.crafter)
   if craftable then
     return Localization.Text("Your alt %s can craft it", alt)
   end
