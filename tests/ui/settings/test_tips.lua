@@ -142,6 +142,7 @@ return function()
   SettingsFixture.open(only_ns, "Crafters")
   local only = SettingsFixture.button(SettingsFixture.window(), "Only current expansion")
   local text = "Alerts only for this expansion's recipes: all older ones are muted and your own picks are replaced."
+    .. " Craft Alert also does this on its own when a profession is first read and when a new expansion's recipes appear."
   Assert.same(hover(only).lines, { "Only current expansion", text })
   only.label:SetText("Only Dragonflight")
   Assert.same(hover(only).lines, { "Only Dragonflight", text }, "title follows the button text")
