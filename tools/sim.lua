@@ -601,6 +601,8 @@ function STEPS.event(ctx, step)
   reportRead(ctx)
   reportLearn(ctx)
   runFrameTimers(step.name == "GET_ITEM_INFO_RECEIVED" and BIND_DEBOUNCE_SECONDS or 0)
+  -- A list update reads on the next frame (ModernReader.OnListUpdate), so its read lands here.
+  reportRead(ctx)
   flushBind(ctx)
 end
 

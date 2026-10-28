@@ -34,6 +34,7 @@ local GUARDS = { "IsNPCCrafting", "IsTradeSkillGuild", "IsTradeSkillGuildMember"
 local db = nil
 local reads = {} -- by profession: { count, settled } of the last read that stored a recipe for it
 local windowOpen = false
+local updatePending = false -- a list update waits for the next frame
 local activeJob = nil -- the job last started; running only while Slicer.IsRunning(JOB_NAME)
 local keptJob = nil -- a job its window cut off; the same key and recipe count resume it
 
@@ -317,8 +318,24 @@ function ModernReader.ForgetReads()
   end
 end
 
+-- The frame's list updates, checked once on the list as it stands on the next frame: the
+-- window may have closed since the first one came.
+local function onUpdateTimer()
+  updatePending = false
+  if windowOpen then
+    onWindowEvent(false)
+  end
+end
+
+-- TRADE_SKILL_LIST_UPDATE comes in bursts, and with the window closed too. A closed window is
+-- read when it opens (OnShow forces a read); an open one is checked once per frame. The flag is
+-- set once C_Timer.After returned: if it raises, the next update arms the timer again.
 function ModernReader.OnListUpdate()
-  onWindowEvent(false)
+  if not windowOpen or updatePending then
+    return
+  end
+  _G["C_Timer"].After(0, onUpdateTimer)
+  updatePending = true
 end
 
 -- §10.2 CraftScan import: the stored fields of any recipe, an alt's included (`learned` is not
