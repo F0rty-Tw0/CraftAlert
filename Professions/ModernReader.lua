@@ -348,6 +348,22 @@ function ModernReader.FieldsOf(recipeID)
   return readFields(api, recipeID, info, profInfo), profInfo
 end
 
+-- A newly learned recipe of an older line starts muted when the profession has a newestLine and
+-- the recipe's ID is at or below that line's median rank; a stray high-ID one stays unmuted.
+-- This differs from the window read on purpose: that mutes every newly stored older-line recipe
+-- (ReadJob muteNewOlder), so a stray high-ID learned one stays on until the next window read.
+local function muteIfOlder(character, recipeID, professionKey, line)
+  local record = character.professions[professionKey]
+  local newest = record and record.newestLine
+  if newest == nil or line == nil or line == newest then
+    return
+  end
+  local rank = RecipeStore.LineRank(character.recipes, professionKey, newest)
+  if rank and recipeID <= rank then
+    character.recipes[recipeID].muted = true
+  end
+end
+
 -- Reads one learned recipe (§5.3), the window open or not → whether it is now stored.
 function ModernReader.ReadOne(recipeID, professionKey)
   local api = tradeSkillApi()
@@ -359,7 +375,13 @@ function ModernReader.ReadOne(recipeID, professionKey)
     return false
   end
   local fields = readFields(api, recipeID, info, professionInfo(recipeID))
-  local changed = store(db.characters[PlayerName.Own()].recipes, recipeID, fields, professionKey)
+  local character = db.characters[PlayerName.Own()]
+  local recipes = character.recipes
+  local isNew = recipes[recipeID] == nil
+  local changed = store(recipes, recipeID, fields, professionKey)
+  if isNew then
+    muteIfOlder(character, recipeID, professionKey, fields.line)
+  end
   if changed then
     Index.RequestRebuild("learn")
   end

@@ -203,6 +203,26 @@ local function testCharacterClass()
   Assert.equal(db.characters["Bad-Realm"].class, nil)
 end
 
+-- A profession's newestLine is optional: kept when a number, cleared otherwise.
+local function testProfessionNewestLine()
+  local Schema = load()
+  local db = Schema.Validate({
+    characters = {
+      ["Me-Realm"] = {
+        professions = {
+          [164] = { name = "Blacksmithing", primary = true, read = true, newestLine = 2883 },
+          [333] = { name = "Enchanting", primary = false, read = true, newestLine = "x" },
+          [185] = { name = "Cooking", primary = false, read = false },
+        },
+      },
+    },
+  })
+  local professions = db.characters["Me-Realm"].professions
+  Assert.equal(professions[164].newestLine, 2883)
+  Assert.equal(professions[333].newestLine, nil, "a non-number is cleared")
+  Assert.equal(professions[185].newestLine, nil)
+end
+
 local function testLedgerRecentIgnoredLeadsUi()
   local Schema = load()
   local db = Schema.Validate({
@@ -542,6 +562,7 @@ return function()
   testCharactersUnknownKeysAndBadRecords()
   testImportCharacter()
   testCharacterClass()
+  testProfessionNewestLine()
   testLedgerRecentIgnoredLeadsUi()
   testListWithHoles()
   testNewerSchemaKeepsNestedUiValues()

@@ -25,6 +25,7 @@ local ipairs = ipairs
 local RANGES = { toastDuration = { 5, 120 }, leadTimeoutMin = { 1, 60 }, opacity = { 0.3, 1.0 } }
 local SETTING_OPTIONAL = { craftScanImported = "number", craftScanPrompted = "boolean" }
 local PROFESSION_SHAPE = { name = "", primary = false, read = false }
+local PROFESSION_OPTIONAL = { newestLine = "number" }
 local RECIPE_FIELDS = {
   name = "string",
   prof = "key",
@@ -214,7 +215,7 @@ local function fixSettings(settings)
 end
 
 local function fixProfession(record)
-  return fixShape(record, PROFESSION_SHAPE)
+  return fixShape(record, PROFESSION_SHAPE, PROFESSION_OPTIONAL)
 end
 
 -- A recipe without a usable name or profession cannot be matched or shown: dropped.

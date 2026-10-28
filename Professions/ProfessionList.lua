@@ -174,7 +174,12 @@ function ProfessionList.Refresh(db, charKey)
   local professions, keys = {}, {}
   for _, profession in ipairs(list) do
     local old = previous[profession.key]
-    professions[profession.key] = { name = profession.name, primary = old ~= nil and old.primary == true, read = old ~= nil and old.read == true }
+    professions[profession.key] = {
+      name = profession.name,
+      primary = old ~= nil and old.primary == true,
+      read = old ~= nil and old.read == true,
+      newestLine = old and old.newestLine or nil,
+    }
     keys[#keys + 1] = profession.key
   end
   local kept = {}

@@ -167,6 +167,7 @@ local function testCraftersOnlyExpansion()
   Assert.same(mutedNames(me), { "Lost Belt", "Old Belt", "War Belt" }, "older lines muted, the current one on, no-line recipes as they were")
   Assert.equal(me.recipes[9003].muted, nil, "unmuted recipes keep no muted field")
   Assert.same(take(refreshes), { "rebuild:mute" }, "one request")
+  Assert.equal(me.professions[BS].newestLine, 2918, "the click remembers the line")
   Assert.equal(db.characters["Alt-Realm"].recipes[9001].muted, nil, "another character is untouched")
   Assert.equal(me.recipes[9010].muted, nil, "another profession is untouched")
   Widgets.click(button)
@@ -184,6 +185,37 @@ local function testCraftersOnlyExpansion()
   Widgets.pick(row("Profession").input, BS)
   Assert.equal(button:IsShown(), true)
   Assert.equal(button.label:GetText(), "Only current expansion", "no GetProfessionInfoBySkillLineID")
+end
+
+-- 8.0 order: Classic 2540 (low recipe IDs) and Kul Tiran 2533 (high IDs): the button's current
+-- line is 2533 (median recipe-ID rank, not the highest line ID), and a click mutes Classic.
+local function testCraftersOnlyNewestByRank()
+  local ns, db, refreshes = SettingsFixture.load({
+    db = function(accountDb)
+      crafters(accountDb)
+      accountDb.characters["Me-Realm"].recipes = {
+        [2385] = { name = "Old Belt", prof = BS, line = 2540 },
+        [2386] = { name = "Old Helm", prof = BS, line = 2540 },
+        [250001] = { name = "KT Belt", prof = BS, line = 2533 },
+        [250002] = { name = "KT Helm", prof = BS, line = 2533 },
+      }
+    end,
+  })
+  local names = { [2540] = "Classic", [2533] = "Battle for Azeroth" }
+  Wow.stub("C_TradeSkillUI", {
+    GetProfessionInfoBySkillLineID = function(id)
+      return { professionID = id, expansionName = names[id] }
+    end,
+  })
+  local me = db.characters["Me-Realm"]
+  open(ns, "Crafters")
+  take(refreshes)
+  local button = assert(onlyButton())
+  Assert.equal(button.label:GetText(), "Only Battle for Azeroth")
+  Widgets.click(button)
+  Assert.same(mutedNames(me), { "Old Belt", "Old Helm" })
+  Assert.equal(me.professions[BS].newestLine, 2533)
+  Assert.same(take(refreshes), { "rebuild:mute" })
 end
 
 -- Items with no binding never alert while "Track unbound items" is off (Index): their rows are
@@ -281,6 +313,7 @@ return function()
   testMuteKeepsOwnState()
   testCraftersMuteAll()
   testCraftersOnlyExpansion()
+  testCraftersOnlyNewestByRank()
   testCraftersUntracked()
   testLeaveKeepsAnotherOwnersTooltip()
   Wow.reset()

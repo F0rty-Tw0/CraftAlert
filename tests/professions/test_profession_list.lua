@@ -99,12 +99,15 @@ return function()
   local professions = db.characters[CHAR].professions
   professions[BS].read = true
   professions[BS].primary = true
+  professions[BS].newestLine = 2883
   db.characters[CHAR].recipes[1] = { name = "belt", prof = BS, muted = true }
   db.characters[CHAR].recipes[2] = { name = "enchant bracer", prof = ENCH }
   ProfessionList.Refresh(db, CHAR)
   Assert.equal(db.characters[CHAR].professions[BS].read, true)
   Assert.equal(db.characters[CHAR].professions[BS].primary, true, "a chosen primary survives a refresh")
   Assert.equal(db.characters[CHAR].professions[ENCH].primary, false)
+  Assert.equal(db.characters[CHAR].professions[BS].newestLine, 2883, "a refresh keeps newestLine")
+  Assert.equal(db.characters[CHAR].professions[ENCH].newestLine, nil, "and adds none")
   Assert.equal(db.characters[CHAR].recipes[1].muted, true)
   Assert.same(ProfessionList.UnreadNames(db, CHAR), { "Enchanting" })
 
