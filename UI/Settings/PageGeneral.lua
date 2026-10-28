@@ -53,12 +53,18 @@ end
 function PageGeneral.Create(parent)
   local column = Controls.Column(parent, Theme.LAYOUT.PAGE_PADDING)
   local add, refresh = Controls.Refresher()
-  local function toggle(label, owner, key, after)
-    add(Controls.BoundToggle(column, Localization.Text(label), owner, key, after))
+  local function toggle(label, owner, key, after, tip)
+    add(Controls.BoundToggle(column, Localization.Text(label), owner, key, after, tip and Localization.Text(tip)))
   end
   Controls.Section(column, Localization.Text("Scanning"))
-  toggle("Enable Craft Alert", settings, "enable", evaluate)
-  toggle("Only where Trade chat exists", settings, "onlyResting", evaluate)
+  toggle("Enable Craft Alert", settings, "enable", evaluate, "Turns scanning on or off. Off, Craft Alert reads no chat and shows no alerts.")
+  toggle(
+    "Only where Trade chat exists",
+    settings,
+    "onlyResting",
+    evaluate,
+    "Scans only while a Trade channel is available to you, as in a major city. Elsewhere scanning pauses and resumes on its own."
+  )
   Controls.Section(column, Localization.Text("Channels"))
   local available = Constants.flavors[FlavorCompat.flavorKey].channels
   for _, channel in ipairs(ScanGate.CHANNELS) do
@@ -67,8 +73,20 @@ function PageGeneral.Create(parent)
     end
   end
   Controls.Section(column, Localization.Text("Matching"))
-  toggle("Profession-word alerts", settings, "professionWordAlerts", rebuild("professionWordAlerts"))
-  toggle("Bell markers on recipe rows", settings, "recipeMarkers", refreshMarkers)
+  toggle(
+    "Profession-word alerts",
+    settings,
+    "professionWordAlerts",
+    rebuild("professionWordAlerts"),
+    'Also alerts when a line names only a profession, such as "LF blacksmith", with no item. Off, only requests for an item you can craft alert.'
+  )
+  toggle(
+    "Bell markers on recipe rows",
+    settings,
+    "recipeMarkers",
+    refreshMarkers,
+    "Draws a mute switch on each recipe in the profession window. Click it to mute or unmute that recipe."
+  )
   return { Refresh = refresh }
 end
 

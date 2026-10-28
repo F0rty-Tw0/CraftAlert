@@ -44,7 +44,7 @@ end
 local function addSound(column, add)
   local choice = Controls.Choice(column, Localization.Text("Alert sound"), soundOptions(), function(value)
     settings().sound = value
-  end)
+  end, Localization.Text("The sound played with each new lead. Play tries the chosen one; None is silent."))
   -- Under the label, Play first and the dropdown in the rest of the line; the 20 px button sits
   -- 2 px up, in the middle of the dropdown's 24.
   local layout = Theme.LAYOUT
@@ -115,15 +115,38 @@ function PageAlerts.Create(parent)
   local add, refresh = Controls.Refresher()
   Controls.Section(column, Localization.Text("When a request arrives"))
   addSound(column, add)
-  add(Controls.BoundToggle(column, Localization.Text("Flash the taskbar icon"), settings, "flash", nothing))
-  local toast = { label = Localization.Text("Toast duration"), min = 5, max = 120, step = 5, format = seconds }
+  local flashTip = Localization.Text("Flashes the game's taskbar icon on a new lead while the game is in the background.")
+  add(Controls.BoundToggle(column, Localization.Text("Flash the taskbar icon"), settings, "flash", nothing, flashTip))
+  local toast = {
+    label = Localization.Text("Toast duration"),
+    min = 5,
+    max = 120,
+    step = 5,
+    format = seconds,
+    tip = Localization.Text("How long the alert toast stays on screen before it hides on its own."),
+  }
   addSlider(column, add, toast, "toastDuration", nothing)
   Controls.Section(column, Localization.Text("Leads"))
-  local timeout = { label = Localization.Text("Lead timeout"), min = 1, max = 60, step = 1, format = minutes }
+  local timeout = {
+    label = Localization.Text("Lead timeout"),
+    min = 1,
+    max = 60,
+    step = 1,
+    format = minutes,
+    tip = Localization.Text("How long a lead stays in the list before it expires and is removed."),
+  }
   addSlider(column, add, timeout, "leadTimeoutMin", rearm)
   local hideLabel = Localization.Text("Hide the launcher when there are no leads")
-  add(Controls.BoundToggle(column, hideLabel, settings, "hideLauncherWhenNoLeads", launcherToggled))
-  local opacity = { label = Localization.Text("Opacity"), min = 0.3, max = 1, step = 0.05, format = percent }
+  local hideTip = Localization.Text("Hides the launcher button while there are no leads. It returns with the next lead.")
+  add(Controls.BoundToggle(column, hideLabel, settings, "hideLauncherWhenNoLeads", launcherToggled, hideTip))
+  local opacity = {
+    label = Localization.Text("Opacity"),
+    min = 0.3,
+    max = 1,
+    step = 0.05,
+    format = percent,
+    tip = Localization.Text("How see-through the leads window and the toast are."),
+  }
   addSlider(column, add, opacity, "opacity", opacityChanged)
   return { Refresh = refresh }
 end
