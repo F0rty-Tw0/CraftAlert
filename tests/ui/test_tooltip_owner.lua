@@ -30,6 +30,31 @@ local function testHideIfOwned()
   Assert.equal(tooltip:IsShown(), false, "its owner: hidden")
 end
 
+-- Tooltip.ShowHint: gold title, white body, green clicks; the blank line only between a body and
+-- clicks. → the tooltip's lines and their colours for (body, clicks).
+local function hint(ns, body, clicks)
+  local owner = _G["CreateFrame"]("Button", nil, _G["UIParent"])
+  ns.Tooltip.ShowHint(owner, "ANCHOR_TOP", "Title", body, clicks)
+  local tooltip = ns.Tooltip.Get()
+  Assert.same({ tooltip.owner, tooltip.anchor, tooltip:IsShown() }, { owner, "ANCHOR_TOP", true })
+  return tooltip.lines, tooltip.colors
+end
+
+local function testShowHint()
+  local ns = UiFixture.load()
+  local gold, white, green = { 1, 0.82, 0 }, { 1, 1, 1 }, { 0.1, 1, 0.1 }
+  local lines, colors = hint(ns, { "a", "b" }, { "Click: c" })
+  Assert.same(lines, { "Title", "a", "b", " ", "Click: c" })
+  Assert.same(colors, { gold, white, white, {}, green })
+  lines, colors = hint(ns, nil, { "Click: c", "Drag: d" })
+  Assert.same(lines, { "Title", "Click: c", "Drag: d" }, "no body: no blank line")
+  Assert.same(colors, { gold, green, green })
+  lines, colors = hint(ns, { "a" })
+  Assert.same(lines, { "Title", "a" }, "no clicks: no blank line")
+  Assert.same(colors, { gold, white })
+  Assert.same(hint(ns, {}, {}), { "Title" }, "empty lists: title only")
+end
+
 local function testSettingsGearLeave()
   local ns = UiFixture.load()
   ns.LeadsWindow.Toggle()
@@ -52,6 +77,7 @@ end
 
 return function()
   testHideIfOwned()
+  testShowHint()
   testSettingsGearLeave()
   testToastLeave()
   testLauncherLeave()

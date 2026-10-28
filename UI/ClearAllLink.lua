@@ -19,13 +19,10 @@ local function paint(link, color)
   link.label:SetTextColor(color[1], color[2], color[3], color[4])
 end
 
--- Blizzard's tooltip hierarchy: gold title, white body; no click line, the label names the click.
+-- Tooltip.ShowHint with a white body and no click line: the label names the click.
 local function showTooltip(link)
-  local tooltip = Tooltip.Get()
-  tooltip:SetOwner(link, "ANCHOR_BOTTOMLEFT")
-  _G["GameTooltip_SetTitle"](tooltip, Localization.Text("Clear all leads"), _G["NORMAL_FONT_COLOR"])
-  _G["GameTooltip_AddHighlightLine"](tooltip, Localization.Text("Dismisses every lead in the list."))
-  tooltip:Show()
+  local body = { Localization.Text("Dismisses every lead in the list.") }
+  Tooltip.ShowHint(link, "ANCHOR_BOTTOMLEFT", Localization.Text("Clear all leads"), body)
 end
 
 -- The link Button under `parent`, LEDGER_HEIGHT tall and as wide as its label, not placed.
@@ -37,14 +34,7 @@ function ClearAllLink.Build(parent)
   -- English only: the label never changes, so it is measured once.
   link:SetSize(link.label:GetStringWidth(), Theme.LAYOUT.LEDGER_HEIGHT)
   link:SetScript("OnClick", Leads.DismissAll)
-  link:SetScript("OnEnter", function(self)
-    paint(self, Theme.COLORS.white)
-    showTooltip(self)
-  end)
-  link:SetScript("OnLeave", function(self)
-    paint(self, Theme.COLORS.gold)
-    Tooltip.HideIfOwned(self)
-  end)
+  Tooltip.GoldLink(link, showTooltip)
   return link
 end
 

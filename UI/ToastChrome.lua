@@ -10,7 +10,7 @@ local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 -- toast's lead and away-summary modes (UI/AlertToast.lua). There is one toast, so one timer.
 local ToastChrome = {}
 
-local ipairs = ipairs
+local unpack = unpack
 
 local hideAt = 0
 local timerPending = false
@@ -54,24 +54,12 @@ function ToastChrome.HideAfter(frame, hide)
   armHide()
 end
 
--- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua, every flavour): gold
--- title, the `description` lines in white and a blank line when given, one green instruction line
--- per entry of `clicks`, then the drag (it moves the launcher).
+-- Tooltip.ShowHint: the `description` lines (or nil) in white, one green instruction line per
+-- entry of `clicks`, then the drag (it moves the launcher).
 function ToastChrome.ShowTooltip(frame, description, clicks)
-  local tooltip = Tooltip.Get()
-  tooltip:SetOwner(frame, "ANCHOR_TOP")
-  _G["GameTooltip_SetTitle"](tooltip, Localization.Text("Craft Alert"), _G["NORMAL_FONT_COLOR"])
-  if description then
-    for _, line in ipairs(description) do
-      _G["GameTooltip_AddHighlightLine"](tooltip, line)
-    end
-    _G["GameTooltip_AddBlankLineToTooltip"](tooltip)
-  end
-  for _, line in ipairs(clicks) do
-    _G["GameTooltip_AddInstructionLine"](tooltip, line)
-  end
-  _G["GameTooltip_AddInstructionLine"](tooltip, Localization.Text("Drag: move"))
-  tooltip:Show()
+  local lines = { unpack(clicks) }
+  lines[#lines + 1] = Localization.Text("Drag: move")
+  Tooltip.ShowHint(frame, "ANCHOR_TOP", Localization.Text("Craft Alert"), description, lines)
 end
 
 ns.ToastChrome = ToastChrome
