@@ -38,9 +38,17 @@ local function testLitDimAndTooltip()
   ns.Launcher.Refresh("ignored", "arguments")
   Assert.equal(frame.icon.desaturated, false)
   Assert.equal(frame:GetAlpha(), 1)
-  -- The badge counts the leads.
+  -- The badge counts the unseen leads: one seen (shown in the details) or greeted drops out.
   Assert.equal(frame.badge:IsShown(), true)
   Assert.equal(frame.badgeText:GetText(), "2")
+  local leads = ns.Leads.List()
+  ns.Leads.MarkSeen(leads[1].id)
+  ns.Launcher.Refresh()
+  Assert.equal(frame.badgeText:GetText(), "1", "a seen lead drops out")
+  leads[2].greeted = true
+  ns.Launcher.Refresh()
+  Assert.equal(frame.badge:IsShown(), false, "a greeted lead drops out")
+  Assert.equal(#ns.Leads.List(), 2, "both stay listed")
 
   -- The tooltip is the status line, on the addon's own tooltip, and goes away on leave.
   local tooltip = ns.Tooltip.Get()
@@ -180,6 +188,24 @@ local function testArt()
   frame.scripts.OnEnter(frame)
 end
 
+-- The badge is gold like the unseen dots it counts, with a dark number and a dark rim, centred on
+-- the ring's top-right edge.
+local function testBadgeLook()
+  local ns = UiFixture.load({ leads = 1 })
+  setScan(ns, true)
+  local frame = ns.Launcher.Create()
+  local badge, colors = frame.badge, ns.Theme.COLORS
+  Assert.same({ badge:GetWidth(), badge:GetHeight() }, { 20, 20 })
+  Assert.same(badge.points, { { "CENTER", frame, "TOPRIGHT", -8, -8 } })
+  Assert.same({ badge.circle.texture, badge.circle.vertexColor }, { "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask", colors.gold })
+  Assert.same(
+    { badge.rim.texture, badge.rim.vertexColor, badge.rim.layer },
+    { "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask", { 0, 0, 0, 0.75 }, "BACKGROUND" }
+  )
+  Assert.same(badge.rim.points, { { "TOPLEFT", badge, "TOPLEFT", -2, 2 }, { "BOTTOMRIGHT", badge, "BOTTOMRIGHT", 2, -2 } })
+  Assert.same(frame.badgeText.textColor, { 0.07, 0.07, 0.10, 1.0 })
+end
+
 local function testIconAndPulse()
   local ns = UiFixture.load()
   setScan(ns, true)
@@ -298,6 +324,7 @@ return function()
   testHiddenInInstance()
   testSavedPosition()
   testArt()
+  testBadgeLook()
   testIconAndPulse()
   testDragApi()
   testSuppressed()
