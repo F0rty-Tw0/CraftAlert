@@ -40,7 +40,7 @@ local function onClick(switch)
     record.muted = target or nil
   end
   paintSwitch(switch)
-  Index.RequestRebuild("mute")
+  Index.RequestRebuildSoon("mute")
 end
 
 -- The switch on `row`, created on first use, 14 × 14 at the row's right end, or with its right

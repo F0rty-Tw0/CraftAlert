@@ -359,6 +359,34 @@ local function testCoalescing()
   Assert.equal(builds.n, 2)
 end
 
+-- Mute clicks: RequestRebuildSoon builds once 0.3 s after the last call (each call moves the
+-- deadline, one timer pending); a RequestRebuild in between serves it at once.
+local function testRebuildSoon()
+  local Index, Defaults = load()
+  configure(Index, Defaults)
+  local builds = countBuilds(Index)
+  for _, at in ipairs({ 0, 0.1, 0.2 }) do
+    Wow.clock.gettime = at
+    Index.RequestRebuildSoon("mute")
+  end
+  Assert.same({ #Wow.timers, Wow.timers[1].delay }, { 1, 0.3 }, "one timer, armed by the first click")
+  Wow.clock.gettime = 0.3
+  table.remove(Wow.timers, 1).fn()
+  Assert.equal(builds.n, 0, "the last click moved the deadline")
+  Assert.equal(#Wow.timers, 1, "re-armed for the rest")
+  Wow.clock.gettime = 0.5
+  Wow.runTimers()
+  Assert.equal(builds.n, 1, "three clicks, one build")
+  Assert.equal(Index.lastReason, "mute")
+
+  Index.RequestRebuildSoon("mute")
+  Index.RequestRebuild("read")
+  Wow.clock.gettime = 1
+  Wow.runTimers()
+  Assert.equal(builds.n, 2, "the read built at once and served the pending mute")
+  Assert.equal(Index.lastReason, "read")
+end
+
 local function regenRegistered()
   for _, frame in ipairs(Wow.frames) do
     if frame:IsEventRegistered("PLAYER_REGEN_ENABLED") then
@@ -458,6 +486,7 @@ return function()
   testRebuild()
   testFailingCallback()
   testCoalescing()
+  testRebuildSoon()
   testCombatDeferral()
   testCombatBeforeFirstTick()
   testAddPending()

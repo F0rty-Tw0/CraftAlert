@@ -118,7 +118,7 @@ local function testCraftersPage()
   Assert.same({ #mute.regions, mute.icon.atlas, mute.icon.desaturated }, { 1, "voicechat-icon-speaker", false }, "not muted: the speaker")
   Widgets.click(mute)
   Assert.equal(me.recipes[9001].muted, true)
-  Assert.same(take(refreshes), { "rebuild:mute" })
+  Assert.same(take(refreshes), { "rebuildSoon:mute" })
   mute = rowOf(9001).mute
   Assert.same({ mute.icon.atlas, mute.icon.desaturated }, { "voicechat-icon-speaker-mute", false }, "muted: the crossed-out speaker")
   Assert.equal(iconOf(9001).desaturated, true, "a muted recipe's icon is grey")
@@ -129,7 +129,7 @@ local function testCraftersPage()
   -- The clear button empties the search and lists every recipe again.
   Widgets.fire(search.clearButton, "OnClick")
   Assert.truthy(texts():find("Plate Greaves / Thick Plate Belt", 1, true), texts())
-  Assert.same(take(refreshes), { "rebuild:mute" })
+  Assert.same(take(refreshes), { "rebuildSoon:mute" })
   Widgets.pick(row("Profession").input, ENCH)
   Assert.truthy(texts():find("Enchant Bracer - Health", 1, true), "the search clears with the profession")
 

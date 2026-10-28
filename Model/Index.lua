@@ -30,6 +30,7 @@ local lower = string.lower
 local sort = table.sort
 
 local JOB = "index"
+local SOON_SECONDS = 0.3 -- quiet after the last RequestRebuildSoon before its build
 
 local function append(map, key, value)
   local list = map[key]
@@ -293,6 +294,9 @@ local current = nil
 local rebuilt = {}
 local pendingNames = {}
 local pendingSet = {} -- lowercase name -> the client's spelling
+local soonReason = nil -- the reason of a RequestRebuildSoon not yet served, else nil
+local soonAt = 0 -- GetTime() at which it is due
+local soonTimerPending = false
 
 Index.lastBuildMs = nil -- CPU ms of the last build: the sum of its steps
 Index.lastBuildSteps = nil -- Slicer steps of the last build; 1 for a synchronous one
@@ -356,11 +360,43 @@ end
 
 -- Starts the sliced build, or restarts it: the db may have changed under a half-built index,
 -- so a request during a build drops that work. The old index stays live until a build ends.
+-- It also serves a pending RequestRebuildSoon.
 function Index.RequestRebuild(reason)
   Index.lastReason = reason
+  soonReason = nil
   if context ~= nil then
     startJob(context.db, context.opts)
   end
+end
+
+local armSoon
+
+local function onSoonTimer()
+  soonTimerPending = false
+  armSoon()
+end
+
+-- One pending timer: it fires at the deadline set by the latest RequestRebuildSoon, or re-arms
+-- for the rest.
+armSoon = function()
+  if soonTimerPending or soonReason == nil then
+    return
+  end
+  local remaining = soonAt - _G["GetTime"]()
+  if remaining <= 0 then
+    Index.RequestRebuild(soonReason)
+    return
+  end
+  soonTimerPending = true
+  _G["C_Timer"].After(remaining, onSoonTimer)
+end
+
+-- RequestRebuild once SOON_SECONDS passed without another call, so a run of mute clicks costs
+-- one build of the whole index, not one per click.
+function Index.RequestRebuildSoon(reason)
+  soonReason = reason
+  soonAt = _G["GetTime"]() + SOON_SECONDS
+  armSoon()
 end
 
 -- §5.3 Classic session learn: a recipe name as the client spells it, matched by its lowercase
