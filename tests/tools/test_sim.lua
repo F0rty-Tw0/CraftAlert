@@ -272,6 +272,15 @@ return function()
     stepLines(Sim.Run({ "--event", "TRADE_SKILL_SHOW", "--event", "GET_ITEM_INFO_RECEIVED", "190005", "true" })),
     booted({ "read: prof=164 stored=3 pendingBind=1", "index: size=5", "bind: stored=1", "index: size=4" })
   )
+  -- Newest expansion default: the window read mutes the older line of the seeded profession
+  -- (8001, 8002 on line 2540) and leaves the newest line (9010 on 2872) on; chat stays silent.
+  local seeded = Sim.Run({ "--db", "tools/sim_fixture_newest.lua", "--event", "TRADE_SKILL_SHOW" })
+  local recipes = rawget(_G, "CraftAlertDB").characters["Crafter-OwnRealm"].recipes
+  Assert.same({ recipes[8001].muted, recipes[8002].muted, recipes[9010].muted }, { true, true, nil })
+  Assert.equal(rawget(_G, "CraftAlertDB").characters["Crafter-OwnRealm"].professions[164].newestLine, 2872)
+  for _, line in ipairs(seeded) do
+    Assert.falsy(string.find(line, "now alerts only", 1, true), line)
+  end
   -- Classic: the TradeSkill window (every Classic flavor) and Enchanting's Craft window (Era, TBC)
   -- are read into name keys; the new recipe matches by name, the greeting keeps the client's spelling.
   local classicWindow =
