@@ -26,6 +26,7 @@ local type = type
 
 -- A toggle's label sits this far below the row's top, and as far above its bottom: one line is
 -- centred on the check.
+-- off-scale: WhisperMessenger label spacing.
 local LABEL_TOP = 6
 
 local function create(frameType, parent, template)
@@ -261,6 +262,7 @@ function Controls.Input(column, label, onCommit, maxLetters, tip)
   local row = newRow(column, label, true)
   local box = create("EditBox", row, "InputBoxTemplate")
   box:SetHeight(layout.INPUT_HEIGHT)
+  -- off-scale: InputBoxTemplate art starts 5 px out of the box.
   underLabel(row, box, 5, 0)
   box:SetAutoFocus(false)
   box:SetFontObject(Theme.FONTS.setting)

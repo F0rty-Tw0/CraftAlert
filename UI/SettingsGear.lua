@@ -89,6 +89,7 @@ end
 -- The gear on `frame` (a ButtonFrameTemplate frame); a click runs onClick().
 function SettingsGear.Create(frame, onClick)
   local gear = SettingsGear.Build(frame, onClick)
+  -- off-scale: close button art nudge.
   gear:SetPoint("RIGHT", frame.CloseButton, "LEFT", -2, 0)
   -- With the title above the NineSlice border, whose metal top edge covers the title strip. Not the
   -- close button's level: the Classic template leaves that one under the border.

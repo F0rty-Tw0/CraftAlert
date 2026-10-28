@@ -11,6 +11,7 @@ local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 -- under it, each wrapping across the toast's inner width.
 local ToastLayout = {}
 
+-- off-scale: text leading, kept as is.
 local LINE_GAP = 3
 
 -- A wrapping line. Its explicit width lets GetStringHeight measure it before the first layout.
