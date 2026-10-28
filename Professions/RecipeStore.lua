@@ -4,8 +4,15 @@ if type(ns) ~= "table" then
 end
 
 -- Spec §5.2 stored recipe: how every window reader (ModernReader, ClassicReader) merges one
--- recipe into a character's `recipes`. Reads only add; the player's mute and a known bind survive.
+-- recipe into a character's `recipes`. A merge only adds; the player's mute and a known bind
+-- survive it. Also ranks a profession's expansion lines by median recipe ID, names the newest,
+-- looks up a line's expansion name, and applies the only-newest rule (OnlyNewest), which does
+-- overwrite mutes.
 local RecipeStore = {}
+
+local pairs, type = pairs, type
+local floor = math.floor
+local sort = table.sort
 
 local function sameList(a, b)
   if a == nil or b == nil then
@@ -60,14 +67,14 @@ local function keysByLine(recipes, prof, only)
     end
   end
   for _, keys in pairs(byLine) do
-    table.sort(keys)
+    sort(keys)
   end
   return byLine
 end
 
 local function median(keys)
   local count = #keys
-  local middle = math.floor(count / 2)
+  local middle = floor(count / 2)
   if count % 2 == 1 then
     return keys[middle + 1]
   end
