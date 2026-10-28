@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local ItemKeywords = ns.ItemKeywords or require("CraftAlert.Model.ItemKeywords")
@@ -24,7 +25,6 @@ local Index = {}
 
 local pairs = pairs
 local ipairs = ipairs
-local pcall = pcall
 local type = type
 local lower = string.lower
 local sort = table.sort
@@ -35,8 +35,6 @@ local status = coroutine.status
 
 local JOB = "index"
 local PAUSE_EVERY = 8 -- pause weight per clock read
-
-local function noPause() end
 
 local function append(map, key, value)
   local list = map[key]
@@ -267,7 +265,7 @@ end
 -- a list's length; a no-op when absent.
 function Index.Build(db, settings, opts)
   opts = opts or {}
-  local pause = opts.pause or noPause
+  local pause = opts.pause or Slicer.NoPause
   local index = newIndex(settings, opts)
   local ctx = { settings = settings, names = {}, words = {}, professions = {} }
   local characters = db.characters or {}
@@ -320,13 +318,6 @@ function Index.OnRebuilt(fn)
   rebuilt[#rebuilt + 1] = fn
 end
 
-local function reportError(err)
-  local getHandler = _G["geterrorhandler"]
-  if type(getHandler) == "function" then
-    getHandler()(err)
-  end
-end
-
 local function buildOpts(opts, pause)
   return {
     professionOrder = opts.professionOrder,
@@ -339,12 +330,7 @@ end
 local function swapIn(index, ms, steps)
   Index.lastBuildMs, Index.lastBuildSteps = ms, steps
   current = index
-  for i = 1, #rebuilt do
-    local ok, err = pcall(rebuilt[i], index)
-    if not ok then
-      reportError(err)
-    end
-  end
+  EventRouter.CallAll(rebuilt, index)
 end
 
 -- Synchronous build from the configured context (login); cancels a running sliced build. nil

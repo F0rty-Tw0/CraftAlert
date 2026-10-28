@@ -5,6 +5,7 @@ end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Constants = ns.Constants or require("CraftAlert.Core.Constants")
+local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 local Slang = ns.Slang or require("CraftAlert.Model.Slang")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
 local Candidates = ns.MatchCandidates or require("CraftAlert.Model.MatchCandidates")
@@ -64,8 +65,6 @@ end
 -- In-game C26 (2026-10-25): the word set of a worn item without words (index.wordlessGear), so
 -- a slot word drops it (MatchCandidates entryKept) where a group without a set stays.
 local NO_WORDS = {}
-
-local function noPause() end
 
 -- The sliced build pauses between the walks over one word list (weighted by its length), and
 -- every LIST_CHUNK entries inside byProfession's split, a list's longest walk, so no list's
@@ -308,7 +307,7 @@ end
 -- the long loops, weighted by a word's list length, and between the walks of one list
 -- (LIST_CHUNK): Index's sliced build yields there.
 function WordGroups.Build(index, pause)
-  pause = pause or noPause
+  pause = pause or Slicer.NoPause
   buildSlotsOf(index)
   buildGroupWords(index, pause)
   local rank = {}

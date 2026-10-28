@@ -48,8 +48,6 @@ local HEADER_WIDTH = 32 -- bytes holding "CA<version>:<flavor>:"
 local Fields = ExportFields
 local MAX = Fields.MAX
 
-local function noPause() end
-
 -- Adler-32, the sums reduced once per CHUNK (exact in doubles: b stays under 2^33).
 local function checksum(text, pause)
   local byte = string.byte
@@ -143,7 +141,7 @@ end
 
 -- → the export string of the db's local characters (imported ones are never passed on).
 function ExportString.Encode(db, flavorKey, pause)
-  pause = pause or noPause
+  pause = pause or Slicer.NoPause
   local parts, characters = {}, 0
   for _, key in ipairs(sortedKeys(db.characters)) do
     local character = db.characters[key]
@@ -186,7 +184,7 @@ end
 -- end, which may push the string past MAX.length. Only TRIM_SLACK + 1 bytes at each end are
 -- looked at: a scan over a 509 KB run of spaces took 45 ms in one slice.
 function ExportString.Decode(text, flavorKey, pause)
-  pause = pause or noPause
+  pause = pause or Slicer.NoPause
   if type(text) ~= "string" then
     return nil, Localization.Text("Not a Craft Alert export string.")
   end
@@ -276,7 +274,7 @@ end
 -- another job (the CraftScan import) may have stored it in the pauses. The caller rebuilds the
 -- index.
 function ExportString.Apply(db, data, pause)
-  pause = pause or noPause
+  pause = pause or Slicer.NoPause
   local counts = { characters = 0, recipes = 0, skipped = 0 }
   local now = _G["time"]()
   local function isOwn(key)
