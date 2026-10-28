@@ -17,7 +17,7 @@ ProfessionWords.entries = {
     englishName = "blacksmithing",
   },
   {
-    words = { "leatherworking", "leatherworker", "leatherworkers", "lw", "lwer", "lwers" },
+    words = { "leatherworking", "leatherwork", "leatherworks", "leatherworker", "leatherworkers", "lw", "lwer", "lwers" },
     skillLineID = 165,
     englishName = "leatherworking",
   },
@@ -27,7 +27,7 @@ ProfessionWords.entries = {
     englishName = "tailoring",
   },
   {
-    words = { "jewelcrafting", "jewelcrafter", "jewelcrafters", "jc", "jcer" },
+    words = { "jewelcrafting", "jewelcraft", "jewelcrafts", "jewelcrafter", "jewelcrafters", "jc", "jcer" },
     skillLineID = 755,
     englishName = "jewelcrafting",
   },
@@ -47,7 +47,7 @@ ProfessionWords.entries = {
     englishName = "engineering",
   },
   {
-    words = { "inscription", "scribe", "scribes" },
+    words = { "inscription", "insc", "scribe", "scribes" },
     skillLineID = 773,
     englishName = "inscription",
   },
