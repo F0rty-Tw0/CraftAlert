@@ -39,7 +39,7 @@ function ToastLayout.Build(frame)
   local padding, fonts = Theme.LAYOUT.PADDING, Theme.FONTS
   local name = FrameKit.Text(frame, fonts.name)
   name:SetPoint("TOPLEFT", frame, "TOPLEFT", padding, -padding)
-  local badge = FrameKit.Text(frame, fonts.badge, Theme.COLORS.accent)
+  local badge = FrameKit.Text(frame, fonts.badge, Theme.COLORS.gold)
   badge:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -padding, -padding)
   badge:SetJustifyH("RIGHT")
   name:SetPoint("RIGHT", badge, "LEFT", -padding, 0)

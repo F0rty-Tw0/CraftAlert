@@ -82,6 +82,9 @@ local function testMarks()
   Assert.same({ greeted:IsShown(), greeted.width, greeted.height }, { true, MARK_SIZE, MARK_SIZE })
   Assert.same(greeted.points[1], { "BOTTOMRIGHT", row, "BOTTOMRIGHT", -EDGE, 4 })
   Assert.equal(greeted.texture, ns.Theme.GREETED_ICON)
+  Assert.same(greeted.vertexColor, { 0.12, 0.72, 0.96, 1 }, "the greeted mark is greeted-blue, the replied tag keeps green")
+  Assert.equal(greeted.desaturated, true, "desaturated first, so the tint is the colour that shows")
+  Assert.same(row.repliedTag.textColor, ns.Theme.COLORS.replied)
   Assert.equal(row.repliedTag:IsShown(), false)
   Assert.same(row.what.points, {
     { "BOTTOMLEFT", row.iconFrame, "BOTTOMRIGHT", 10, -1 },
