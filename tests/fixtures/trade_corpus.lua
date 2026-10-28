@@ -416,6 +416,14 @@ return {
     note = "4.7 'ring' is a want anywhere in the line, even after a break (ruling 2026-10-28)",
   },
   {
+    text = "LF crafter 2 make",
+    class = "WARRIOR",
+    expect = "silent",
+    stop = "nomatch",
+    src = "user",
+    note = "4.7 '2' is chat shorthand for 'to': 'crafter 2' names a want (ruling 2026-10-28)",
+  },
+  {
     text = "LF crafter pls, legs",
     class = "WARRIOR",
     expect = "silent",

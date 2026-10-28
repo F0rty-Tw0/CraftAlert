@@ -194,8 +194,9 @@ local armorProfession = { plate = "blacksmithing", mail = "leatherworking", leat
 local crafterWords = { crafter = true, crafters = true }
 local lfFillerWords = { a = true, any = true, some = true }
 -- User ruling 2026-10-28: "crafter for flask", "crafter to make", "crafter who can": the line
--- names something, even when nothing here can read what.
-local namingWords = { ["for"] = true, to = true, who = true, that = true }
+-- names something, even when nothing here can read what. "2" and "4" are chat shorthand for to
+-- and for ("LF crafter 2 make", "LF crafter 4 my alt").
+local namingWords = { ["for"] = true, to = true, who = true, that = true, ["2"] = true, ["4"] = true }
 
 -- The index of a "crafter" token right after an "lf" one (one lfFillerWords word between at
 -- most), with nothing but spaces between, else nil. BreakBefore, a string search, is asked only
@@ -228,12 +229,12 @@ end
 
 -- Step 4.7, only after steps 4.1-4.6 found nothing: "LF crafter" naming no want (no item link,
 -- step 4.2 hit, profession word, word step 4.4 knows anywhere in the line, or for / to / who /
--- that right after "crafter") is a profession lead for the sender's armor type, behind the
+-- that / 2 / 4 right after "crafter") is a profession lead for the sender's armor type, behind the
 -- profession-word setting (user ruling 2026-10-28: the armor guess is for a bare line only).
 -- Step 4.4 counted no word on such a line, so it never asked the class: the class lookup here is
 -- still the line's only one. The profession is looked up in index.professionWords, so one no
--- character has gives no match, as in step 4.6. Everyday words ("LF crafter, back in 5") count
--- only when step 4.4 counted them: a cue word next to them, never across a break
+-- character has gives no match, as in step 4.6. Everyday words ("LF crafter, back in 5"), "ring"
+-- aside, count only when step 4.4 counted them: a cue word next to them, never across a break
 -- (.claude/rules/matcher-adjacent-words.md); a naming word names something only with no break
 -- after "crafter" ("LF crafter, for a friend" still leads).
 local function matchLfCrafter(hasSet)
