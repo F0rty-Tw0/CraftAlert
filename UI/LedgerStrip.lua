@@ -159,17 +159,20 @@ function LedgerStrip.New(parent, host)
 end
 
 -- The text from PADDING right of `strip.leftEdge`'s right (the strip's own left when unset) to
--- `strip.rightInset` before the strip's right.
+-- `strip.rightInset` before the strip's right. The edge (a frame whose top is the strip's
+-- bottom) gives the box's bottom-left and the strip its top-right: the text box is the band, its
+-- line centred in it; a LEFT anchor on the edge would take the edge's vertical centre.
 local function placeText(strip)
   local padding = Theme.LAYOUT.PADDING
-  local edge = strip.leftEdge
+  local edge, right = strip.leftEdge, -(strip.rightInset or padding)
   strip.text:ClearAllPoints()
   if edge then
-    strip.text:SetPoint("LEFT", edge, "RIGHT", padding, 0)
+    strip.text:SetPoint("BOTTOMLEFT", edge, "TOPRIGHT", padding, 0)
+    strip.text:SetPoint("TOPRIGHT", strip, "TOPRIGHT", right, 0)
   else
     strip.text:SetPoint("LEFT", strip, "LEFT", padding, 0)
+    strip.text:SetPoint("RIGHT", strip, "RIGHT", right, 0)
   end
-  strip.text:SetPoint("RIGHT", strip, "RIGHT", -(strip.rightInset or padding), 0)
 end
 
 -- Ends the strip text `inset` px before the strip's right, clear of a control placed there.
@@ -179,7 +182,7 @@ function LedgerStrip.SetRightInset(strip, inset)
 end
 
 -- Starts the strip text right of `frame` (it follows the frame's width), clear of what the host
--- draws down the strip at that frame's right edge.
+-- draws down the strip at that frame's right edge. `frame`'s top must be the strip's bottom.
 function LedgerStrip.SetLeftEdge(strip, frame)
   strip.leftEdge = frame
   placeText(strip)

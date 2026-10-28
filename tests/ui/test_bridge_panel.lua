@@ -307,7 +307,7 @@ local function testLinkOnLedgerLine()
   local link, strip, details = gearOf(host), captured.view.strip, captured.view.details
   Assert.equal(link.parent, strip)
   Assert.same(link.points, { { "RIGHT", strip, "RIGHT", -8, 0 } })
-  Assert.same(strip.text.points[2], { "RIGHT", strip, "RIGHT", -88, 0 })
+  Assert.same(strip.text.points[2], { "TOPRIGHT", strip, "TOPRIGHT", -88, 0 })
   for _, line in ipairs({ details.lineOne, details.lineTwo }) do
     Assert.same(line.points[2], { "RIGHT", details.header, "RIGHT", -16, 0 })
   end
@@ -326,6 +326,8 @@ local function testCountsStartRightOfSplit()
     local textLeft = Layout.edges(view.strip.text)
     local _, splitX = Layout.edges(view.listPane)
     Assert.equal(textLeft, splitX + ns.Theme.LAYOUT.PADDING, message)
+    -- Every anchor agrees on the band: the text box is the strip's height, not the list's middle.
+    Assert.same({ Layout.ys(view.strip.text) }, { Layout.ys(view.strip) }, message .. ": in the ledger band")
   end
   check("rail")
   wm.split("CraftAlert", 260)

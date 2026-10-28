@@ -55,9 +55,9 @@ local function testLayout()
   -- A left edge keeps the right inset, and a later right inset keeps the edge.
   local edge = _G["CreateFrame"]("Frame")
   ns.LedgerStrip.SetLeftEdge(strip, edge)
-  Assert.same(strip.text.points, { { "LEFT", edge, "RIGHT", padding, 0 }, { "RIGHT", strip, "RIGHT", -88, 0 } })
+  Assert.same(strip.text.points, { { "BOTTOMLEFT", edge, "TOPRIGHT", padding, 0 }, { "TOPRIGHT", strip, "TOPRIGHT", -88, 0 } })
   ns.LedgerStrip.SetRightInset(strip, 40)
-  Assert.same(strip.text.points, { { "LEFT", edge, "RIGHT", padding, 0 }, { "RIGHT", strip, "RIGHT", -40, 0 } })
+  Assert.same(strip.text.points, { { "BOTTOMLEFT", edge, "TOPRIGHT", padding, 0 }, { "TOPRIGHT", strip, "TOPRIGHT", -40, 0 } })
   -- (496 - 20 - 2 * 4) / 48 → 9 rows, not the 10 the whole height holds.
   local leads = {}
   for id = 12, 1, -1 do
