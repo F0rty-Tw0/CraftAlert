@@ -41,9 +41,9 @@ local function anyRowShown()
   return false
 end
 
--- The list pane's empty-state frame, once it holds the empty text.
+-- The details pane's empty-state frame, once it holds the empty text.
 local function emptyText()
-  local empty = frame().view.list.empty
+  local empty = frame().view.empty
   for _, region in ipairs(empty.regions) do
     if region.GetText and string.find(region:GetText() or "", "No leads", 1, true) then
       return empty
