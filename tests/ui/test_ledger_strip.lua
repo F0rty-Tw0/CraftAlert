@@ -56,6 +56,7 @@ local function testLayout()
   local edge = _G["CreateFrame"]("Frame")
   ns.LedgerStrip.SetLeftEdge(strip, edge)
   Assert.same(strip.text.points, { { "BOTTOMLEFT", edge, "TOPRIGHT", padding, 0 }, { "TOPRIGHT", strip, "TOPRIGHT", -88, 0 } })
+  Assert.equal(strip.text.justifyV, "MIDDLE", "the line centred in the band-tall box")
   ns.LedgerStrip.SetRightInset(strip, 40)
   Assert.same(strip.text.points, { { "BOTTOMLEFT", edge, "TOPRIGHT", padding, 0 }, { "TOPRIGHT", strip, "TOPRIGHT", -40, 0 } })
   -- (496 - 20 - 2 * 4) / 48 → 9 rows, not the 10 the whole height holds.

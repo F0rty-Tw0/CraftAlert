@@ -166,6 +166,7 @@ local function placeText(strip)
   local padding = Theme.LAYOUT.PADDING
   local edge, right = strip.leftEdge, -(strip.rightInset or padding)
   strip.text:ClearAllPoints()
+  strip.text:SetJustifyV("MIDDLE")
   if edge then
     strip.text:SetPoint("BOTTOMLEFT", edge, "TOPRIGHT", padding, 0)
     strip.text:SetPoint("TOPRIGHT", strip, "TOPRIGHT", right, 0)
