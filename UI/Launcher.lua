@@ -16,8 +16,9 @@ local LauncherArt = ns.LauncherArt or require("CraftAlert.UI.LauncherArt")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 
 -- Spec §7.3 and §7.6: the launcher button, frame CraftAlertLauncher, the one Craft Alert frame
--- made at login (§4.4 rule 5). Lit while scanning, dim while paused; a badge counts the leads;
--- the tooltip is the status line; a click toggles the leads window; "Hide when no leads"
+-- made at login (§4.4 rule 5). Lit while scanning, dim while paused; a gold badge counts the
+-- unseen leads (Leads.IsUnseen); the tooltip is the status line; a click toggles the leads
+-- window; "Hide when no leads"
 -- hides it while the list is empty. Draggable, position saved in CraftAlertDB.ui.launcher.
 -- Native-HUD spec §5.1–5.2: CraftScan-style ring and portrait (UI/LauncherArt.lua); the portrait shows the
 -- shown lead's profession, else the first profession; a new lead pulses the ring.
