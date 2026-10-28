@@ -12,7 +12,7 @@ local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 -- between the list and the settings pane; the gear turns into a back arrow while the pane shows.
 local SettingsGear = {}
 
-local LABEL_GAP = 4
+local LABEL_GAP = Theme.LAYOUT.SPACE.XS
 
 -- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua): gold title, then
 -- one green instruction line naming what a click does now (no body, so no gap above it).

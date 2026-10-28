@@ -38,7 +38,9 @@ local FALLBACK_PINK = { 1, 0.5, 1, 1 }
 
 -- WM's row numbers: EDGE from the row's sides, ICON_GAP after the icon, MARK_GAP between the marks
 -- and before the second line's end, NAME_GAP between the name and the age.
-local EDGE, ICON_GAP, MARK_GAP, NAME_GAP = 6, 10, 4, 2
+-- off-scale: the row's edge, the icon gap and the name gap are WhisperMessenger's row numbers.
+local EDGE, ICON_GAP, NAME_GAP = 6, 10, 2
+local MARK_GAP = Theme.LAYOUT.SPACE.XS
 local ANCHOR = "ANCHOR_RIGHT"
 -- A customer of unknown class: white on the row (spec D6), as a RAID_CLASS_COLORS entry.
 local NO_CLASS = { r = 1, g = 1, b = 1 }

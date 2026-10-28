@@ -91,7 +91,8 @@ end
 -- The lead count in the band between the title bar and the panes, right of the portrait.
 local function createStatus(frame)
   local status = FrameKit.Text(frame, Theme.FONTS.body, Theme.COLORS.textSecondary)
-  status:SetPoint("LEFT", frame, "TOPLEFT", 64, -42)
+  local offset = Theme.LAYOUT.STATUS_OFFSET
+  status:SetPoint("LEFT", frame, "TOPLEFT", offset.x, offset.y)
   frame.status = status
 end
 

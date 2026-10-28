@@ -59,7 +59,10 @@ local GONE = {
   ["UI/Settings/PageCrafters.lua"] = { "REMOVE_WIDTH = 140" },
   ["UI/Settings/PageLinked.lua"] = { "IMPORT_WIDTH = 100", "CRAFTSCAN_WIDTH = 180" },
   ["UI/LeadDetails.lua"] = { "BUTTON_GAP, BUTTON_WIDTH, BUTTON_HEIGHT = 8, 100, 22" },
-  ["UI/CraftScanPrompt.lua"] = { "local BUTTON_WIDTH = 110" },
+  ["UI/CraftScanPrompt.lua"] = { "local BUTTON_WIDTH = 110", "TEXT_INSET = 16", "BUTTON_GAP = 8", "BUTTON_GAP / 2, 4)" },
+  ["UI/LeadsWindow.lua"] = { '"TOPLEFT", 64, -42' },
+  ["UI/SettingsGear.lua"] = { "local LABEL_GAP = 4" },
+  ["UI/LeadRow.lua"] = { "EDGE, ICON_GAP, MARK_GAP, NAME_GAP = 6, 10, 4, 2" },
   ["UI/Settings/SettingsPane.lua"] = {
     "-(4 + (index - 1)",
     '"TOPLEFT", pane.nav, "TOPLEFT", 2, top',
