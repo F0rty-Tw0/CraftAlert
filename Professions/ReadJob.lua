@@ -7,11 +7,12 @@ local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.Prof
 local RecipeStore = ns.RecipeStore or require("CraftAlert.Professions.RecipeStore")
 local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local Index = ns.Index or require("CraftAlert.Model.Index")
 
 -- The steps of ModernReader's Slicer job "read" (spec 2026-10-22 §4.2): phase 1 stores one
 -- recipe per step, phase 2 drops one foreign recipe per step. ModernReader owns the window
 -- state and the storing helpers; it hands them in as `ops` so this file holds the walk and, in
--- Finish, the only-newest rule that follows it.
+-- Finish, the only-newest rule that follows it. CancelRebuild serves ClassicReader's jobs too.
 local ReadJob = {}
 
 local ipairs, pairs = ipairs, pairs
@@ -176,6 +177,14 @@ function ReadJob.Finish(job)
     job.anyChanged = applyNewest(job, professionKey) or job.anyChanged
   end
   return { prof = job.key, stored = job.stored, pendingBind = job.pendingBind, ms = job.ms, steps = job.steps }
+end
+
+-- A read job's onCancel: when the job stored a change, rebuilds the index once with it.
+function ReadJob.CancelRebuild(job)
+  if job.anyChanged then
+    job.anyChanged = false
+    Index.RequestRebuild("read")
+  end
 end
 
 ns.ReadJob = ReadJob

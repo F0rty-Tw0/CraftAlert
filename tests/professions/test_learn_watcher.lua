@@ -25,6 +25,8 @@ local function setup(flavor, withoutDb)
   local db = ns.Defaults.Db()
   Fresh.require("Professions.ProfessionList").Refresh(db, CHAR)
   Fresh.require("Professions.BindLookup")
+  Fresh.require("Professions.RecipeStore")
+  Fresh.require("Professions.ReadJob")
   local ModernReader = Fresh.require("Professions.ModernReader")
   local LearnWatcher = Fresh.require("Professions.LearnWatcher")
   local run = { builds = 0, reasons = {} }

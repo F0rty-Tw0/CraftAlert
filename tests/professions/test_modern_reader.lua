@@ -34,6 +34,7 @@ local function setup(flavor)
   ns.PlayerName.Init()
   local ProfessionList = Fresh.require("Professions.ProfessionList")
   Fresh.require("Professions.BindLookup")
+  Fresh.require("Professions.RecipeStore")
   Fresh.require("Professions.ReadJob")
   queued = {}
   Fresh.require("Professions.QualityReach").Queue = function(recipeIDs)

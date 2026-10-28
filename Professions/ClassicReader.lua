@@ -10,6 +10,7 @@ local Index = ns.Index or require("CraftAlert.Model.Index")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local BindLookup = ns.BindLookup or require("CraftAlert.Professions.BindLookup")
 local RecipeStore = ns.RecipeStore or require("CraftAlert.Professions.RecipeStore")
+local ReadJob = ns.ReadJob or require("CraftAlert.Professions.ReadJob")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 
 -- Spec §5.2 row 2 (Era to MoP): reads the open TradeSkill window into the current character's
@@ -46,17 +47,6 @@ ClassicReader.lastRead = nil
 -- The newer of the TradeSkill and Craft window reads, for /ca perf.
 ClassicReader.newestRead = nil
 
--- → changed, and queues the bind lookup when the output item's bind is unknown.
-local function store(recipes, recipeKey, fields, professionKey)
-  local changed = RecipeStore.Merge(recipes, recipeKey, fields, professionKey)
-  local recipe = recipes[recipeKey]
-  if recipe.item and recipe.bind == nil then
-    BindLookup.Queue(recipe.item)
-    return changed, true
-  end
-  return changed, false
-end
-
 -- The open window's profession when the current character stores it: nil for another player's
 -- list, Beast Training, Cooking, or a window not loaded yet ("UNKNOWN"). `source` names the
 -- window's calls: `line`, and `linked` when the window can show another player's list. The
@@ -87,7 +77,7 @@ local function readRow(job)
   end
   local recipes = job.db.characters[job.charKey].recipes
   -- The client's spelling: the greeting names the recipe with it; the key is lowercase.
-  local changed, unknownBind = store(recipes, lower(name), { item = itemOf(link), name = name }, job.key)
+  local changed, unknownBind = RecipeStore.Store(recipes, lower(name), { item = itemOf(link), name = name }, job.key)
   job.stored = job.stored + 1
   job.anyChanged = job.anyChanged or changed
   job.pendingBind = job.pendingBind + (unknownBind and 1 or 0)
@@ -138,10 +128,7 @@ local function newJob(reader, key, count)
   -- A job cut off by a close, a switch, a restart or an error: what it stored so far goes to the
   -- index.
   job.onCancel = function()
-    if job.anyChanged then
-      job.anyChanged = false
-      Index.RequestRebuild("read")
-    end
+    ReadJob.CancelRebuild(job)
   end
   return job
 end
