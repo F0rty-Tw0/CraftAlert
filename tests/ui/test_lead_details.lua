@@ -445,8 +445,7 @@ local function testCraftersZone()
   -- Nobody knows the profession: no menu, no instruction.
   lead.prof, lead.cannotOrder = 999, nil
   Widgets.fire(zone, "OnEnter")
-  Assert.same(tip().lines[#tip().lines], "Picked for this lead: Me")
-  Assert.falsy(tip().lines[#tip().lines] == " ", "no instruction: no dangling blank line")
+  Assert.same(tip().lines[#tip().lines], "Picked for this lead: Me", "no instruction: no dangling blank line")
   -- No MenuUtil: no instruction either.
   lead.prof = 164
   Wow.stub("MenuUtil", nil)

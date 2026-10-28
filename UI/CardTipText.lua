@@ -81,8 +81,10 @@ end
 
 function CardTipText.Matched(tip, lead)
   title(tip, Localization.Text("Matched"))
-  for _, part in ipairs(lead.why and LeadText.WhyParts(lead.why) or {}) do
-    white(tip, part)
+  if lead.why then
+    for _, part in ipairs(LeadText.WhyParts(lead.why)) do
+      white(tip, part)
+    end
   end
   if lead.profName then
     white(tip, lead.profName)

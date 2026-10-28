@@ -123,9 +123,11 @@ local function showTooltip(frame)
     return
   end
   local why = current.lead and current.lead.why
+  local hasWhy = type(why) == "string" and why ~= ""
   local matched
-  if type(why) == "string" and why ~= "" then
-    matched = { Localization.Text("Matched"), unpack(LeadText.WhyParts(why)) }
+  if hasWhy then
+    local parts = LeadText.WhyParts(why)
+    matched = { Localization.Text("Matched"), unpack(parts) }
   end
   ToastChrome.ShowTooltip(frame, matched, LeadText.ClickLines())
 end

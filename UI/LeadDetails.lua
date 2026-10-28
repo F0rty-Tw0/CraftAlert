@@ -97,12 +97,13 @@ local function createButton(details, action, previous)
       action.run(details)
     end
   end)
-  button:HookScript("OnEnter", function()
+  local function showTip()
     local tip = Tooltip.Get()
     tip:SetOwner(button, ANCHOR)
     action.tip(tip, details.lead)
     tip:Show()
-  end)
+  end
+  button:HookScript("OnEnter", showTip)
   button:HookScript("OnLeave", Tooltip.HideIfOwned)
   return button
 end

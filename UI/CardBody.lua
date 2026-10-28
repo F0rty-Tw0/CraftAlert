@@ -79,7 +79,8 @@ end
 function CardBody.MatchedText(lead, professionColor)
   local colors = Theme.COLORS
   local why = lead.why and FrameKit.ThemeCode(lead.why, colors.white)
-  local profession = lead.profName and FrameKit.ThemeCode(lead.profName, professionColor or colors.gold)
+  local color = professionColor or colors.gold
+  local profession = lead.profName and FrameKit.ThemeCode(lead.profName, color)
   if why and profession then
     return why .. " · " .. profession
   end
