@@ -606,18 +606,16 @@ end
 -- "LF crafter, back in 5" stays bare) other than "ring" (user ruling 2026-10-28: "LF crafter, ring
 -- me" names a ring; PhraseMatch R4 still reads it as everyday). Matcher's "LF crafter" step reads
 -- it, so a bare line is told from one step 4.4 just could not match (user ruling 2026-10-28: a named want beats the
--- armor guess). Same tokens, count and breakBefore as that Match.
-function WordGroups.NamedWant(index, tokens, count, breakBefore)
+-- armor guess). Same tokens and count as that Match. No HandWord here: collect
+-- always counts an "off hand" ("offhand" is in Slang.wordSet), so such a line returns above.
+function WordGroups.NamedWant(index, tokens, count)
   if lineCount > 0 or namedCount > 0 then
     return true
   end
   local wordIndex, extraSlang = index.wordIndex, index.extraSlang
   for i = 1, count do
     local token = tokens[i]
-    if token == "hand" then
-      token = HandWord(tokens, i, breakBefore)
-    end
-    if token and (token == "ring" or not everydaySlot[token]) and (wordIndex[token] or slangWords[token] or extraSlang[token]) then
+    if (token == "ring" or not everydaySlot[token]) and (wordIndex[token] or slangWords[token] or extraSlang[token]) then
       return true
     end
   end

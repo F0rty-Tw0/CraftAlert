@@ -245,7 +245,7 @@ local function matchLfCrafter(hasSet)
   if at == nil or Tokenizer.itemCount > 0 or (namingWords[tokens[at + 1]] and not BreakBefore(at + 1)) then
     return false
   end
-  if WordGroups.NamedWant(index, tokens, tokenCount, BreakBefore) or phraseHit(hasSet) then
+  if WordGroups.NamedWant(index, tokens, tokenCount) or phraseHit(hasSet) then
     return false
   end
   local armor, label = senderArmor()
