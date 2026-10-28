@@ -25,23 +25,6 @@ local function db()
   return _G["CraftAlertDB"]
 end
 
--- An InputBoxTemplate box on a row of its own, inset as Controls.Input's box; `label` names the
--- row (`row.settingsLabel`, as a control's row) and `row.input` is the box.
-local function textBox(column, label)
-  local layout = Theme.LAYOUT
-  local row = Controls.Bar(column, layout.INPUT_HEIGHT)
-  row.settingsLabel = label
-  -- off-scale: the box starts 5 px in, clear of the template art.
-  local box = _G["CreateFrame"]("EditBox", nil, row, "InputBoxTemplate")
-  box:SetPoint("TOPLEFT", row, "TOPLEFT", 5, 0)
-  box:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
-  box:SetAutoFocus(false)
-  box:SetFontObject(Theme.FONTS.setting)
-  box:SetTextInsets(layout.INPUT_INSET.left, layout.INPUT_INSET.right, 0, 0)
-  row.input = box
-  return box
-end
-
 -- "Name-Realm, imported <date>" per imported character, by key.
 local function importedText()
   local keys = {}
@@ -68,7 +51,7 @@ local function createExport(column, page)
   Controls.Section(column, Localization.Text("Export this account"))
   local hint = Controls.Note(column)
   hint:SetText(Localization.Text("Copy this string and paste it on the Linked accounts page of your other account."))
-  local box = textBox(column, Localization.Text("Export string"))
+  local box = Controls.TextBox(column, Localization.Text("Export string"))
   local shown = ""
   local function show(text)
     shown = text
@@ -96,7 +79,7 @@ end
 local function createImport(column, page)
   Controls.Section(column, Localization.Text("Import another account"))
   Controls.Note(column):SetText(Localization.Text("Paste the string from your other account here, then click Import."))
-  local box = textBox(column, Localization.Text("Import string"))
+  local box = Controls.TextBox(column, Localization.Text("Import string"))
   local result
   local button
   local function import()

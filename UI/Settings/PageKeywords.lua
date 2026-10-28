@@ -3,9 +3,9 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
-local Constants = ns.Constants or require("CraftAlert.Core.Constants")
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Index = ns.Index or require("CraftAlert.Model.Index")
+local Defaults = ns.Defaults or require("CraftAlert.Persistence.Defaults")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
@@ -31,14 +31,6 @@ local function splitWords(text)
     end
   end
   return words
-end
-
-local function copy(list)
-  local result = {}
-  for i, value in ipairs(list) do
-    result[i] = value
-  end
-  return result
 end
 
 -- "word=target" pairs; a part without both sides is dropped.
@@ -70,12 +62,14 @@ local function formatSlang(slang)
   return table.concat(parts, " ")
 end
 
-local function wordsInput(column, add, label, key, fallback, tip)
+-- The word list settings[key] as one box. restoreDefault: an emptied box saves the default list
+-- (Defaults.Settings) instead of none.
+local function wordsInput(column, add, label, key, restoreDefault, tip)
   local input
   input = Controls.Input(column, Localization.Text(label), function(text)
     local words = splitWords(text)
-    if #words == 0 and fallback then
-      words = copy(fallback)
+    if #words == 0 and restoreDefault then
+      words = Defaults.Settings()[key]
     end
     db().settings[key] = words
     input.Set(table.concat(words, " "))
@@ -109,9 +103,9 @@ function PageKeywords.Create(parent)
   local add, refresh = Controls.Refresher()
   Controls.Section(column, Localization.Text("Request words"))
   local intentTip = "Words that mark a request, such as lf or wtb. A line needs one of them to count as a request. Emptied, the default list returns."
-  wordsInput(column, add, "Intent words", "intentWords", Constants.intentWords, intentTip)
+  wordsInput(column, add, "Intent words", "intentWords", true, intentTip)
   local blockerTip = "Words that cancel a match, such as wts. A line with one of them never alerts."
-  wordsInput(column, add, "Blocker words", "blockerWords", nil, blockerTip)
+  wordsInput(column, add, "Blocker words", "blockerWords", false, blockerTip)
   slangInput(column, add)
   return { Refresh = refresh }
 end

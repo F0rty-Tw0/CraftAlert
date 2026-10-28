@@ -72,15 +72,6 @@ local function professionOptions()
   return options
 end
 
-local function textOf(options, value)
-  for _, option in ipairs(options) do
-    if option.value == value then
-      return option.text
-    end
-  end
-  return nil
-end
-
 -- A lead as Leads.OnMatch makes it, for the player (own) or an alt on the player's realm.
 local function sampleLead(template, prof, profName)
   local own = PlayerName.Own() or "Me-Realm"
@@ -120,14 +111,14 @@ end
 function PageGreetings.Create(parent)
   local column = Controls.Column(parent, Theme.LAYOUT.PAGE_PADDING)
   local add, refresh = Controls.Refresher()
-  local state = { options = {} }
+  local state = {}
   local lines
   local function repaint()
     local settings = db().settings
     local prof = state.profession.Value()
     state.note.Set(prof ~= nil and settings.notes[prof] or "")
     for i, template in ipairs(TEMPLATES) do
-      local greeting = Greeting.Build(sampleLead(template, prof, textOf(state.options, prof)), settings)
+      local greeting = Greeting.Build(sampleLead(template, prof, state.profession.Text()), settings)
       lines[i]:SetText(Localization.Text("%s: %s", Localization.Text(template.label), greeting))
     end
   end
@@ -153,8 +144,7 @@ function PageGreetings.Create(parent)
   lines = createPreview(column)
   createNotes(column, state, repaint)
   add(function()
-    state.options = professionOptions()
-    state.profession.SetOptions(state.options, state.profession.Value())
+    state.profession.SetOptions(professionOptions(), state.profession.Value())
     repaint()
   end)
   return { Refresh = refresh }

@@ -10,7 +10,7 @@ local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 
 -- The settings pages' controls on Blizzard templates: check button, slider with steppers,
 -- input box, search box, dropdown and panel button, in a Column (UI/Settings/Column.lua). Each
--- control returns { row, input, Set(value) }: Set shows a value without reporting it; only the
+-- control (but the bare TextBox) returns { row, input, Set(value) }: Set shows a value without reporting it; only the
 -- player's action calls onChange. `row.settingsLabel` names the row and `row.input` is its control
 -- frame. A row is as wide as the column and its controls are anchored to its edges. As
 -- WhisperMessenger's settings, a slider, input or dropdown sits on the line under its label; a
@@ -29,9 +29,7 @@ local type = type
 -- off-scale: WhisperMessenger label spacing.
 local LABEL_TOP = 6
 
-local function create(frameType, parent, template)
-  return _G["CreateFrame"](frameType, nil, parent, template)
-end
+local create = Column.Create
 
 -- The column's layout, as the pages call it.
 Controls.Column = Column.New
@@ -253,10 +251,32 @@ function Controls.Slider(column, spec)
   return { row = row, input = slider, Set = set }
 end
 
+-- An InputBoxTemplate box's text in the label font, inset clear of the art's end caps; no
+-- focus on show.
+local function styleBox(box)
+  local inset = Theme.LAYOUT.INPUT_INSET
+  box:SetAutoFocus(false)
+  box:SetFontObject(Theme.FONTS.setting)
+  box:SetTextInsets(inset.left, inset.right, 0, 0)
+end
+
+-- A box from `template` filling a bar of its own (no label line); `label` names the row
+-- (`row.settingsLabel`) and `row.input` is the box. → row, box
+local function barBox(column, label, template)
+  local row = Column.Bar(column, Theme.LAYOUT.INPUT_HEIGHT)
+  row.settingsLabel = label
+  -- off-scale: the box starts 5 px in, clear of the template art.
+  local box = create("EditBox", row, template)
+  box:SetPoint("TOPLEFT", row, "TOPLEFT", 5, 0)
+  box:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
+  row.input = box
+  return row, box
+end
+
 -- The box under its label, committed as commitOn says. maxLetters (optional) caps the box;
 -- without it a long word list is kept whole (a cut text would be committed on focus loss).
 -- The template's art reaches 5 px left of the box, so the box starts 5 px in: the art lines up
--- with the label. Its text is in the label font, inset clear of the art's end caps.
+-- with the label. Styled as styleBox says.
 function Controls.Input(column, label, onCommit, maxLetters, tip)
   local layout = Theme.LAYOUT
   local row = newRow(column, label, true)
@@ -264,9 +284,7 @@ function Controls.Input(column, label, onCommit, maxLetters, tip)
   box:SetHeight(layout.INPUT_HEIGHT)
   -- off-scale: InputBoxTemplate art starts 5 px out of the box.
   underLabel(row, box, 5, 0)
-  box:SetAutoFocus(false)
-  box:SetFontObject(Theme.FONTS.setting)
-  box:SetTextInsets(layout.INPUT_INSET.left, layout.INPUT_INSET.right, 0, 0)
+  styleBox(box)
   if maxLetters then
     box:SetMaxLetters(maxLetters)
   end
@@ -277,6 +295,14 @@ function Controls.Input(column, label, onCommit, maxLetters, tip)
   return { row = row, input = box, Set = commitOn(box, onCommit) }
 end
 
+-- An InputBoxTemplate box on a bar of its own, styled as Controls.Input's box; `label` names the
+-- row but is not shown. No commit wiring: the caller scripts the box. → the box
+function Controls.TextBox(column, label)
+  local _, box = barBox(column, label, "InputBoxTemplate")
+  styleBox(box)
+  return box
+end
+
 -- A search box (SearchBoxTemplate: magnifier, clear button) with `placeholder` as the template's
 -- empty-box text in place of a label, committed as commitOn says and on every typed change
 -- (OnTextChanged with userInput; Set and other programmatic SetText commit nothing, and commit
@@ -285,12 +311,7 @@ end
 -- own font and insets (room for the magnifier and the clear button). `row.settingsLabel` is the
 -- placeholder, and the title of its tip.
 function Controls.Search(column, placeholder, onCommit, tip)
-  local row = Column.Bar(column, Theme.LAYOUT.INPUT_HEIGHT)
-  row.settingsLabel = placeholder
-  -- off-scale: the box starts 5 px in, clear of the template art.
-  local box = create("EditBox", row, "SearchBoxTemplate")
-  box:SetPoint("TOPLEFT", row, "TOPLEFT", 5, 0)
-  box:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
+  local row, box = barBox(column, placeholder, "SearchBoxTemplate")
   box.Instructions:SetText(placeholder)
   local set, commit = commitOn(box, onCommit)
   box.clearButton:HookScript("OnClick", commit)
@@ -302,7 +323,6 @@ function Controls.Search(column, placeholder, onCommit, tip)
   if tip then
     Controls.Tip(row, placeholder, tip, box)
   end
-  row.input = box
   return { row = row, input = box, Set = set }
 end
 
@@ -353,6 +373,11 @@ function Controls.Choice(column, label, options, onChange, tip)
   function control.Value()
     local option = options[current]
     return option and option.value
+  end
+  -- The selected option's text, nil when there are no options.
+  function control.Text()
+    local option = options[current]
+    return option and option.text
   end
   return control
 end

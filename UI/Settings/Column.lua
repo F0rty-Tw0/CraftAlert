@@ -20,9 +20,12 @@ local min = math.min
 
 local NO_PADDING = { left = 0, right = 0, top = 0, bottom = 0 }
 
-local function create(frameType, parent, template)
+-- An unnamed frame of `frameType` on `parent`, from `template` (optional); Controls builds on it too.
+function Column.Create(frameType, parent, template)
   return _G["CreateFrame"](frameType, nil, parent, template)
 end
+
+local create = Column.Create
 
 -- A font string is as tall as its text; a frame has its own height.
 local function heightOf(region)

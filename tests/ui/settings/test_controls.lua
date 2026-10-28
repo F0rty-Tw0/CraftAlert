@@ -184,6 +184,7 @@ local function testChoice()
   Assert.same(seen, { 3081 })
   Assert.equal(choice.input.Text:GetText(), "Sound 2")
   Assert.equal(choice.Value(), 3081)
+  Assert.equal(choice.Text(), "Sound 2", "Text: the selected option's text")
   -- New options keep the shown value when it is still offered, else show the first.
   choice.SetOptions({ { value = 3081, text = "Only" } }, 9999)
   Assert.equal(choice.input.Text:GetText(), "Only")
@@ -191,6 +192,7 @@ local function testChoice()
   Assert.same(seen, { 3081 }, "SetOptions reports nothing")
   choice.SetOptions({}, nil)
   Assert.equal(choice.Value(), nil)
+  Assert.equal(choice.Text(), nil, "no options: no text")
   Assert.equal(choice.input.Text:GetText(), "")
 end
 
