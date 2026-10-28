@@ -194,11 +194,6 @@ local function testTooltip()
   frame.scripts.OnEnter(frame)
   Assert.same(tip.lines, { "Craft Alert", clicks[1], clicks[2], clicks[3], clicks[4], drag })
   Assert.same(tip.colors, { gold, green, green, green, green, green })
-  -- ShowTooltip also takes a plain string, and an empty list draws no body and no blank.
-  ns.ToastChrome.ShowTooltip(frame, "plain", { clicks[1] })
-  Assert.same(tip.lines, { "Craft Alert", "plain", " ", clicks[1], drag })
-  ns.ToastChrome.ShowTooltip(frame, {}, { clicks[1] })
-  Assert.same(tip.lines, { "Craft Alert", clicks[1], drag })
 end
 
 local function testLinks()
