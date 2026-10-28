@@ -108,6 +108,16 @@ local function runOneTick()
   timer.fn()
 end
 
+-- Fires a list update and runs the end-of-frame check it armed, if any, at once: the queued
+-- Slicer tick stays queued, so the update is checked before the job's next step.
+local function listUpdate()
+  local queuedBefore = #Wow.timers
+  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  if #Wow.timers > queuedBefore then
+    table.remove(Wow.timers).fn()
+  end
+end
+
 local function threeBelts()
   return { belt(1, 100), belt(2, 200), belt(3, 300) }
 end
@@ -219,7 +229,7 @@ local function jobCases()
     replaced = function(tripped)
       tripped.base = ENCH
       tripped.recipes = {}
-      Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+      listUpdate()
     end,
   }
   for name, trip in pairs(trips) do
@@ -276,7 +286,7 @@ local function jobCases()
   Wow.fireEvent("TRADE_SKILL_SHOW")
   runOneTick()
   for _ = 1, 3 do
-    Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+    listUpdate()
   end
   Slicer.Drain()
   Assert.same(calls, { 1, 2, 3 }, "each recipe is read once")
@@ -290,7 +300,7 @@ local function jobCases()
   state.recipes = threeBelts()
   Wow.fireEvent("TRADE_SKILL_SHOW")
   state.recipes = { belt(1, 100), belt(2, 200) }
-  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  listUpdate()
   Slicer.Drain()
   Assert.same(calls, { 1, 2 }, "the three-recipe job was replaced")
 
@@ -312,9 +322,92 @@ local function jobCases()
   -- A list update with the window never opened reads nothing.
   state, _, db, _, Slicer = setup()
   state.recipes = threeBelts()
-  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  listUpdate()
   Slicer.Drain()
   Assert.same(recipesOf(db), {})
+end
+
+-- Counts the C_TradeSkillUI.GetAllRecipeIDs calls: each one builds the whole recipe list.
+local function countListReads()
+  local api = _G["C_TradeSkillUI"]
+  local original, count = api.GetAllRecipeIDs, { n = 0 }
+  rawset(api, "GetAllRecipeIDs", function()
+    count.n = count.n + 1
+    return original()
+  end)
+  return count
+end
+
+-- TRADE_SKILL_LIST_UPDATE with the window closed checks nothing, and a burst of them in one
+-- frame is checked once, on the list as it stands at the end of the frame.
+local function listUpdateCases()
+  local state, _, db, _, Slicer = setup()
+  state.recipes = threeBelts()
+  local reads = countListReads()
+  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  Assert.equal(reads.n, 0, "a window never opened: the list is not built")
+  Assert.equal(Slicer.IsRunning("read"), false)
+  Assert.equal(Wow.pendingTimers(0), 0, "nothing waits for the end of the frame")
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Slicer.Drain()
+  Wow.runTimers()
+  Wow.fireEvent("TRADE_SKILL_CLOSE")
+  reads.n = 0
+  state.recipes[4] = belt(4, 400)
+  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  Assert.equal(reads.n, 0, "a closed window: the list is not built")
+  Assert.equal(Wow.pendingTimers(0), 0)
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Slicer.Drain()
+  Assert.truthy(recipesOf(db)[4], "the next open reads what the closed window's update skipped")
+
+  state, _, db, _, Slicer = setup()
+  state.recipes = { belt(1, 100) }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Slicer.Drain()
+  Wow.runTimers()
+  reads = countListReads()
+  for i = 2, 6 do
+    state.recipes[i] = belt(i, i * 100)
+    Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  end
+  Assert.equal(reads.n, 0, "the burst waits for the end of the frame")
+  Assert.equal(Wow.pendingTimers(0), 1, "one check for the whole burst")
+  Wow.runTimers()
+  Assert.equal(reads.n, 1, "five updates in one frame build the list once")
+  for i = 1, 6 do
+    Assert.truthy(recipesOf(db)[i], "the one check reads the last list")
+  end
+
+  -- A window closed in the frame of the burst is not checked at its end.
+  state, _, _, _, Slicer = setup()
+  state.recipes = { belt(1, 100) }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Slicer.Drain()
+  Wow.runTimers()
+  reads = countListReads()
+  state.recipes[2] = belt(2, 200)
+  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  Wow.fireEvent("TRADE_SKILL_CLOSE")
+  Wow.runTimers()
+  Assert.equal(reads.n, 0)
+  Assert.equal(Slicer.IsRunning("read"), false)
+
+  -- A C_Timer.After that raised armed nothing: the next update arms the check again.
+  local ModernReader
+  state, ModernReader = setup()
+  state.recipes = { belt(1, 100) }
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Wow.runTimers()
+  local timer = _G["C_Timer"]
+  local after = timer.After
+  rawset(timer, "After", function()
+    error("timer refused")
+  end)
+  Assert.equal(pcall(ModernReader.OnListUpdate), false)
+  rawset(timer, "After", after)
+  ModernReader.OnListUpdate()
+  Assert.equal(Wow.pendingTimers(0), 1, "the failed arm left no update pending")
 end
 
 -- The re-open skip: a window re-open whose last read of the profession was settled (a loaded
@@ -395,7 +488,7 @@ local function reopenCases()
   state.base = BS
   state.recipes = { belt(1, 100, { profession = lined }), belt(2, 200, { profession = lined }) }
   queued = {}
-  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  listUpdate()
   Assert.equal(Slicer.IsRunning("read"), false, "a same-count update skips after another profession was read")
   Assert.same(queued, {}, "an update queues no reach")
   Wow.fireEvent("TRADE_SKILL_SHOW")
@@ -654,7 +747,7 @@ return function()
       return true, "party"
     end)
     Wow.fireEvent("TRADE_SKILL_SHOW")
-    Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+    listUpdate()
     Assert.equal(Slicer.IsRunning("read"), false, "no read job")
     Assert.same(recipesOf(db), {})
     Assert.equal(Wow.pendingTimers(0), 0)
@@ -668,7 +761,7 @@ return function()
     state.recipes = { belt(1, 100) }
     state.guards[guard] = true
     Wow.fireEvent("TRADE_SKILL_SHOW")
-    Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+    listUpdate()
     Assert.same(recipesOf(db), {}, guard)
     Assert.equal(db.characters[CHAR].professions[BS].read, false, guard)
     Assert.equal(Wow.pendingTimers(0), 0, guard)
@@ -725,11 +818,11 @@ return function()
   Wow.fireEvent("TRADE_SKILL_SHOW")
   Slicer.Drain()
   state.recipes[1].name = "Changed"
-  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  listUpdate()
   Slicer.Drain()
   Assert.equal(recipesOf(db)[1].name, "Belt 1", "same count: no re-read")
   state.recipes[2] = belt(2, 200)
-  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  listUpdate()
   Slicer.Drain()
   Assert.equal(recipesOf(db)[1].name, "Changed")
   Assert.truthy(recipesOf(db)[2])
@@ -744,7 +837,7 @@ return function()
   Slicer.Drain()
   Assert.equal(db.characters[CHAR].professions[BS].read, false)
   state.recipes = { belt(1, 100) }
-  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  listUpdate()
   Slicer.Drain()
   Assert.truthy(recipesOf(db)[1])
   Assert.equal(db.characters[CHAR].professions[BS].read, true)
@@ -837,7 +930,7 @@ return function()
   Assert.equal(db.characters[CHAR].professions[BS].read, false)
   Assert.equal(db.characters[CHAR].professions[ENCH].read, true)
   state.recipes = { belt(3, 300, { profession = ownBs }), belt(4, 400) }
-  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  listUpdate()
   Assert.equal(Slicer.IsRunning("read"), true, "the same count still reads: nothing was stored for the window")
   Slicer.Drain()
   Assert.equal(recipesOf(db)[3].prof, BS)
@@ -918,16 +1011,17 @@ return function()
   Slicer.Drain()
   state.recipes[2] = belt(2, 200)
   state.changing = true
-  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  listUpdate()
   Slicer.Drain()
   Assert.equal(recipesOf(db)[2], nil, "no read while the data source changes")
   state.changing = false
-  Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
+  listUpdate()
   Slicer.Drain()
   Assert.truthy(recipesOf(db)[2])
 
   lineCases()
   jobCases()
+  listUpdateCases()
   reopenCases()
   isBlockedCases()
 end
