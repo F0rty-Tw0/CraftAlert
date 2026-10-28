@@ -205,6 +205,45 @@ local function testAlertsPage()
   Widgets.slide(row("Opacity").input, 0.5)
   Assert.equal(settings.opacity, 0.5)
   Assert.same(take(refreshes), { "leadsWindow" })
+
+  -- Sounds are named from the client's SOUNDKIT (first key alphabetically for a shared value).
+  Wow.stub("SOUNDKIT", { RAID_WARNING = 8959, READY_CHECK = 8960, ALARM = 12867, ALARM_CLOCK = 12867 })
+  local names = {
+    ns.PageAlerts.SoundName(8959, 1),
+    ns.PageAlerts.SoundName(12867, 4),
+    ns.PageAlerts.SoundName(3081, 2),
+  }
+  Assert.same(names, { "Raid warning", "Alarm", "Sound 2" })
+  Wow.stub("SOUNDKIT", nil)
+  Assert.equal(ns.PageAlerts.SoundName(8959, 3), "Sound 3", "no SOUNDKIT table")
+
+  -- Sections run When a request arrives, Leads, Window and launcher: each hangs below the last.
+  local function section(text)
+    for _, frame in ipairs(Wow.frames) do
+      for _, region in ipairs(SettingsFixture.visible(frame) and frame.regions or {}) do
+        if region.text == text then
+          return region
+        end
+      end
+    end
+    error("no section " .. text)
+  end
+  local function hangsBelow(lower, upper)
+    local anchor = lower.points[1] and lower.points[1][2]
+    while anchor do
+      if anchor == upper then
+        return true
+      end
+      anchor = anchor.points and anchor.points[1] and anchor.points[1][2]
+    end
+    return false
+  end
+  local leads, window = section("Leads"), section("Window and launcher")
+  Assert.truthy(hangsBelow(section("Leads"), row("Toast duration")), "Leads follows the toast duration")
+  Assert.truthy(hangsBelow(row("Lead timeout"), leads), "Lead timeout stays under Leads")
+  Assert.truthy(hangsBelow(window, row("Lead timeout")), "Window and launcher follows Lead timeout")
+  Assert.truthy(hangsBelow(row("Hide the launcher when there are no leads"), window), "launcher toggle is under the new section")
+  Assert.truthy(hangsBelow(row("Opacity"), window), "opacity too")
 end
 
 -- The Alerts page reaches the launcher and the leads window only through its setters: loading it

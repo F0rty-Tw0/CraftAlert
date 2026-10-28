@@ -10,8 +10,9 @@ local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
--- Spec §9 Alerts: sound + test, taskbar flash, toast duration, lead timeout, launcher "Hide
--- when no leads", opacity. Nothing here touches the index or the scan gate. Sound, flash and
+-- Spec §9 Alerts: sections "When a request arrives" (sound + test, taskbar flash, toast
+-- duration), "Leads" (lead timeout), "Window and launcher" (launcher "Hide when no leads",
+-- opacity). Nothing here touches the index or the scan gate. Sound, flash and
 -- duration are read when an alert fires; a new lead timeout re-arms the expiry timer
 -- (Leads.Rearm); the launcher and the leads window repaint at once (the toast takes the
 -- opacity when it next shows). Both repaints come through setters Bootstrap calls
@@ -25,10 +26,29 @@ local function settings()
   return _G["CraftAlertDB"].settings
 end
 
+-- The client's own SOUNDKIT key for `kit` (the alphabetically first when several share it), as
+-- words with a capital first letter: RAID_WARNING -> "Raid warning". "Sound <index>" without one.
+function PageAlerts.SoundName(kit, index)
+  local kits = _G["SOUNDKIT"]
+  local best
+  if type(kits) == "table" then
+    for key, value in pairs(kits) do
+      if value == kit and type(key) == "string" and (best == nil or key < best) then
+        best = key
+      end
+    end
+  end
+  if best == nil then
+    return Localization.Text("Sound %d", index)
+  end
+  local words = best:gsub("_", " ")
+  return words:sub(1, 1) .. words:sub(2):lower()
+end
+
 local function soundOptions()
   local options = { { value = 0, text = Localization.Text("None") } }
   for i, kit in ipairs(Constants.flavors[FlavorCompat.flavorKey].soundKits) do
-    options[#options + 1] = { value = kit, text = Localization.Text("Sound %d", i) }
+    options[#options + 1] = { value = kit, text = PageAlerts.SoundName(kit, i) }
   end
   return options
 end
@@ -136,6 +156,7 @@ function PageAlerts.Create(parent)
     tip = Localization.Text("How long a lead stays in the list before it expires and is removed."),
   }
   addSlider(column, add, timeout, "leadTimeoutMin", rearm)
+  Controls.Section(column, Localization.Text("Window and launcher"))
   local hideLabel = Localization.Text("Hide the launcher when there are no leads")
   local hideTip = Localization.Text("Hides the launcher button while there are no leads. It returns with the next lead.")
   add(Controls.BoundToggle(column, hideLabel, settings, "hideLauncherWhenNoLeads", launcherToggled, hideTip))
