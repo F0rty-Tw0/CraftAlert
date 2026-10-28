@@ -67,6 +67,7 @@ local Normalize = PlayerName.Normalize
 local db = nil
 local active = nil -- nil until the first evaluation, so that one is reported too
 local lastReason = nil -- why the last evaluation paused, nil while active
+local lastUnread = nil -- the profession the last "empty" pause named, nil otherwise
 local announced = false -- whether the status line was printed this session
 local registered = {} -- event -> true while the shim below is registered for it
 local shims = {} -- event -> the function registered with EventRouter, created once
@@ -272,10 +273,11 @@ function ScanGate.Evaluate()
   for _, key in ipairs(state.active and enabledChannels() or {}) do
     wanted[CHANNEL_EVENTS[key]] = true
   end
-  local changed = state.active ~= active or state.reason ~= lastReason
+  local changed = state.active ~= active or state.reason ~= lastReason or state.unreadProfession ~= lastUnread
   -- Set first: the events are registered while the gate already reports active.
   active = state.active
   lastReason = state.reason
+  lastUnread = state.unreadProfession
   applyEvents(wanted)
   if changed then
     notify(state)
@@ -283,7 +285,8 @@ function ScanGate.Evaluate()
 end
 
 -- Called with (active, state) whenever the gate turns active or paused or pauses for another
--- reason (entering an instance while already paused counts); the first evaluation counts.
+-- reason (entering an instance while already paused counts), or an "empty" pause names another
+-- unread profession; the first evaluation counts.
 function ScanGate.OnChange(fn)
   listeners[#listeners + 1] = fn
 end
