@@ -53,14 +53,18 @@ function ToastLayout.Build(frame)
 end
 
 -- Stacks the lines under the top row (the message under the detail line when `hasDetail`, else
--- under the headline: a hidden line keeps its size) and sizes the frame to the text.
+-- under the headline: a hidden line keeps its size; an empty message is skipped) and sizes the frame to the text.
 function ToastLayout.Fit(frame, parts, hasDetail)
   local padding = Theme.LAYOUT.PADDING
   local top = place(frame, parts.headline, padding + parts.name:GetStringHeight() + LINE_GAP)
   if hasDetail then
     top = place(frame, parts.detail, top)
   end
-  local bottom = place(frame, parts.message, top) - LINE_GAP
+  -- An empty message (the away summary) adds no line, so no gap trails the line above it.
+  local bottom = top - LINE_GAP
+  if (parts.message:GetText() or "") ~= "" then
+    bottom = place(frame, parts.message, top) - LINE_GAP
+  end
   frame:SetHeight(bottom + padding)
 end
 
