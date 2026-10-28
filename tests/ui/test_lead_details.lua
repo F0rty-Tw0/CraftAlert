@@ -425,14 +425,19 @@ local function testCraftersZone()
     "Bob",
     "Picked for this lead: Me",
     "Can't send an order (other realm)",
+    " ",
     "Click: choose the main crafter",
   })
-  Assert.same({ tip().colors[1], tip().colors[2], tip().colors[3], tip().colors[7] }, { GOLD, { MAGE.r, MAGE.g, MAGE.b }, WHITE, GREEN })
+  Assert.same(
+    { tip().colors[1], tip().colors[2], tip().colors[3], tip().colors[7], tip().colors[8] },
+    { GOLD, { MAGE.r, MAGE.g, MAGE.b }, WHITE, {}, GREEN }
+  )
   Assert.same(tip().rights[2], { "R3 (conc)", GREY[1], GREY[2], GREY[3] })
   -- Nobody knows the profession: no menu, no instruction.
   lead.prof, lead.cannotOrder = 999, nil
   Widgets.fire(zone, "OnEnter")
   Assert.same(tip().lines[#tip().lines], "Picked for this lead: Me")
+  Assert.falsy(tip().lines[#tip().lines] == " ", "no instruction: no dangling blank line")
   -- No MenuUtil: no instruction either.
   lead.prof = 164
   Wow.stub("MenuUtil", nil)
@@ -446,10 +451,10 @@ local function testTipFollowsLead()
   old.crafter = "Bob-Realm"
   local ns, d = open({ old, UiFixture.lead(2, "Buyer-Realm") }, 2)
   Widgets.fire(d.zones.crafters, "OnEnter")
-  Assert.same(tip().lines, { "Crafters", "Me", "Picked for this lead: Me", "Click: choose the main crafter" })
+  Assert.same(tip().lines, { "Crafters", "Me", "Picked for this lead: Me", " ", "Click: choose the main crafter" })
   ns.LeadDetails.Show(d, leadOf(ns, 1))
   Widgets.fire(d.zones.crafters, "OnEnter")
-  Assert.same(tip().lines, { "Crafters", "Bob", "Picked for this lead: Bob", "Click: choose the main crafter" })
+  Assert.same(tip().lines, { "Crafters", "Bob", "Picked for this lead: Bob", " ", "Click: choose the main crafter" })
 end
 
 -- Main-crafter spec §3: a left-click on the Crafters zone (any modifier) opens the menu. Every other
@@ -550,9 +555,9 @@ local function testButtons()
   Widgets.fire(b.greet, "OnEnter")
   Assert.same(
     { tip().owner, tip().anchor, tip().lines },
-    { b.greet, "ANCHOR_RIGHT", { "Greet", "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper" } }
+    { b.greet, "ANCHOR_RIGHT", { "Greet", " ", "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper" } }
   )
-  Assert.same(tip().colors, { GOLD, GREEN, GREEN, GREEN })
+  Assert.same(tip().colors, { GOLD, {}, GREEN, GREEN, GREEN })
   Widgets.fire(b.greet, "OnLeave")
   Assert.equal(tip().shown, false)
   Widgets.fire(b.whisper, "OnEnter")

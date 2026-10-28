@@ -13,7 +13,7 @@ local CardBody = ns.CardBody or require("CraftAlert.UI.CardBody")
 local MainCrafterMenu = ns.MainCrafterMenu or require("CraftAlert.UI.MainCrafterMenu")
 
 -- Lead-cards spec §2: what the lead tooltips say. Each builder fills a tooltip that already has its
--- owner: a gold title, white text, green instruction lines. The details pane's zones
+-- owner: a gold title, white text, a blank line, green instruction lines. The details pane's zones
 -- (UI/LeadDetails.lua, UI/DetailsBody.lua) and the list rows (UI/LeadRow.lua: Chat, Compact)
 -- decide when one shows. InfoLines builds no tooltip: it gives the lines of a customer's info line
 -- in a WhisperMessenger conversation (UI/BridgeInfo.lua).
@@ -36,6 +36,14 @@ end
 
 local function instruction(tip, text)
   _G["GameTooltip_AddInstructionLine"](tip, text)
+end
+
+-- A blank line, then each of `lines` green: the gap Blizzard leaves above instruction lines.
+local function instructions(tip, lines)
+  _G["GameTooltip_AddBlankLineToTooltip"](tip)
+  for _, text in ipairs(lines) do
+    instruction(tip, text)
+  end
 end
 
 -- r, g, b of a class colour (a RAID_CLASS_COLORS entry), else of `fallback` (a Theme colour).
@@ -110,7 +118,7 @@ function CardTipText.Crafters(tip, lead)
     white(tip, realm)
   end
   if MainCrafterMenu.CanOpen(lead) then
-    instruction(tip, Localization.Text("Click: choose the main crafter"))
+    instructions(tip, { Localization.Text("Click: choose the main crafter") })
   end
 end
 
@@ -118,9 +126,7 @@ end
 function CardTipText.Greet(tip)
   title(tip, Localization.Text("Greet"))
   local lines = LeadText.ClickLines()
-  for index = 1, 3 do
-    instruction(tip, lines[index])
-  end
+  instructions(tip, { lines[1], lines[2], lines[3] })
 end
 
 local function customerColor(lead, fallback)
@@ -138,8 +144,7 @@ end
 
 -- What a row click does (a left click selects, never greets).
 local function rowClickLines(tip)
-  instruction(tip, Localization.Text("Click: select"))
-  instruction(tip, Localization.Text("Right-click: dismiss"))
+  instructions(tip, { Localization.Text("Click: select"), Localization.Text("Right-click: dismiss") })
 end
 
 -- The lead's latest chat line, then the row's click lines.
