@@ -46,8 +46,29 @@ local function testFaceAndTooltip()
   local tip = ns.Tooltip.Get()
   frame.scripts.OnEnter(frame)
   local gold, green = { 1, 0.82, 0 }, { 0.1, 1, 0.1 }
-  Assert.same(tip.lines, { "Craft Alert", " ", "Left-click: open the leads", "Right-click: dismiss", "Drag: move" })
-  Assert.same(tip.colors, { gold, {}, green, green, green })
+  Assert.same(tip.lines, { "Craft Alert", "Left-click: open the leads", "Right-click: dismiss", "Drag: move" })
+  Assert.same(tip.colors, { gold, green, green, green })
+end
+
+-- The toast font strings using this font object, in creation order (name, then headline, share
+-- GameFontNormal).
+local function part(font)
+  local found = {}
+  for _, region in ipairs(toastFrame().regions) do
+    if region.font == font then
+      found[#found + 1] = region
+    end
+  end
+
+  return found
+end
+
+-- PADDING + name + gap + headline + PADDING: the empty message adds no line and no trailing gap.
+local function testHeightWithoutMessage()
+  local ns = UiFixture.load({ leads = 1 })
+  ns.AlertToast.ShowSummary(4, 1)
+  local name, headline = part("GameFontNormal")[1], part("GameFontNormal")[2]
+  Assert.equal(toastFrame():GetHeight(), 8 + name:GetStringHeight() + 3 + headline:GetStringHeight() + 8)
 end
 
 -- Left opens the leads window (an open one stays open), right hides the toast and dismisses no
@@ -107,6 +128,7 @@ end
 
 return function()
   testFaceAndTooltip()
+  testHeightWithoutMessage()
   testClicks()
   testHideReplaceInstance()
   Wow.reset()

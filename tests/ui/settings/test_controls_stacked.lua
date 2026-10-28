@@ -63,8 +63,9 @@ local function testStackedRows()
   Assert.same(controls.input.input.SetTextInsetsArgs, { 6, 11, 0, 0 })
 end
 
--- Row gaps as WM's settings: 16 px between rows (SETTINGS_TOGGLE_ROW_SPACING), 32 px above a
--- section label (SETTINGS_SLIDER_ROW_SPACING, WM's gap before a section title).
+-- 8 px under a heading, 16 between rows, 32 above a heading. Row to row and above a heading as
+-- WM's settings (SETTINGS_TOGGLE_ROW_SPACING, SETTINGS_SLIDER_ROW_SPACING); the row under a
+-- heading sits closer, so the heading reads as its group's title.
 local function testRowGaps()
   local Controls, column = load(PAGE)
   local first = Controls.Section(column, "General")
@@ -76,7 +77,7 @@ local function testRowGaps()
     local top = Layout.ys(below)
     return bottom - top
   end
-  Assert.same({ gap(first, one), gap(one, two), gap(two, second) }, { 16, 16, 32 })
+  Assert.same({ gap(first, one), gap(one, two), gap(two, second) }, { 8, 16, 32 })
   Assert.equal(one.labelText.font, "GameFontHighlight", "a toggle's label too")
   local labelTop, labelBottom = Layout.ys(one.labelText)
   local rowTop, rowBottom = Layout.ys(one)

@@ -3,15 +3,13 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
-local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
-local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadRow = ns.LeadRow or require("CraftAlert.UI.LeadRow")
 local ScrollBar = ns.ScrollBar or require("CraftAlert.UI.ScrollBar")
 
 -- Spec A.3: the list half of the split view (UI/LeadsView.lua). 48 px rows (UI/LeadRow.lua) in
--- the list pane, newest first from the scroll offset, as many as the host's height fits; the
--- empty text when there are no leads, unless the rows are icon-only. Rows, the empty text and the scroll bar (UI/ScrollBar.lua,
+-- the list pane, newest first from the scroll offset, as many as the host's height fits (the
+-- empty text is the view's, in the details pane). Rows and the scroll bar (UI/ScrollBar.lua,
 -- scroll bars spec §3) sit above the pane's inset art; the bar shows only while more leads than
 -- fit, and its width and SCROLLBAR_GAP are kept free right of full rows either way. Icon-only rows
 -- (WM's rail) hide the bar; the wheel still scrolls them.
@@ -52,22 +50,6 @@ local function rowAt(list, index)
   return row
 end
 
--- A frame over the whole pane, at the rows' level, holding the centred, wrapping text.
-local function createEmpty(pane, level)
-  local empty = _G["CreateFrame"]("Frame", nil, pane)
-  empty:SetAllPoints(pane)
-  empty:SetFrameLevel(level)
-  local text = FrameKit.Text(empty, Theme.FONTS.body, Theme.COLORS.textSecondary)
-  text:SetPoint("LEFT", pane, "LEFT", Theme.LAYOUT.PANE_PADDING, 0)
-  text:SetPoint("RIGHT", pane, "RIGHT", -Theme.LAYOUT.PANE_PADDING, 0)
-  text:SetWordWrap(true)
-  text:SetJustifyH("CENTER")
-  text:SetText(Localization.Text("No leads right now. Requests you can craft show up here."))
-  empty.text = text
-  empty:Hide()
-  return empty
-end
-
 -- The bar at the pane's right, PANE_PADDING in from its edges, at the rows' level.
 local function createBar(pane, level, onScroll)
   local padding = Theme.LAYOUT.PANE_PADDING
@@ -85,7 +67,6 @@ function LeadsList.New(pane, onSelect, onScroll)
   return {
     pane = pane,
     rows = {},
-    empty = createEmpty(pane, level),
     bar = createBar(pane, level, onScroll),
     offset = 0,
     onSelect = onSelect,
@@ -94,16 +75,12 @@ function LeadsList.New(pane, onSelect, onScroll)
   }
 end
 
--- Icon-only rows (spec 6a), for the rows made and the ones to come; no empty text meanwhile, as
--- it cannot fit the rail.
+-- Icon-only rows (spec 6a), for the rows made and the ones to come.
 function LeadsList.SetCompact(list, compact)
   list.compact = compact
   for index, row in ipairs(list.rows) do
     LeadRow.SetCompact(row, compact)
     placeRow(list, row, index)
-  end
-  if compact then
-    list.empty:Hide()
   end
 end
 
@@ -124,20 +101,18 @@ function LeadsList.Refresh(list, leads, fit, selectedId)
       LeadRow.Clear(list.rows[index])
     end
   end
-  list.empty:SetShown(#leads == 0 and not list.compact)
   ScrollBar.Set(list.bar, max(0, #leads - fit), list.offset, 1)
   if list.compact then
     list.bar:Hide()
   end
 end
 
--- Hides every row, the empty text and each row's lead, so the next draw shows each one afresh
--- (its shownAt is then new, which VisibleLatest and SendGuard's look rule read).
+-- Hides every row and each row's lead, so the next draw shows each one afresh (its shownAt is
+-- then new, which VisibleLatest and SendGuard's look rule read).
 function LeadsList.Clear(list)
   for _, row in ipairs(list.rows) do
     LeadRow.Clear(row)
   end
-  list.empty:Hide()
 end
 
 -- The top row when the list is at the top and the row shows, else nil.

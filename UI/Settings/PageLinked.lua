@@ -21,9 +21,6 @@ local PageLinked = { id = "linked", title = Localization.Text("Linked accounts")
 local concat = table.concat
 local sort = table.sort
 
-local IMPORT_WIDTH = 100
-local CRAFTSCAN_WIDTH = 180
-
 local function db()
   return _G["CraftAlertDB"]
 end
@@ -34,6 +31,7 @@ local function textBox(column, label)
   local layout = Theme.LAYOUT
   local row = Controls.Bar(column, layout.INPUT_HEIGHT)
   row.settingsLabel = label
+  -- off-scale: the box starts 5 px in, clear of the template art.
   local box = _G["CreateFrame"]("EditBox", nil, row, "InputBoxTemplate")
   box:SetPoint("TOPLEFT", row, "TOPLEFT", 5, 0)
   box:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
@@ -97,6 +95,7 @@ end
 
 local function createImport(column, page)
   Controls.Section(column, Localization.Text("Import another account"))
+  Controls.Note(column):SetText(Localization.Text("Paste the string from your other account here, then click Import."))
   local box = textBox(column, Localization.Text("Import string"))
   local result
   local button
@@ -119,7 +118,7 @@ local function createImport(column, page)
       result:SetText("")
     end)
   end
-  button = Controls.Button(column.parent, Localization.Text("Import"), IMPORT_WIDTH, import)
+  button = Controls.Button(column.parent, Localization.Text("Import"), Theme.LAYOUT.BUTTON_WIDTH.M, import)
   Controls.Place(column, button)
   -- Enter in the box imports, as the button does; nothing while an import runs.
   box:SetScript("OnEnterPressed", function()
@@ -142,7 +141,7 @@ local function createCraftScan(column, page)
   Controls.Section(column, Localization.Text("CraftScan"))
   local result
   local button
-  button = Controls.Button(column.parent, Localization.Text("Import from CraftScan"), CRAFTSCAN_WIDTH, function()
+  button = Controls.Button(column.parent, Localization.Text("Import from CraftScan"), Theme.LAYOUT.BUTTON_WIDTH.XL, function()
     if type(_G["CraftScan_DB"]) ~= "table" then
       return
     end

@@ -41,9 +41,9 @@ local function anyRowShown()
   return false
 end
 
--- The list pane's empty-state frame, once it holds the empty text.
+-- The details pane's empty-state frame, once it holds the empty text.
 local function emptyText()
-  local empty = frame().view.list.empty
+  local empty = frame().view.empty
   for _, region in ipairs(empty.regions) do
     if region.GetText and string.find(region:GetText() or "", "No leads", 1, true) then
       return empty
@@ -322,11 +322,11 @@ local function testGearTooltip()
   Widgets.fire(gear(), "OnEnter")
   Assert.equal(tooltip.owner, gear())
   Assert.equal(tooltip.anchor, "ANCHOR_BOTTOMLEFT")
-  Assert.same(tooltip.lines, { "Settings", " ", "Click: open settings" })
+  Assert.same(tooltip.lines, { "Settings", "Click: open settings" })
   Assert.same(tooltip.colors[1], { 1, 0.82, 0 })
-  Assert.same(tooltip.colors[3], { 0.1, 1, 0.1 })
+  Assert.same(tooltip.colors[2], { 0.1, 1, 0.1 })
   Widgets.click(gear())
-  Assert.equal(tooltip.lines[3], "Click: back to leads", "the line follows the click")
+  Assert.equal(tooltip.lines[2], "Click: back to leads", "the line follows the click")
   Widgets.fire(gear(), "OnLeave")
   Assert.equal(tooltip.shown, false)
 end

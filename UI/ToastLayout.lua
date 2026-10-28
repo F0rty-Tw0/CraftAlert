@@ -11,6 +11,7 @@ local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 -- under it, each wrapping across the toast's inner width.
 local ToastLayout = {}
 
+-- off-scale: text leading, kept as is.
 local LINE_GAP = 3
 
 -- A wrapping line. Its explicit width lets GetStringHeight measure it before the first layout.
@@ -39,7 +40,7 @@ function ToastLayout.Build(frame)
   local padding, fonts = Theme.LAYOUT.PADDING, Theme.FONTS
   local name = FrameKit.Text(frame, fonts.name)
   name:SetPoint("TOPLEFT", frame, "TOPLEFT", padding, -padding)
-  local badge = FrameKit.Text(frame, fonts.badge, Theme.COLORS.accent)
+  local badge = FrameKit.Text(frame, fonts.badge, Theme.COLORS.gold)
   badge:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -padding, -padding)
   badge:SetJustifyH("RIGHT")
   name:SetPoint("RIGHT", badge, "LEFT", -padding, 0)
@@ -53,14 +54,18 @@ function ToastLayout.Build(frame)
 end
 
 -- Stacks the lines under the top row (the message under the detail line when `hasDetail`, else
--- under the headline: a hidden line keeps its size) and sizes the frame to the text.
+-- under the headline: a hidden line keeps its size; an empty message is skipped) and sizes the frame to the text.
 function ToastLayout.Fit(frame, parts, hasDetail)
   local padding = Theme.LAYOUT.PADDING
   local top = place(frame, parts.headline, padding + parts.name:GetStringHeight() + LINE_GAP)
   if hasDetail then
     top = place(frame, parts.detail, top)
   end
-  local bottom = place(frame, parts.message, top) - LINE_GAP
+  -- An empty message (the away summary) adds no line, so no gap trails the line above it.
+  local bottom = top - LINE_GAP
+  if (parts.message:GetText() or "") ~= "" then
+    bottom = place(frame, parts.message, top) - LINE_GAP
+  end
   frame:SetHeight(bottom + padding)
 end
 

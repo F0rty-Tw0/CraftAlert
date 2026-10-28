@@ -64,7 +64,7 @@ function LeadsWindow.Refresh()
   local leads = Leads.List()
   LeadsView.Layout(window.view)
   LeadsView.Refresh(window.view, leads)
-  frame.status:SetText(#leads > 0 and Localization.Text("%d leads", #leads) or "")
+  frame.status:SetText(#leads > 0 and Localization.Plural(#leads, "%d lead", "%d leads") or "")
 end
 
 -- The bell in the template's portrait; a template without SetPortraitToAsset gets the texture set
@@ -91,7 +91,8 @@ end
 -- The lead count in the band between the title bar and the panes, right of the portrait.
 local function createStatus(frame)
   local status = FrameKit.Text(frame, Theme.FONTS.body, Theme.COLORS.textSecondary)
-  status:SetPoint("LEFT", frame, "TOPLEFT", 64, -42)
+  local offset = Theme.LAYOUT.STATUS_OFFSET
+  status:SetPoint("LEFT", frame, "TOPLEFT", offset.x, offset.y)
   frame.status = status
 end
 

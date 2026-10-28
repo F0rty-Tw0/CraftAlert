@@ -16,6 +16,10 @@ local function testKeywordsPage()
   local settings = db.settings
   open(ns, "Keywords")
   take(refreshes)
+  local shown = SettingsFixture.texts()
+  Assert.truthy(shown:find('Example: kicks=boots makes "LF kicks" find boots.', 1, true), shown)
+  local targets = "Targets are slot words (belt, boots, helm, chest) or type words (plate, mail, leather, cloth)."
+  Assert.truthy(shown:find(targets, 1, true), shown)
   Assert.equal(row("Intent words").input:GetText(), "lf lfc lfrc wtb wtc need needs looking any any1 anyone who recraft")
   Widgets.type(row("Intent words").input, "LF  need, wtb lf")
   Assert.same(settings.intentWords, { "lf", "need", "wtb" }, "lowercase, once each")
@@ -66,6 +70,10 @@ local function testCraftersPage()
   local me = db.characters["Me-Realm"]
   open(ns, "Crafters")
   take(refreshes)
+  local page = texts()
+  Assert.truthy(page:find("This character", 1, true), "the first section is named for the group, not the dropdown")
+  Assert.truthy(page:find("Recipes", 1, true), page)
+  Assert.falsy(page:find("Professions", 1, true), "no heading that echoes the Profession dropdown")
   local character = row("Character").input
   Assert.equal(character.Text:GetText(), "Me-Realm (this character)", "opens on the current character")
   Widgets.pick(character, "Alt-Realm")
@@ -100,6 +108,11 @@ local function testCraftersPage()
   Assert.same({ search.template, search.Instructions:GetText() }, { "SearchBoxTemplate", "Search recipes" }, "the native search box")
   Widgets.type(search, "BELT")
   Assert.falsy(texts():find("Plate Greaves", 1, true))
+  Widgets.type(search, "")
+  Assert.truthy(texts():find("Plate Greaves", 1, true), "an emptied search lists every recipe")
+  search.text = "belt"
+  Widgets.fire(search, "OnTextChanged", true)
+  Assert.falsy(texts():find("Plate Greaves", 1, true), "narrowed without Enter")
   -- The speaker, swapped for the crossed-out speaker while muted (one texture, never greyed).
   local mute = rowOf(9001).mute
   Assert.same({ #mute.regions, mute.icon.atlas, mute.icon.desaturated }, { 1, "voicechat-icon-speaker", false }, "not muted: the speaker")
@@ -301,6 +314,35 @@ local function testCraftersRecipeBar()
   Assert.equal(list.mouseWheelEnabled, false)
 end
 
+-- An empty list says why: nothing read yet (also with no profession shown), or the search found none.
+local function testCraftersEmptyList()
+  local readYet = "No recipes read yet. Open this profession's window in the game to read them."
+  local ns = SettingsFixture.load({ db = crafters })
+  open(ns, "Crafters")
+  Assert.falsy(texts():find("No recipes read yet", 1, true), "recipes listed: no empty line")
+  Widgets.pick(row("Character").input, "Far-Away")
+  Assert.truthy(texts():find("No professions read for this character yet.", 1, true), texts())
+  Assert.falsy(texts():find("No recipes read yet", 1, true), "no profession: no advice to open its window")
+  Widgets.pick(row("Character").input, "Me-Realm")
+  Assert.falsy(texts():find("No recipes read yet", 1, true), "recipes listed: no empty line")
+  Widgets.type(row("Search recipes").input, "zzz")
+  Assert.truthy(texts():find("No recipe matches your search.", 1, true), texts())
+  Assert.falsy(texts():find("No recipes read yet", 1, true), "a search with no match is not the unread line")
+  Widgets.type(row("Search recipes").input, "")
+  Assert.falsy(texts():find("No recipe matches", 1, true), "search cleared: recipes listed again")
+
+  -- A profession known but never read.
+  local unread = SettingsFixture.load({
+    db = function(accountDb)
+      crafters(accountDb)
+      accountDb.characters["Me-Realm"].professions[171] = { name = "Alchemy", primary = false, read = false }
+    end,
+  })
+  open(unread, "Crafters")
+  Widgets.pick(row("Profession").input, 171)
+  Assert.truthy(texts():find(readYet, 1, true), texts())
+end
+
 -- A tooltip hidden by the client (no OnLeave) while a row is hovered comes back when the scroll
 -- puts an item recipe under the cursor; after OnLeave the scroll shows none.
 local function testCraftersRecipeHoverAfterHide()
@@ -374,20 +416,20 @@ local function testCraftersRecipeTooltip()
   Assert.equal(tooltip.owner, itemRow)
   Assert.equal(tooltip.anchor, "ANCHOR_RIGHT")
   Assert.same(tooltip.hyperlinks, { "item:501" }, "the crafted item's tooltip")
-  Assert.same(tooltip.lines, { "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other" })
-  Assert.same(tooltip.colors[1], { 1, 1, 1 })
+  Assert.same(tooltip.lines, { " ", "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other" })
+  Assert.same(tooltip.colors[2], { 1, 1, 1 })
   Assert.equal(tooltip.shown, true)
   Widgets.fire(itemRow, "OnLeave")
   Assert.equal(tooltip.shown, false)
   db.characters["Me-Realm"].recipes[9001].muted = true
   Widgets.fire(itemRow, "OnEnter")
-  Assert.same(tooltip.lines, { "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other", "Muted" })
-  Assert.same(tooltip.colors[2], { 0.5, 0.5, 0.5 })
+  Assert.same(tooltip.lines, { " ", "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other", "Muted" })
+  Assert.same(tooltip.colors[3], { 0.5, 0.5, 0.5 })
   Widgets.fire(itemRow, "OnLeave")
   db.characters["Me-Realm"].recipes[9001].muted = nil
 
   Widgets.fire(mutedRow, "OnEnter")
-  Assert.same(tooltip.lines, { "B Bracer", "Blacksmithing", "Known by: Me", "Muted" }, "no item: our own lines")
+  Assert.same(tooltip.lines, { "B Bracer", "Blacksmithing", " ", "Known by: Me", "Muted" }, "no item: our own lines")
   Assert.same(tooltip.colors[1], { 1, 0.82, 0 })
   Assert.equal(#tooltip.hyperlinks, 2, "no item: no item tooltip")
   Assert.equal(tooltip.owner, mutedRow)
@@ -428,7 +470,7 @@ local function testRecipeTooltipNameKey()
   })
   open(ns, "Crafters")
   Widgets.fire(rowOf("Old Recipe"), "OnEnter")
-  Assert.same(ns.Tooltip.Get().lines, { "C Old Recipe", "Blacksmithing", "Known by: Me" })
+  Assert.same(ns.Tooltip.Get().lines, { "C Old Recipe", "Blacksmithing", " ", "Known by: Me" })
 end
 
 -- GameTooltip_OnUpdate (Blizzard GameTooltip.lua): the owner's UpdateTooltip when it has one;
@@ -457,21 +499,21 @@ local function testRecipeTooltipItemLoads()
   open(ns, "Crafters")
   local tooltip, itemRow = ns.Tooltip.Get(), rowOf(9001)
   Widgets.fire(itemRow, "OnEnter")
-  local ours = tooltip.lines[1]
+  local ours = tooltip.lines[2] -- lines[1] is the blank above it
   Assert.truthy(ours:find("^Known by: "), ours)
   tooltip.shouldRefreshData = true -- the item loaded
   for _ = 1, 3 do
     clientUpdate(tooltip)
-    Assert.same(tooltip.lines, { ours }, "every update keeps our lines")
+    Assert.same(tooltip.lines, { " ", ours }, "every update keeps our lines")
   end
   Assert.same(tooltip.hyperlinks, { "item:501", "item:501", "item:501", "item:501" })
   db.characters["Me-Realm"].recipes[9001].muted = true
   clientUpdate(tooltip)
-  Assert.same(tooltip.lines, { ours, "Muted" }, "read anew")
+  Assert.same(tooltip.lines, { " ", ours, "Muted" }, "read anew")
 
   tooltip.badLinks = { ["item:501"] = true }
   Widgets.fire(itemRow, "OnEnter")
-  Assert.same(tooltip.lines, { "A Belt", "Blacksmithing", ours, "Muted" }, "rejected link: our own tooltip")
+  Assert.same(tooltip.lines, { "A Belt", "Blacksmithing", " ", ours, "Muted" }, "rejected link: our own tooltip")
 end
 
 -- Removing the current character stores it again from the client at once (as at login), so its
@@ -549,7 +591,7 @@ local function testTestPage()
   shown = texts()
   Assert.truthy(shown:find("Profession: 333", 1, true), shown)
   Widgets.type(row("Test a line").input, "hello there")
-  Assert.truthy(texts():find("No match (stopped at: prefilter)", 1, true), texts())
+  Assert.truthy(texts():find("No match: the line does not look like a request", 1, true), texts())
   Assert.same(db.leads, {}, "no lead")
 end
 
@@ -561,6 +603,7 @@ return function()
   testCraftersRecipeGroups()
   testCraftersRecipeIcons()
   testCraftersRecipeBar()
+  testCraftersEmptyList()
   testCraftersRecipeTooltip()
   testCraftersRecipeHoverAfterHide()
   testRecipeTooltipNameKey()

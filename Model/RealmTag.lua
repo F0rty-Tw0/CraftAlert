@@ -7,9 +7,10 @@ local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 
 -- Spec §7.2 (Retail only; Forever and Classic have no crafting orders): each local character
--- stores its connected realms at login, and a lead is tagged "can't order" when the customer's
--- realm is not among the chosen crafter's. An empty list means "unknown" (Phase 0:
--- GetAutoCompleteRealms returned {} on every probed flavor), never "own realm only".
+-- stores its connected realms at login, and a lead is tagged "Can't send an order (other
+-- realm)" when the customer's realm is not among the chosen crafter's. An empty list means
+-- "unknown" (Phase 0: GetAutoCompleteRealms returned {} on every probed flavor), never "own
+-- realm only".
 local RealmTag = {}
 
 local gsub = string.gsub

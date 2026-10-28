@@ -48,7 +48,7 @@ local function testMuteKeepsOwnState()
     "Not tracked",
     "Items with no binding (materials, potions, gems) do not alert",
     " ",
-    "Turn on Track unbound items in Craft Alert's Crafters settings",
+    "Turn on Track unbound items in Craft Alert's General settings",
   })
   Widgets.fire(mute, "OnLeave")
 end
@@ -252,7 +252,7 @@ local function testCraftersUntracked()
     "Not tracked",
     "Items with no binding (materials, potions, gems) do not alert",
     " ",
-    "Turn on Track unbound items in Craft Alert's Crafters settings",
+    "Turn on Track unbound items in Craft Alert's General settings",
   }
   Widgets.fire(mute, "OnEnter")
   Assert.same(tooltip.lines, why)
@@ -264,27 +264,31 @@ local function testCraftersUntracked()
   Widgets.fire(mute, "OnLeave")
 
   local label = "Track unbound items (materials, potions, gems)"
+  open(ns, "General")
   local toggle = row(label)
-  Assert.equal(toggle.points[1][2], rowOf(9001).parent, "under the recipe list")
   Assert.equal(toggle.input:GetChecked(), false)
   Widgets.click(toggle.input)
   Assert.equal(db.settings.includeUnbound, true)
   Assert.same(take(refreshes), { "rebuild:includeUnbound" })
+  open(ns, "Crafters")
   Assert.same(look(9005), { false, 1, "voicechat-icon-speaker", false }, "tracked now: the list repaints")
   Assert.same(look(9002), { true, dim, "voicechat-icon-speaker-mute", false }, "muted stays muted")
   Widgets.fire(rowOf(9005).mute, "OnEnter")
   Assert.equal(tooltip.lines[1], "Alerts on")
   Widgets.fire(rowOf(9005).mute, "OnLeave")
-  Widgets.click(toggle.input)
+  open(ns, "General")
+  Widgets.click(row(label).input)
   Assert.equal(db.settings.includeUnbound, false)
   Assert.same(take(refreshes), { "rebuild:includeUnbound" })
+  open(ns, "Crafters")
   Assert.same(look(9005), { true, dim, "voicechat-icon-speaker", true })
 
   -- The page shows what the db holds each time it opens.
   db.settings.includeUnbound = true
   ns.LeadsWindow.ToggleSettings()
-  open(ns, "Crafters")
+  open(ns, "General")
   Assert.equal(row(label).input:GetChecked(), true)
+  open(ns, "Crafters")
   Assert.same(look(9005), { false, 1, "voicechat-icon-speaker", false })
 end
 

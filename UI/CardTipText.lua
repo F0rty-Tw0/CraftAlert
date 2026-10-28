@@ -13,7 +13,7 @@ local CardBody = ns.CardBody or require("CraftAlert.UI.CardBody")
 local MainCrafterMenu = ns.MainCrafterMenu or require("CraftAlert.UI.MainCrafterMenu")
 
 -- Lead-cards spec §2: what the lead tooltips say. Each builder fills a tooltip that already has its
--- owner: a gold title, white text, green instruction lines. The details pane's zones
+-- owner: a gold title, white text, a blank line, green instruction lines. The details pane's zones
 -- (UI/LeadDetails.lua, UI/DetailsBody.lua) and the list rows (UI/LeadRow.lua: Chat, Compact)
 -- decide when one shows. InfoLines builds no tooltip: it gives the lines of a customer's info line
 -- in a WhisperMessenger conversation (UI/BridgeInfo.lua).
@@ -21,8 +21,6 @@ local CardTipText = {}
 
 local format = string.format
 local tostring = tostring
-
-local WHY_SEPARATOR = " + "
 
 -- As GameTooltip_SetTitle: replaces the lines, wrapping.
 local function title(tip, text)
@@ -38,6 +36,14 @@ local function instruction(tip, text)
   _G["GameTooltip_AddInstructionLine"](tip, text)
 end
 
+-- A blank line, then each of `lines` green: the gap Blizzard leaves above instruction lines.
+local function instructions(tip, lines)
+  _G["GameTooltip_AddBlankLineToTooltip"](tip)
+  for _, text in ipairs(lines) do
+    instruction(tip, text)
+  end
+end
+
 -- r, g, b of a class colour (a RAID_CLASS_COLORS entry), else of `fallback` (a Theme colour).
 local function rgbOf(color, fallback)
   if color then
@@ -46,8 +52,13 @@ local function rgbOf(color, fallback)
   return fallback[1], fallback[2], fallback[3]
 end
 
--- The customer in class colour, their class, and whether they were greeted or replied. The class
--- name needs the token anyway, so it is read once, with or without a colour table.
+-- A line in a Theme colour (a table with an alpha slot), wrapping.
+local function stateLine(tip, text, color)
+  tip:AddLine(text, color[1], color[2], color[3], true)
+end
+
+-- The customer in class colour, their class, and whether they were greeted (blue) or replied
+-- (green). The class name needs the token anyway, so it is read once, with or without a colour table.
 function CardTipText.Customer(tip, lead)
   local token = FlavorCompat.ClassOf(lead.guid)
   tip:SetText(tostring(lead.customer), rgbOf(FrameKit.ClassColor(token), Theme.COLORS.gold))
@@ -56,10 +67,10 @@ function CardTipText.Customer(tip, lead)
     white(tip, className)
   end
   if lead.greeted then
-    white(tip, Localization.Text("Greeted"))
+    stateLine(tip, Localization.Text("Greeted"), Theme.COLORS.greeted)
   end
   if lead.replied then
-    white(tip, Localization.Text("Replied"))
+    stateLine(tip, Localization.Text("Replied"), Theme.COLORS.replied)
   end
 end
 
@@ -68,28 +79,15 @@ function CardTipText.What(tip, lead)
   white(tip, Localization.Text(lead.kind == "profession" and "Profession request" or "Item request"))
 end
 
--- Each part of the why text (the Matcher joins its tokens with " + ") on its own line.
-local function whyParts(why)
-  local parts, from = {}, 1
-  while true do
-    local at = string.find(why, WHY_SEPARATOR, from, true)
-    if at == nil then
-      parts[#parts + 1] = string.sub(why, from)
-      return parts
-    end
-    parts[#parts + 1] = string.sub(why, from, at - 1)
-    from = at + #WHY_SEPARATOR
-  end
-end
-
 function CardTipText.Matched(tip, lead)
   title(tip, Localization.Text("Matched"))
-  for _, part in ipairs(lead.why and whyParts(lead.why) or {}) do
-    white(tip, part)
+  if lead.why then
+    for _, part in ipairs(LeadText.WhyParts(lead.why)) do
+      white(tip, part)
+    end
   end
   if lead.profName then
-    local gold = Theme.COLORS.gold
-    tip:AddLine(lead.profName, gold[1], gold[2], gold[3], true)
+    white(tip, lead.profName)
   end
 end
 
@@ -105,21 +103,35 @@ function CardTipText.Crafters(tip, lead)
   if lead.crafter then
     white(tip, Localization.Text("Picked for this lead: %s", Greeting.CrafterName(lead.crafter)))
   end
-  if lead.cannotOrder then
-    white(tip, Localization.Text("Can't send an order (realm)"))
+  local realm = LeadText.RealmTag(lead)
+  if realm then
+    white(tip, realm)
   end
   if MainCrafterMenu.CanOpen(lead) then
-    instruction(tip, Localization.Text("Click to choose the main crafter"))
+    instructions(tip, { Localization.Text("Click: choose the main crafter") })
   end
 end
 
--- "Greet" and the first three click lines (the fourth, dismiss, is not the button's).
-function CardTipText.Greet(tip)
+-- "Greet", who gets the whisper (when there is a lead), and the first three click lines (the
+-- fourth, dismiss, is not the button's).
+function CardTipText.Greet(tip, lead)
   title(tip, Localization.Text("Greet"))
-  local lines = LeadText.ClickLines()
-  for index = 1, 3 do
-    instruction(tip, lines[index])
+  if lead then
+    white(tip, Localization.Text("Whispers %s", tostring(lead.customer)))
   end
+  local lines = LeadText.ClickLines()
+  instructions(tip, { lines[1], lines[2], lines[3] })
+end
+
+-- No click line on Whisper and Dismiss: the button's label is the click.
+function CardTipText.Whisper(tip)
+  title(tip, Localization.Text("Whisper"))
+  white(tip, Localization.Text("Open a whisper without the greeting"))
+end
+
+function CardTipText.Dismiss(tip)
+  title(tip, Localization.Text("Dismiss"))
+  white(tip, Localization.Text("Remove this lead"))
 end
 
 local function customerColor(lead, fallback)
@@ -137,13 +149,12 @@ end
 
 -- What a row click does (a left click selects, never greets).
 local function rowClickLines(tip)
-  instruction(tip, Localization.Text("Click: select"))
-  instruction(tip, Localization.Text("Right-click: dismiss"))
+  instructions(tip, { Localization.Text("Click: select"), Localization.Text("Right-click: dismiss") })
 end
 
 -- The lead's latest chat line, then the row's click lines.
 function CardTipText.Chat(tip, lead)
-  tip:SetText(Localization.Text("Chat with %s", tostring(lead.customer)), customerColor(lead, Theme.COLORS.gold))
+  tip:SetText(tostring(lead.customer), customerColor(lead, Theme.COLORS.gold))
   tip:AddLine(chatText(lead), 1, 1, 1, true)
   rowClickLines(tip)
 end
@@ -168,7 +179,7 @@ local MAX_CRAFTER_LINES = 7
 function CardTipText.InfoLines(lead)
   local gold, grey = Theme.COLORS.gold, Theme.COLORS.grey
   local lines = { FrameKit.ColorCode(LeadText.Headline(lead), gold[1], gold[2], gold[3]) }
-  local matched = CardBody.MatchedText(lead)
+  local matched = CardBody.MatchedText(lead, Theme.COLORS.white)
   if matched then
     lines[#lines + 1] = Localization.Text("Matched: %s", matched)
   end

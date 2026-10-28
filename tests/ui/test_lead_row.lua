@@ -82,6 +82,9 @@ local function testMarks()
   Assert.same({ greeted:IsShown(), greeted.width, greeted.height }, { true, MARK_SIZE, MARK_SIZE })
   Assert.same(greeted.points[1], { "BOTTOMRIGHT", row, "BOTTOMRIGHT", -EDGE, 4 })
   Assert.equal(greeted.texture, ns.Theme.GREETED_ICON)
+  Assert.same(greeted.vertexColor, { 0.12, 0.72, 0.96, 1 }, "the greeted mark is greeted-blue, the replied tag keeps green")
+  Assert.equal(greeted.desaturated, true, "desaturated first, so the tint is the colour that shows")
+  Assert.same(row.repliedTag.textColor, ns.Theme.COLORS.replied)
   Assert.equal(row.repliedTag:IsShown(), false)
   Assert.same(row.what.points, {
     { "BOTTOMLEFT", row.iconFrame, "BOTTOMRIGHT", 10, -1 },
@@ -291,13 +294,15 @@ local function testChatTooltip()
   local _, row, lead = hovered()
   Assert.same({ tip().owner, tip().anchor, tip().shown }, { row, "ANCHOR_RIGHT", true })
   Assert.same(tip().lines, {
-    "Chat with Bob-Draenor",
+    "Bob-Draenor",
     chatLine(lead, "Trade", "  LF plate belt  "),
+    " ",
     "Click: select",
     "Right-click: dismiss",
   })
+  Assert.equal(tip().lines[3], " ", "blank line before the green click lines")
   local green = { 0.1, 1, 0.1 } -- the GREEN_FONT_COLOR stub, as GameTooltip_AddInstructionLine draws
-  Assert.same(tip().colors, { { WARRIOR.r, WARRIOR.g, WARRIOR.b }, { 1, 1, 1 }, green, green })
+  Assert.same(tip().colors, { { WARRIOR.r, WARRIOR.g, WARRIOR.b }, { 1, 1, 1 }, {}, green, green })
   Widgets.fire(row, "OnLeave")
   Assert.equal(tip().shown, false)
 end
@@ -346,7 +351,7 @@ end
 local function testChatTooltipRepaint()
   local ns, row = hovered()
   ns.LeadRow.Show(row, UiFixture.lead(2))
-  Assert.same({ tip().owner, tip().shown, tip().lines[1] }, { row, true, "Chat with Customer2-Draenor" })
+  Assert.same({ tip().owner, tip().shown, tip().lines[1] }, { row, true, "Customer2-Draenor" })
   local quiet = UiFixture.lead(3)
   quiet.message = nil
   ns.LeadRow.Show(row, quiet)
@@ -521,12 +526,15 @@ local function testCompactTooltip()
   tip():Hide()
   Assert.equal(tip().minWidth, 0, "hidden: minimum width reset")
   compactHovered()
-  Assert.same(tip().lines, { "Bob-Draenor", "Blacksmithing", chatLine(lead, "Trade", "  LF plate belt  "), "Click: select", "Right-click: dismiss" })
-  Assert.same(tip().colors, { { WARRIOR.r, WARRIOR.g, WARRIOR.b }, white, white, green, green })
+  Assert.same(
+    tip().lines,
+    { "Bob-Draenor", "Blacksmithing", chatLine(lead, "Trade", "  LF plate belt  "), " ", "Click: select", "Right-click: dismiss" }
+  )
+  Assert.same(tip().colors, { { WARRIOR.r, WARRIOR.g, WARRIOR.b }, white, white, {}, green, green })
   compactHovered(function(edited)
     edited.message = nil
   end)
-  local lines = { "Bob-Draenor", "Blacksmithing", "Click: select", "Right-click: dismiss" }
+  local lines = { "Bob-Draenor", "Blacksmithing", " ", "Click: select", "Right-click: dismiss" }
   Assert.same({ tip().shown, tip().lines }, { true, lines }, "no message: still a tooltip")
 end
 

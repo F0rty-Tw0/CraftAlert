@@ -116,7 +116,7 @@ local function testLazyFrameAndContent()
   ns.AlertToast.Show(ns.Leads.Latest())
   shown = texts()
   Assert.truthy(string.find(shown, "Wants " .. link .. " — you can craft it", 1, true), shown)
-  Assert.truthy(string.find(shown, "can't order (realm)", 1, true), shown)
+  Assert.truthy(string.find(shown, "Can't send an order (other realm)", 1, true), shown)
   Assert.falsy(string.find(shown, "R2", 1, true), "no rank, no R part: " .. shown)
 
   -- Native-HUD spec §4.1: the rank sits on the detail line; the crafter is not drawn.
@@ -144,7 +144,7 @@ local function testDetailLine()
     end,
   })
   ns.AlertToast.Show(ns.Leads.Latest())
-  Assert.equal(part("GameFontDisableSmall")[1].text, "R2 (conc) · can't order (realm)")
+  Assert.equal(part("GameFontDisableSmall")[1].text, "R2 (conc) · Can't send an order (other realm)")
 end
 
 local function testHeight()
@@ -180,20 +180,20 @@ local function testTooltip()
   local frame, tip = toastFrame(), ns.Tooltip.Get()
   frame.scripts.OnEnter(frame)
   Assert.same({ tip.owner, tip.anchor, tip.shown }, { frame, "ANCHOR_TOP", true })
-  -- Blizzard's tooltip hierarchy: a gold title, what matched in white, a blank line, then one
+  -- Blizzard's tooltip hierarchy: a gold title, what matched in white (a line each), a blank line, then one
   -- green instruction line per action: the clicks, then the drag (it moves the launcher).
   local clicks = { "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper", "Right-click: dismiss" }
   local drag = "Drag: move"
   local gold, white, green = { 1, 0.82, 0 }, { 1, 1, 1 }, { 0.1, 1, 0.1 }
-  Assert.same(tip.lines, { "Craft Alert", "Matched: lf + blacksmith", " ", clicks[1], clicks[2], clicks[3], clicks[4], drag })
-  Assert.same(tip.colors, { gold, white, {}, green, green, green, green, green })
+  Assert.same(tip.lines, { "Craft Alert", "Matched", "lf", "blacksmith", " ", clicks[1], clicks[2], clicks[3], clicks[4], drag })
+  Assert.same(tip.colors, { gold, white, white, white, {}, green, green, green, green, green })
   frame.scripts.OnLeave(frame)
   Assert.equal(tip.shown, false)
   ns.Leads.Latest().why = ""
   ns.AlertToast.Show(ns.Leads.Latest())
   frame.scripts.OnEnter(frame)
-  Assert.same(tip.lines, { "Craft Alert", " ", clicks[1], clicks[2], clicks[3], clicks[4], drag })
-  Assert.same(tip.colors, { gold, {}, green, green, green, green, green })
+  Assert.same(tip.lines, { "Craft Alert", clicks[1], clicks[2], clicks[3], clicks[4], drag })
+  Assert.same(tip.colors, { gold, green, green, green, green, green })
 end
 
 local function testLinks()
@@ -243,6 +243,7 @@ local function testNewerLeadAndAutoHide()
   Assert.equal(ns.AlertToast.VisibleLead(), leads[2])
   Assert.equal(select(2, ns.AlertToast.VisibleLead()), 60)
   Assert.truthy(string.find(texts(), "+1 more", 1, true), texts())
+  Assert.same(fontStringWith("+1 more").textColor, ns.Theme.COLORS.gold, "+N more is gold, not the greeted blue")
   ns.AlertToast.Show(leads[1])
   Assert.truthy(string.find(texts(), "+2 more", 1, true), texts())
   Assert.equal(ns.AlertToast.more, 2)
@@ -383,6 +384,7 @@ local function testRealPathTestLead()
   ns.AlertToast.Show(leads[2])
   ns.AlertToast.Show(leads[1])
   Assert.truthy(string.find(texts(), "Test · +2 more", 1, true), texts())
+  Assert.same(fontStringWith("Test · +2 more").textColor, ns.Theme.COLORS.gold)
   Assert.equal(ns.AlertToast.more, 2)
 
   -- A real lead after a test lead shows "+1 more" and no "Test".

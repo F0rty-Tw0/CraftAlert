@@ -33,7 +33,7 @@ local INSTALLED_EVENTS = {
 }
 local WHISPER_EVENTS = { "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM" }
 local ORDER_FILLED = "CRAFTINGORDERS_DISPLAY_CRAFTER_FULFILLED_MSG"
--- The customer's realm is connected, so the lead carries no "can't order" tag.
+-- The customer's realm is connected: no "Can't send an order (other realm)" tag on the lead.
 local CONNECTED_REALMS = { "OwnRealm", "Other Realm" }
 local DIM_ALPHA = 0.5
 
@@ -466,7 +466,7 @@ local function testRaisingLoadKeepsWindowsClosed(db)
 end
 
 -- A fresh install whose saved variables fail to load has no CraftAlertDB at all: the windows
--- stay closed and say why instead of raising, and /ca test names the stage it stopped at.
+-- stay closed and say why instead of raising, and /ca test says in plain words why it stopped.
 local function testRaisingLoadOnFreshInstall()
   local session = startClient(nil)
   local errors = recordErrors()

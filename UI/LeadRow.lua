@@ -38,7 +38,9 @@ local FALLBACK_PINK = { 1, 0.5, 1, 1 }
 
 -- WM's row numbers: EDGE from the row's sides, ICON_GAP after the icon, MARK_GAP between the marks
 -- and before the second line's end, NAME_GAP between the name and the age.
-local EDGE, ICON_GAP, MARK_GAP, NAME_GAP = 6, 10, 4, 2
+-- off-scale: the row's edge, the icon gap and the name gap are WhisperMessenger's row numbers.
+local EDGE, ICON_GAP, NAME_GAP = 6, 10, 2
+local MARK_GAP = Theme.LAYOUT.SPACE.XS
 local ANCHOR = "ANCHOR_RIGHT"
 -- A customer of unknown class: white on the row (spec D6), as a RAID_CLASS_COLORS entry.
 local NO_CLASS = { r = 1, g = 1, b = 1 }
@@ -142,6 +144,10 @@ local function createMarks(row)
   greeted:SetSize(size, size)
   greeted:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -EDGE, 4)
   greeted:SetTexture(Theme.GREETED_ICON)
+  -- The check art is green: desaturated first, so the greeted blue is the colour that shows.
+  local color = Theme.COLORS.greeted
+  greeted:SetDesaturated(true)
+  greeted:SetVertexColor(color[1], color[2], color[3], color[4])
   local replied = FrameKit.Text(row, Theme.FONTS.detail, Theme.COLORS.replied)
   replied:SetText(Localization.Text("replied"))
   return greeted, replied
@@ -162,6 +168,7 @@ function LeadRow.Create(parent, index, onSelect)
   -- WM puts the age's top 4 px above the name's (-6 from the row's top); anchored to the row, as
   -- the name's RIGHT already anchors to the age.
   row.age = FrameKit.Text(row, fonts.detail, colors.textSecondary)
+  -- off-scale: WhisperMessenger row text offsets (-2, 1, -1).
   row.age:SetPoint("TOPRIGHT", row, "TOPRIGHT", -EDGE, -2)
   row.name = FrameKit.Text(row, fonts.name)
   row.name:SetPoint("TOPLEFT", row.iconFrame, "TOPRIGHT", ICON_GAP, 1)
@@ -199,6 +206,7 @@ local function placeMarks(row, lead)
   local greetedWidth = lead.greeted and Theme.LAYOUT.ROW_ICON_SIZE + MARK_GAP or 0
   local marksWidth = greetedWidth + (lead.replied and tag:GetStringWidth() + MARK_GAP or 0)
   row.what:ClearAllPoints()
+  -- off-scale: WhisperMessenger row text offset.
   row.what:SetPoint("BOTTOMLEFT", row.iconFrame, "BOTTOMRIGHT", ICON_GAP, -1)
   row.what:SetPoint("RIGHT", row, "RIGHT", -(EDGE + marksWidth), 0)
 end

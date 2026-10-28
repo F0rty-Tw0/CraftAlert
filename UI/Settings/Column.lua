@@ -33,10 +33,11 @@ local function heightOf(region)
 end
 
 -- The parent as tall as the placed regions, the gaps above them and the top and bottom padding.
+-- A collapsed region counts no height.
 local function measure(column)
   local height = column.padding.top + column.padding.bottom
   for _, entry in ipairs(column.placed) do
-    height = height + entry.gap + heightOf(entry.region)
+    height = height + entry.gap + (entry.collapsed and 0 or heightOf(entry.region))
   end
   column.parent:SetHeight(height)
 end
@@ -80,19 +81,43 @@ function Column.OnWidth(column, refit)
   measure(column)
 end
 
--- Anchors `region` below the column's last row (`gap` px; default CONTROL_GAP). The first row
--- carries the centering gap; the rest hang off it.
+-- Anchors `region` below the column's last row (`gap` px; else the gap a heading left pending,
+-- else CONTROL_GAP). The first row carries the centering gap; the rest hang off it.
 function Column.Place(column, region, gap)
-  if column.last then
-    gap = gap or Theme.LAYOUT.CONTROL_GAP
-    region:SetPoint("TOPLEFT", column.last, "BOTTOMLEFT", 0, -gap)
+  local anchor = column.last
+  local pending = column.nextGap
+  column.nextGap = nil
+  if anchor then
+    gap = gap or pending or Theme.LAYOUT.CONTROL_GAP
+    region:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -gap)
   else
     gap = 0
     column.first = region
     region:SetPoint("TOPLEFT", column.parent, "TOPLEFT", column.left, -column.padding.top)
   end
   column.last = region
-  column.placed[#column.placed + 1] = { region = region, gap = gap }
+  column.placed[#column.placed + 1] = { region = region, gap = gap, baseGap = gap, anchor = anchor }
+  measure(column)
+end
+
+-- A collapsed region takes no gap above it and no height: the rows after it hang from the nearest
+-- row above that is not collapsed, so its own height (an empty text's line, a frame) never shows,
+-- and one gap stays between the neighbours. Uncollapsed, it gets its gap back.
+function Column.Collapse(column, region, collapsed)
+  local above
+  for _, entry in ipairs(column.placed) do
+    if entry.region == region then
+      entry.collapsed = collapsed
+      entry.gap = collapsed and 0 or entry.baseGap
+    end
+    if entry.anchor then
+      entry.region:ClearAllPoints()
+      entry.region:SetPoint("TOPLEFT", above or entry.anchor, "BOTTOMLEFT", 0, -entry.gap)
+    end
+    if not entry.collapsed then
+      above = entry.region
+    end
+  end
   measure(column)
 end
 
@@ -104,29 +129,33 @@ local function wrapped(column, font)
   return text
 end
 
+-- The row under it hangs SPACE.S below.
 function Column.Section(column, text)
   local label = wrapped(column, Theme.FONTS.name)
   label:SetText(text)
   Column.Place(column, label, column.last and Theme.LAYOUT.SECTION_GAP or 0)
+  column.nextGap = Theme.LAYOUT.SPACE.S
   return label
 end
 
 -- Previews and results; a new text can change the note's height, so the parent is measured again.
+-- An empty note is collapsed: it leaves no gap until text arrives.
 function Column.Note(column, font)
   local text = wrapped(column, font or Theme.FONTS.body)
   Column.Place(column, text)
+  Column.Collapse(column, text, true)
   _G["hooksecurefunc"](text, "SetText", function()
-    measure(column)
+    Column.Collapse(column, text, (text:GetText() or "") == "")
   end)
   return text
 end
 
--- An empty row as wide as the column, `height` tall, for controls side by side.
-function Column.Bar(column, height)
+-- An empty row as wide as the column, `height` tall, for controls side by side; `gap` as in Place.
+function Column.Bar(column, height, gap)
   local bar = create("Frame", column.parent)
   bar:SetHeight(height)
   Column.Span(column, bar)
-  Column.Place(column, bar)
+  Column.Place(column, bar, gap)
   return bar
 end
 

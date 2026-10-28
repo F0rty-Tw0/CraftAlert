@@ -23,10 +23,6 @@ local subscribed = false
 
 local SECONDS_PER_DAY = 24 * 60 * 60
 local NOON = 12 * 60 * 60
--- Inline colour codes: a code replaces the FontString's rgb, never its alpha, so the strip's and
--- the tooltip's base colour is the opaque Theme grey.
-local GOLD_CODE = "|cffffd100"
-local CODE_END = "|r"
 local SEPARATOR = " · "
 -- Each counter in its lead dot's colour (UI/LeadText.lua); filled has no dot.
 local COUNTER_COLORS = {
@@ -68,7 +64,7 @@ end
 
 -- Gold "Today", then every counter.
 local function stripLine(counters)
-  return GOLD_CODE .. Localization.Text("Today") .. CODE_END .. "  " .. countsLine(counters, false)
+  return FrameKit.ThemeCode(Localization.Text("Today"), Theme.COLORS.gold) .. "  " .. countsLine(counters, false)
 end
 
 -- Row `i` (1 = today): "Today", "Yesterday", then "Sun 25 Oct". Stepped from today's noon, as
@@ -158,12 +154,35 @@ function LedgerStrip.New(parent, host)
   return strip
 end
 
+-- The text from PADDING right of `strip.leftEdge`'s right (the strip's own left when unset) to
+-- `strip.rightInset` before the strip's right. The edge (a frame whose top is the strip's
+-- bottom) gives the box's bottom-left and the strip its top-right: the text box is the band, its
+-- line centred in it; a LEFT anchor on the edge would take the edge's vertical centre.
+local function placeText(strip)
+  local padding = Theme.LAYOUT.PADDING
+  local edge, right = strip.leftEdge, -(strip.rightInset or padding)
+  strip.text:ClearAllPoints()
+  strip.text:SetJustifyV("MIDDLE")
+  if edge then
+    strip.text:SetPoint("BOTTOMLEFT", edge, "TOPRIGHT", padding, 0)
+    strip.text:SetPoint("TOPRIGHT", strip, "TOPRIGHT", right, 0)
+  else
+    strip.text:SetPoint("LEFT", strip, "LEFT", padding, 0)
+    strip.text:SetPoint("RIGHT", strip, "RIGHT", right, 0)
+  end
+end
+
 -- Ends the strip text `inset` px before the strip's right, clear of a control placed there.
 function LedgerStrip.SetRightInset(strip, inset)
-  local layout = Theme.LAYOUT
-  strip.text:ClearAllPoints()
-  strip.text:SetPoint("LEFT", strip, "LEFT", layout.PADDING, 0)
-  strip.text:SetPoint("RIGHT", strip, "RIGHT", -inset, 0)
+  strip.rightInset = inset
+  placeText(strip)
+end
+
+-- Starts the strip text right of `frame` (it follows the frame's width), clear of what the host
+-- draws down the strip at that frame's right edge. `frame`'s top must be the strip's bottom.
+function LedgerStrip.SetLeftEdge(strip, frame)
+  strip.leftEdge = frame
+  placeText(strip)
 end
 
 ns.LedgerStrip = LedgerStrip

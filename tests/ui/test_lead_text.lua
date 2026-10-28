@@ -15,13 +15,35 @@ local function testText()
   -- An alt on another realm keeps its realm.
   Assert.equal(H({ crafter = "Alt-Other", recipeName = "Plate Belt" }), "Wants Plate Belt — your alt Alt-Other can craft it")
   Assert.equal(H({ crafter = "Alt-Other", profName = "Blacksmithing" }), "Wants Blacksmithing — your alt Alt-Other has it")
+  -- The why text (the Matcher joins its tokens with " + ") split into its parts.
+  Assert.same(ns.LeadText.WhyParts("lf + blacksmith"), { "lf", "blacksmith" })
+  Assert.same(ns.LeadText.WhyParts("lf"), { "lf" })
   -- A lead's channel key as its word; an unknown key as itself; no key, nil.
-  local channels = { trade = "Trade", services = "Services", general = "General", lfg = "LFG", guild = "Guild", communities = "Community" }
+  local channels =
+    { trade = "Trade", services = "Services", general = "General", lfg = "LookingForGroup", guild = "Guild", communities = "Communities" }
   for key, name in pairs(channels) do
     Assert.equal(ns.LeadText.Channel({ channel = key }), name, key)
   end
+  -- One table (ScanGate's) feeds the lead words, the status line and the settings toggles, in
+  -- the toggles' order.
+  local keys, labels = {}, {}
+  for i, channel in ipairs(ns.ScanGate.CHANNELS) do
+    keys[i], labels[i] = channel.key, channel.label
+  end
+  Assert.same(keys, { "trade", "services", "general", "lfg", "guild", "communities" })
+  Assert.same(labels, { "Trade", "Services", "General", "LookingForGroup", "Guild", "Communities" })
   Assert.equal(ns.LeadText.Channel({ channel = "weird" }), "weird")
   Assert.equal(ns.LeadText.Channel({}), nil)
+  Assert.equal(ns.LeadText.RealmTag({ cannotOrder = true }), "Can't send an order (other realm)")
+  Assert.equal(ns.LeadText.RealmTag({}), nil)
+  -- A stop reason as plain words; an unknown one keeps its code.
+  local S = ns.LeadText.StopText
+  Assert.equal(S("prefilter"), "No match: the line does not look like a request")
+  Assert.equal(S("intent"), "No match: no request word such as LF")
+  Assert.equal(S("blocker"), "No match: it reads like a crafter's ad, or has a blocked word")
+  Assert.equal(S("nomatch"), "No match: nothing in it that you can craft")
+  Assert.equal(S("noIndex"), "No match: the word list is not built yet, try /reload")
+  Assert.equal(S("weird"), "No match (weird)")
   Wow.reset()
 end
 

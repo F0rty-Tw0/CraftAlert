@@ -28,7 +28,7 @@ local function showTooltip(mute)
   local title, text, instruction
   if recipe and RecipeMute.Untracked(recipe) then
     title, text = "Not tracked", "Items with no binding (materials, potions, gems) do not alert"
-    instruction = "Turn on Track unbound items in Craft Alert's Crafters settings"
+    instruction = "Turn on Track unbound items in Craft Alert's General settings"
   else
     title = muted and "Muted" or "Alerts on"
     text = muted and "Requests for this recipe do not alert you" or "Requests for this recipe alert you"

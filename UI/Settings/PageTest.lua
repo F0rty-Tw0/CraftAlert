@@ -8,6 +8,7 @@ local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
+local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
 -- Spec §9 Test: a text box → the result and its "why". This page only previews: it runs
@@ -53,7 +54,7 @@ end
 local function run(text)
   local result = Matcher.MatchUngated(text)
   if result == nil then
-    return { Localization.Text("No match (stopped at: %s)", tostring(Matcher.lastStop)) }
+    return { LeadText.StopText(Matcher.lastStop) }
   end
   local crafter = CrafterRank.Pick(result, PlayerName.TestCustomer(), db(), { skipIgnore = true })
   return {

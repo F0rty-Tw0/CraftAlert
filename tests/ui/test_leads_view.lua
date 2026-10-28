@@ -72,7 +72,7 @@ local function testStructure()
     Assert.equal(pane.art.Bg.shown, false, "the inset's marble hidden so the atlas shows")
   end
   Assert.equal(view.details.frame:GetFrameLevel(), details:GetFrameLevel() + 2, "the details above the inset art")
-  Assert.same({ view.list.empty.parent, view.list.empty:GetFrameLevel() }, { list, list:GetFrameLevel() + 2 })
+  Assert.same({ view.empty.parent, view.empty:GetFrameLevel() }, { details, details:GetFrameLevel() + 2 })
   -- The divider sits in the 1 px gap between the panes, on the root (the panes' insets would cover it).
   local divider = view.divider
   Assert.same({ divider.parent, divider.layer, divider:GetWidth(), divider.color }, { view.frame, "BORDER", 1, ns.Theme.COLORS.divider })
@@ -156,20 +156,24 @@ local function testEmpty()
   local ns, view = open(0)
   ns.LeadsView.Refresh(view, leadsDown(2))
   ns.LeadsView.Refresh(view, {})
-  local empty = view.list.empty
+  local empty = view.empty
   Assert.same({ empty:IsShown(), empty.text:GetText() }, { true, "No leads right now. Requests you can craft show up here." })
   Assert.same({ empty.text.font, empty.text.textColor }, { ns.Theme.FONTS.body, ns.Theme.COLORS.textSecondary })
-  local pane, padding = view.list.pane, ns.Theme.LAYOUT.PANE_PADDING
+  local pane, padding = view.detailsPane, ns.Theme.LAYOUT.PANE_PADDING
   Assert.same(empty.text.points, { { "LEFT", pane, "LEFT", padding, 0 }, { "RIGHT", pane, "RIGHT", -padding, 0 } })
   Assert.same({ empty.text.wordWrap, empty.text.justifyH }, { true, "CENTER" })
   Assert.same({ view.details.frame:IsShown(), view.details.lead }, { false, nil })
   Assert.same({ ns.LeadsView.TopRow(view), ns.LeadsView.Selected(view), #shownRows(view) }, { nil, nil, 0 })
+  ns.LeadsView.Clear(view)
+  Assert.equal(empty:IsShown(), false, "Clear hides the empty text too")
+  ns.LeadsView.Refresh(view, {})
   ns.LeadsView.Refresh(view, leadsDown(1))
   Assert.equal(empty:IsShown(), false)
 end
 
 -- Spec 6a: a list narrower than LIST_MIN_WIDTH (WM's rail) is icon-only, rows made then and later,
--- with no empty text; at 180 and up the rows are full again. Layout then Refresh, as BridgePanel does.
+-- the empty text still shown in the details; at 180 and up the rows are full again. Layout then
+-- Refresh, as BridgePanel does.
 local function testCompactLayout()
   local ns, view, _, size = open(0)
   local function layout(width, leads)
@@ -178,14 +182,14 @@ local function testCompactLayout()
     ns.LeadsView.Refresh(view, leads)
   end
   layout(50, {})
-  Assert.same({ view.listPane:GetWidth(), view.list.empty:IsShown() }, { 50, false })
+  Assert.same({ view.listPane:GetWidth(), view.empty:IsShown() }, { 50, true }, "the rail with no leads still says so")
   layout(50, leadsDown(2))
   local rows = shownRows(view)
   Assert.same({ #rows, rows[1].name:IsShown(), rows[2].what:IsShown(), rows[1].iconFrame.points[1][1] }, { 2, false, false, "CENTER" })
   layout(220, leadsDown(2))
   Assert.same({ rows[1].name:IsShown(), rows[2].what:IsShown(), rows[1].iconFrame.points[1][1] }, { true, true, "LEFT" })
   layout(220, {})
-  Assert.equal(view.list.empty:IsShown(), true)
+  Assert.equal(view.empty:IsShown(), true)
   layout(179, leadsDown(3))
   Assert.same({ rows[1].name:IsShown(), shownRows(view)[3].name:IsShown() }, { false, false }, "179: compact, the new row too")
   layout(180, leadsDown(3))
@@ -338,7 +342,7 @@ local function testReopen()
   Widgets.click(view.list.rows[3], "LeftButton")
   ns.LeadsView.Scroll(view, -1)
   ns.LeadsView.Clear(view)
-  Assert.same({ #shownRows(view), view.list.empty:IsShown(), view.details.frame:IsShown(), view.selectedId }, { 0, false, false, 3 })
+  Assert.same({ #shownRows(view), view.empty:IsShown(), view.details.frame:IsShown(), view.selectedId }, { 0, false, false, 3 })
   ns.LeadsView.ResetTop(view)
   Assert.same({ view.list.offset, view.selectedId }, { 0, nil })
   Wow.clock.gettime = 70

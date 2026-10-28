@@ -21,9 +21,10 @@ local CraftScanPrompt = {}
 
 local FRAME_NAME = "CraftAlertCraftScanPrompt"
 local WIDTH, HEIGHT = 360, 170
-local BUTTON_WIDTH = 110
-local TEXT_INSET = 16
-local BUTTON_GAP = 8
+-- off-scale: not one of the four button widths, not resized.
+local PROMPT_BUTTON_WIDTH = 110
+local TEXT_INSET = Theme.LAYOUT.SPACE.L
+local BUTTON_GAP = Theme.LAYOUT.SPACE.S
 
 ---@type table
 local frame = nil -- made on the first show
@@ -72,10 +73,10 @@ local function create()
   local body = "CraftScan data found. Import this account's characters, recipes and greetings? What Craft Alert already has stays as it is."
   text:SetText(Localization.Text(body))
   window.text = text
-  window.accept = Controls.Button(window, Localization.Text("Import"), BUTTON_WIDTH, nil)
-  window.accept:SetPoint("BOTTOMRIGHT", window, "BOTTOM", -BUTTON_GAP / 2, 4)
-  window.decline = Controls.Button(window, Localization.Text("Decline"), BUTTON_WIDTH, nil)
-  window.decline:SetPoint("BOTTOMLEFT", window, "BOTTOM", BUTTON_GAP / 2, 4)
+  window.accept = Controls.Button(window, Localization.Text("Import"), PROMPT_BUTTON_WIDTH, nil)
+  window.accept:SetPoint("BOTTOMRIGHT", window, "BOTTOM", -BUTTON_GAP / 2, Theme.LAYOUT.SPACE.XS)
+  window.decline = Controls.Button(window, Localization.Text("Decline"), PROMPT_BUTTON_WIDTH, nil)
+  window.decline:SetPoint("BOTTOMLEFT", window, "BOTTOM", BUTTON_GAP / 2, Theme.LAYOUT.SPACE.XS)
   window:Hide()
   return window
 end

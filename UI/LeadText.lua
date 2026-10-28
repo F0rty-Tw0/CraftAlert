@@ -9,25 +9,24 @@ local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 
 -- The words a lead shows as: the toast, the leads list rows, the details pane (header, Quality
--- row), the tooltips and WhisperMessenger's info lines.
+-- row), the tooltips and WhisperMessenger's info lines; also the test-line result words (StopText).
 local LeadText = {}
 
 local floor = math.floor
 local max = math.max
 local tostring = tostring
 
--- A lead's channel key and its word, localized when shown. Only the keys come from
--- Core/ScanGate.lua:33; the words are the lead-cards spec's (§2.1), not the status line's.
-local CHANNEL_NAMES = {
-  trade = "Trade",
-  services = "Services",
-  general = "General",
-  lfg = "LFG",
-  guild = "Guild",
-  communities = "Community",
-}
+local WHY_SEPARATOR = " + "
+
+-- A lead's channel key and its word, localized when shown; ScanGate.CHANNELS owns both.
+local CHANNEL_NAMES = {}
+
+for _, channel in ipairs(ScanGate.CHANNELS) do
+  CHANNEL_NAMES[channel.key] = channel.label
+end
 
 -- The matched item link, else the recipe, else the profession.
 function LeadText.What(lead)
@@ -59,12 +58,33 @@ function LeadText.Rank(lead)
   return Localization.Text("R%d", lead.rank)
 end
 
--- §7.2: "can't order (realm)" when the customer cannot send the crafter an order, else nil.
+-- §7.2: the one realm warning (toast, crafters tooltip, details pane) when the customer cannot
+-- send the crafter an order, else nil.
 function LeadText.RealmTag(lead)
   if lead.cannotOrder then
-    return Localization.Text("can't order (realm)")
+    return Localization.Text("Can't send an order (other realm)")
   end
   return nil
+end
+
+-- Matcher.lastStop codes the Test page and /ca test explain in plain words.
+local STOP_WORDS = {
+  prefilter = "No match: the line does not look like a request",
+  intent = "No match: no request word such as LF",
+  blocker = "No match: it reads like a crafter's ad, or has a blocked word",
+  nomatch = "No match: nothing in it that you can craft",
+  noIndex = "No match: the word list is not built yet, try /reload",
+}
+
+-- The result line for a Matcher stop reason; a code without words is shown as itself.
+function LeadText.StopText(reason)
+  local words = STOP_WORDS[reason]
+
+  if words then
+    return Localization.Text(words)
+  end
+
+  return Localization.Text("No match (%s)", tostring(reason))
 end
 
 -- What each click on a lead does (UI/ClickRouter.lua), one tooltip instruction line each.
@@ -131,6 +151,20 @@ function LeadText.Channel(lead)
   end
   local name = CHANNEL_NAMES[key]
   return name and Localization.Text(name) or tostring(key)
+end
+
+-- The parts of a why text (the Matcher joins its tokens with " + "), one per tooltip line.
+function LeadText.WhyParts(why)
+  local parts, from = {}, 1
+  while true do
+    local at = string.find(why, WHY_SEPARATOR, from, true)
+    if at == nil then
+      parts[#parts + 1] = string.sub(why, from)
+      return parts
+    end
+    parts[#parts + 1] = string.sub(why, from, at - 1)
+    from = at + #WHY_SEPARATOR
+  end
 end
 
 -- The lead's status word (unlocalized) and its dot colour: grey new, blue greeted, green replied.

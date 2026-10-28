@@ -10,8 +10,9 @@ local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
--- Spec §9 Alerts: sound + test, taskbar flash, toast duration, lead timeout, launcher "Hide
--- when no leads", opacity. Nothing here touches the index or the scan gate. Sound, flash and
+-- Spec §9 Alerts: sections "When a request arrives" (sound + test, taskbar flash, toast
+-- duration), "Leads" (lead timeout), "Window and launcher" (launcher "Hide when no leads",
+-- opacity). Nothing here touches the index or the scan gate. Sound, flash and
 -- duration are read when an alert fires; a new lead timeout re-arms the expiry timer
 -- (Leads.Rearm); the launcher and the leads window repaint at once (the toast takes the
 -- opacity when it next shows). Both repaints come through setters Bootstrap calls
@@ -25,10 +26,29 @@ local function settings()
   return _G["CraftAlertDB"].settings
 end
 
+-- The client's own SOUNDKIT key for `kit` (the alphabetically first when several share it), as
+-- words with a capital first letter: RAID_WARNING -> "Raid warning". "Sound <index>" without one.
+function PageAlerts.SoundName(kit, index)
+  local kits = _G["SOUNDKIT"]
+  local best
+  if type(kits) == "table" then
+    for key, value in pairs(kits) do
+      if value == kit and type(key) == "string" and (best == nil or key < best) then
+        best = key
+      end
+    end
+  end
+  if best == nil then
+    return Localization.Text("Sound %d", index)
+  end
+  local words = best:gsub("_", " ")
+  return Localization.Text(words:sub(1, 1) .. words:sub(2):lower())
+end
+
 local function soundOptions()
   local options = { { value = 0, text = Localization.Text("None") } }
   for i, kit in ipairs(Constants.flavors[FlavorCompat.flavorKey].soundKits) do
-    options[#options + 1] = { value = kit, text = Localization.Text("Sound %d", i) }
+    options[#options + 1] = { value = kit, text = PageAlerts.SoundName(kit, i) }
   end
   return options
 end
@@ -42,17 +62,21 @@ local function playSound()
 end
 
 local function addSound(column, add)
-  local choice = Controls.Choice(column, Localization.Text("Alert sound"), soundOptions(), function(value)
+  local label = Localization.Text("Alert sound")
+  local choice = Controls.Choice(column, label, soundOptions(), function(value)
     settings().sound = value
   end)
   -- Under the label, Play first and the dropdown in the rest of the line; the 20 px button sits
-  -- 2 px up, in the middle of the dropdown's 24.
+  -- 2 px up, in the middle of the dropdown's 24. off-scale: the 2 and -2 are template art nudges.
   local layout = Theme.LAYOUT
-  local play = Controls.Button(choice.row, Localization.Text("Play"), 48, playSound)
+  local play = Controls.Button(choice.row, Localization.Text("Play"), Theme.LAYOUT.BUTTON_WIDTH.S, playSound)
   play:SetPoint("BOTTOMLEFT", choice.row, "BOTTOMLEFT", 0, 2)
   choice.input:ClearAllPoints()
   choice.input:SetPoint("BOTTOMLEFT", play, "BOTTOMRIGHT", layout.PADDING, -2)
   choice.input:SetPoint("BOTTOMRIGHT", choice.row, "BOTTOMRIGHT", 0, 0)
+  -- Play takes the mouse inside the row, so it shows the row's tip too.
+  local tip = Localization.Text("The sound played with each new lead. Play tries the chosen one; None is silent.")
+  Controls.Tip(choice.row, label, tip, choice.input, play)
   add(function()
     choice.Set(settings().sound)
   end)
@@ -115,15 +139,39 @@ function PageAlerts.Create(parent)
   local add, refresh = Controls.Refresher()
   Controls.Section(column, Localization.Text("When a request arrives"))
   addSound(column, add)
-  add(Controls.BoundToggle(column, Localization.Text("Flash the taskbar icon"), settings, "flash", nothing))
-  local toast = { label = Localization.Text("Toast duration"), min = 5, max = 120, step = 5, format = seconds }
+  local flashTip = Localization.Text("Flashes the game's taskbar icon on a new lead while the game is in the background.")
+  add(Controls.BoundToggle(column, Localization.Text("Flash the taskbar icon"), settings, "flash", nothing, flashTip))
+  local toast = {
+    label = Localization.Text("Toast duration"),
+    min = 5,
+    max = 120,
+    step = 5,
+    format = seconds,
+    tip = Localization.Text("How long the alert toast stays on screen before it hides on its own."),
+  }
   addSlider(column, add, toast, "toastDuration", nothing)
   Controls.Section(column, Localization.Text("Leads"))
-  local timeout = { label = Localization.Text("Lead timeout"), min = 1, max = 60, step = 1, format = minutes }
+  local timeout = {
+    label = Localization.Text("Lead timeout"),
+    min = 1,
+    max = 60,
+    step = 1,
+    format = minutes,
+    tip = Localization.Text("How long a lead stays in the list before it expires and is removed."),
+  }
   addSlider(column, add, timeout, "leadTimeoutMin", rearm)
+  Controls.Section(column, Localization.Text("Window and launcher"))
   local hideLabel = Localization.Text("Hide the launcher when there are no leads")
-  add(Controls.BoundToggle(column, hideLabel, settings, "hideLauncherWhenNoLeads", launcherToggled))
-  local opacity = { label = Localization.Text("Opacity"), min = 0.3, max = 1, step = 0.05, format = percent }
+  local hideTip = Localization.Text("Hides the launcher button while there are no leads. It returns with the next lead.")
+  add(Controls.BoundToggle(column, hideLabel, settings, "hideLauncherWhenNoLeads", launcherToggled, hideTip))
+  local opacity = {
+    label = Localization.Text("Opacity"),
+    min = 0.3,
+    max = 1,
+    step = 0.05,
+    format = percent,
+    tip = Localization.Text("How see-through the leads window and the toast are."),
+  }
   addSlider(column, add, opacity, "opacity", opacityChanged)
   return { Refresh = refresh }
 end

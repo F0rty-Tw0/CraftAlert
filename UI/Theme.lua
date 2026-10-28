@@ -45,10 +45,23 @@ Theme.FONTS = {
   setting = "GameFontHighlight",
 }
 
+-- The spacing scale: every gap and padding takes one of these steps, bar the off-scale values
+-- commented where they are declared.
+local SPACE = { XS = 4, S = 8, M = 12, L = 16, XL = 24, XXL = 32 }
+
 Theme.LAYOUT = {
-  PADDING = 8,
+  SPACE = SPACE,
+  -- The button widths: small (Play), standard (details actions), wide and extra wide.
+  BUTTON_WIDTH = { S = 48, M = 100, L = 140, XL = 180 },
+  -- off-scale: the details action bar's buttons, not resized to BUTTON_HEIGHT.
+  ACTION_BUTTON_HEIGHT = 22,
+  -- off-scale: the lead count's place in the title-bar art.
+  STATUS_OFFSET = { x = 64, y = -42 },
+  -- off-scale: the nav row's highlight inset.
+  NAV_BUTTON_INSET = 2,
+  PADDING = SPACE.S,
   TOAST_WIDTH = 320,
-  DOCK_GAP = 8,
+  DOCK_GAP = SPACE.S,
   WINDOW_WIDTH = 840,
   WINDOW_HEIGHT = 560,
   WINDOW_MIN_WIDTH = 720,
@@ -66,21 +79,23 @@ Theme.LAYOUT = {
   CONTROL_HEIGHT = 24,
   -- Between settings rows and above a section label (WhisperMessenger's toggle row spacing and its
   -- gap before a section title).
-  CONTROL_GAP = 16,
-  SECTION_GAP = 32,
+  CONTROL_GAP = SPACE.L,
+  SECTION_GAP = SPACE.XXL,
   -- The label line above a slider, input or dropdown: a 12 px line of FONTS.setting, then 6 px
   -- (WhisperMessenger's SETTINGS_LABEL_SPACING) to the control's top.
   LABEL_HEIGHT = 18,
   -- An input's text insets, clear of InputBoxTemplate's 8 px end caps (the left one starts 5 px
   -- out of the box) by 3 px.
+  -- off-scale: clear of the template art.
   INPUT_INSET = { left = 6, right = 11 },
   -- Room right of the slider bar for the template's value text (drawn 25 px right of the bar).
   SLIDER_VALUE_WIDTH = 56,
   -- A settings page's rows inside its scroll content (16 px in from the left, as WhisperMessenger's
   -- settings pages); the scroll bar right of the content sizes itself (UI/ScrollBar.lua).
-  PAGE_PADDING = { left = 16, right = 16, top = 12, bottom = 12 },
+  PAGE_PADDING = { left = SPACE.L, right = SPACE.L, top = SPACE.M, bottom = SPACE.M },
   -- Between a list's rows and its scroll bar: WhisperMessenger's SCROLLBAR_RETAIL_GUTTER (there,
   -- the most of its retail bar that may hang into the empty space right of a view).
+  -- off-scale: WhisperMessenger's scroll bar gutter.
   SCROLLBAR_GAP = 5,
   MUTE_SIZE = 16,
   INPUT_HEIGHT = 22,
@@ -96,11 +111,13 @@ Theme.LAYOUT = {
   LIST_ROW_INSET = 2,
   -- A lead row's hover tooltip is at least this wide, so the chat line is not a tall column.
   ROW_TIP_WIDTH = 360,
-  PANE_PADDING = 4,
+  -- A settings control's hover tip wraps at this width, wide enough for ~50 letters a line.
+  TIP_WIDTH = 300,
+  PANE_PADDING = SPACE.XS,
   LIST_ICON_SIZE = 34,
   DETAILS_HEADER_HEIGHT = 62,
   INFO_STRIP_HEIGHT = 24,
-  DETAILS_PADDING = 16,
+  DETAILS_PADDING = SPACE.L,
   ACTION_BAR_HEIGHT = 44,
   BAND_HEIGHT = 36,
   -- The ledger line above the split view's panes (UI/LedgerStrip.lua).

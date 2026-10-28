@@ -422,7 +422,7 @@ return function()
     Assert.falsy(string.find(line, "^send: "), line)
   end
   Assert.equal(rawget(_G, "SLASH_CRAFTALERT2"), "/ca")
-  Assert.equal(stepLines(Sim.Run({ "--cmd", "/ca test hello there" }))[4], "chat: Craft Alert: No match (stopped at: prefilter)")
+  Assert.equal(stepLines(Sim.Run({ "--cmd", "/ca test hello there" }))[4], "chat: Craft Alert: No match: the line does not look like a request")
   Assert.equal(
     stepLines(Sim.Run({ "--cmd", "/ca nonsense" }))[4],
     "chat: Craft Alert: Commands: /ca (leads window), /ca config, /ca test <line>, /ca perf"
