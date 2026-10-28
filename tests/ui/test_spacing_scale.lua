@@ -44,6 +44,15 @@ local function testButtonWidthsKeepTheirPixels()
   end
 end
 
+-- Stub points are { point, relativeTo, relativePoint, x, y }; [4] is x. Mute all and Unmute all meet at the bar's middle.
+local function testMuteAllHalves()
+  local ns = SettingsFixture.load({ db = CraftersFixture.crafters })
+  SettingsFixture.open(ns, "Crafters")
+  local mute = SettingsFixture.button(SettingsFixture.window(), "Mute all")
+  local unmute = SettingsFixture.button(SettingsFixture.window(), "Unmute all")
+  Assert.same({ mute.points[2][4], unmute.points[1][4] }, { -4, 4 }, "4 px each side of the bar's middle")
+end
+
 -- Later tasks add rows: GONE["UI/X.lua"] = { "old declaration text", ... }.
 local GONE = {
   ["UI/Settings/PageAlerts.lua"] = { 'Localization.Text("Play"), 48,' },
@@ -51,6 +60,13 @@ local GONE = {
   ["UI/Settings/PageLinked.lua"] = { "IMPORT_WIDTH = 100", "CRAFTSCAN_WIDTH = 180" },
   ["UI/LeadDetails.lua"] = { "BUTTON_GAP, BUTTON_WIDTH, BUTTON_HEIGHT = 8, 100, 22" },
   ["UI/CraftScanPrompt.lua"] = { "local BUTTON_WIDTH = 110" },
+  ["UI/Settings/SettingsPane.lua"] = {
+    "-(4 + (index - 1)",
+    '"TOPLEFT", pane.nav, "TOPLEFT", 2, top',
+    '"LEFT", button, "LEFT", 12, 0',
+    '"BOTTOMLEFT", nav, "BOTTOMLEFT", 4, 4',
+  },
+  ["UI/Settings/RecipeList.lua"] = { "Theme.LAYOUT.PADDING / 2" },
 }
 
 local function source(path)
@@ -73,5 +89,6 @@ return function()
   testScaleAndWidths()
   testGapKeysKeepTheirPixels()
   testButtonWidthsKeepTheirPixels()
+  testMuteAllHalves()
   testNoMagicSpacingLeft()
 end

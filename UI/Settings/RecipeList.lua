@@ -103,7 +103,7 @@ end
 
 -- Mute all and Unmute all share a row, half each less the gap; their anchors set the widths.
 local function createMuteAll(column, muteAll)
-  local gap = Theme.LAYOUT.PADDING / 2
+  local gap = Theme.LAYOUT.SPACE.XS
   local bar = Controls.Bar(column, Theme.LAYOUT.BUTTON_HEIGHT)
   local mute = Controls.Button(bar, Localization.Text("Mute all"), 0, function()
     muteAll(true)
