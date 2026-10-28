@@ -98,17 +98,22 @@ function Column.Place(column, region, gap)
   measure(column)
 end
 
--- A collapsed region takes no gap above it and no height; the row after it keeps its own gap, so
--- one gap stays between the neighbours. Uncollapsed, it gets its gap back.
+-- A collapsed region takes no gap above it and no height: the rows after it hang from the nearest
+-- row above that is not collapsed, so its own height (an empty text's line, a frame) never shows,
+-- and one gap stays between the neighbours. Uncollapsed, it gets its gap back.
 function Column.Collapse(column, region, collapsed)
+  local above
   for _, entry in ipairs(column.placed) do
     if entry.region == region then
       entry.collapsed = collapsed
       entry.gap = collapsed and 0 or entry.baseGap
-      if entry.anchor then
-        region:ClearAllPoints()
-        region:SetPoint("TOPLEFT", entry.anchor, "BOTTOMLEFT", 0, -entry.gap)
-      end
+    end
+    if entry.anchor then
+      entry.region:ClearAllPoints()
+      entry.region:SetPoint("TOPLEFT", above or entry.anchor, "BOTTOMLEFT", 0, -entry.gap)
+    end
+    if not entry.collapsed then
+      above = entry.region
     end
   end
   measure(column)
