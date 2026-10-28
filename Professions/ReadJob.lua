@@ -10,7 +10,8 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 
 -- The steps of ModernReader's Slicer job "read" (spec 2026-10-22 §4.2): phase 1 stores one
 -- recipe per step, phase 2 drops one foreign recipe per step. ModernReader owns the window
--- state and the storing helpers; it hands them in as `ops` so this file holds only the walk.
+-- state and the storing helpers; it hands them in as `ops` so this file holds the walk and, in
+-- Finish, the only-newest rule that follows it.
 local ReadJob = {}
 
 local ipairs, pairs = ipairs, pairs
@@ -149,7 +150,7 @@ end
 local function applyNewest(job, professionKey)
   local character = job.db.characters[job.charKey]
   local recipes, record = character.recipes, character.professions[professionKey]
-  local newest = record and RecipeStore.NewestLine(recipes, professionKey)
+  local newest = RecipeStore.NewestLine(recipes, professionKey)
   if newest == nil then
     return false
   end

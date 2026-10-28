@@ -576,6 +576,19 @@ local function newestCases()
   readWindow(Slicer)
   Assert.equal(recipesOf(db)[1].muted, true, "a lineless recipe is left alone")
   Assert.equal(recipesOf(db)[2].muted, nil)
+
+  -- A read newly stores an Enchanting recipe from the Blacksmithing window: Blacksmithing's
+  -- rule skips it (its line is Enchanting's newest, not Blacksmithing's).
+  state, _, db, _, Slicer = setup()
+  db.characters[CHAR].professions[BS].newestLine = 2883
+  db.characters[CHAR].professions[ENCH].newestLine = 2909
+  state.recipes = {
+    lined(446001, 102, 2883),
+    belt(2, 200, { profession = { professionID = 2909, parentProfessionID = ENCH } }),
+  }
+  readWindow(Slicer)
+  Assert.equal(recipesOf(db)[2].prof, ENCH)
+  Assert.equal(recipesOf(db)[2].muted, nil, "another profession's new recipe is not muted by this read's rule")
 end
 
 -- §5.3 learn path with a newestLine: a new older-line recipe at or below the newest line's rank
