@@ -54,8 +54,13 @@ local function rgbOf(color, fallback)
   return fallback[1], fallback[2], fallback[3]
 end
 
--- The customer in class colour, their class, and whether they were greeted or replied. The class
--- name needs the token anyway, so it is read once, with or without a colour table.
+-- A line in a Theme colour (a table with an alpha slot), wrapping.
+local function stateLine(tip, text, color)
+  tip:AddLine(text, color[1], color[2], color[3], true)
+end
+
+-- The customer in class colour, their class, and whether they were greeted (blue) or replied
+-- (green). The class name needs the token anyway, so it is read once, with or without a colour table.
 function CardTipText.Customer(tip, lead)
   local token = FlavorCompat.ClassOf(lead.guid)
   tip:SetText(tostring(lead.customer), rgbOf(FrameKit.ClassColor(token), Theme.COLORS.gold))
@@ -64,10 +69,10 @@ function CardTipText.Customer(tip, lead)
     white(tip, className)
   end
   if lead.greeted then
-    white(tip, Localization.Text("Greeted"))
+    stateLine(tip, Localization.Text("Greeted"), Theme.COLORS.greeted)
   end
   if lead.replied then
-    white(tip, Localization.Text("Replied"))
+    stateLine(tip, Localization.Text("Replied"), Theme.COLORS.replied)
   end
 end
 
@@ -149,7 +154,7 @@ end
 
 -- The lead's latest chat line, then the row's click lines.
 function CardTipText.Chat(tip, lead)
-  tip:SetText(Localization.Text("Chat with %s", tostring(lead.customer)), customerColor(lead, Theme.COLORS.gold))
+  tip:SetText(tostring(lead.customer), customerColor(lead, Theme.COLORS.gold))
   tip:AddLine(chatText(lead), 1, 1, 1, true)
   rowClickLines(tip)
 end

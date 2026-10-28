@@ -363,7 +363,13 @@ local function testCustomerZone()
   Widgets.fire(zone, "OnEnter")
   Assert.same({ tip().owner, tip().anchor, tip().shown }, { zone, "ANCHOR_RIGHT", true })
   Assert.same(tip().lines, { "Buyer-Realm", "Warrior", "Greeted", "Replied" })
-  Assert.same(tip().colors, { { WARRIOR.r, WARRIOR.g, WARRIOR.b }, WHITE, WHITE, WHITE })
+  local greeted, replied = ns.Theme.COLORS.greeted, ns.Theme.COLORS.replied
+  Assert.same(tip().colors, {
+    { WARRIOR.r, WARRIOR.g, WARRIOR.b },
+    WHITE,
+    { greeted[1], greeted[2], greeted[3] },
+    { replied[1], replied[2], replied[3] },
+  })
   Widgets.fire(zone, "OnLeave")
   Assert.equal(tip().shown, false)
   -- A customer of unknown class and not greeted: the name in gold, no more lines.

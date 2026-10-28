@@ -291,7 +291,7 @@ local function testChatTooltip()
   local _, row, lead = hovered()
   Assert.same({ tip().owner, tip().anchor, tip().shown }, { row, "ANCHOR_RIGHT", true })
   Assert.same(tip().lines, {
-    "Chat with Bob-Draenor",
+    "Bob-Draenor",
     chatLine(lead, "Trade", "  LF plate belt  "),
     " ",
     "Click: select",
@@ -348,7 +348,7 @@ end
 local function testChatTooltipRepaint()
   local ns, row = hovered()
   ns.LeadRow.Show(row, UiFixture.lead(2))
-  Assert.same({ tip().owner, tip().shown, tip().lines[1] }, { row, true, "Chat with Customer2-Draenor" })
+  Assert.same({ tip().owner, tip().shown, tip().lines[1] }, { row, true, "Customer2-Draenor" })
   local quiet = UiFixture.lead(3)
   quiet.message = nil
   ns.LeadRow.Show(row, quiet)
