@@ -271,7 +271,7 @@ local function testInfoLines()
   local customer = ns.Leads.Latest().customer
   Assert.same(ns.CardTipText.InfoLines(ns.Leads.Latest()), {
     "|cffffd100Wants Blacksmithing — you have it|r",
-    "Matched: |cfffffffflf + blacksmith|r · |cffffd100Blacksmithing|r",
+    "Matched: |cfffffffflf + blacksmith|r · |cffffffffBlacksmithing|r",
     "|cffff7f00Me|r |cff7f7f7fR2 (conc)|r",
     "Bob",
     "[12:34] [Trade] [|cffffffff" .. customer .. "|r]: LF plate belt",

@@ -404,7 +404,10 @@ end
 local function testMatchedZone()
   local ns, d, _, lead = open({ itemLead() })
   Widgets.fire(d.zones.matched, "OnEnter")
-  Assert.same({ tip().owner, tip().lines, tip().colors }, { d.zones.matched, { "Matched", "lf", "bolt", "Tailoring" }, { GOLD, WHITE, WHITE, GOLD } })
+  Assert.same(
+    { tip().owner, tip().lines, tip().colors },
+    { d.zones.matched, { "Matched", "lf", "bolt", "Tailoring" }, { GOLD, WHITE, WHITE, WHITE } }
+  )
   lead.why = nil
   Widgets.fire(d.zones.matched, "OnEnter")
   Assert.same(tip().lines, { "Matched", "Tailoring" })

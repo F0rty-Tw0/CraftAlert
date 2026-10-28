@@ -101,8 +101,7 @@ function CardTipText.Matched(tip, lead)
     white(tip, part)
   end
   if lead.profName then
-    local gold = Theme.COLORS.gold
-    tip:AddLine(lead.profName, gold[1], gold[2], gold[3], true)
+    white(tip, lead.profName)
   end
 end
 
@@ -194,7 +193,7 @@ local MAX_CRAFTER_LINES = 7
 function CardTipText.InfoLines(lead)
   local gold, grey = Theme.COLORS.gold, Theme.COLORS.grey
   local lines = { FrameKit.ColorCode(LeadText.Headline(lead), gold[1], gold[2], gold[3]) }
-  local matched = CardBody.MatchedText(lead)
+  local matched = CardBody.MatchedText(lead, Theme.COLORS.white)
   if matched then
     lines[#lines + 1] = Localization.Text("Matched: %s", matched)
   end

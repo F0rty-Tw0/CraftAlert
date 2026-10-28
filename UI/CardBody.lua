@@ -74,11 +74,12 @@ function CardBody.Crafters(lead)
   return entries
 end
 
--- Why in white, then the profession in gold; whichever is set, nil for neither.
-function CardBody.MatchedText(lead)
+-- Why in white, then the profession in professionColor (gold when omitted; a tooltip passes white,
+-- gold being for titles there); whichever is set, nil for neither.
+function CardBody.MatchedText(lead, professionColor)
   local colors = Theme.COLORS
   local why = lead.why and FrameKit.ThemeCode(lead.why, colors.white)
-  local profession = lead.profName and FrameKit.ThemeCode(lead.profName, colors.gold)
+  local profession = lead.profName and FrameKit.ThemeCode(lead.profName, professionColor or colors.gold)
   if why and profession then
     return why .. " · " .. profession
   end
