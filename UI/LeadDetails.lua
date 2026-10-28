@@ -29,7 +29,8 @@ local min = math.min
 local ANCHOR = "ANCHOR_RIGHT"
 -- Action bar buttons: Greet and Whisper from the left, Dismiss at the right edge, BUTTON_GAP
 -- apart, at most BUTTON_WIDTH wide (spec A.4 small hosts).
-local BUTTON_GAP, BUTTON_WIDTH, BUTTON_HEIGHT = 8, 100, 22
+local LAYOUT = Theme.LAYOUT
+local BUTTON_GAP, BUTTON_WIDTH, BUTTON_HEIGHT = LAYOUT.SPACE.S, LAYOUT.BUTTON_WIDTH.M, LAYOUT.ACTION_BUTTON_HEIGHT
 
 -- Left to right: each button's key in details.buttons, its label, what it does to the shown lead,
 -- read at click time, and its tooltip for that lead, read at hover time. Greet and Dismiss act as

@@ -1,6 +1,8 @@
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Fresh = require("tests.helpers.fresh")
+local SettingsFixture = require("tests.helpers.settings_fixture")
+local CraftersFixture = require("tests.helpers.crafters_fixture")
 
 local function layout()
   Wow.reset()
@@ -26,8 +28,30 @@ local function testGapKeysKeepTheirPixels()
   )
 end
 
+-- Oracle: the widths the settings pages' buttons held at f316061.
+local function testButtonWidthsKeepTheirPixels()
+  local ns = SettingsFixture.load({ db = CraftersFixture.crafters })
+  local expected = {
+    Alerts = { Play = 48 },
+    ["Linked accounts"] = { Import = 100, ["Import from CraftScan"] = 180 },
+    Crafters = { ["Remove character"] = 140 },
+  }
+  for page, widths in pairs(expected) do
+    SettingsFixture.open(ns, page)
+    for label, width in pairs(widths) do
+      Assert.equal(SettingsFixture.button(SettingsFixture.window(), label):GetWidth(), width, page .. ": " .. label)
+    end
+  end
+end
+
 -- Later tasks add rows: GONE["UI/X.lua"] = { "old declaration text", ... }.
-local GONE = {}
+local GONE = {
+  ["UI/Settings/PageAlerts.lua"] = { 'Localization.Text("Play"), 48,' },
+  ["UI/Settings/PageCrafters.lua"] = { "REMOVE_WIDTH = 140" },
+  ["UI/Settings/PageLinked.lua"] = { "IMPORT_WIDTH = 100", "CRAFTSCAN_WIDTH = 180" },
+  ["UI/LeadDetails.lua"] = { "BUTTON_GAP, BUTTON_WIDTH, BUTTON_HEIGHT = 8, 100, 22" },
+  ["UI/CraftScanPrompt.lua"] = { "local BUTTON_WIDTH = 110" },
+}
 
 local function source(path)
   local handle = assert(io.open(path, "r"))
@@ -48,5 +72,6 @@ end
 return function()
   testScaleAndWidths()
   testGapKeysKeepTheirPixels()
+  testButtonWidthsKeepTheirPixels()
   testNoMagicSpacingLeft()
 end

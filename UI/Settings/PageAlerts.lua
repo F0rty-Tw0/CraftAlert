@@ -69,7 +69,7 @@ local function addSound(column, add)
   -- Under the label, Play first and the dropdown in the rest of the line; the 20 px button sits
   -- 2 px up, in the middle of the dropdown's 24.
   local layout = Theme.LAYOUT
-  local play = Controls.Button(choice.row, Localization.Text("Play"), 48, playSound)
+  local play = Controls.Button(choice.row, Localization.Text("Play"), Theme.LAYOUT.BUTTON_WIDTH.S, playSound)
   play:SetPoint("BOTTOMLEFT", choice.row, "BOTTOMLEFT", 0, 2)
   choice.input:ClearAllPoints()
   choice.input:SetPoint("BOTTOMLEFT", play, "BOTTOMRIGHT", layout.PADDING, -2)
