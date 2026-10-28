@@ -442,8 +442,7 @@ local function testAltCrafterColor()
   Widgets.click(toastFrame(), "LeftButton")
   local sent = UiFixture.callsTo(calls, "chat")
   Assert.equal(#sent, 1)
-  Assert.truthy(string.find(sent[1][2], "Alt", 1, true), sent[1][2])
-  Assert.falsy(string.find(sent[1][2], "|", 1, true), sent[1][2])
+  Assert.equal(sent[1][2], "Hi! My alt Alt has Blacksmithing, what do you need?")
 end
 
 local ROWS = { -- launcher centre, toast point → launcher point, x

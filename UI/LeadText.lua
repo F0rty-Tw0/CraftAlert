@@ -34,15 +34,22 @@ function LeadText.What(lead)
   return lead.itemLink or lead.recipeName or lead.profName or ""
 end
 
--- The alt's name as the greeting says it, in the class CraftAlertDB saved for it like the details
--- header's crafter (user, 2026-10-28: the toast and WM's preview colour it too); plain when no class
--- is saved. Display only: Greeting.Build names the alt itself, so no colour code reaches a whisper.
-local function altName(key)
+-- The class token saved with the character `key`, or nil.
+function LeadText.ClassOf(key)
   local db = _G["CraftAlertDB"]
   local characters = type(db) == "table" and db.characters
   local character = type(characters) == "table" and characters[key]
-  local color = type(character) == "table" and FrameKit.ClassColor(character.class)
-  return FrameKit.ClassCode(Greeting.CrafterName(key), color)
+  if type(character) ~= "table" then
+    return nil
+  end
+  return character.class
+end
+
+-- The alt's name as the greeting says it, in the class CraftAlertDB saved for it (user, 2026-10-28:
+-- the toast and WM's preview colour it too); plain, not white, when no class is saved. Display only:
+-- Greeting.Build names the alt itself, so no colour code reaches a whisper.
+local function altName(key)
+  return FrameKit.ClassCode(Greeting.CrafterName(key), FrameKit.ClassColor(LeadText.ClassOf(key)))
 end
 
 -- Native-HUD spec §4.2: "Wants <what> — you can craft it" / "— your alt <name> can craft it"; a lead without
