@@ -13,6 +13,7 @@ local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls
 local RecipeTooltip = ns.RecipeTooltip or require("CraftAlert.UI.Settings.RecipeTooltip")
 local RecipeRarity = ns.RecipeRarity or require("CraftAlert.UI.Settings.RecipeRarity")
 local RecipeMute = ns.RecipeMute or require("CraftAlert.UI.Settings.RecipeMute")
+local RecipeStore = ns.RecipeStore or require("CraftAlert.Professions.RecipeStore")
 
 -- The Crafters page's recipe list: search, Mute all / Unmute all over the listed recipes, "Only
 -- <expansion>" over the whole profession, then the scrolling rows with icon, name in its rarity
@@ -78,27 +79,9 @@ local function recipeIcon(item)
     or Theme.ICON
 end
 
--- The highest stored `line` among the profession's recipes (spec Design 2: line IDs rise with each
--- expansion), or nil when none has one.
-local function currentLine(character, prof)
-  local current
-  for _, recipe in pairs(character and character.recipes or {}) do
-    if recipe.prof == prof and recipe.line and (current == nil or recipe.line > current) then
-      current = recipe.line
-    end
-  end
-  return current
-end
-
--- The line's expansion name, or nil: an empty name and a client without the call give none.
-local function expansionName(line)
-  local api = _G["C_TradeSkillUI"]
-  if type(api) ~= "table" or type(api.GetProfessionInfoBySkillLineID) ~= "function" then
-    return nil
-  end
-  local info = api.GetProfessionInfoBySkillLineID(line)
-  local name = type(info) == "table" and info.expansionName
-  return type(name) == "string" and name ~= "" and name or nil
+-- The recipes of the character the list shows, or an empty table.
+local function recipesOfList(list)
+  return list.character and list.character.recipes or {}
 end
 
 -- Mute all and Unmute all share a row, half each less the gap; their anchors set the widths.
@@ -126,13 +109,13 @@ local function createOnlyCurrent(column, onClick)
   return button
 end
 
--- Labels the button for the profession's current line (one lookup), or hides it when none.
+-- Labels the button for the profession's newest line (one lookup), or hides it when none.
 local function paintOnlyCurrent(button, line)
   if line == nil then
     button:Hide()
     return
   end
-  local name = expansionName(line)
+  local name = RecipeStore.ExpansionName(line)
   button.label:SetText(name and Localization.Text("Only %s", name) or Localization.Text("Only current expansion"))
   button:Show()
 end
@@ -142,7 +125,7 @@ function RecipeList.Create(column)
   local list = {}
 
   local function render()
-    paintOnlyCurrent(list.onlyCurrent, currentLine(list.character, list.prof))
+    paintOnlyCurrent(list.onlyCurrent, RecipeStore.NewestLine(recipesOfList(list), list.prof))
     list.recipes.Render(recipeItems(list.character, list.prof, list.search.input:GetText()), list.showRecipe)
   end
 
@@ -166,16 +149,18 @@ function RecipeList.Create(column)
     afterMute(changed)
   end
 
-  -- Alerts only for the current line over the profession's whole list, the search ignored; a
-  -- recipe without a line is left alone.
+  -- Alerts only for the newest line (by recipe-ID rank) over the profession's whole list, the
+  -- search ignored; a recipe without a line is left alone. The line is remembered on the profession.
   local function onlyCurrent()
-    local current, changed = currentLine(list.character, list.prof), 0
-    for _, recipe in pairs(list.character and list.character.recipes or {}) do
-      local muted = recipe.line ~= current
-      if recipe.prof == list.prof and recipe.line and (recipe.muted == true) ~= muted then
-        recipe.muted = muted or nil
-        changed = changed + 1
-      end
+    local recipes = recipesOfList(list)
+    local line = RecipeStore.NewestLine(recipes, list.prof)
+    if line == nil then
+      return
+    end
+    local changed = RecipeStore.OnlyNewest(recipes, list.prof, line)
+    local record = list.character.professions and list.character.professions[list.prof]
+    if record then
+      record.newestLine = line
     end
     afterMute(changed)
   end
