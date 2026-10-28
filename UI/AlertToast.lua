@@ -34,6 +34,7 @@ local concat = table.concat
 local match = string.match
 local tostring = tostring
 local type = type
+local unpack = unpack
 
 local FRAME_NAME = "CraftAlertToast"
 local NO_LAUNCHER_POSITION = { "TOP", 0, -160 }
@@ -122,7 +123,10 @@ local function showTooltip(frame)
     return
   end
   local why = current.lead and current.lead.why
-  local matched = type(why) == "string" and why ~= "" and Localization.Text("Matched: %s", why) or nil
+  local matched
+  if type(why) == "string" and why ~= "" then
+    matched = { Localization.Text("Matched"), unpack(LeadText.WhyParts(why)) }
+  end
   ToastChrome.ShowTooltip(frame, matched, LeadText.ClickLines())
 end
 

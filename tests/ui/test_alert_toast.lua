@@ -180,13 +180,13 @@ local function testTooltip()
   local frame, tip = toastFrame(), ns.Tooltip.Get()
   frame.scripts.OnEnter(frame)
   Assert.same({ tip.owner, tip.anchor, tip.shown }, { frame, "ANCHOR_TOP", true })
-  -- Blizzard's tooltip hierarchy: a gold title, what matched in white, a blank line, then one
+  -- Blizzard's tooltip hierarchy: a gold title, what matched in white (a line each), a blank line, then one
   -- green instruction line per action: the clicks, then the drag (it moves the launcher).
   local clicks = { "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper", "Right-click: dismiss" }
   local drag = "Drag: move"
   local gold, white, green = { 1, 0.82, 0 }, { 1, 1, 1 }, { 0.1, 1, 0.1 }
-  Assert.same(tip.lines, { "Craft Alert", "Matched: lf + blacksmith", " ", clicks[1], clicks[2], clicks[3], clicks[4], drag })
-  Assert.same(tip.colors, { gold, white, {}, green, green, green, green, green })
+  Assert.same(tip.lines, { "Craft Alert", "Matched", "lf", "blacksmith", " ", clicks[1], clicks[2], clicks[3], clicks[4], drag })
+  Assert.same(tip.colors, { gold, white, white, white, {}, green, green, green, green, green })
   frame.scripts.OnLeave(frame)
   Assert.equal(tip.shown, false)
   ns.Leads.Latest().why = ""
@@ -194,6 +194,11 @@ local function testTooltip()
   frame.scripts.OnEnter(frame)
   Assert.same(tip.lines, { "Craft Alert", clicks[1], clicks[2], clicks[3], clicks[4], drag })
   Assert.same(tip.colors, { gold, green, green, green, green, green })
+  -- ShowTooltip also takes a plain string, and an empty list draws no body and no blank.
+  ns.ToastChrome.ShowTooltip(frame, "plain", { clicks[1] })
+  Assert.same(tip.lines, { "Craft Alert", "plain", " ", clicks[1], drag })
+  ns.ToastChrome.ShowTooltip(frame, {}, { clicks[1] })
+  Assert.same(tip.lines, { "Craft Alert", clicks[1], drag })
 end
 
 local function testLinks()

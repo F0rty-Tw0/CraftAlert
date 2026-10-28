@@ -22,8 +22,6 @@ local CardTipText = {}
 local format = string.format
 local tostring = tostring
 
-local WHY_SEPARATOR = " + "
-
 -- As GameTooltip_SetTitle: replaces the lines, wrapping.
 local function title(tip, text)
   local gold = Theme.COLORS.gold
@@ -81,23 +79,9 @@ function CardTipText.What(tip, lead)
   white(tip, Localization.Text(lead.kind == "profession" and "Profession request" or "Item request"))
 end
 
--- Each part of the why text (the Matcher joins its tokens with " + ") on its own line.
-local function whyParts(why)
-  local parts, from = {}, 1
-  while true do
-    local at = string.find(why, WHY_SEPARATOR, from, true)
-    if at == nil then
-      parts[#parts + 1] = string.sub(why, from)
-      return parts
-    end
-    parts[#parts + 1] = string.sub(why, from, at - 1)
-    from = at + #WHY_SEPARATOR
-  end
-end
-
 function CardTipText.Matched(tip, lead)
   title(tip, Localization.Text("Matched"))
-  for _, part in ipairs(lead.why and whyParts(lead.why) or {}) do
+  for _, part in ipairs(lead.why and LeadText.WhyParts(lead.why) or {}) do
     white(tip, part)
   end
   if lead.profName then

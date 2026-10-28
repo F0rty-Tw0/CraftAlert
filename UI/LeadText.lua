@@ -19,6 +19,8 @@ local floor = math.floor
 local max = math.max
 local tostring = tostring
 
+local WHY_SEPARATOR = " + "
+
 -- A lead's channel key and its word, localized when shown; ScanGate.CHANNELS owns both.
 local CHANNEL_NAMES = {}
 
@@ -149,6 +151,20 @@ function LeadText.Channel(lead)
   end
   local name = CHANNEL_NAMES[key]
   return name and Localization.Text(name) or tostring(key)
+end
+
+-- The parts of a why text (the Matcher joins its tokens with " + "), one per tooltip line.
+function LeadText.WhyParts(why)
+  local parts, from = {}, 1
+  while true do
+    local at = string.find(why, WHY_SEPARATOR, from, true)
+    if at == nil then
+      parts[#parts + 1] = string.sub(why, from)
+      return parts
+    end
+    parts[#parts + 1] = string.sub(why, from, at - 1)
+    from = at + #WHY_SEPARATOR
+  end
 end
 
 -- The lead's status word (unlocalized) and its dot colour: grey new, blue greeted, green replied.
