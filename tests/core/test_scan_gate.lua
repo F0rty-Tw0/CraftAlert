@@ -200,15 +200,19 @@ return function()
   Assert.equal(paused.unreadProfession, "Blacksmithing")
   Assert.equal(paused.recipeCount, 0)
   -- Reading that profession with nothing to index keeps the "empty" pause but names the next one:
-  -- listeners hear it, so the status line and the empty pane stop naming a read profession.
+  -- listeners hear it, so the empty pane stops naming a read profession. Reading the last one
+  -- (none left to name) is a change too.
   local named = {}
   ns.ScanGate.OnChange(function(_, state)
-    named[#named + 1] = state.unreadProfession
+    named[#named + 1] = state.unreadProfession or false
   end)
   db.characters["Me-Realm"].professions[BS].read = true
   ns.ScanGate.Evaluate()
   ns.ScanGate.Evaluate()
   Assert.same(named, { "Enchanting" }, "another unread profession is a change, the same one is not")
+  db.characters["Me-Realm"].professions[333].read = true
+  ns.ScanGate.Evaluate()
+  Assert.same(named, { "Enchanting", false }, "no unread profession left is a change")
 
   -- While the first index of the session is still being built (the sliced login build), the
   -- gate says so instead of "empty"; the enable setting still beats it. Without the job and
