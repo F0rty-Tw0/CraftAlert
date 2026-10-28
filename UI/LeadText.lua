@@ -45,11 +45,12 @@ function LeadText.ClassOf(key)
   return character.class
 end
 
--- The alt's name as the greeting says it, in the class CraftAlertDB saved for it (user, 2026-10-28:
--- the toast and WM's preview colour it too); plain, not white, when no class is saved. Display only:
--- Greeting.Build names the alt itself, so no colour code reaches a whisper.
-local function altName(key)
-  return FrameKit.ClassCode(Greeting.CrafterName(key), FrameKit.ClassColor(LeadText.ClassOf(key)))
+-- The crafter `key`'s name as the greeting says it, as a colour code in the class CraftAlertDB saved
+-- for it (user, 2026-10-28: the toast and WM's preview colour the alt too); with no class saved, in
+-- the Theme colour `fallback`, else plain. Display only: Greeting.Build names the alt itself, so no
+-- colour code reaches a whisper.
+function LeadText.CrafterCode(key, fallback)
+  return FrameKit.ClassCode(Greeting.CrafterName(key), FrameKit.ClassColor(LeadText.ClassOf(key)), fallback)
 end
 
 -- Native-HUD spec §4.2: "Wants <what> — you can craft it" / "— your alt <name> can craft it"; a lead without
@@ -61,7 +62,7 @@ function LeadText.Headline(lead)
   if isOwn then
     return Localization.Text(craftable and "Wants %s — you can craft it" or "Wants %s — you have it", what)
   end
-  local alt = altName(lead.crafter)
+  local alt = LeadText.CrafterCode(lead.crafter)
 
   return Localization.Text(craftable and "Wants %s — your alt %s can craft it" or "Wants %s — your alt %s has it", what, alt)
 end
@@ -82,7 +83,7 @@ function LeadText.CrafterLine(lead)
   if lead.crafter == PlayerName.Own() then
     return craftable and Localization.Text("You can craft it") or Localization.Text("You have %s", LeadText.What(lead))
   end
-  local alt = altName(lead.crafter)
+  local alt = LeadText.CrafterCode(lead.crafter)
   if craftable then
     return Localization.Text("Your alt %s can craft it", alt)
   end
