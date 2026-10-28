@@ -342,6 +342,28 @@ local function testProfessionWords()
   expect(ns, "lf fiery weapon", "item:enchant weapon - fiery weapon")
 end
 
+-- User ruling 2026-10-28: "lf jewelcraft" never alerted. Every profession takes its stem
+-- ("jewelcraft", like "blacksmith"). Inscription adds only "insc": players say "scribe", and an
+-- "inscriber" word would let the typo pass alert scribes on "inscribed"/"inscribe".
+local function testProfessionStems()
+  local ns = Fixture.load()
+  local db = Fixture.db(ns)
+  db.characters["Jc-Realm"] = character({ 755 }, {})
+  db.characters["Lw-Realm"] = character({ LW }, {})
+  db.characters["Scribe-Realm"] = character({ 773 }, {})
+  fixture(ns, Fixture.index(ns, db))
+  expect(ns, "lf jewelcraft", "profession:755")
+  expect(ns, "any jewelcrafts around?", "profession:755")
+  expect(ns, "LF leatherwork pls", "profession:" .. LW)
+  expect(ns, "lf leatherworks", "profession:" .. LW)
+  expect(ns, "LF insc", "profession:773")
+  expect(ns, "LF scribe", "profession:773")
+  expect(ns, "LF for scribe", "profession:773")
+  expect(ns, "WTB inscribed vellum", "stop:nomatch", "no inscriber word for the typo pass")
+  expect(ns, "LF inscribe my staff", "stop:nomatch")
+  expect(ns, "lf jewelcrafter", "profession:755", "the full noun still alerts")
+end
+
 -- Classic keys professions by name; the matcher passes them through.
 local function testClassicKeys()
   local ns = Fixture.load("tbc")
@@ -492,6 +514,7 @@ return function()
   testFullNameBeatsAlias()
   testTypoPass()
   testProfessionWords()
+  testProfessionStems()
   testClassicKeys()
   testResultReuseAndConfigure()
   testOldIndexReleased()
