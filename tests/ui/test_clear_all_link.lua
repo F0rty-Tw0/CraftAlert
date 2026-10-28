@@ -38,6 +38,11 @@ local function testLayout()
   end
   ns.LeadsView.Layout(view)
   Assert.equal(link:IsShown(), false, "69 < 70")
+  view.getListWidth = function()
+    return 70
+  end
+  ns.LeadsView.Layout(view)
+  Assert.equal(link:IsShown(), true, "70 fits")
 end
 
 local function testHover()
@@ -68,6 +73,16 @@ local function testClickAndDisabled()
   Assert.equal(ns.Leads.HasActive(), false)
 end
 
+-- The click happens under the mouse, so the tooltip is up; the link disables itself and a
+-- disabled Button gets no OnLeave, so disabling hides the tooltip.
+local function testClickHidesTooltip()
+  local ns, _, view = load({ "Ann-Draenor" })
+  local link = view.clearAll
+  Widgets.fire(link, "OnEnter")
+  Widgets.click(link)
+  Assert.equal(ns.Tooltip.Get():IsShown(), false)
+end
+
 -- Settings hides the view, the ledger line and the link with it.
 local function testHiddenInSettings()
   local _, frame, view = load({ "Ann-Draenor" })
@@ -82,6 +97,7 @@ return function()
   testLayout()
   testHover()
   testClickAndDisabled()
+  testClickHidesTooltip()
   testHiddenInSettings()
   Wow.reset()
 end

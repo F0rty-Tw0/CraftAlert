@@ -11,8 +11,8 @@ local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 
 -- "Clear all" on the ledger line, in the "Settings" link's look (UI/SettingsGear.lua): a gold
 -- label, white under the mouse; a click dismisses every lead (Leads.DismissAll). No confirm and no
--- undo. Grey and disabled while the view lists no lead; a disabled Button gets no OnEnter, so no
--- tooltip then.
+-- undo. Grey and disabled while the view lists no lead; a disabled Button gets no OnEnter or
+-- OnLeave, so no tooltip then.
 local ClearAllLink = {}
 
 local function paint(link, color)
@@ -48,10 +48,14 @@ function ClearAllLink.Build(parent)
   return link
 end
 
--- Enabled (gold) when the view lists a lead, else disabled (grey).
+-- Enabled (gold) when the view lists a lead, else disabled (grey). A disabled Button gets no
+-- OnLeave either, so disabling under the mouse (the click itself) hides the tooltip here.
 function ClearAllLink.SetEnabled(link, enabled)
   link:SetEnabled(enabled)
   paint(link, enabled and Theme.COLORS.gold or Theme.COLORS.grey)
+  if not enabled then
+    Tooltip.HideIfOwned(link)
+  end
 end
 
 ns.ClearAllLink = ClearAllLink
