@@ -10,9 +10,10 @@ local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
--- Spec §9 Greetings / §7.4: the four templates, one note per profession, and a live preview
--- that runs Greeting.Build on a sample lead for each template. Greetings are built at click
--- time, so nothing is rebuilt here; the preview repaints after each change.
+-- Spec §9 Greetings / §7.4: the four templates (placeholders in a note), a live preview right
+-- under them that runs Greeting.Build on a sample lead for each template, then one note per
+-- profession. Greetings are built at click time, so nothing is rebuilt here; the preview
+-- repaints after each change.
 local PageGreetings = { id = "greetings", title = Localization.Text("Greetings") }
 
 local find = string.find
@@ -130,7 +131,10 @@ function PageGreetings.Create(parent)
       lines[i]:SetText(Localization.Text("%s: %s", Localization.Text(template.label), greeting))
     end
   end
-  Controls.Section(column, Localization.Text("Templates ({item} {crafter} {profession} {customer})"))
+  Controls.Section(column, Localization.Text("Templates"))
+  Controls.Note(column):SetText(
+    Localization.Text("Placeholders: {item} the recipe, {crafter} the character who crafts it, {profession} its profession, {customer} the buyer.")
+  )
   for _, template in ipairs(TEMPLATES) do
     local input
     -- An emptied template would send an empty whisper: it falls back to the default.
@@ -146,8 +150,8 @@ function PageGreetings.Create(parent)
       input.Set(db().settings.templates[template.key])
     end)
   end
-  createNotes(column, state, repaint)
   lines = createPreview(column)
+  createNotes(column, state, repaint)
   add(function()
     state.options = professionOptions()
     state.profession.SetOptions(state.options, state.profession.Value())
