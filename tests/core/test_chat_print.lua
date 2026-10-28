@@ -15,5 +15,15 @@ return function()
   Wow.stub("DEFAULT_CHAT_FRAME", {})
   Assert.falsy(ChatPrint.Line("lost"))
 
+  -- OffInInstance: the off line and true in an instance, nothing printed and false elsewhere.
+  Wow.reset()
+  Assert.equal(ChatPrint.OffInInstance(), false)
+  Assert.same(Wow.chat, {})
+  Wow.stub("IsInInstance", function()
+    return true, "party"
+  end)
+  Assert.equal(ChatPrint.OffInInstance(), true)
+  Assert.same(Wow.chat, { "|cffffd100Craft Alert:|r Off in instances; it works again when you leave." })
+
   Wow.reset()
 end

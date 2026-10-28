@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+local Defaults = ns.Defaults or require("CraftAlert.Persistence.Defaults")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
 
 -- Spec §5.1: the current character's crafting professions, keyed by base skill-line ID on
@@ -166,7 +167,7 @@ function ProfessionList.Refresh(db, charKey)
     return false
   end
   if character == nil then
-    character = { source = "local", enabled = true, realms = {}, professions = {}, recipes = {} }
+    character = Defaults.Character()
     db.characters[charKey] = character
   end
   character.class = FlavorCompat.OwnClass() or character.class

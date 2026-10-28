@@ -3,6 +3,7 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 
 -- Spec §8: daily counters { seen, greeted, replied, filled } in `db.ledger`, keyed by the local
@@ -10,8 +11,6 @@ local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 -- and the leads' own "seen" event (a lead viewed) is never counted. `/ca test` leads never count.
 -- SavedState.Load drops the days older than 30.
 local Ledger = {}
-
-local pcall = pcall
 
 local SECONDS_PER_DAY = 24 * 60 * 60
 local NOON = 12 * 60 * 60
@@ -35,13 +34,6 @@ local function zeros()
   return counters
 end
 
-local function reportError(err)
-  local getHandler = _G["geterrorhandler"]
-  if type(getHandler) == "function" then
-    getHandler()(err)
-  end
-end
-
 -- Listeners get no argument: the strip re-reads Today and LastDays.
 function Ledger.OnChange(fn)
   listeners[#listeners + 1] = fn
@@ -56,12 +48,7 @@ function Ledger.Add(field)
   local day = db.ledger[key] or zeros()
   db.ledger[key] = day
   day[field] = day[field] + 1
-  for i = 1, #listeners do
-    local ok, err = pcall(listeners[i])
-    if not ok then
-      reportError(err)
-    end
-  end
+  EventRouter.CallAll(listeners)
 end
 
 -- A copy of `key`'s counters, zeros for a day without a record.

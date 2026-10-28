@@ -11,10 +11,6 @@ local Status = {}
 
 local concat = table.concat
 
-local function counted(count, noun)
-  return count .. " " .. noun .. (count == 1 and "" or "s")
-end
-
 function Status.PausedText(state)
   local reason = state.reason
   if reason == "noTrade" then
@@ -46,7 +42,12 @@ function Status.Text(state)
     return pausedText(state)
   end
   local channels = #state.channels > 0 and concat(state.channels, ", ") or Localization.Text("no channel")
-  return Localization.Text("Listening in %s — %s, %s", channels, counted(state.recipeCount, "recipe"), counted(state.crafterCount, "crafter"))
+  return Localization.Text(
+    "Listening in %s — %s, %s",
+    channels,
+    Localization.Plural(state.recipeCount, "%d recipe", "%d recipes"),
+    Localization.Plural(state.crafterCount, "%d crafter", "%d crafters")
+  )
 end
 
 ns.Status = Status

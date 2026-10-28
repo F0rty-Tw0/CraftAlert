@@ -13,7 +13,7 @@ local frame = nil
 local handlers = {} -- event -> array of functions; replaced, never edited, so Dispatch can walk it safely
 
 -- Hands a caught error to the client's error handler (BugSack and the like); raises it when
--- there is none, so bare tests see it. Dispatch and Bootstrap's login steps use it.
+-- there is none, so bare tests see it. CallAll and Bootstrap's login steps use it.
 function EventRouter.ReportError(err)
   local getHandler = _G["geterrorhandler"]
   if type(getHandler) ~= "function" then
@@ -22,17 +22,23 @@ function EventRouter.ReportError(err)
   getHandler()(err)
 end
 
-function EventRouter.Dispatch(event, ...)
-  local list = handlers[event]
-  if list == nil then
-    return
-  end
+-- Calls every function in `list` with the arguments; one that raises is reported through
+-- ReportError and the rest still run.
+function EventRouter.CallAll(list, ...)
   for i = 1, #list do
     local ok, err = pcall(list[i], ...)
     if not ok then
       EventRouter.ReportError(err)
     end
   end
+end
+
+function EventRouter.Dispatch(event, ...)
+  local list = handlers[event]
+  if list == nil then
+    return
+  end
+  EventRouter.CallAll(list, ...)
 end
 
 local function getFrame()

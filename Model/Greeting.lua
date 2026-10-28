@@ -21,14 +21,10 @@ local MAX_LENGTH = 255
 local OWN_TEMPLATE = { item = "item", profession = "profession" }
 local ALT_TEMPLATE = { item = "altItem", profession = "altProfession" }
 
-local function nameOf(key)
-  return match(key, "^[^-]*")
-end
-
 -- The player's own realm is dropped, as Ambiguate does; an alt on another realm keeps it.
 function Greeting.CrafterName(key)
   if PlayerName.RealmOf(key) == PlayerName.RealmOf(PlayerName.Own()) then
-    return nameOf(key)
+    return PlayerName.NameOf(key)
   end
   return key
 end
@@ -56,8 +52,8 @@ local function dropColorStart(kept, pattern)
 end
 
 -- The 255-byte chat limit must not leave half a UTF-8 character, half a hyperlink, a
--- partial colour code or a lone escape pipe behind.
-local function cap(text)
+-- partial colour code or a lone escape pipe behind. CraftScanImport caps imported templates too.
+function Greeting.Cap(text)
   if #text <= MAX_LENGTH then
     return text
   end
@@ -102,7 +98,7 @@ function Greeting.Build(lead, settings)
   local templates = own and OWN_TEMPLATE or ALT_TEMPLATE
   local text = settings.templates[templates[lead.kind == "profession" and "profession" or "item"]] or ""
   local values = {
-    customer = nameOf(lead.customer),
+    customer = PlayerName.NameOf(lead.customer),
     crafter = Greeting.CrafterName(lead.crafter),
     item = lead.itemLink or lead.recipeName or lead.profName or "",
     profession = lead.profName or "",
@@ -115,7 +111,7 @@ function Greeting.Build(lead, settings)
   if type(note) == "string" and note ~= "" then
     text = text .. " " .. note
   end
-  return cap((gsub(text, "[\r\n]+", " ")))
+  return Greeting.Cap((gsub(text, "[\r\n]+", " ")))
 end
 
 ns.Greeting = Greeting

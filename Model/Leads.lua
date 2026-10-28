@@ -18,7 +18,6 @@ local concat = table.concat
 local remove = table.remove
 local sort = table.sort
 local max = math.max
-local pcall = pcall
 local tostring = tostring
 local type = type
 
@@ -76,26 +75,12 @@ local function timeoutSeconds(accountDb)
   return accountDb.settings.leadTimeoutMin * 60
 end
 
-local function reportError(err)
-  local getHandler = _G["geterrorhandler"]
-  if type(getHandler) == "function" then
-    getHandler()(err)
-  end
-end
-
 -- "change" listeners get no argument; the others get the lead.
 local function fire(name, lead)
-  local list = listeners[name]
-  for i = 1, #list do
-    local ok, err
-    if lead then
-      ok, err = pcall(list[i], lead)
-    else
-      ok, err = pcall(list[i])
-    end
-    if not ok then
-      reportError(err)
-    end
+  if lead then
+    EventRouter.CallAll(listeners[name], lead)
+  else
+    EventRouter.CallAll(listeners[name])
   end
 end
 

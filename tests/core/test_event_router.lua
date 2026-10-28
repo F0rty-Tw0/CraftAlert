@@ -121,6 +121,46 @@ local function testFailingHandlerDoesNotBlockOthers()
   end, "step failed")
 end
 
+-- CallAll (Leads, Ledger, Index and ScanGate listeners): every function gets the arguments, in
+-- order; one that raises is reported and the rest still run.
+local function testCallAll()
+  local EventRouter = newRouter()
+  local reported, seen = {}, {}
+  Wow.stub("geterrorhandler", function()
+    return function(err)
+      reported[#reported + 1] = err
+    end
+  end)
+  local list = {
+    function(a, b)
+      seen[#seen + 1] = "first " .. a .. b
+    end,
+    function()
+      error("listener broke", 0)
+    end,
+    function(a, b)
+      seen[#seen + 1] = "third " .. a .. b
+    end,
+  }
+
+  EventRouter.CallAll(list, "x", "y")
+  Assert.same(seen, { "first xy", "third xy" })
+  Assert.same(reported, { "listener broke" })
+  EventRouter.CallAll({})
+  Assert.same(reported, { "listener broke" }, "an empty list calls nothing")
+
+  -- A nil in the middle and no arguments at all (Leads' "change", Ledger) pass through as given.
+  local counts = {}
+  local countArgs = {
+    function(...)
+      counts[#counts + 1] = select("#", ...)
+    end,
+  }
+  EventRouter.CallAll(countArgs, nil, "b")
+  EventRouter.CallAll(countArgs)
+  Assert.same(counts, { 2, 0 })
+end
+
 local function testFailedRegisterKeepsNoHandler()
   local EventRouter = newRouter()
   local failing = true
@@ -153,5 +193,6 @@ return function()
   testSameHandlerRegistersOnce()
   testChangesDuringDispatch()
   testFailingHandlerDoesNotBlockOthers()
+  testCallAll()
   Wow.reset()
 end

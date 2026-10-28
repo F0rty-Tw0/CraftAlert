@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local Constants = ns.Constants or require("CraftAlert.Core.Constants")
+local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 local Tokenizer = ns.Tokenizer or require("CraftAlert.Model.Tokenizer")
 local Slang = ns.Slang or require("CraftAlert.Model.Slang")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
@@ -28,8 +29,6 @@ local sort = table.sort
 local MIN_UNIQUE_LETTERS = 5 -- kind c words
 local MIN_JOIN_LETTERS = 6
 local MIN_SPLIT_SIDE = 2
-
-local function noPause() end
 
 -- "enchant bracer - minor health" -> "enchant bracer minor health", { words }; the form
 -- Tokenizer.normalized uses. nil for a name without word characters.
@@ -257,7 +256,7 @@ end
 -- must already be set. pause (optional) runs inside the long loops: Index's sliced build yields
 -- there, so it is never called from a sort comparator.
 function Aliases.Build(index, names, pause)
-  pause = pause or noPause
+  pause = pause or Slicer.NoPause
   index.phraseSet, index.recipeRecords, index.needsSecondWord, index.joinIndex = {}, {}, {}, {}
   local notKindC = {}
   PhraseMatch.Begin(index)

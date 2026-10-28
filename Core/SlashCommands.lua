@@ -5,7 +5,6 @@ end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
-local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Perf = ns.Perf or require("CraftAlert.Core.Perf")
 local SavedState = ns.SavedState or require("CraftAlert.Persistence.SavedState")
 local TestLine = ns.TestLine or require("CraftAlert.Core.TestLine")
@@ -21,10 +20,6 @@ local lower = string.lower
 local match = string.match
 
 local COMMAND_1, COMMAND_2 = "/craftalert", "/ca"
-
-local function offLine()
-  ChatPrint.Line(Localization.Text("Off in instances; it works again when you leave."))
-end
 
 local function togglePerf()
   if Perf.IsRunning() then
@@ -55,8 +50,7 @@ local COMMANDS = {
 }
 
 local function onSlash(message)
-  if FlavorCompat.InInstance() then
-    offLine()
+  if ChatPrint.OffInInstance() then
     return
   end
   local name, rest = match(message or "", "^%s*(%S*)%s*(.-)%s*$")

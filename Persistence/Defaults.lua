@@ -65,5 +65,10 @@ function Defaults.Db()
   }
 end
 
+-- A new record for one of this account's characters, before any profession is read.
+function Defaults.Character()
+  return { source = "local", enabled = true, realms = {}, professions = {}, recipes = {} }
+end
+
 ns.Defaults = Defaults
 return Defaults

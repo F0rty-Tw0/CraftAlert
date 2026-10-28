@@ -22,7 +22,6 @@ local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 -- go on to Leads.
 local ScanGate = {}
 
-local pcall = pcall
 local type = type
 
 local CHANNEL_EVENT = "CHAT_MSG_CHANNEL"
@@ -73,13 +72,6 @@ local registered = {} -- event -> true while the shim below is registered for it
 local shims = {} -- event -> the function registered with EventRouter, created once
 local listeners = {}
 local handler -- what the shims call; HandleChat unless SetHandler replaced it
-
-local function reportError(err)
-  local getHandler = _G["geterrorhandler"]
-  if type(getHandler) == "function" then
-    getHandler()(err)
-  end
-end
 
 -- → "trade", "services", "general", "lfg", "guild", "communities" or nil. Hot path: table
 -- lookups only. The base name is never compared (§6.1); a channel the flavor lacks is nil.
@@ -249,12 +241,7 @@ local function applyEvents(wanted)
 end
 
 local function notify(state)
-  for i = 1, #listeners do
-    local ok, err = pcall(listeners[i], state.active, state)
-    if not ok then
-      reportError(err)
-    end
-  end
+  EventRouter.CallAll(listeners, state.active, state)
   if state.active and not announced then
     announced = true
     ChatPrint.Line(Status.Text(state))

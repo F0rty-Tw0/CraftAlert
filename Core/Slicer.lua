@@ -178,6 +178,9 @@ function Slicer.Run(name, work, onDone, onCancel)
   })
 end
 
+-- The pause for work that runs outside a sliced job: never yields.
+function Slicer.NoPause() end
+
 -- Tests and tools/sim.lua only: runs every job to the end, ignoring budget and debt.
 function Slicer.Drain()
   while #entries > 0 do

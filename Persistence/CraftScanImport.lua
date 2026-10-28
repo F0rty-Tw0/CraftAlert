@@ -6,10 +6,12 @@ end
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 local Defaults = ns.Defaults or require("CraftAlert.Persistence.Defaults")
+local ExportFields = ns.ExportFields or require("CraftAlert.Persistence.ExportFields")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
 local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
 local MainCrafter = ns.MainCrafter or require("CraftAlert.Model.MainCrafter")
+local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local BindLookup = ns.BindLookup or require("CraftAlert.Professions.BindLookup")
 local ModernReader = ns.ModernReader or require("CraftAlert.Professions.ModernReader")
 
@@ -35,18 +37,11 @@ local GREETINGS = {
   GREETING_ALT_CAN_CRAFT_ITEM = "altItem",
   GREETING_ALT_HAS_PROF = "altProfession",
 }
-local MAX_GREETING = 255
 
 -- The professions Craft Alert listens for; CraftScan also scans Cooking (185).
 local crafting = {} -- skill-line ID -> ProfessionWords entry
 for _, entry in ipairs(ProfessionWords.entries) do
   crafting[entry.skillLineID] = entry
-end
-
-local function noPause() end
-
-local function isId(value)
-  return type(value) == "number" and value % 1 == 0 and value >= 1 and value <= 2147483647
 end
 
 local function tableOr(value)
@@ -154,7 +149,7 @@ local function importProfession(ctx, character, parents, profession)
   for _, recipeID in ipairs(keysOf(recipes)) do
     local recipe = recipes[recipeID]
     local muted, malformed = nil, true
-    if isId(recipeID) and type(recipe) == "table" then
+    if ExportFields.IsId(recipeID) and type(recipe) == "table" then
       muted, malformed = stateOf(recipe, profession, parentOff)
     end
     local fields, profInfo
@@ -202,7 +197,7 @@ local function importCharacter(ctx, csKey, record, realms)
   end
   local character = ctx.db.characters[key]
   if character == nil then
-    character = { source = "local", enabled = true, realms = {}, professions = {}, recipes = {} }
+    character = Defaults.Character()
     ctx.db.characters[key] = character
   end
   if #character.realms == 0 then
@@ -233,15 +228,6 @@ local function setPrimaries(db, primaries)
   end
 end
 
--- The first MAX_GREETING bytes, never ending inside a UTF-8 character.
-local function capped(text)
-  local cut = MAX_GREETING
-  while cut > 0 and cut < #text and string.byte(text, cut + 1) >= 128 and string.byte(text, cut + 1) < 192 do -- a continuation byte
-    cut = cut - 1
-  end
-  return string.sub(text, 1, cut)
-end
-
 local function importGreetings(db, settings, counts)
   local defaults = Defaults.Settings().templates
   for tag, text in pairs(tableOr(settings.greeting) or {}) do
@@ -252,7 +238,7 @@ local function importGreetings(db, settings, counts)
         counts.skipped = counts.skipped + 1
       elseif db.settings.templates[key] == defaults[key] then
         text = gsub(gsub(gsub(text, "{profession_link}", "{profession}"), "|", ""), "[\r\n]", " ")
-        db.settings.templates[key] = capped(text)
+        db.settings.templates[key] = Greeting.Cap(text)
         counts.greetings = counts.greetings + 1
       end
     end
@@ -263,7 +249,7 @@ end
 -- pause: Slicer.Run's (tests may leave it out).
 function CraftScanImport.Run(db, src, pause)
   local counts = { characters = 0, recipes = 0, muted = 0, greetings = 0, skipped = 0 }
-  local ctx = { db = db, counts = counts, pause = pause or noPause, primaries = {} }
+  local ctx = { db = db, counts = counts, pause = pause or Slicer.NoPause, primaries = {} }
   local settings = tableOr(src.settings) or {}
   local mine = settings.my_uuid
   local lists = realmLists(src)
