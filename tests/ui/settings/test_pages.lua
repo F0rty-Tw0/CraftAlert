@@ -115,7 +115,7 @@ end
 
 -- §6.1: enable and "Only where Trade chat exists" re-evaluate the gate; §6.2: channels and
 -- profession-word alerts rebuild the index (channels also re-evaluate the registered events).
--- Unbound items moved to the Crafters page, under the recipe list.
+-- Track unbound items sits in Matching (rebuilds the index) and is gone from the Crafters page.
 local function testGeneralPage()
   local ns, db, refreshes = SettingsFixture.load()
   local settings = db.settings
@@ -126,6 +126,7 @@ local function testGeneralPage()
     { "Only where Trade chat exists", "onlyResting", { "evaluate" } },
     { "Profession-word alerts", "professionWordAlerts", { "rebuild:professionWordAlerts" } },
     { "Bell markers on recipe rows", "recipeMarkers", { "markers", "classicMarkers" } },
+    { "Track unbound items (materials, potions, gems)", "includeUnbound", { "rebuild:includeUnbound" } },
   }
   Assert.raises(function()
     row("Include unbound items")
@@ -136,6 +137,11 @@ local function testGeneralPage()
     Assert.equal(settings[case[2]], not before, case[2])
     Assert.same(take(refreshes), case[3], case[2])
   end
+  open(ns, "Crafters")
+  Assert.raises(function()
+    row("Track unbound items (materials, potions, gems)")
+  end, "no visible row")
+  open(ns, "General")
   Widgets.click(row("General").input)
   Assert.equal(settings.channels.general, true)
   Assert.same(take(refreshes), { "rebuild:channels", "evaluate" })
@@ -205,6 +211,45 @@ local function testAlertsPage()
   Widgets.slide(row("Opacity").input, 0.5)
   Assert.equal(settings.opacity, 0.5)
   Assert.same(take(refreshes), { "leadsWindow" })
+
+  -- Sounds are named from the client's SOUNDKIT (first key alphabetically for a shared value).
+  Wow.stub("SOUNDKIT", { RAID_WARNING = 8959, READY_CHECK = 8960, ALARM = 12867, ALARM_CLOCK = 12867 })
+  local names = {
+    ns.PageAlerts.SoundName(8959, 1),
+    ns.PageAlerts.SoundName(12867, 4),
+    ns.PageAlerts.SoundName(3081, 2),
+  }
+  Assert.same(names, { "Raid warning", "Alarm", "Sound 2" })
+  Wow.stub("SOUNDKIT", nil)
+  Assert.equal(ns.PageAlerts.SoundName(8959, 3), "Sound 3", "no SOUNDKIT table")
+
+  -- Sections run When a request arrives, Leads, Window and launcher: each hangs below the last.
+  local function section(text)
+    for _, frame in ipairs(Wow.frames) do
+      for _, region in ipairs(SettingsFixture.visible(frame) and frame.regions or {}) do
+        if region.text == text then
+          return region
+        end
+      end
+    end
+    error("no section " .. text)
+  end
+  local function hangsBelow(lower, upper)
+    local anchor = lower.points[1] and lower.points[1][2]
+    while anchor do
+      if anchor == upper then
+        return true
+      end
+      anchor = anchor.points and anchor.points[1] and anchor.points[1][2]
+    end
+    return false
+  end
+  local leads, window = section("Leads"), section("Window and launcher")
+  Assert.truthy(hangsBelow(section("Leads"), row("Toast duration")), "Leads follows the toast duration")
+  Assert.truthy(hangsBelow(row("Lead timeout"), leads), "Lead timeout stays under Leads")
+  Assert.truthy(hangsBelow(window, row("Lead timeout")), "Window and launcher follows Lead timeout")
+  Assert.truthy(hangsBelow(row("Hide the launcher when there are no leads"), window), "launcher toggle is under the new section")
+  Assert.truthy(hangsBelow(row("Opacity"), window), "opacity too")
 end
 
 -- The Alerts page reaches the launcher and the leads window only through its setters: loading it
@@ -237,6 +282,11 @@ local function testGreetingsPage()
   open(ns, "Greetings")
   take(refreshes)
   local texts = SettingsFixture.texts()
+  Assert.falsy(texts:find("Templates ({item}", 1, true), "placeholders are no longer crammed into the heading")
+  local placeholders = "Placeholders: {item} the recipe, {crafter} the character who crafts it, {profession} its profession, {customer} the buyer."
+  Assert.truthy(texts:find(placeholders, 1, true), texts)
+  local preview, notes = texts:find("Preview", 1, true), texts:find("Profession note", 1, true)
+  Assert.truthy(preview and notes and preview < notes, "the preview sits right under the templates")
   Assert.truthy(texts:find("Item: Hi! I can craft Sample Item.", 1, true), texts)
   Assert.truthy(texts:find("Alt item: Hi! My alt Alt can craft Sample Item, send the order there.", 1, true), texts)
   Assert.truthy(texts:find("Profession: Hi! I have Blacksmithing, what do you need?", 1, true), texts)

@@ -97,6 +97,7 @@ end
 
 local function createImport(column, page)
   Controls.Section(column, Localization.Text("Import another account"))
+  Controls.Note(column):SetText(Localization.Text("Paste the string from your other account here, then click Import."))
   local box = textBox(column, Localization.Text("Import string"))
   local result
   local button

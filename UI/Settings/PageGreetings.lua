@@ -10,9 +10,10 @@ local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
--- Spec §9 Greetings / §7.4: the four templates, one note per profession, and a live preview
--- that runs Greeting.Build on a sample lead for each template. Greetings are built at click
--- time, so nothing is rebuilt here; the preview repaints after each change.
+-- Spec §9 Greetings / §7.4: the four templates (placeholders in a note), a live preview right
+-- under them that runs Greeting.Build on a sample lead for each template, then one note per
+-- profession. Greetings are built at click time, so nothing is rebuilt here; the preview
+-- repaints after each change.
 local PageGreetings = { id = "greetings", title = Localization.Text("Greetings") }
 
 local find = string.find
@@ -20,10 +21,34 @@ local find = string.find
 local WHISPER_LETTERS = 255 -- the chat limit for one whisper
 
 local TEMPLATES = {
-  { key = "item", label = "Item", kind = "item", own = true },
-  { key = "altItem", label = "Alt item", kind = "item", own = false },
-  { key = "profession", label = "Profession", kind = "profession", own = true },
-  { key = "altProfession", label = "Alt profession", kind = "profession", own = false },
+  {
+    key = "item",
+    label = "Item",
+    kind = "item",
+    own = true,
+    tip = "Whispered when you click Greet on a request for an item you can craft yourself.",
+  },
+  {
+    key = "altItem",
+    label = "Alt item",
+    kind = "item",
+    own = false,
+    tip = "Whispered for an item one of your alts crafts. {crafter} is that alt, so the buyer knows who to ask.",
+  },
+  {
+    key = "profession",
+    label = "Profession",
+    kind = "profession",
+    own = true,
+    tip = "Whispered when a request names only a profession and you have it.",
+  },
+  {
+    key = "altProfession",
+    label = "Alt profession",
+    kind = "profession",
+    own = false,
+    tip = "Whispered when a request names only a profession and one of your alts has it.",
+  },
 }
 
 local function db()
@@ -89,7 +114,7 @@ local function createNotes(column, state, repaint)
       db().settings.notes[prof] = text ~= "" and text or nil
     end
     repaint()
-  end, WHISPER_LETTERS)
+  end, WHISPER_LETTERS, Localization.Text("Added after the greeting for the profession chosen above. Leave it empty for no note."))
 end
 
 function PageGreetings.Create(parent)
@@ -106,7 +131,10 @@ function PageGreetings.Create(parent)
       lines[i]:SetText(Localization.Text("%s: %s", Localization.Text(template.label), greeting))
     end
   end
-  Controls.Section(column, Localization.Text("Templates ({item} {crafter} {profession} {customer})"))
+  Controls.Section(column, Localization.Text("Templates"))
+  Controls.Note(column):SetText(
+    Localization.Text("Placeholders: {item} the recipe, {crafter} the character who crafts it, {profession} its profession, {customer} the buyer.")
+  )
   for _, template in ipairs(TEMPLATES) do
     local input
     -- An emptied template would send an empty whisper: it falls back to the default.
@@ -117,13 +145,13 @@ function PageGreetings.Create(parent)
       end
       db().settings.templates[template.key] = text
       repaint()
-    end, WHISPER_LETTERS)
+    end, WHISPER_LETTERS, Localization.Text(template.tip))
     add(function()
       input.Set(db().settings.templates[template.key])
     end)
   end
-  createNotes(column, state, repaint)
   lines = createPreview(column)
+  createNotes(column, state, repaint)
   add(function()
     state.options = professionOptions()
     state.profession.SetOptions(state.options, state.profession.Value())

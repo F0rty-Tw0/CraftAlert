@@ -96,6 +96,8 @@ Theme.LAYOUT = {
   LIST_ROW_INSET = 2,
   -- A lead row's hover tooltip is at least this wide, so the chat line is not a tall column.
   ROW_TIP_WIDTH = 360,
+  -- A settings control's hover tip wraps at this width, wide enough for ~50 letters a line.
+  TIP_WIDTH = 300,
   PANE_PADDING = 4,
   LIST_ICON_SIZE = 34,
   DETAILS_HEADER_HEIGHT = 62,

@@ -107,12 +107,12 @@ local function createMuteAll(column, muteAll)
   local bar = Controls.Bar(column, Theme.LAYOUT.BUTTON_HEIGHT)
   local mute = Controls.Button(bar, Localization.Text("Mute all"), 0, function()
     muteAll(true)
-  end)
+  end, Localization.Text("Mutes every recipe the list shows. With a search typed, only the recipes it finds."))
   mute:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
   mute:SetPoint("TOPRIGHT", bar, "TOP", -gap, 0)
   local unmute = Controls.Button(bar, Localization.Text("Unmute all"), 0, function()
     muteAll(false)
-  end)
+  end, Localization.Text("Unmutes every recipe the list shows. With a search typed, only the recipes it finds."))
   unmute:SetPoint("TOPLEFT", bar, "TOP", gap, 0)
   unmute:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
 end
@@ -123,6 +123,10 @@ local function createOnlyCurrent(column, onClick)
   local button = Controls.Button(bar, "", 0, onClick)
   button:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
   button:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
+  local tip = Localization.Text("Alerts only for this expansion's recipes: all older ones are muted and your own picks are replaced.")
+  Controls.Tip(button, function()
+    return button:GetText()
+  end, tip)
   return button
 end
 
@@ -137,13 +141,29 @@ local function paintOnlyCurrent(button, line)
   button:Show()
 end
 
--- list: { search, recipes, character, prof, Show }; `character` and `prof` are what Show last got.
+-- The line over an empty list: the search found nothing, the character has no profession, or no
+-- recipe was read yet.
+local function emptyText(search, prof)
+  if search ~= "" then
+    return Localization.Text("No recipe matches your search.")
+  end
+  if prof == nil then
+    return Localization.Text("No professions read for this character yet.")
+  end
+  return Localization.Text("No recipes read yet. Open this profession's window in the game to read them.")
+end
+
+-- list: { search, recipes, empty, character, prof, Show }; `character` and `prof` are what Show last got.
 function RecipeList.Create(column)
   local list = {}
 
   local function render()
+    local search = list.search.input:GetText()
+    local items = recipeItems(list.character, list.prof, search)
     paintOnlyCurrent(list.onlyCurrent, currentLine(list.character, list.prof))
-    list.recipes.Render(recipeItems(list.character, list.prof, list.search.input:GetText()), list.showRecipe)
+    list.recipes.Render(items, list.showRecipe)
+    list.empty:SetText(emptyText(search, list.prof))
+    list.empty:SetShown(#items == 0)
   end
 
   -- One index rebuild when any of the recipes changed, then the list again.
@@ -246,10 +266,20 @@ function RecipeList.Create(column)
     end
   end
 
-  list.search = Controls.Search(column, Localization.Text("Search recipes"), render)
+  list.search = Controls.Search(
+    column,
+    Localization.Text("Search recipes"),
+    render,
+    Localization.Text("Type part of a recipe's name. The list narrows as you type.")
+  )
   createMuteAll(column, muteAll)
   list.onlyCurrent = createOnlyCurrent(column, onlyCurrent)
   list.recipes = Controls.List(column, RECIPE_ROWS, createRecipeRow)
+  local frame, padding = list.recipes.frame, Theme.LAYOUT.PADDING
+  list.empty = FrameKit.Text(frame, Theme.FONTS.body, Theme.COLORS.textSecondary)
+  list.empty:SetWordWrap(true)
+  list.empty:SetPoint("TOPLEFT", frame, "TOPLEFT", padding, -padding)
+  list.empty:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -padding, -padding)
   -- A mute made elsewhere (the profession window) shows when the index rebuilds; the order stays.
   Index.OnRebuilt(repaintIfShown)
 

@@ -10,6 +10,7 @@ local function load()
   Fresh.require("Core.FlavorCompat")
   local Theme = Fresh.require("UI.Theme")
   Fresh.require("UI.FrameKit")
+  Fresh.require("UI.Tooltip")
   local Controls = Fresh.require("UI.Settings.Controls")
   local parent = _G["CreateFrame"]("Frame", nil, _G["UIParent"])
   return Controls, Controls.Column(parent), parent, Theme
@@ -154,6 +155,15 @@ local function testSearch()
   box.text = "plate"
   box:ClearFocus()
   Assert.same(seen, { "belt", "", "plate" }, "focus loss commits")
+  box.text = "be"
+  Widgets.fire(box, "OnTextChanged", true)
+  box.text = "bel"
+  Widgets.fire(box, "OnTextChanged", true)
+  Assert.same({ seen[#seen - 1], seen[#seen] }, { "be", "bel" }, "each typed change commits")
+  local count = #seen
+  box.text = "other"
+  Widgets.fire(box, "OnTextChanged", false)
+  Assert.equal(#seen, count, "a programmatic change commits nothing")
 end
 
 local function testChoice()
@@ -196,10 +206,126 @@ local function testButton()
   Assert.equal(clicks, 1)
 end
 
+local GOLD, WHITE = { 1, 0.82, 0 }, { 1, 1, 1 }
+
+-- A control's `tip` hangs on its whole row: the row and the control's own frames show the row's
+-- tooltip (gold label, white text) and hide it on leave. A control without one shows none.
+local function testTips()
+  local Controls, column, _, Theme = load()
+  local tip = require("CraftAlert.UI.Tooltip").Get()
+  local toggle = Controls.Toggle(column, "Enable", function() end, "Turns scanning on or off.")
+  Assert.equal(toggle.row.mouseEnabled, true, "the row takes the hover")
+  Widgets.fire(toggle.row, "OnEnter")
+  Assert.same(
+    { tip.owner, tip.anchor, tip.lines, tip.colors, tip.minWidth, tip.shown },
+    { toggle.row, "ANCHOR_RIGHT", { "Enable", "Turns scanning on or off." }, { GOLD, WHITE }, Theme.LAYOUT.TIP_WIDTH, true }
+  )
+  Widgets.fire(toggle.row, "OnLeave")
+  Assert.equal(tip.shown, false)
+  Widgets.fire(toggle.input, "OnEnter")
+  Assert.same({ tip.owner, tip.lines[1] }, { toggle.row, "Enable" }, "the check shows the row's tip")
+  Widgets.fire(toggle.input, "OnLeave")
+  Assert.equal(tip.shown, false, "and hides it")
+  local slider = Controls.Slider(column, {
+    label = "Timeout",
+    min = 1,
+    max = 60,
+    step = 1,
+    onChange = function() end,
+    tip = "How long.",
+  })
+  Widgets.fire(slider.input.Slider, "OnEnter")
+  Assert.same({ tip.owner, tip.lines }, { slider.row, { "Timeout", "How long." } })
+  Widgets.fire(slider.input.Slider, "OnLeave")
+  Widgets.fire(slider.input.Forward, "OnEnter")
+  Assert.same({ tip.owner, tip.shown }, { slider.row, true }, "a stepper shows the row's tip")
+  Widgets.fire(slider.input.Forward, "OnLeave")
+  local input = Controls.Input(column, "Item", function() end, nil, "Whispered.")
+  Widgets.fire(input.input, "OnEnter")
+  Assert.same({ tip.owner, tip.lines }, { input.row, { "Item", "Whispered." } })
+  Widgets.fire(input.input, "OnLeave")
+  local search = Controls.Search(column, "Search recipes", function() end, "Type a name.")
+  Widgets.fire(search.input, "OnEnter")
+  Assert.same({ tip.owner, tip.lines }, { search.row, { "Search recipes", "Type a name." } })
+  Widgets.fire(search.input, "OnLeave")
+  local choice = Controls.Choice(column, "Sound", { { value = 0, text = "None" } }, function() end, "Played.")
+  Widgets.fire(choice.input, "OnEnter")
+  Assert.same({ tip.owner, tip.lines }, { choice.row, { "Sound", "Played." } })
+  Widgets.fire(choice.input, "OnLeave")
+  local bound = { on = false }
+  Controls.BoundToggle(column, "Bound", function()
+    return bound
+  end, "on", function() end, "Forwarded.")
+  local boundRow = column.last
+  Widgets.fire(boundRow, "OnEnter")
+  Assert.same({ tip.owner, tip.lines }, { boundRow, { "Bound", "Forwarded." } }, "BoundToggle forwards the tip")
+  Widgets.fire(boundRow, "OnLeave")
+  local button = Controls.Button(column.parent, "Remove", 100, function() end, "Deletes it.")
+  Widgets.fire(button, "OnEnter")
+  Assert.same({ tip.owner, tip.lines }, { button, { "Remove", "Deletes it." } })
+  Widgets.fire(button, "OnLeave")
+  Assert.equal(tip.shown, false)
+  local plain = Controls.Toggle(column, "Plain", function() end)
+  Widgets.fire(plain.row, "OnEnter")
+  Widgets.fire(plain.input, "OnEnter")
+  Assert.equal(tip.shown, false, "no tip, no tooltip")
+  Assert.equal(plain.row.mouseEnabled, nil, "and the row keeps its mouse state")
+  local dynamic = "Before"
+  local other = Controls.Button(column.parent, "Only", 100, function() end)
+  Controls.Tip(other, function()
+    return dynamic
+  end, "Body.")
+  dynamic = "After"
+  Widgets.fire(other, "OnEnter")
+  Assert.equal(tip.lines[1], "After", "a function title is read at hover time")
+end
+
 local function testSectionKeepsFontColour()
   local Controls, column = load()
   local section = Controls.Section(column, "Sounds")
   Assert.equal(section.textColor, nil, "the font object's colour stands")
+end
+
+local function testEmptyNote()
+  local Controls, column, parent, Theme = load()
+  Controls.Section(column, "A")
+  local note = Controls.Note(column)
+  Controls.Toggle(column, "B", function() end)
+  local other = _G["CreateFrame"]("Frame", nil, _G["UIParent"])
+  local plain = Controls.Column(other)
+  Controls.Section(plain, "A")
+  Controls.Toggle(plain, "B", function() end)
+  Assert.equal(parent:GetHeight(), other:GetHeight(), "an empty note adds no height and no gap")
+  local _, _, _, _, collapsedY = note:GetPoint()
+  Assert.equal(collapsedY, 0, "an empty note sits right on the row above")
+  note:SetText("Result")
+  local point, _, _, _, y = note:GetPoint()
+  Assert.same({ point, y }, { "TOPLEFT", -Theme.LAYOUT.CONTROL_GAP }, "text brings the gap back")
+  Assert.truthy(parent:GetHeight() > other:GetHeight())
+  note:SetText("")
+  Assert.equal(parent:GetHeight(), other:GetHeight(), "emptied again: collapsed again")
+end
+
+local function testCollapseFrame()
+  local _, _, _, Theme = load()
+  local Column = Fresh.require("UI.Settings.Column")
+  local parent = _G["CreateFrame"]("Frame", nil, _G["UIParent"])
+  local column = Column.New(parent)
+  local top = Column.Bar(column, 10)
+  local bar = Column.Bar(column, 20)
+  local below = Column.Bar(column, 10)
+  local height = parent:GetHeight()
+  local gap = Theme.LAYOUT.CONTROL_GAP
+  Column.Collapse(column, bar, true)
+  Assert.equal(parent:GetHeight(), height - 20 - gap, "a collapsed frame counts no height and no gap")
+  local _, relative, _, _, y = below:GetPoint()
+  Assert.equal(relative, top, "the row below hangs from the row above, so the frame's height never shows")
+  Assert.equal(y, -gap, "with its own gap")
+  Column.Collapse(column, bar, false)
+  Assert.equal(parent:GetHeight(), height, "uncollapsed, it counts both again")
+  _, relative, _, _, y = below:GetPoint()
+  Assert.equal(relative, bar, "and the row below hangs from it again")
+  Assert.equal(y, -gap)
 end
 
 local function testListPages()
@@ -359,7 +485,10 @@ return function()
   testSearch()
   testChoice()
   testButton()
+  testTips()
   testSectionKeepsFontColour()
+  testEmptyNote()
+  testCollapseFrame()
   testListPages()
   testFakeCheckButton()
   testFakeSlider()

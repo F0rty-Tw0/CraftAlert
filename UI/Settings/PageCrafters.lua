@@ -15,8 +15,8 @@ local RecipeList = ns.RecipeList or require("CraftAlert.UI.Settings.RecipeList")
 
 -- Spec §9 Crafters: one character at a time (current, same-account, imported) with enable,
 -- remove (asks for a second click) and, per profession, the main crafter flag (stored as
--- `primary`) and the recipe list (RecipeList), then "Track unbound items" (`includeUnbound`).
--- Enable, remove, mute and unbound items rebuild the index (§6.2); the flag is read when a lead
+-- `primary`) and the recipe list (RecipeList).
+-- Enable, remove and mute rebuild the index (§6.2); the flag is read when a lead
 -- picks its crafter (§6.3 step 5), so it rebuilds nothing.
 local PageCrafters = { id = "crafters", title = Localization.Text("Crafters") }
 
@@ -24,10 +24,6 @@ local REMOVE_WIDTH = 140
 
 local function db()
   return _G["CraftAlertDB"]
-end
-
-local function settings()
-  return db().settings
 end
 
 local function characterOptions()
@@ -61,14 +57,17 @@ local function createCharacterRows(column, page)
   Controls.Section(column, Localization.Text("This character"))
   page.character = Controls.Choice(column, Localization.Text("Character"), {}, function()
     page.ShowCharacter()
-  end)
+  end, Localization.Text("Pick whose professions and recipes this page shows."))
   page.enabled = Controls.Toggle(column, Localization.Text("Listen for this character"), function(on)
     local character = shownCharacter(page)
     if character then
       character.enabled = on
       Index.RequestRebuild("crafter")
     end
-  end)
+  end, Localization.Text("Alerts for this character's recipes. Off, its recipes are left out of matching."))
+  local removeTip = Localization.Text(
+    "Deletes this character's saved professions and recipes. It asks for a second click. Your logged-in character comes back empty until you open a profession window."
+  )
   page.remove = Controls.Button(column.parent, Localization.Text("Remove character"), REMOVE_WIDTH, function()
     if shownCharacter(page) == nil then
       return
@@ -88,7 +87,7 @@ local function createCharacterRows(column, page)
     end
     Index.RequestRebuild("crafter")
     page.Refresh()
-  end)
+  end, removeTip)
   Controls.Place(column, page.remove)
 end
 
@@ -97,19 +96,19 @@ local function createProfessionRows(column, page)
   page.profession = Controls.Choice(column, Localization.Text("Profession"), {}, function()
     page.ShowProfession()
   end)
-  page.primary = Controls.Toggle(column, Localization.Text("Main crafter for this profession"), function(on)
-    if page.profession.Value() ~= nil then
-      MainCrafter.Set(db(), page.character.Value(), page.profession.Value(), on)
-    end
-  end)
+  page.primary = Controls.Toggle(
+    column,
+    Localization.Text("Main crafter for this profession"),
+    function(on)
+      if page.profession.Value() ~= nil then
+        MainCrafter.Set(db(), page.character.Value(), page.profession.Value(), on)
+      end
+    end,
+    Localization.Text(
+      "When several of your characters can craft a request, this one is chosen first and gets the greeting. One main crafter per profession."
+    )
+  )
   page.list = RecipeList.Create(column)
-  -- The list greys the recipes this leaves out, so it repaints after a change.
-  local function trackUnbound()
-    Index.RequestRebuild("includeUnbound")
-    page.list.Show(shownCharacter(page), page.profession.Value())
-  end
-  local label = Localization.Text("Track unbound items (materials, potions, gems)")
-  page.unbound = Controls.BoundToggle(column, label, settings, "includeUnbound", trackUnbound)
 end
 
 function PageCrafters.Create(parent)
@@ -137,7 +136,6 @@ function PageCrafters.Create(parent)
       current = PlayerName.Own()
     end
     page.character.SetOptions(characterOptions(), current)
-    page.unbound()
     page.ShowCharacter()
   end
   return page

@@ -70,7 +70,7 @@ local function formatSlang(slang)
   return table.concat(parts, " ")
 end
 
-local function wordsInput(column, add, label, key, fallback)
+local function wordsInput(column, add, label, key, fallback, tip)
   local input
   input = Controls.Input(column, Localization.Text(label), function(text)
     local words = splitWords(text)
@@ -80,7 +80,7 @@ local function wordsInput(column, add, label, key, fallback)
     db().settings[key] = words
     input.Set(table.concat(words, " "))
     Index.RequestRebuild("keywords")
-  end)
+  end, nil, Localization.Text(tip))
   add(function()
     local words = db().settings[key]
     input.Set(type(words) == "table" and table.concat(words, " ") or "")
@@ -88,12 +88,17 @@ local function wordsInput(column, add, label, key, fallback)
 end
 
 local function slangInput(column, add)
+  Controls.Note(column):SetText(
+    Localization.Text(
+      'Teach Craft Alert your own word for a slot or armor type, as word=target pairs separated by spaces. Example: kicks=boots makes "LF kicks" find boots. Targets are slot words (belt, boots, helm, chest) or type words (plate, mail, leather, cloth).'
+    )
+  )
   local input
   input = Controls.Input(column, Localization.Text("Extra slang (word=slot)"), function(text)
     db().settings.extraSlang = parseSlang(text)
     input.Set(formatSlang(db().settings.extraSlang))
     Index.RequestRebuild("keywords")
-  end)
+  end, nil, Localization.Text("Teach Craft Alert a word it does not know. Each word=target pair makes your word mean that slot or armor type."))
   add(function()
     input.Set(formatSlang(db().settings.extraSlang))
   end)
@@ -103,8 +108,10 @@ function PageKeywords.Create(parent)
   local column = Controls.Column(parent, Theme.LAYOUT.PAGE_PADDING)
   local add, refresh = Controls.Refresher()
   Controls.Section(column, Localization.Text("Request words"))
-  wordsInput(column, add, "Intent words", "intentWords", Constants.intentWords)
-  wordsInput(column, add, "Blocker words", "blockerWords", nil)
+  local intentTip = "Words that mark a request, such as lf or wtb. A line needs one of them to count as a request. Emptied, the default list returns."
+  wordsInput(column, add, "Intent words", "intentWords", Constants.intentWords, intentTip)
+  local blockerTip = "Words that cancel a match, such as wts. A line with one of them never alerts."
+  wordsInput(column, add, "Blocker words", "blockerWords", nil, blockerTip)
   slangInput(column, add)
   return { Refresh = refresh }
 end

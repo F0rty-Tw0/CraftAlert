@@ -419,17 +419,20 @@ end
 function Templates.fakes.GameTooltipTemplate(tooltip)
   tooltip.shown, tooltip.lines, tooltip.colors, tooltip.rights, tooltip.hyperlinks = false, {}, {}, {}, {}
   function tooltip:SetOwner(owner, anchor)
-    self.owner, self.anchor, self.lines, self.colors, self.rights = owner, anchor, {}, {}, {}
+    self.owner, self.anchor, self.lines, self.colors, self.rights, self.wraps = owner, anchor, {}, {}, {}, {}
   end
   function tooltip:ClearLines()
-    self.lines, self.colors, self.rights = {}, {}, {}
+    self.lines, self.colors, self.rights, self.wraps = {}, {}, {}, {}
   end
   function tooltip:SetText(text, r, g, b)
-    self.lines, self.colors, self.rights = { text }, { { r, g, b } }, {}
+    self.lines, self.colors, self.rights, self.wraps = { text }, { { r, g, b } }, {}, {}
   end
-  function tooltip:AddLine(text, r, g, b)
+  -- `wraps[i]` is line i's wrap flag (nil when the caller passed none).
+  function tooltip:AddLine(text, r, g, b, wrap)
     table.insert(self.lines, text)
     table.insert(self.colors, { r, g, b })
+    self.wraps = self.wraps or {}
+    self.wraps[#self.lines] = wrap
   end
   function tooltip:AddDoubleLine(left, right, lr, lg, lb, rr, rg, rb)
     table.insert(self.lines, left)
