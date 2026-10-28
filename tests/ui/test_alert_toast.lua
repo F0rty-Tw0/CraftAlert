@@ -192,8 +192,8 @@ local function testTooltip()
   ns.Leads.Latest().why = ""
   ns.AlertToast.Show(ns.Leads.Latest())
   frame.scripts.OnEnter(frame)
-  Assert.same(tip.lines, { "Craft Alert", " ", clicks[1], clicks[2], clicks[3], clicks[4], drag })
-  Assert.same(tip.colors, { gold, {}, green, green, green, green, green })
+  Assert.same(tip.lines, { "Craft Alert", clicks[1], clicks[2], clicks[3], clicks[4], drag })
+  Assert.same(tip.colors, { gold, green, green, green, green, green })
 end
 
 local function testLinks()
