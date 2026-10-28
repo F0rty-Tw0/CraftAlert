@@ -142,6 +142,10 @@ local function createMarks(row)
   greeted:SetSize(size, size)
   greeted:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -EDGE, 4)
   greeted:SetTexture(Theme.GREETED_ICON)
+  -- The check art is green: desaturated first, so the greeted blue is the colour that shows.
+  local color = Theme.COLORS.greeted
+  greeted:SetDesaturated(true)
+  greeted:SetVertexColor(color[1], color[2], color[3], color[4])
   local replied = FrameKit.Text(row, Theme.FONTS.detail, Theme.COLORS.replied)
   replied:SetText(Localization.Text("replied"))
   return greeted, replied
