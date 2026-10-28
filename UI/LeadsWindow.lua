@@ -67,16 +67,6 @@ function LeadsWindow.Refresh()
   frame.status:SetText(#leads > 0 and Localization.Plural(#leads, "%d lead", "%d leads") or "")
 end
 
--- The bell in the template's portrait; a template without SetPortraitToAsset gets the texture set
--- directly, as WhisperMessenger does (RetailChrome.lua:25-34, WM).
-local function paintPortrait(frame)
-  if type(frame.SetPortraitToAsset) == "function" then
-    frame:SetPortraitToAsset(Theme.ICON)
-  else
-    frame.PortraitContainer.portrait:SetTexture(Theme.ICON)
-  end
-end
-
 -- The view's and the settings pane's host, below the portrait (WhisperMessenger's
 -- RETAIL_HUD_INSET_*). It replaces the template's inset; each pane draws its own inset art.
 local function createContent(frame)
@@ -167,7 +157,8 @@ local function create()
   frame.onCloseCallback = onClose
   frame:SetFrameStrata("HIGH")
   frame:SetTitle(Localization.Text("Craft Alert — Leads"))
-  paintPortrait(frame)
+  -- The bell in the template's portrait.
+  FrameKit.Portrait(frame, Theme.ICON)
   createContent(frame)
   createStatus(frame)
   WindowSize.Apply(frame, SIZE)

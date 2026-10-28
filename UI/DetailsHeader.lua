@@ -5,7 +5,6 @@ end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
-local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
@@ -74,19 +73,18 @@ function DetailsHeader.LineTwo(lead)
 end
 
 -- The crafter's short name in the class saved for them, white when none is; nil without a crafter.
-local function crafterText(lead, db)
+local function crafterText(lead)
   if lead.crafter == nil then
     return nil
   end
-  local character = db.characters[lead.crafter]
-  local color = character and FrameKit.ClassColor(character.class)
-  return FrameKit.ClassCode(Greeting.CrafterName(lead.crafter), color, Theme.COLORS.white)
+  return LeadText.CrafterCode(lead.crafter, Theme.COLORS.white)
 end
 
 -- The strip: "Wants <link or recipe> · <profession> · <crafter>", each part (and the " · "
 -- before it) left out when missing; a profession lead "Wants a <profession> crafter" ("an"
 -- before a vowel). Colour codes for the profession (gold) and the crafter; the link keeps its own.
-function DetailsHeader.Strip(lead, db)
+-- The crafter's class is read from CraftAlertDB (LeadText.ClassOf).
+function DetailsHeader.Strip(lead)
   local profName = lead.profName
   local profession = profName and FrameKit.ThemeCode(profName, Theme.COLORS.gold)
   if lead.kind == "profession" and profession then
@@ -97,7 +95,7 @@ function DetailsHeader.Strip(lead, db)
   local parts = { what and Localization.Text("Wants %s", what) }
   -- A nil part adds nothing.
   parts[#parts + 1] = profession
-  parts[#parts + 1] = crafterText(lead, db)
+  parts[#parts + 1] = crafterText(lead)
   return table.concat(parts, SEPARATOR)
 end
 
@@ -138,12 +136,8 @@ local function createStrip(details)
   fill:SetColorTexture(unpack(Theme.COLORS.headerFill))
   divider(strip, "TOP")
   divider(strip, "BOTTOM")
-  local text = FrameKit.Text(strip, Theme.FONTS.body, PLAIN_COLOR)
+  local text = FrameKit.Wrapped(strip, Theme.FONTS.body, PLAIN_COLOR, STRIP_LINES)
   text:SetPoint("LEFT", strip, "LEFT", padding, 0)
-  text:SetWordWrap(true)
-  if text.SetMaxLines then
-    text:SetMaxLines(STRIP_LINES)
-  end
   LinkHover.Attach(strip, nil)
   details.strip, details.stripText = strip, text
 end
@@ -209,7 +203,7 @@ function DetailsHeader.Paint(details, lead)
   DetailsHeader.FitName(details)
   details.lineOne:SetText(DetailsHeader.LineOne(lead))
   details.lineTwo:SetText(DetailsHeader.LineTwo(lead))
-  details.stripText:SetText(DetailsHeader.Strip(lead, _G["CraftAlertDB"]))
+  details.stripText:SetText(DetailsHeader.Strip(lead))
   DetailsHeader.FitStrip(details)
 end
 

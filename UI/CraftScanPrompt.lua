@@ -60,16 +60,10 @@ local function create()
   window:SetSize(WIDTH, HEIGHT)
   window:SetPoint("CENTER", _G["UIParent"], "CENTER", 0, 0)
   window:SetTitle(Localization.Text("Craft Alert — CraftScan"))
-  if type(window.SetPortraitToAsset) == "function" then
-    window:SetPortraitToAsset(Theme.ICON)
-  else
-    window.PortraitContainer.portrait:SetTexture(Theme.ICON)
-  end
-  local text = FrameKit.Text(window.Inset, Theme.FONTS.body)
+  FrameKit.Portrait(window, Theme.ICON)
+  local text = FrameKit.Wrapped(window.Inset, Theme.FONTS.body)
   text:SetPoint("TOPLEFT", window.Inset, "TOPLEFT", TEXT_INSET, -TEXT_INSET)
   text:SetPoint("TOPRIGHT", window.Inset, "TOPRIGHT", -TEXT_INSET, -TEXT_INSET)
-  text:SetWordWrap(true)
-  text:SetJustifyH("LEFT")
   local body = "CraftScan data found. Import this account's characters, recipes and greetings? What Craft Alert already has stays as it is."
   text:SetText(Localization.Text(body))
   window.text = text

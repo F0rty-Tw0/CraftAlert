@@ -7,7 +7,7 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local MainCrafter = ns.MainCrafter or require("CraftAlert.Model.MainCrafter")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
-local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 
 -- Main-crafter spec §3: the menu the details pane's Crafters zone opens (UI/LeadDetails.lua). Blizzard's
 -- context menu: a title, one radio per enabled character that knows the lead's profession, then
@@ -37,11 +37,6 @@ local function craftersOf(prof)
     return a < b
   end)
   return keys
-end
-
-local function nameOf(key)
-  local color = FrameKit.ClassColor(db().characters[key].class)
-  return FrameKit.ClassCode(Greeting.CrafterName(key), color)
 end
 
 -- Whether a click can open the menu: Blizzard's menu API is there and an enabled character knows the
@@ -94,7 +89,7 @@ function MainCrafterMenu.Open(owner, lead)
   menuUtil.CreateContextMenu(owner, function(_, root)
     root:CreateTitle(Localization.Text("Main crafter for %s", lead.profName or ""))
     for _, key in ipairs(craftersOf(prof)) do
-      root:CreateRadio(nameOf(key), isSelected, setSelected, key)
+      root:CreateRadio(LeadText.CrafterCode(key), isSelected, setSelected, key)
     end
     root:CreateRadio(Localization.Text("None"), isSelected, setSelected, false)
   end)

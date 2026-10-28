@@ -54,7 +54,7 @@ local function countsLine(counters, skipZeros)
     local text = Localization.Text("%d %s", part[1], part[2])
     if part[1] ~= 0 then
       local color = COUNTER_COLORS[part[3]]
-      words[#words + 1] = FrameKit.ColorCode(text, color[1], color[2], color[3])
+      words[#words + 1] = FrameKit.ThemeCode(text, color)
     elseif not skipZeros then
       words[#words + 1] = text
     end

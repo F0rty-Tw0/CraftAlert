@@ -103,21 +103,21 @@ local function testStrip()
   local ns = load({})
   local Strip, db = ns.DetailsHeader.Strip, _G["CraftAlertDB"]
   local lead = itemLead()
-  Assert.equal(Strip(lead, db), "Wants " .. LINK_TEXT .. " · " .. gold("Tailoring") .. " · " .. MAGE_CODE .. "Me|r")
+  Assert.equal(Strip(lead), "Wants " .. LINK_TEXT .. " · " .. gold("Tailoring") .. " · " .. MAGE_CODE .. "Me|r")
   lead.crafter = "Bob-Realm"
-  Assert.equal(Strip(lead, db), "Wants " .. LINK_TEXT .. " · " .. gold("Tailoring") .. " · |cffffffffBob|r", "a crafter not in the db: white")
+  Assert.equal(Strip(lead), "Wants " .. LINK_TEXT .. " · " .. gold("Tailoring") .. " · |cffffffffBob|r", "a crafter not in the db: white")
   db.characters["Bob-Realm"] = {}
-  Assert.equal(Strip(lead, db), "Wants " .. LINK_TEXT .. " · " .. gold("Tailoring") .. " · |cffffffffBob|r", "no class saved: white")
+  Assert.equal(Strip(lead), "Wants " .. LINK_TEXT .. " · " .. gold("Tailoring") .. " · |cffffffffBob|r", "no class saved: white")
   lead.profName, lead.crafter = nil, nil
-  Assert.equal(Strip(lead, db), "Wants " .. LINK_TEXT)
+  Assert.equal(Strip(lead), "Wants " .. LINK_TEXT)
   lead.itemLink, lead.recipeName, lead.crafter = nil, "Bolt of Silk", "Me-Realm"
-  Assert.equal(Strip(lead, db), "Wants Bolt of Silk · " .. MAGE_CODE .. "Me|r")
+  Assert.equal(Strip(lead), "Wants Bolt of Silk · " .. MAGE_CODE .. "Me|r")
   local profession = UiFixture.lead(1)
   profession.profName = "Jewelcrafting"
-  Assert.equal(Strip(profession, db), "Wants a " .. gold("Jewelcrafting") .. " crafter")
+  Assert.equal(Strip(profession), "Wants a " .. gold("Jewelcrafting") .. " crafter")
   for _, name in ipairs({ "Alchemy", "Enchanting", "Engineering", "Inscription" }) do
     profession.profName = name
-    Assert.equal(Strip(profession, db), "Wants an " .. gold(name) .. " crafter")
+    Assert.equal(Strip(profession), "Wants an " .. gold(name) .. " crafter")
   end
   Wow.reset()
 end
@@ -133,7 +133,7 @@ local function testStripFrame()
   Assert.same({ text.points, text:GetWidth() }, { { { "LEFT", strip, "LEFT", PAD, 0 } }, 449 - 2 * PAD })
   local dim = ns.Theme.COLORS.textSecondary[4]
   Assert.same(text.textColor, { dim, dim, dim, 1 })
-  Assert.equal(text:GetText(), ns.DetailsHeader.Strip(d.lead, _G["CraftAlertDB"]))
+  Assert.equal(text:GetText(), ns.DetailsHeader.Strip(d.lead))
   -- The header's fill, and a 1 px divider above and below (the mock's borders).
   local fills = {}
   for _, region in ipairs(strip.regions) do

@@ -193,6 +193,34 @@ local function testClassCode()
   Assert.equal(FrameKit.ClassCode("Me", nil), "Me")
 end
 
+-- r, g, b of a class colour; without one, of the fallback Theme colour (its alpha left out).
+local function testClassRGB()
+  local FrameKit = load({})
+  Assert.same({ FrameKit.ClassRGB({ r = 1, g = 0.5, b = 0 }, { 0, 0, 0, 1 }) }, { 1, 0.5, 0 })
+  Assert.same({ FrameKit.ClassRGB(nil, { 0.2, 0.4, 0.6, 0.5 }) }, { 0.2, 0.4, 0.6 })
+end
+
+-- Wrapping text, cut at maxLines lines only when given; a client without SetMaxLines still wraps.
+local function testWrapped()
+  local FrameKit = load({})
+  local parent = rawget(_G, "CreateFrame")("Frame")
+  local text = FrameKit.Wrapped(parent, "GameFontNormal", { 1, 1, 1, 1 }, 2)
+  Assert.same({ text.wordWrap, text.maxLines, text.font, text.textColor }, { true, 2, "GameFontNormal", { 1, 1, 1, 1 } })
+  local spy, capped = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal"), false
+  function spy:SetMaxLines()
+    capped = true
+  end
+  local spyParent = {
+    CreateFontString = function()
+      return spy
+    end,
+  }
+  Assert.equal(FrameKit.Wrapped(spyParent, "GameFontNormal").wordWrap, true)
+  Assert.equal(capped, false, "no maxLines: no cap")
+  spy.SetMaxLines, spy.wordWrap = nil, false
+  Assert.equal(FrameKit.Wrapped(spyParent, "GameFontNormal", nil, 2).wordWrap, true, "no SetMaxLines")
+end
+
 -- The localized name of a class token, from LOCALIZED_CLASS_NAMES_MALE.
 local function testClassName()
   local FrameKit = load({})
@@ -242,6 +270,8 @@ return function()
   testClassName()
   testThemeColourFoldsAlpha()
   testClassCode()
+  testClassRGB()
+  testWrapped()
   testLookCodeGone()
   Wow.reset()
 end

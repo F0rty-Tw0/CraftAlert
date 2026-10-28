@@ -70,6 +70,11 @@ local function testCrafterColor()
   Assert.equal(C({ crafter = "Gone-Realm", recipeName = "Plate Belt" }), "Your alt Gone can craft it")
   Assert.equal(H({ crafter = "Me-Realm", recipeName = "Plate Belt" }), "Wants Plate Belt — you can craft it")
   Assert.equal(C({ crafter = "Me-Realm", recipeName = "Plate Belt" }), "You can craft it")
+  -- CrafterCode: the saved class wins over the fallback; with no class, the fallback, else plain.
+  local code, white = ns.LeadText.CrafterCode, ns.Theme.COLORS.white
+  Assert.equal(code("Alt-Realm", white), MAGE_ALT)
+  Assert.equal(code("Alt-Other", white), "|cffffffffAlt-Other|r")
+  Assert.equal(code("Alt-Other"), "Alt-Other")
   Wow.reset()
 end
 

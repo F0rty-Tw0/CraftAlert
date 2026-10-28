@@ -7,7 +7,8 @@ local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 
 -- Builders the toast, leads window, cards, launcher and settings share: text, colour codes, the
--- customer's class colour, atlas-or-file art, list highlight, and dragging with the position saved
+-- customer's class colour, atlas-or-file art, inset panes and the divider between them, the window
+-- portrait, list highlight, and dragging with the position saved
 -- account-wide in `CraftAlertDB.ui[key]`.
 local FrameKit = {}
 
@@ -32,6 +33,17 @@ function FrameKit.Text(parent, font, color)
   text:SetWordWrap(false)
   if color then
     text:SetTextColor(color[1], color[2], color[3], color[4])
+  end
+  return text
+end
+
+-- Left-aligned text in a Blizzard font object that wraps; cut at `maxLines` lines with "…" when
+-- given (a client without SetMaxLines lets it run on).
+function FrameKit.Wrapped(parent, font, color, maxLines)
+  local text = FrameKit.Text(parent, font, color)
+  text:SetWordWrap(true)
+  if maxLines and text.SetMaxLines then
+    text:SetMaxLines(maxLines)
   end
   return text
 end
@@ -79,6 +91,44 @@ function FrameKit.PaintPanel(texture, atlas)
   texture:SetBlendMode("BLEND")
 
   return true
+end
+
+-- A pane: its atlas in a BACKGROUND texture (pane.bg), then an InsetFrameTemplate border one level
+-- above (pane.art), as WhisperMessenger's panes. The inset's marble Bg would cover the atlas, so it
+-- hides when the atlas paints and stays when it cannot (Classic flavors: no fill but the inset's own).
+function FrameKit.InsetPane(parent, atlas)
+  local pane = _G["CreateFrame"]("Frame", nil, parent)
+  pane.bg = pane:CreateTexture(nil, "BACKGROUND")
+  pane.bg:SetAllPoints(pane)
+  pane.art = _G["CreateFrame"]("Frame", nil, pane, "InsetFrameTemplate")
+  pane.art:SetAllPoints(pane)
+  pane.art:SetFrameLevel(pane:GetFrameLevel() + 1)
+  if FrameKit.PaintPanel(pane.bg, atlas) then
+    pane.art.Bg:Hide()
+  end
+  return pane
+end
+
+-- The 1 px line down the right edge of `leftPane`, a texture of `container`: the pane's inset art
+-- would cover a line of its own.
+function FrameKit.Divider(container, leftPane)
+  local color = Theme.COLORS.divider
+  local divider = container:CreateTexture(nil, "BORDER")
+  divider:SetWidth(1)
+  divider:SetPoint("TOPLEFT", leftPane, "TOPRIGHT", 0, 0)
+  divider:SetPoint("BOTTOMLEFT", leftPane, "BOTTOMRIGHT", 0, 0)
+  divider:SetColorTexture(color[1], color[2], color[3], color[4])
+  return divider
+end
+
+-- `icon` in a ButtonFrameTemplate's portrait; a template without SetPortraitToAsset gets the texture
+-- set directly, as WhisperMessenger does (RetailChrome.lua:25-34, WM).
+function FrameKit.Portrait(frame, icon)
+  if type(frame.SetPortraitToAsset) == "function" then
+    frame:SetPortraitToAsset(icon)
+  else
+    frame.PortraitContainer.portrait:SetTexture(icon)
+  end
 end
 
 -- The quest-log hover highlight over the whole of `button`, shown by the client while hovered.
@@ -170,15 +220,18 @@ function FrameKit.ClassCode(name, classColor, fallback)
   return name
 end
 
+-- r, g, b of a class colour (a RAID_CLASS_COLORS entry, or nil), else of the Theme colour `fallback`.
+function FrameKit.ClassRGB(classColor, fallback)
+  if classColor then
+    return classColor.r, classColor.g, classColor.b
+  end
+  return fallback[1], fallback[2], fallback[3]
+end
+
 -- Colours a customer's name by class, or in the plain text colour when the class is unknown.
 function FrameKit.PaintName(text, guid)
-  local color = FrameKit.GuidClassColor(guid)
-  if color then
-    text:SetTextColor(color.r, color.g, color.b, 1)
-    return
-  end
-  local plain = Theme.COLORS.textPrimary
-  text:SetTextColor(plain[1], plain[2], plain[3], plain[4])
+  local r, g, b = FrameKit.ClassRGB(FrameKit.GuidClassColor(guid), Theme.COLORS.textPrimary)
+  text:SetTextColor(r, g, b, 1)
 end
 
 local function uiTable()

@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
+local WindowSize = ns.WindowSize or require("CraftAlert.UI.WindowSize")
 
 -- Spec B.2: a size grip in a window's bottom-right corner. Dragging it sizes a translucent ghost
 -- outline (the client's StartSizing does the dragging, no OnUpdate) while the window fades out of
@@ -15,9 +16,6 @@ local GRIP_SIZE = 16
 local DRAG_ALPHA = 0.08
 local FILL = { 0.10, 0.09, 0.08, 0.20 }
 local EDGE = { 1, 1, 1, 0.85 }
-
-local max = math.max
-local min = math.min
 
 ---@type table|nil
 local resizing = nil -- the window being resized, nil when none is
@@ -115,8 +113,8 @@ function GhostResize.Attach(frame, size, onStopped)
     resizing = nil
     ghost:StopMovingOrSizing()
     local screen = _G["UIParent"]
-    local width = max(min(ghost:GetWidth(), screen:GetWidth()), size.minWidth)
-    local height = max(min(ghost:GetHeight(), screen:GetHeight()), size.minHeight)
+    local width = WindowSize.Clamp(ghost:GetWidth(), size.minWidth, screen:GetWidth())
+    local height = WindowSize.Clamp(ghost:GetHeight(), size.minHeight, screen:GetHeight())
     ghost:Hide()
     frame:SetAlpha(alpha)
     frame:SetSize(width, height)

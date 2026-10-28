@@ -14,11 +14,14 @@ local max = math.max
 local min = math.min
 local type = type
 
--- The saved number, else the default; at least the minimum and at most the screen's (the Schema
--- keeps any finite number).
-local function clamped(saved, default, minimum, screen)
-  local value = type(saved) == "number" and saved or default
+-- `value` at most the screen's and at least the minimum (the minimum wins on a smaller screen).
+function WindowSize.Clamp(value, minimum, screen)
   return max(min(value, screen), minimum)
+end
+
+-- The saved number, else the default, clamped (the Schema keeps any finite number).
+local function clamped(saved, default, minimum, screen)
+  return WindowSize.Clamp(type(saved) == "number" and saved or default, minimum, screen)
 end
 
 -- Sets the resize bounds, then sizes the frame to its saved size (a saved size under the minimum

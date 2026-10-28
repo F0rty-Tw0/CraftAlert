@@ -127,9 +127,8 @@ end
 
 -- A wrapping text block as wide as the controls.
 local function wrapped(column, font)
-  local text = FrameKit.Text(column.parent, font)
+  local text = FrameKit.Wrapped(column.parent, font)
   Column.Span(column, text)
-  text:SetWordWrap(true)
   return text
 end
 
