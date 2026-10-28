@@ -264,8 +264,7 @@ function RecipeList.Create(column)
   list.onlyCurrent = createOnlyCurrent(column, onlyCurrent)
   list.recipes = Controls.List(column, RECIPE_ROWS, createRecipeRow)
   local frame, padding = list.recipes.frame, Theme.LAYOUT.PADDING
-  list.empty = FrameKit.Text(frame, Theme.FONTS.body, Theme.COLORS.textSecondary)
-  list.empty:SetWordWrap(true)
+  list.empty = FrameKit.Wrapped(frame, Theme.FONTS.body, Theme.COLORS.textSecondary)
   list.empty:SetPoint("TOPLEFT", frame, "TOPLEFT", padding, -padding)
   list.empty:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -padding, -padding)
   -- A mute made elsewhere (the profession window) shows when the index rebuilds; the order stays.

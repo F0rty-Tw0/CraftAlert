@@ -26,41 +26,14 @@ local LeadsView = {}
 
 local floor = math.floor
 
--- A pane: its atlas in a BACKGROUND texture, then the inset's border one level above. The inset's
--- marble Bg would cover the atlas, so it hides when the atlas paints and stays when it cannot
--- (Classic flavors: no fill but the inset's own).
-local function createPane(parent, atlas)
-  local pane = _G["CreateFrame"]("Frame", nil, parent)
-  pane.bg = pane:CreateTexture(nil, "BACKGROUND")
-  pane.bg:SetAllPoints(pane)
-  pane.art = _G["CreateFrame"]("Frame", nil, pane, "InsetFrameTemplate")
-  pane.art:SetAllPoints(pane)
-  pane.art:SetFrameLevel(pane:GetFrameLevel() + 1)
-  if FrameKit.PaintPanel(pane.bg, atlas) then
-    pane.art.Bg:Hide()
-  end
-  return pane
-end
-
-local function createDivider(view)
-  local color, listPane = Theme.COLORS.divider, view.listPane
-  local divider = view.frame:CreateTexture(nil, "BORDER")
-  divider:SetWidth(1)
-  divider:SetPoint("TOPLEFT", listPane, "TOPRIGHT", 0, 0)
-  divider:SetPoint("BOTTOMLEFT", listPane, "BOTTOMRIGHT", 0, 0)
-  divider:SetColorTexture(color[1], color[2], color[3], color[4])
-  return divider
-end
-
 -- A frame over the whole pane, at the details' level, holding the centred, wrapping text.
 local function createEmpty(pane)
   local empty = _G["CreateFrame"]("Frame", nil, pane)
   empty:SetAllPoints(pane)
   empty:SetFrameLevel(pane:GetFrameLevel() + 2)
-  local text = FrameKit.Text(empty, Theme.FONTS.body, Theme.COLORS.textSecondary)
+  local text = FrameKit.Wrapped(empty, Theme.FONTS.body, Theme.COLORS.textSecondary)
   text:SetPoint("LEFT", pane, "LEFT", Theme.LAYOUT.PANE_PADDING, 0)
   text:SetPoint("RIGHT", pane, "RIGHT", -Theme.LAYOUT.PANE_PADDING, 0)
-  text:SetWordWrap(true)
   text:SetJustifyH("CENTER")
   text:SetText(Localization.Text("No leads right now. Requests you can craft show up here."))
   empty.text = text
@@ -145,7 +118,7 @@ function LeadsView.New(parent, opts)
   end)
   view.frame = frame
   view.strip = LedgerStrip.New(frame, parent)
-  view.listPane = createPane(frame, Theme.ART.PANEL_BACKGROUND)
+  view.listPane = FrameKit.InsetPane(frame, Theme.ART.PANEL_BACKGROUND)
   view.listPane:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -Theme.LAYOUT.LEDGER_HEIGHT)
   view.listPane:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
   -- In the band over the list, at its right (in the strip: it hides with it, in an instance); the
@@ -153,11 +126,11 @@ function LeadsView.New(parent, opts)
   view.clearAll = ClearAllLink.Build(view.strip)
   view.clearAll:SetPoint("BOTTOMRIGHT", view.listPane, "TOPRIGHT", -Theme.LAYOUT.PADDING, 0)
   LedgerStrip.SetLeftEdge(view.strip, view.listPane)
-  view.detailsPane = createPane(frame, Theme.ART.WIDE_PANEL_BACKGROUND)
+  view.detailsPane = FrameKit.InsetPane(frame, Theme.ART.WIDE_PANEL_BACKGROUND)
   -- off-scale: the 1 px divider between the panes.
   view.detailsPane:SetPoint("TOPLEFT", view.listPane, "TOPRIGHT", 1, 0)
   view.detailsPane:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
-  view.divider = createDivider(view)
+  view.divider = FrameKit.Divider(frame, view.listPane)
   view.list = LeadsList.New(view.listPane, function(row)
     view.selectedId = row.lead.id
     LeadsView.Refresh(view, view.leads)

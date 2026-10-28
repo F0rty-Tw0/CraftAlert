@@ -42,8 +42,6 @@ local FALLBACK_PINK = { 1, 0.5, 1, 1 }
 local EDGE, ICON_GAP, NAME_GAP = 6, 10, 2
 local MARK_GAP = Theme.LAYOUT.SPACE.XS
 local ANCHOR = "ANCHOR_RIGHT"
--- A customer of unknown class: white on the row (spec D6), as a RAID_CLASS_COLORS entry.
-local NO_CLASS = { r = 1, g = 1, b = 1 }
 
 local function now()
   return _G["GetTime"]()
@@ -221,8 +219,9 @@ function LeadRow.Show(row, lead)
   row.icon:SetTexture(iconOf(lead))
   RowArt.PaintDot(row.dot, dotColor(lead))
   row.name:SetText(tostring(lead.customer))
-  local class = FrameKit.GuidClassColor(lead.guid) or NO_CLASS
-  row.name:SetTextColor(class.r, class.g, class.b, 1)
+  -- A customer of unknown class: white on the row (spec D6).
+  local r, g, b = FrameKit.ClassRGB(FrameKit.GuidClassColor(lead.guid), Theme.COLORS.white)
+  row.name:SetTextColor(r, g, b, 1)
   row.age:SetText(LeadText.Age(_G["time"]() - lead.time))
   row.what:SetText(LeadText.What(lead))
   placeMarks(row, lead)

@@ -17,9 +17,8 @@ local LINE_GAP = 3
 -- A wrapping line. Its explicit width lets GetStringHeight measure it before the first layout.
 local function wrapped(frame, font)
   local layout = Theme.LAYOUT
-  local text = FrameKit.Text(frame, font)
+  local text = FrameKit.Wrapped(frame, font)
   text:SetWidth(layout.TOAST_WIDTH - 2 * layout.PADDING)
-  text:SetWordWrap(true)
 
   return text
 end

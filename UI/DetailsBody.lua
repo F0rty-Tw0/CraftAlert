@@ -105,13 +105,9 @@ local function createBubble(sections, key)
   bubble:SetBackdropColor(unpack(spec.center))
   bubble:SetBackdropBorderColor(unpack(spec.border))
   LinkHover.Attach(bubble, nil)
-  local text = FrameKit.Text(bubble, FONTS.title)
+  local text = FrameKit.Wrapped(bubble, FONTS.title, nil, BUBBLE_LINES)
   text:SetPoint("TOPLEFT", bubble, "TOPLEFT", BUBBLE_PAD_X, -BUBBLE_PAD_Y)
-  text:SetWordWrap(true)
   text:SetJustifyV("TOP")
-  if text.SetMaxLines then
-    text:SetMaxLines(BUBBLE_LINES)
-  end
   sections.labels[key], sections.bubbles[key], sections.texts[key] = label, bubble, text
 end
 

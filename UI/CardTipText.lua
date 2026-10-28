@@ -44,14 +44,6 @@ local function instructions(tip, lines)
   end
 end
 
--- r, g, b of a class colour (a RAID_CLASS_COLORS entry), else of `fallback` (a Theme colour).
-local function rgbOf(color, fallback)
-  if color then
-    return color.r, color.g, color.b
-  end
-  return fallback[1], fallback[2], fallback[3]
-end
-
 -- A line in a Theme colour (a table with an alpha slot), wrapping.
 local function stateLine(tip, text, color)
   tip:AddLine(text, color[1], color[2], color[3], true)
@@ -61,7 +53,7 @@ end
 -- (green). The class name needs the token anyway, so it is read once, with or without a colour table.
 function CardTipText.Customer(tip, lead)
   local token = FlavorCompat.ClassOf(lead.guid)
-  tip:SetText(tostring(lead.customer), rgbOf(FrameKit.ClassColor(token), Theme.COLORS.gold))
+  tip:SetText(tostring(lead.customer), FrameKit.ClassRGB(FrameKit.ClassColor(token), Theme.COLORS.gold))
   local className = FrameKit.ClassName(token)
   if className then
     white(tip, className)
@@ -97,7 +89,7 @@ function CardTipText.Crafters(tip, lead)
   title(tip, Localization.Text("Crafters"))
   local grey = Theme.COLORS.grey
   for _, crafter in ipairs(CardBody.Crafters(lead)) do
-    local r, g, b = rgbOf(crafter.color, Theme.COLORS.white)
+    local r, g, b = FrameKit.ClassRGB(crafter.color, Theme.COLORS.white)
     tip:AddDoubleLine(crafter.name, crafter.rank or "", r, g, b, grey[1], grey[2], grey[3])
   end
   if lead.crafter then
@@ -135,7 +127,7 @@ function CardTipText.Dismiss(tip)
 end
 
 local function customerColor(lead, fallback)
-  return rgbOf(FrameKit.GuidClassColor(lead.guid), fallback)
+  return FrameKit.ClassRGB(FrameKit.GuidClassColor(lead.guid), fallback)
 end
 
 -- Row-chat-tooltip spec: "[HH:MM] [Channel] [Name]: message", the customer in class colour, the
@@ -178,7 +170,7 @@ local MAX_CRAFTER_LINES = 7
 -- line. WM draws every line white, so colour comes only from the codes. A pure function, no tooltip.
 function CardTipText.InfoLines(lead)
   local gold, grey = Theme.COLORS.gold, Theme.COLORS.grey
-  local lines = { FrameKit.ColorCode(LeadText.Headline(lead), gold[1], gold[2], gold[3]) }
+  local lines = { FrameKit.ThemeCode(LeadText.Headline(lead), gold) }
   local matched = CardBody.MatchedText(lead, Theme.COLORS.white)
   if matched then
     lines[#lines + 1] = Localization.Text("Matched: %s", matched)
@@ -188,7 +180,7 @@ function CardTipText.InfoLines(lead)
       break
     end
     local line = FrameKit.ClassCode(crafter.name, crafter.color)
-    lines[#lines + 1] = crafter.rank and (line .. " " .. FrameKit.ColorCode(crafter.rank, grey[1], grey[2], grey[3])) or line
+    lines[#lines + 1] = crafter.rank and (line .. " " .. FrameKit.ThemeCode(crafter.rank, grey)) or line
   end
   if lead.message then
     lines[#lines + 1] = chatText(lead)

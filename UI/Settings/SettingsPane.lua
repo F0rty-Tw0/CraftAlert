@@ -34,32 +34,6 @@ local function pageById(id)
   return nil
 end
 
--- A pane as the leads view's (UI/LeadsView.lua createPane): its atlas in a BACKGROUND texture, the
--- inset's border one level above, its marble Bg hidden when the atlas paints.
-local function createPane(parent, atlas)
-  local frame = _G["CreateFrame"]("Frame", nil, parent)
-  frame.bg = frame:CreateTexture(nil, "BACKGROUND")
-  frame.bg:SetAllPoints(frame)
-  frame.art = _G["CreateFrame"]("Frame", nil, frame, "InsetFrameTemplate")
-  frame.art:SetAllPoints(frame)
-  frame.art:SetFrameLevel(frame:GetFrameLevel() + 1)
-  if FrameKit.PaintPanel(frame.bg, atlas) then
-    frame.art.Bg:Hide()
-  end
-  return frame
-end
-
--- The 1 px line in the gap between the panes, a region of the container: the nav's inset art
--- would cover it.
-local function createDivider(container, nav)
-  local color = Theme.COLORS.divider
-  local divider = container:CreateTexture(nil, "BORDER")
-  divider:SetWidth(1)
-  divider:SetPoint("TOPLEFT", nav, "TOPRIGHT", 0, 0)
-  divider:SetPoint("BOTTOMLEFT", nav, "BOTTOMRIGHT", 0, 0)
-  divider:SetColorTexture(color[1], color[2], color[3], color[4])
-end
-
 -- A page scrolls (UI/ScrollView.lua, WhisperMessenger's scroll view) in a box PANE_PADDING
 -- in from the pane on every side, above its inset art: the bar hugs the box's right, inside the
 -- inset border, as WhisperMessenger's. The page draws on the view's content, the box less the
@@ -138,15 +112,15 @@ local function build(host)
   local layout, art = Theme.LAYOUT, Theme.ART
   local container = _G["CreateFrame"]("Frame", nil, host)
   container:Hide()
-  local nav = createPane(container, art.PANEL_BACKGROUND)
+  local nav = FrameKit.InsetPane(container, art.PANEL_BACKGROUND)
   nav:SetPoint("TOPLEFT", container, "TOPLEFT", 0, 0)
   nav:SetPoint("BOTTOMLEFT", container, "BOTTOMLEFT", 0, 0)
   nav:SetWidth(layout.LIST_WIDTH)
-  local right = createPane(container, art.WIDE_PANEL_BACKGROUND)
+  local right = FrameKit.InsetPane(container, art.WIDE_PANEL_BACKGROUND)
   -- off-scale: the 1 px divider between the panes.
   right:SetPoint("TOPLEFT", nav, "TOPRIGHT", 1, 0)
   right:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", 0, 0)
-  createDivider(container, nav)
+  FrameKit.Divider(container, nav)
   pane = { container = container, nav = nav, right = right, content = {}, buttons = {}, selected = nil }
   for _, name in ipairs(BUILT_IN) do
     pages[#pages + 1] = ns[name] or require("CraftAlert.UI.Settings." .. name)

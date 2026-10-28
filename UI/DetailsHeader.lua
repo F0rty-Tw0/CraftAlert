@@ -138,12 +138,8 @@ local function createStrip(details)
   fill:SetColorTexture(unpack(Theme.COLORS.headerFill))
   divider(strip, "TOP")
   divider(strip, "BOTTOM")
-  local text = FrameKit.Text(strip, Theme.FONTS.body, PLAIN_COLOR)
+  local text = FrameKit.Wrapped(strip, Theme.FONTS.body, PLAIN_COLOR, STRIP_LINES)
   text:SetPoint("LEFT", strip, "LEFT", padding, 0)
-  text:SetWordWrap(true)
-  if text.SetMaxLines then
-    text:SetMaxLines(STRIP_LINES)
-  end
   LinkHover.Attach(strip, nil)
   details.strip, details.stripText = strip, text
 end
