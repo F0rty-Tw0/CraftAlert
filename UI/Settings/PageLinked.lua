@@ -31,6 +31,7 @@ local function textBox(column, label)
   local layout = Theme.LAYOUT
   local row = Controls.Bar(column, layout.INPUT_HEIGHT)
   row.settingsLabel = label
+  -- off-scale: the box starts 5 px in, clear of the template art.
   local box = _G["CreateFrame"]("EditBox", nil, row, "InputBoxTemplate")
   box:SetPoint("TOPLEFT", row, "TOPLEFT", 5, 0)
   box:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
