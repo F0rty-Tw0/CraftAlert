@@ -80,7 +80,7 @@ end
 -- token and not by a link name, and no token is a wordIndex word or an enchant slot word
 -- (→ "", "alias" | "full"); else the why tokens and whether only a slot word kept the hit.
 local function reference42(index, records, slots, Tokenizer, count)
-  local padded, best, hits = " " .. Tokenizer.normalized .. " ", 0, {}
+  local padded, best, hits = " " .. Tokenizer.Normalized() .. " ", 0, {}
   local function add(record, length, why)
     if length > best then
       best, hits = length, {}

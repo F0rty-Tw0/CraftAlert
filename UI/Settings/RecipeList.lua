@@ -155,7 +155,7 @@ function RecipeList.Create(column)
   -- One index rebuild when any of the recipes changed, then the list again.
   local function afterMute(changed)
     if changed > 0 then
-      Index.RequestRebuild("mute")
+      Index.RequestRebuildSoon("mute")
     end
     render()
   end
@@ -214,7 +214,7 @@ function RecipeList.Create(column)
     row.name:SetPoint("LEFT", row.icon, "RIGHT", Theme.LAYOUT.PADDING, 0)
     row.mute = RecipeMute.Create(row, function()
       row.item.recipe.muted = not row.item.recipe.muted or nil
-      Index.RequestRebuild("mute")
+      Index.RequestRebuildSoon("mute")
       repaint()
     end)
     -- On a narrow page a long name is cut short of the speaker.

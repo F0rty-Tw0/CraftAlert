@@ -250,8 +250,56 @@ local function testRunSlicesCoroutineWork()
   Assert.equal(cancelled, 1)
 end
 
+-- Run → { ms, steps }: by onDone it holds the CPU ms of every resume and the step count; a job
+-- that onDone restarts under its own name runs on instead of being taken for done.
+local function testRunRestartedFromOnDoneRunsOn()
+  local Slicer = newSlicer()
+  local seen, restarts, finished = nil, 0, 0
+  local run
+  local function start()
+    run = Slicer.Run("index", function(pause)
+      for _ = 1, 6 do
+        Wow.clock.profile = Wow.clock.profile + 1
+        pause(8) -- yields on every second ms: 2 + 2 + 2 ms, then a step that returns
+      end
+      return "built"
+    end, function(result)
+      seen = { result = result, ms = run.ms, steps = run.steps }
+      finished = finished + 1
+      if restarts == 0 then
+        restarts = 1
+        start()
+      end
+    end)
+  end
+  start()
+  Slicer.Drain()
+  Assert.equal(finished, 2, "the job onDone started ran too")
+  Assert.falsy(Slicer.IsRunning("index"))
+  Assert.same(seen, { result = "built", ms = 6, steps = 4 })
+end
+
+-- A step that restarts its own job and then raises is reported; the replacement runs on.
+local function testRaisingStepKeepsItsReplacement()
+  local Slicer = newSlicer()
+  local reported = captureErrors()
+  local log = {}
+  local bad = { cancels = 0 }
+  function bad.step()
+    Slicer.Start("A", costJob(log, "new", { 1, 1 }))
+    error("boom", 0)
+  end
+  Slicer.Start("A", bad)
+
+  Wow.runTimers()
+  Assert.same(reported, { "boom" })
+  Assert.same(log, { "new", "new" }, "the replacement finished")
+end
+
 return function()
   testRunSlicesCoroutineWork()
+  testRunRestartedFromOnDoneRunsOn()
+  testRaisingStepKeepsItsReplacement()
   testBudgetStopsAfterTwoOneMsSteps()
   testSlowStepIsPaidBackByIdleTicks()
   testJobsAlternate()

@@ -28,7 +28,7 @@ local function load(flavor)
       return itemID, "type", "subtype", item[1], 0, item[2], item[3]
     end,
   })
-  for _, path in ipairs({ "Core.FlavorCompat", "Core.Constants", "Core.EventRouter", "Core.Slicer", "Core.PlayerName" }) do
+  for _, path in ipairs({ "Core.FlavorCompat", "Core.TableKit", "Core.Constants", "Core.EventRouter", "Core.Slicer", "Core.PlayerName" }) do
     Fresh.require(path)
   end
   for _, path in ipairs({
@@ -186,7 +186,7 @@ local function testIndexes()
   -- Class-armor spec §4 rule 1 tags; the extra slang word takes its target's tag.
   Assert.equal(index.armorTags.cuffs, "slot")
   Assert.equal(index.armorTags.plate, "type")
-  -- Phrases are normalized like Tokenizer.normalized: runs of non-word characters -> one space.
+  -- Phrases are normalized like Tokenizer.Normalized(): runs of non-word characters -> one space.
   local enchant = index.nameIndex.enchant[1]
   Assert.equal(enchant.phrase, "enchant bracer minor health")
   Assert.equal(enchant.full, true)
@@ -359,6 +359,34 @@ local function testCoalescing()
   Assert.equal(builds.n, 2)
 end
 
+-- Mute clicks: RequestRebuildSoon builds once 0.3 s after the last call (each call moves the
+-- deadline, one timer pending); a RequestRebuild in between serves it at once.
+local function testRebuildSoon()
+  local Index, Defaults = load()
+  configure(Index, Defaults)
+  local builds = countBuilds(Index)
+  for _, at in ipairs({ 0, 0.1, 0.2 }) do
+    Wow.clock.gettime = at
+    Index.RequestRebuildSoon("mute")
+  end
+  Assert.same({ #Wow.timers, Wow.timers[1].delay }, { 1, 0.3 }, "one timer, armed by the first click")
+  Wow.clock.gettime = 0.3
+  table.remove(Wow.timers, 1).fn()
+  Assert.equal(builds.n, 0, "the last click moved the deadline")
+  Assert.equal(#Wow.timers, 1, "re-armed for the rest")
+  Wow.clock.gettime = 0.5
+  Wow.runTimers()
+  Assert.equal(builds.n, 1, "three clicks, one build")
+  Assert.equal(Index.lastReason, "mute")
+
+  Index.RequestRebuildSoon("mute")
+  Index.RequestRebuild("read")
+  Wow.clock.gettime = 1
+  Wow.runTimers()
+  Assert.equal(builds.n, 2, "the read built at once and served the pending mute")
+  Assert.equal(Index.lastReason, "read")
+end
+
 local function regenRegistered()
   for _, frame in ipairs(Wow.frames) do
     if frame:IsEventRegistered("PLAYER_REGEN_ENABLED") then
@@ -458,6 +486,7 @@ return function()
   testRebuild()
   testFailingCallback()
   testCoalescing()
+  testRebuildSoon()
   testCombatDeferral()
   testCombatBeforeFirstTick()
   testAddPending()

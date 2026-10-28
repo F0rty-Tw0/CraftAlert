@@ -59,7 +59,6 @@ Tokenizer.linkIDs = linkIDs
 Tokenizer.linkTails = linkTails
 Tokenizer.itemCount = 0
 Tokenizer.linkNameCount = 0
-Tokenizer.normalized = ""
 
 -- Per-call state, module-level so the helpers below need no closures.
 local count, items, names = 0, 0, 0
@@ -193,11 +192,9 @@ local function finish()
   lastCount, lastItems, lastNames = count, items, names
   Tokenizer.itemCount = items
   Tokenizer.linkNameCount = names
-  Tokenizer.normalized = concat(tokens, " ", 1, count)
 end
 
--- Fills the buffers from lowercase text; returns the token count. `normalized` is the tokens
--- joined by one space: every run of non-word characters collapsed, no edge spaces.
+-- Fills the buffers from lowercase text; returns the token count.
 function Tokenizer.Tokenize(lower)
   count, items, names, linkEnd, line = 0, 0, 0, nil, lower
   local afterEnd = #lower + 1
@@ -246,6 +243,12 @@ function Tokenizer.Tokenize(lower)
   end
   finish()
   return count
+end
+
+-- The last line's tokens joined by one space: every run of non-word characters collapsed, no edge
+-- spaces. Built per call, so a line that never asks (most pass no phrase token) pays no copy.
+function Tokenizer.Normalized()
+  return concat(tokens, " ", 1, count)
 end
 
 -- §6.4 cue adjacency: whether anything but spaces (punctuation, an escape, a link) sits

@@ -6,6 +6,7 @@ end
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
+local TableKit = ns.TableKit or require("CraftAlert.Core.TableKit")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local ItemKeywords = ns.ItemKeywords or require("CraftAlert.Model.ItemKeywords")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
@@ -27,14 +28,9 @@ local pairs = pairs
 local ipairs = ipairs
 local type = type
 local lower = string.lower
-local sort = table.sort
-local create = coroutine.create
-local resume = coroutine.resume
-local yield = coroutine.yield
-local status = coroutine.status
 
 local JOB = "index"
-local PAUSE_EVERY = 8 -- pause weight per clock read
+local SOON_SECONDS = 0.3 -- quiet after the last RequestRebuildSoon before its build
 
 local function append(map, key, value)
   local list = map[key]
@@ -144,10 +140,8 @@ local function addCharacter(index, ctx, key, character, pause)
   for profKey in pairs(character.professions or {}) do
     ctx.professions[profKey] = true
   end
-  local recipes, keys = character.recipes or {}, {}
-  for recipeKey in pairs(recipes) do
-    keys[#keys + 1] = recipeKey
-  end
+  local recipes = character.recipes or {}
+  local keys = TableKit.KeysOf(recipes)
   local added, stored, listening = false, {}, {}
   for i = 1, #keys do
     local recipeKey = keys[i]
@@ -218,14 +212,6 @@ local function wordList(words)
   return list, set
 end
 
-local function copySet(map)
-  local copy = {}
-  for key, value in pairs(map or {}) do
-    copy[key] = value
-  end
-  return copy
-end
-
 local function newIndex(settings, opts)
   local intentList, intentSet = wordList(settings.intentWords)
   local _, blockerSet = wordList(settings.blockerWords)
@@ -236,7 +222,7 @@ local function newIndex(settings, opts)
     wordlessGear = {}, -- group -> true: a worn item without words (profession gear), read by WordGroups.Build
     professionWords = {},
     mutedProfessions = {}, -- characterKey -> { professionKey -> true }: every stored recipe muted
-    channelEnabled = copySet(settings.channels),
+    channelEnabled = TableKit.CopyMap(settings.channels or {}),
     intentList = intentList,
     intentSet = intentSet,
     blockerSet = blockerSet,
@@ -248,15 +234,6 @@ local function newIndex(settings, opts)
     size = 0,
     crafterCount = 0,
   }
-end
-
-local function sortedKeys(map)
-  local keys = {}
-  for key in pairs(map) do
-    keys[#keys + 1] = key
-  end
-  sort(keys)
-  return keys
 end
 
 -- Pure: reads db and settings, writes neither. opts = { professionOrder = fn → key[],
@@ -271,7 +248,7 @@ function Index.Build(db, settings, opts)
   local characters = db.characters or {}
   local crafters = {}
   -- Sorted, so entry lists come out in the same order on every build.
-  for _, key in ipairs(sortedKeys(characters)) do
+  for _, key in ipairs(TableKit.SortedKeys(characters)) do
     local character = characters[key]
     if character and character.enabled ~= false and addCharacter(index, ctx, key, character, pause) then
       crafters[key] = true
@@ -298,7 +275,9 @@ local current = nil
 local rebuilt = {}
 local pendingNames = {}
 local pendingSet = {} -- lowercase name -> the client's spelling
-local generation = 0 -- sliced jobs started; tells the running job whether it was replaced
+local soonReason = nil -- the reason of a RequestRebuildSoon not yet served, else nil
+local soonAt = 0 -- GetTime() at which it is due
+local soonTimerPending = false
 
 Index.lastBuildMs = nil -- CPU ms of the last build: the sum of its steps
 Index.lastBuildSteps = nil -- Slicer steps of the last build; 1 for a synchronous one
@@ -340,6 +319,7 @@ function Index.Rebuild()
     return nil
   end
   Slicer.Cancel(JOB)
+  soonReason = nil
   local clock = _G["debugprofilestop"]
   local started = clock()
   local index = Index.Build(context.db, context.db.settings, buildOpts(context.opts))
@@ -347,57 +327,58 @@ function Index.Rebuild()
   return index
 end
 
--- The sliced build: each step resumes the coroutine, which yields from pause once
--- Slicer.BUDGET_MS has passed since that resume (the clock is read once the weights passed to
--- pause add up to PAUSE_EVERY, so a run of heavy loop bodies reads it after each).
--- Pause runs only in plain Lua loop bodies: never in a sort comparator, a gsub callback, a
--- metamethod or under pcall (Lua 5.1 cannot yield across those). An abandoned coroutine (the
--- job restarted or cancelled) is never resumed, so StatSlot.Begin's reset holds for the next.
--- A step error carries the coroutine's stack, which the Slicer's pcall can't see.
+-- The sliced build runs through Slicer.Run, which yields at the pause points and carries a step
+-- error's coroutine stack. An abandoned coroutine (the job restarted or cancelled) is never
+-- resumed, so StatSlot.Begin's reset holds for the next. A subscriber may request a rebuild
+-- from swapIn: the new job replaces this one under the same name and runs on.
 local function startJob(db, opts)
-  generation = generation + 1
-  local mine = generation
-  local clock = _G["debugprofilestop"]
-  local resumedAt, work, spent, steps = 0, 0, 0, 0
-  local function pause(weight)
-    work = work + (weight or 1)
-    if work >= PAUSE_EVERY then
-      work = 0
-      if clock() - resumedAt >= Slicer.BUDGET_MS then
-        yield()
-      end
-    end
-  end
-  local thread = create(function()
+  local run
+  run = Slicer.Run(JOB, function(pause)
     return Index.Build(db, db.settings, buildOpts(opts, pause))
+  end, function(index)
+    swapIn(index, run.ms, run.steps)
   end)
-  Slicer.Start(JOB, {
-    step = function()
-      resumedAt = clock()
-      local ok, result = resume(thread)
-      spent, steps = spent + (clock() - resumedAt), steps + 1
-      if not ok then
-        local stack = _G["debugstack"]
-        error(type(stack) == "function" and tostring(result) .. "\n" .. stack(thread) or result, 0)
-      end
-      if status(thread) ~= "dead" then
-        return false
-      end
-      swapIn(result, spent, steps)
-      -- A subscriber that requested a rebuild replaced this job under the same name; false
-      -- keeps the Slicer from removing the new one as done.
-      return generation == mine
-    end,
-  })
 end
 
 -- Starts the sliced build, or restarts it: the db may have changed under a half-built index,
 -- so a request during a build drops that work. The old index stays live until a build ends.
+-- It also serves a pending RequestRebuildSoon.
 function Index.RequestRebuild(reason)
   Index.lastReason = reason
+  soonReason = nil
   if context ~= nil then
     startJob(context.db, context.opts)
   end
+end
+
+local armSoon
+
+local function onSoonTimer()
+  soonTimerPending = false
+  armSoon()
+end
+
+-- One pending timer: it fires at the deadline set by the latest RequestRebuildSoon, or re-arms
+-- for the rest.
+armSoon = function()
+  if soonTimerPending or soonReason == nil then
+    return
+  end
+  local remaining = soonAt - _G["GetTime"]()
+  if remaining <= 0 then
+    Index.RequestRebuild(soonReason)
+    return
+  end
+  soonTimerPending = true
+  _G["C_Timer"].After(remaining, onSoonTimer)
+end
+
+-- RequestRebuild once SOON_SECONDS passed without another call, so a run of mute clicks costs
+-- one build of the whole index, not one per click.
+function Index.RequestRebuildSoon(reason)
+  soonReason = reason
+  soonAt = _G["GetTime"]() + SOON_SECONDS
+  armSoon()
 end
 
 -- §5.3 Classic session learn: a recipe name as the client spells it, matched by its lowercase

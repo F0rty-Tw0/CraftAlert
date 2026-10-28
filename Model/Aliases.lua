@@ -31,7 +31,7 @@ local MIN_JOIN_LETTERS = 6
 local MIN_SPLIT_SIDE = 2
 
 -- "enchant bracer - minor health" -> "enchant bracer minor health", { words }; the form
--- Tokenizer.normalized uses. nil for a name without word characters.
+-- Tokenizer.Normalized() uses. nil for a name without word characters.
 function Aliases.Normalize(name)
   local words = {}
   for word in gmatch(name, Tokenizer.WORD) do

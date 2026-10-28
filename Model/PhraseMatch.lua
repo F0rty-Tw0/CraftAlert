@@ -325,7 +325,7 @@ end
 -- padded and tokenAt for the line. Run fills them at the first token that starts a phrase
 -- or a join pair, so a line with none pays neither the copy nor the walk.
 local function fillSpans()
-  padded = " " .. Tokenizer.normalized .. " "
+  padded = " " .. Tokenizer.Normalized() .. " "
   local at = 2 -- position of token 1 in padded
   for i = 1, tokenCount do
     tokenAt[i] = at

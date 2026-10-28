@@ -44,7 +44,7 @@ local function testTypedBrackets()
   local count = Tokenizer.Tokenize(Tokenizer.Scan("LF [Enchant Bracer - Minor Health]"))
   Assert.equal(count, 5)
   Assert.same(tokensOf(Tokenizer, count), { "lf", "enchant", "bracer", "minor", "health" })
-  Assert.equal(Tokenizer.normalized, "lf enchant bracer minor health")
+  Assert.equal(Tokenizer.Normalized(), "lf enchant bracer minor health")
   Assert.equal(Tokenizer.itemCount, 0)
   Assert.equal(Tokenizer.linkNameCount, 0)
 end
@@ -60,7 +60,7 @@ local function testLinkShapes()
     .. " or |cff71d5ff|Hspell:7418|h[Enchant Bracer - Minor Health]|h|r pst"
   local count = Tokenizer.Tokenize(Tokenizer.Scan(line))
   Assert.same(tokensOf(Tokenizer, count), { "wtb", "and", "or", "or", "pst" })
-  Assert.equal(Tokenizer.normalized, "wtb and or or pst")
+  Assert.equal(Tokenizer.Normalized(), "wtb and or or pst")
   Assert.equal(Tokenizer.itemCount, 2)
   Assert.same({ unpack(Tokenizer.itemIDs, 1, Tokenizer.itemCount) }, { 19019, 2575 })
   Assert.equal(Tokenizer.linkNameCount, 2)
@@ -115,7 +115,7 @@ local function testNonAscii()
   local Tokenizer = load()
   local count = Tokenizer.Tokenize(string.lower("LF Verzauberer für Brust, ask Zoë-Kel'Thuzad"))
   Assert.same(tokensOf(Tokenizer, count), { "lf", "verzauberer", "für", "brust", "ask", "zoë", "kel'thuzad" })
-  Assert.equal(Tokenizer.normalized, "lf verzauberer für brust ask zoë kel'thuzad")
+  Assert.equal(Tokenizer.Normalized(), "lf verzauberer für brust ask zoë kel'thuzad")
 end
 
 -- WORD spells its class as byte ranges (a class like %w calls the C library per byte): every
@@ -135,9 +135,9 @@ local function testOtherEscapes()
   local count = Tokenizer.Tokenize(string.lower("LF |TInterface\\Icons\\INV_Misc_Bell_01:0|t +8stam to chest || 1h|nsword"))
   Assert.same(tokensOf(Tokenizer, count), { "lf", "8stam", "to", "chest", "1h", "sword" })
   Assert.equal(Tokenizer.Tokenize("!!! ..."), 0)
-  Assert.equal(Tokenizer.normalized, "")
+  Assert.equal(Tokenizer.Normalized(), "")
   Tokenizer.Tokenize("|qlf a|xb") -- unknown escapes drop only the bar
-  Assert.equal(Tokenizer.normalized, "qlf a xb")
+  Assert.equal(Tokenizer.Normalized(), "qlf a xb")
 end
 
 -- No table per line: the same buffers every call, and a shorter line clears the old tail.
@@ -154,7 +154,7 @@ local function testBuffersReused()
   Assert.equal(itemIDs[1], nil)
   Assert.equal(Tokenizer.linkNameCount, 0)
   Assert.equal(linkNames[1], nil)
-  Assert.equal(Tokenizer.normalized, "lf belt")
+  Assert.equal(Tokenizer.Normalized(), "lf belt")
 end
 
 -- Real Forever request shapes (docs/knowledge/trade-requests-forever.md).
@@ -168,7 +168,7 @@ local function testRealLines()
   }
   for _, case in ipairs(cases) do
     Tokenizer.Tokenize(string.lower(case[1]))
-    Assert.equal(Tokenizer.normalized, case[2])
+    Assert.equal(Tokenizer.Normalized(), case[2])
   end
 end
 
@@ -184,7 +184,7 @@ local function testTokenCap()
   Assert.equal(Tokenizer.Tokenize(line), 64)
   Assert.equal(Tokenizer.tokens[64], "w64")
   Assert.equal(Tokenizer.tokens[65], nil)
-  Assert.equal(Tokenizer.normalized, table.concat(words, " ", 1, 64))
+  Assert.equal(Tokenizer.Normalized(), table.concat(words, " ", 1, 64))
   Assert.equal(Tokenizer.itemCount, 1)
   Assert.equal(Tokenizer.itemIDs[1], 7)
   Assert.same({ Tokenizer.linkNames[1], Tokenizer.linkNames[2] }, { "thick belt", "mongoose" })
@@ -199,9 +199,9 @@ end
 local function testPipeRuns()
   local Tokenizer = load()
   Tokenizer.Tokenize("lf ||||word |||cffff0000red|r ok|r|r|rend")
-  Assert.equal(Tokenizer.normalized, "lf word red ok end")
+  Assert.equal(Tokenizer.Normalized(), "lf word red ok end")
   Tokenizer.Tokenize("lf " .. string.rep("||", 200) .. "x")
-  Assert.equal(Tokenizer.normalized, "lf x")
+  Assert.equal(Tokenizer.Normalized(), "lf x")
 end
 
 -- §6.4 cue adjacency: BreakBefore(k) says a byte other than a space (punctuation, an escape, a

@@ -141,7 +141,7 @@ local function testScrollRepaints()
   Assert.same(looks(stub.tradeSkill, 1, 8), shrunk, "hidden buttons with stale IDs")
 end
 
--- A click mutes or unmutes the row's recipe, repaints at once and requests a rebuild; it never
+-- A click mutes or unmutes the row's recipe, repaints at once and requests a rebuild 0.3 s on; it never
 -- reaches the row (no select).
 local function testClickMutes()
   local ns, db, stub = load()
@@ -153,6 +153,9 @@ local function testClickMutes()
   Widgets.click(switchOf(row))
   Assert.equal(recipes["sim plate belt"].muted, true)
   Assert.same(look(row), OFF_MUTED, "repainted at once")
+  Assert.equal(ns.Index.lastReason, nil, "the rebuild waits for more clicks")
+  Wow.clock.gettime = Wow.clock.gettime + 0.3
+  Wow.runTimers()
   Assert.equal(ns.Index.lastReason, "mute")
   Widgets.click(switchOf(stub.tradeSkill.rows[3]))
   Assert.equal(recipes["sim plate helm"].muted, nil, "muted → unmuted")

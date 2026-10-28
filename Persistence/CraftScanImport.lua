@@ -5,6 +5,7 @@ end
 
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
+local TableKit = ns.TableKit or require("CraftAlert.Core.TableKit")
 local Defaults = ns.Defaults or require("CraftAlert.Persistence.Defaults")
 local ExportFields = ns.ExportFields or require("CraftAlert.Persistence.ExportFields")
 local Index = ns.Index or require("CraftAlert.Model.Index")
@@ -51,13 +52,7 @@ end
 -- The keys of a CraftScan_DB table, copied before a walk that pauses: CraftScan writes its data
 -- at runtime, and a key added during `pairs` is undefined in Lua 5.1. A key gone by the time it
 -- is read is skipped as malformed.
-local function keysOf(map)
-  local keys = {}
-  for key in pairs(map) do
-    keys[#keys + 1] = key
-  end
-  return keys
-end
+local keysOf = TableKit.KeysOf
 
 -- realmID ("_N" or a realm name) → its stripped realm names, from connected_realms, sorted.
 local function realmLists(src)

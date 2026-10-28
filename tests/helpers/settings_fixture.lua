@@ -1,5 +1,6 @@
 -- The settings pane in the leads window over UiFixture, with the refreshes a setting may trigger recorded instead
--- of run: Index.RequestRebuild(reason) → "rebuild:<reason>", ScanGate.Evaluate → "evaluate",
+-- of run: Index.RequestRebuild(reason) → "rebuild:<reason>", Index.RequestRebuildSoon(reason) →
+-- "rebuildSoon:<reason>", ScanGate.Evaluate → "evaluate",
 -- Leads.Rearm → "rearm", Launcher.Refresh → "launcher", LeadsWindow.Refresh → "leadsWindow",
 -- ModernRows.Refresh → "markers", ClassicRows.Refresh → "classicMarkers". The Alerts page calls
 -- launcher and leadsWindow as Bootstrap wires them (PageAlerts.SetOnLauncherToggle, SetOnOpacity).
@@ -27,6 +28,9 @@ function SettingsFixture.load(opts)
   local refreshes = {}
   spy(ns.Index, "RequestRebuild", function(reason)
     refreshes[#refreshes + 1] = "rebuild:" .. tostring(reason)
+  end)
+  spy(ns.Index, "RequestRebuildSoon", function(reason)
+    refreshes[#refreshes + 1] = "rebuildSoon:" .. tostring(reason)
   end)
   local names = {
     { ns.ScanGate, "Evaluate", "evaluate" },

@@ -94,7 +94,7 @@ local function mutedRanks(db)
 end
 
 -- A click mutes every stored rank of the chain unless all are muted already, repaints at once and
--- requests a rebuild; it never reaches the row (no select, no favorite menu).
+-- requests a rebuild 0.3 s on; it never reaches the row (no select, no favorite menu).
 local function testClickMutesChain()
   local ns, db, list = load()
   local row = list:row(201)
@@ -106,6 +106,9 @@ local function testClickMutesChain()
   Widgets.click(switchOf(row))
   Assert.same(mutedRanks(db), { true, true, true }, "all unmuted → all muted")
   Assert.same(look(row), { MUTED, false }, "repainted at once")
+  Assert.equal(ns.Index.lastReason, nil, "the rebuild waits for more clicks")
+  Wow.clock.gettime = Wow.clock.gettime + 0.3
+  Wow.runTimers()
   Assert.equal(ns.Index.lastReason, "mute")
 
   recipes[201].muted, recipes[203].muted = nil, nil

@@ -18,6 +18,7 @@ Fixture.SENDER = "Customer-Other"
 
 local MODULES = {
   "Core.FlavorCompat",
+  "Core.TableKit",
   "Core.Constants",
   "Core.EventRouter",
   "Core.Slicer",
