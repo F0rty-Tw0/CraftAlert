@@ -391,6 +391,30 @@ return {
     src = "spec",
     note = "4.7 a break between LF and crafter",
   },
+  {
+    text = "LF crafter for flask",
+    class = "WARRIOR",
+    expect = "silent",
+    stop = "nomatch",
+    src = "user",
+    note = "4.7 'crafter for' names a want, though no fixture word reads it (ruling 2026-10-28)",
+  },
+  {
+    text = "LF crafter to make ring",
+    class = "WARRIOR",
+    expect = "silent",
+    stop = "nomatch",
+    src = "user",
+    note = "4.7 'crafter to' names a want; 'ring' sits too far from a cue for step 4.4 (ruling 2026-10-28)",
+  },
+  {
+    text = "LF crafter pls, legs",
+    class = "WARRIOR",
+    expect = "silent",
+    stop = "nomatch",
+    src = "user",
+    note = "4.7 'legs' is a slot word step 4.4 left uncounted (no cue): still a named want (ruling 2026-10-28)",
+  },
   -- ===== must ignore =====
   {
     text = "225 Enchant have ALL WEAPON and NECK LFW!!! DM if need!!! |cffffd000|Htrade:<guid>:7413:333|h[Enchanting]|h|r",

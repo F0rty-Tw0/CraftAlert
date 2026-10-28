@@ -6,7 +6,7 @@ local Fixture = require("tests.helpers.matcher_fixture")
 -- line alerts for the profession that makes the sender's armor type (plate → Blacksmithing,
 -- mail and leather → Leatherworking, cloth → Tailoring), behind the profession-word setting.
 -- Every row checks the number of GetPlayerInfoByGUID calls: one only when "LF" and "crafter"
--- are both in the line and nothing earlier matched.
+-- are both in the line, nothing earlier matched and the line names no want.
 local BS, TAILOR, LW = Fixture.BS, Fixture.TAILOR, Fixture.LW
 local expect, outcome, why = Fixture.expect, Fixture.outcome, Fixture.why
 
@@ -121,6 +121,39 @@ local function testWants()
   check(ns, "unindexed slang", "LF crafter for a cloak", W, "stop:nomatch", 0)
 end
 
+-- User ruling 2026-10-28: the armor guess is for a bare line only; a named want always beats it.
+-- "crafter(s)" then for / to / who / that in the same clause names something, even when Craft
+-- Alert cannot read what; a word step 4.4 knows anywhere in the line names a want, even one it
+-- did not count (an ambiguous word with no cue next to it), and so does an extraSlang key with
+-- no recipe indexed. Everyday words (back, ring, hand, head...) after a break still need a cue
+-- (testEverydayWords).
+local function testNamedSomething()
+  local ns = fullIndex()
+  check(ns, "for", "LF crafter for flask", W, "stop:nomatch", 0)
+  check(ns, "for my", "LF crafter for my weapon", W, "stop:nomatch", 0)
+  check(ns, "to", "LF crafter to make ring", W, "stop:nomatch", 0)
+  check(ns, "who", "LF crafter who can make", W, "stop:nomatch", 0)
+  check(ns, "that", "LF crafters that can", W, "stop:nomatch", 0)
+  check(ns, "pst is no naming word", "LF crafter pst", W, "profession:" .. BS, 1)
+  check(ns, "break before for", "LF crafter, for a friend", W, "profession:" .. BS, 1)
+  check(ns, "uncounted slot word", "LF crafter pls, legs", W, "stop:nomatch", 0)
+  check(ns, "uncounted slot word", "LF crafter, feet", W, "stop:nomatch", 0)
+  ns = fullIndex({ extraSlang = { zzneck = "neck" } })
+  check(ns, "extraSlang key", "LF crafter zzneck", W, "stop:nomatch", 0)
+end
+
+-- A step 4.2 set that step 4.4 cannot decide (saved recipes without a profession) is a want too.
+local function testUndecidedSet()
+  local ns = Fixture.load()
+  local db = Fixture.db(ns)
+  db.characters["Odd-Realm"] = Fixture.character({}, {
+    [91] = { name = "Zorkian Iron Hauberk" },
+    [92] = { name = "Zorkian Iron Leggings" },
+  })
+  ns.Matcher.SetIndex(Fixture.index(ns, db))
+  check(ns, "undecided set", "LF crafter zorkian iron", W, "stop:nomatch", 0)
+end
+
 -- No character with the profession → no match (step 4.6 alike); the Settings Test page has no
 -- GUID; Classic keys a profession by its English name.
 local function testNoCrafterUngatedClassic()
@@ -145,6 +178,8 @@ return function()
   testWordShape()
   testEverydayWords()
   testWants()
+  testNamedSomething()
+  testUndecidedSet()
   testNoCrafterUngatedClassic()
   Wow.reset()
 end
