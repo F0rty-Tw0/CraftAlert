@@ -19,7 +19,6 @@ local ipairs = ipairs
 local type = type
 
 local ADDON = "Blizzard_Professions"
-local LOADED_EVENT = "ADDON_LOADED"
 
 ---@type table
 local db = nil -- set by Install; nil means every call is a no-op
@@ -130,11 +129,7 @@ local function hook()
   walk()
 end
 
-local function onAddonLoaded(name)
-  if name ~= ADDON then
-    return
-  end
-  EventRouter.Off(LOADED_EVENT, onAddonLoaded)
+local function onProfessionsLoaded()
   professionsLoaded = true
   hook()
 end
@@ -143,12 +138,7 @@ end
 -- is loaded, else when it loads.
 function ModernRows.Install(accountDb)
   db = accountDb
-  if FlavorCompat.IsAddOnLoaded(ADDON) then
-    professionsLoaded = true
-    hook()
-  else
-    EventRouter.On(LOADED_EVENT, onAddonLoaded)
-  end
+  EventRouter.WhenAddOnLoaded(ADDON, onProfessionsLoaded)
 end
 
 -- Repaints every row, hooking first when the setting was turned on after the addon loaded. On

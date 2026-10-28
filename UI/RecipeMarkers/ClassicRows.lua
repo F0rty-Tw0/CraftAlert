@@ -22,7 +22,6 @@ local ipairs = ipairs
 local lower = string.lower
 local type = type
 
-local LOADED_EVENT = "ADDON_LOADED"
 local SKIPPED_KINDS = { header = true, subheader = true }
 
 -- A window's addon, update function and row buttons (`prefix`1..`_G[displayed]`), and its calls
@@ -119,20 +118,10 @@ end
 -- Hooks now when the window's addon is loaded, else when it loads.
 local function watch(source)
   sources[#sources + 1] = source
-  if FlavorCompat.IsAddOnLoaded(source.addon) then
+  EventRouter.WhenAddOnLoaded(source.addon, function()
     loaded[source] = true
     hook(source)
-    return
-  end
-  local function onAddonLoaded(name)
-    if name ~= source.addon then
-      return
-    end
-    EventRouter.Off(LOADED_EVENT, onAddonLoaded)
-    loaded[source] = true
-    hook(source)
-  end
-  EventRouter.On(LOADED_EVENT, onAddonLoaded)
+  end)
 end
 
 -- At PLAYER_LOGIN (the own character key is needed to paint): the TradeSkill window, and the Craft
