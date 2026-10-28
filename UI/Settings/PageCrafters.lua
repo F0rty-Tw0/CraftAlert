@@ -20,8 +20,6 @@ local RecipeList = ns.RecipeList or require("CraftAlert.UI.Settings.RecipeList")
 -- picks its crafter (§6.3 step 5), so it rebuilds nothing.
 local PageCrafters = { id = "crafters", title = Localization.Text("Crafters") }
 
-local REMOVE_WIDTH = 140
-
 local function db()
   return _G["CraftAlertDB"]
 end
@@ -68,7 +66,7 @@ local function createCharacterRows(column, page)
   local removeTip = Localization.Text(
     "Deletes this character's saved professions and recipes. It asks for a second click. Your logged-in character comes back empty until you open a profession window."
   )
-  page.remove = Controls.Button(column.parent, Localization.Text("Remove character"), REMOVE_WIDTH, function()
+  page.remove = Controls.Button(column.parent, Localization.Text("Remove character"), Theme.LAYOUT.BUTTON_WIDTH.L, function()
     if shownCharacter(page) == nil then
       return
     end

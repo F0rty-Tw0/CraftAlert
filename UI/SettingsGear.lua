@@ -12,7 +12,7 @@ local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 -- between the list and the settings pane; the gear turns into a back arrow while the pane shows.
 local SettingsGear = {}
 
-local LABEL_GAP = 4
+local LABEL_GAP = Theme.LAYOUT.SPACE.XS
 
 -- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua): gold title, then
 -- one green instruction line naming what a click does now (no body, so no gap above it).
@@ -89,6 +89,7 @@ end
 -- The gear on `frame` (a ButtonFrameTemplate frame); a click runs onClick().
 function SettingsGear.Create(frame, onClick)
   local gear = SettingsGear.Build(frame, onClick)
+  -- off-scale: close button art nudge.
   gear:SetPoint("RIGHT", frame.CloseButton, "LEFT", -2, 0)
   -- With the title above the NineSlice border, whose metal top edge covers the title strip. Not the
   -- close button's level: the Classic template leaves that one under the border.

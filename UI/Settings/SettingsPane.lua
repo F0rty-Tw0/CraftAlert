@@ -102,12 +102,12 @@ local function addNavButton(page, index)
   local button = _G["CreateFrame"]("Button", nil, pane.nav)
   button:SetHeight(layout.NAV_BUTTON_HEIGHT)
   button:SetFrameLevel(pane.nav:GetFrameLevel() + 2)
-  local top = -(4 + (index - 1) * layout.NAV_BUTTON_HEIGHT)
-  button:SetPoint("TOPLEFT", pane.nav, "TOPLEFT", 2, top)
-  button:SetPoint("TOPRIGHT", pane.nav, "TOPRIGHT", -2, top)
+  local top = -(layout.SPACE.XS + (index - 1) * layout.NAV_BUTTON_HEIGHT)
+  button:SetPoint("TOPLEFT", pane.nav, "TOPLEFT", layout.NAV_BUTTON_INSET, top)
+  button:SetPoint("TOPRIGHT", pane.nav, "TOPRIGHT", -layout.NAV_BUTTON_INSET, top)
   button.pageId = page.id
   button.label = FrameKit.Text(button, Theme.FONTS.name)
-  button.label:SetPoint("LEFT", button, "LEFT", 12, 0)
+  button.label:SetPoint("LEFT", button, "LEFT", layout.SPACE.M, 0)
   button.label:SetText(page.title)
   FrameKit.ListHighlight(button)
   button.selected = button:CreateTexture(nil, "ARTWORK")
@@ -158,14 +158,14 @@ local function build(host)
   end
   -- Controls loads after the pane (TOC), so it resolves here, not at load.
   local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
-  -- Anchored 4 px in from both sides of the nav, so its width follows the nav's.
+  -- Anchored SPACE.XS in from both sides of the nav, so its width follows the nav's.
   local back = Controls.Button(nav, Localization.Text("Back to leads"), 0, function()
     pane.onBack()
   end)
   back:SetHeight(layout.NAV_BUTTON_HEIGHT)
   back:SetFrameLevel(nav:GetFrameLevel() + 2)
-  back:SetPoint("BOTTOMLEFT", nav, "BOTTOMLEFT", 4, 4)
-  back:SetPoint("BOTTOMRIGHT", nav, "BOTTOMRIGHT", -4, 4)
+  back:SetPoint("BOTTOMLEFT", nav, "BOTTOMLEFT", layout.SPACE.XS, layout.SPACE.XS)
+  back:SetPoint("BOTTOMRIGHT", nav, "BOTTOMRIGHT", -layout.SPACE.XS, layout.SPACE.XS)
   pane.back = back
 end
 

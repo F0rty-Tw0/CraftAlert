@@ -103,8 +103,8 @@ end
 
 -- Mute all and Unmute all share a row, half each less the gap; their anchors set the widths.
 local function createMuteAll(column, muteAll)
-  local gap = Theme.LAYOUT.PADDING / 2
-  local bar = Controls.Bar(column, Theme.LAYOUT.BUTTON_HEIGHT)
+  local gap = Theme.LAYOUT.SPACE.XS
+  local bar = Controls.Bar(column, Theme.LAYOUT.BUTTON_HEIGHT, Theme.LAYOUT.SPACE.S)
   local mute = Controls.Button(bar, Localization.Text("Mute all"), 0, function()
     muteAll(true)
   end, Localization.Text("Mutes every recipe the list shows. With a search typed, only the recipes it finds."))
@@ -119,7 +119,7 @@ end
 
 -- The "Only <expansion>" button, full width on its own row. Hidden, its row keeps its height.
 local function createOnlyCurrent(column, onClick)
-  local bar = Controls.Bar(column, Theme.LAYOUT.BUTTON_HEIGHT)
+  local bar = Controls.Bar(column, Theme.LAYOUT.BUTTON_HEIGHT, Theme.LAYOUT.SPACE.S)
   local button = Controls.Button(bar, "", 0, onClick)
   button:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
   button:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)

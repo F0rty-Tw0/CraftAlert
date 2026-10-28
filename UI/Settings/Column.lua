@@ -81,12 +81,14 @@ function Column.OnWidth(column, refit)
   measure(column)
 end
 
--- Anchors `region` below the column's last row (`gap` px; default CONTROL_GAP). The first row
--- carries the centering gap; the rest hang off it.
+-- Anchors `region` below the column's last row (`gap` px; else the gap a heading left pending,
+-- else CONTROL_GAP). The first row carries the centering gap; the rest hang off it.
 function Column.Place(column, region, gap)
   local anchor = column.last
+  local pending = column.nextGap
+  column.nextGap = nil
   if anchor then
-    gap = gap or Theme.LAYOUT.CONTROL_GAP
+    gap = gap or pending or Theme.LAYOUT.CONTROL_GAP
     region:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -gap)
   else
     gap = 0
@@ -127,10 +129,12 @@ local function wrapped(column, font)
   return text
 end
 
+-- The row under it hangs SPACE.S below.
 function Column.Section(column, text)
   local label = wrapped(column, Theme.FONTS.name)
   label:SetText(text)
   Column.Place(column, label, column.last and Theme.LAYOUT.SECTION_GAP or 0)
+  column.nextGap = Theme.LAYOUT.SPACE.S
   return label
 end
 
@@ -146,12 +150,12 @@ function Column.Note(column, font)
   return text
 end
 
--- An empty row as wide as the column, `height` tall, for controls side by side.
-function Column.Bar(column, height)
+-- An empty row as wide as the column, `height` tall, for controls side by side; `gap` as in Place.
+function Column.Bar(column, height, gap)
   local bar = create("Frame", column.parent)
   bar:SetHeight(height)
   Column.Span(column, bar)
-  Column.Place(column, bar)
+  Column.Place(column, bar, gap)
   return bar
 end
 
