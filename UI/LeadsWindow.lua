@@ -64,7 +64,7 @@ function LeadsWindow.Refresh()
   local leads = Leads.List()
   LeadsView.Layout(window.view)
   LeadsView.Refresh(window.view, leads)
-  frame.status:SetText(#leads > 0 and Localization.Text("%d leads", #leads) or "")
+  frame.status:SetText(#leads > 0 and Localization.Plural(#leads, "%d lead", "%d leads") or "")
 end
 
 -- The bell in the template's portrait; a template without SetPortraitToAsset gets the texture set
