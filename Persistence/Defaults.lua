@@ -5,28 +5,13 @@ end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Constants = ns.Constants or require("CraftAlert.Core.Constants")
+local TableKit = ns.TableKit or require("CraftAlert.Core.TableKit")
 
 -- Default settings (spec §9) and an empty account DB (spec §10). Every call builds new
 -- tables, so a caller may edit the result freely.
 local Defaults = {}
 
 Defaults.schemaVersion = 1
-
-local function copyList(list)
-  local copy = {}
-  for i = 1, #list do
-    copy[i] = list[i]
-  end
-  return copy
-end
-
-local function copyMap(map)
-  local copy = {}
-  for key, value in pairs(map) do
-    copy[key] = value
-  end
-  return copy
-end
 
 function Defaults.Settings()
   local flavorKey = FlavorCompat.flavorKey
@@ -43,10 +28,10 @@ function Defaults.Settings()
     leadTimeoutMin = 10,
     hideLauncherWhenNoLeads = false,
     opacity = 1.0,
-    templates = copyMap(Constants.templates[flavorKey]),
+    templates = TableKit.CopyMap(Constants.templates[flavorKey]),
     notes = {},
-    intentWords = copyList(Constants.intentWords),
-    blockerWords = copyList(Constants.blockerWords),
+    intentWords = TableKit.CopyList(Constants.intentWords),
+    blockerWords = TableKit.CopyList(Constants.blockerWords),
     extraSlang = {},
     craftScanImported = nil,
     craftScanPrompted = nil,

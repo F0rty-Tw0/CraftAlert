@@ -6,6 +6,7 @@ end
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
+local TableKit = ns.TableKit or require("CraftAlert.Core.TableKit")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local ItemKeywords = ns.ItemKeywords or require("CraftAlert.Model.ItemKeywords")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
@@ -27,7 +28,6 @@ local pairs = pairs
 local ipairs = ipairs
 local type = type
 local lower = string.lower
-local sort = table.sort
 
 local JOB = "index"
 local SOON_SECONDS = 0.3 -- quiet after the last RequestRebuildSoon before its build
@@ -140,10 +140,8 @@ local function addCharacter(index, ctx, key, character, pause)
   for profKey in pairs(character.professions or {}) do
     ctx.professions[profKey] = true
   end
-  local recipes, keys = character.recipes or {}, {}
-  for recipeKey in pairs(recipes) do
-    keys[#keys + 1] = recipeKey
-  end
+  local recipes = character.recipes or {}
+  local keys = TableKit.KeysOf(recipes)
   local added, stored, listening = false, {}, {}
   for i = 1, #keys do
     local recipeKey = keys[i]
@@ -214,14 +212,6 @@ local function wordList(words)
   return list, set
 end
 
-local function copySet(map)
-  local copy = {}
-  for key, value in pairs(map or {}) do
-    copy[key] = value
-  end
-  return copy
-end
-
 local function newIndex(settings, opts)
   local intentList, intentSet = wordList(settings.intentWords)
   local _, blockerSet = wordList(settings.blockerWords)
@@ -232,7 +222,7 @@ local function newIndex(settings, opts)
     wordlessGear = {}, -- group -> true: a worn item without words (profession gear), read by WordGroups.Build
     professionWords = {},
     mutedProfessions = {}, -- characterKey -> { professionKey -> true }: every stored recipe muted
-    channelEnabled = copySet(settings.channels),
+    channelEnabled = TableKit.CopyMap(settings.channels or {}),
     intentList = intentList,
     intentSet = intentSet,
     blockerSet = blockerSet,
@@ -244,15 +234,6 @@ local function newIndex(settings, opts)
     size = 0,
     crafterCount = 0,
   }
-end
-
-local function sortedKeys(map)
-  local keys = {}
-  for key in pairs(map) do
-    keys[#keys + 1] = key
-  end
-  sort(keys)
-  return keys
 end
 
 -- Pure: reads db and settings, writes neither. opts = { professionOrder = fn → key[],
@@ -267,7 +248,7 @@ function Index.Build(db, settings, opts)
   local characters = db.characters or {}
   local crafters = {}
   -- Sorted, so entry lists come out in the same order on every build.
-  for _, key in ipairs(sortedKeys(characters)) do
+  for _, key in ipairs(TableKit.SortedKeys(characters)) do
     local character = characters[key]
     if character and character.enabled ~= false and addCharacter(index, ctx, key, character, pause) then
       crafters[key] = true

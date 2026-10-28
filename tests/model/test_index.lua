@@ -28,7 +28,7 @@ local function load(flavor)
       return itemID, "type", "subtype", item[1], 0, item[2], item[3]
     end,
   })
-  for _, path in ipairs({ "Core.FlavorCompat", "Core.Constants", "Core.EventRouter", "Core.Slicer", "Core.PlayerName" }) do
+  for _, path in ipairs({ "Core.FlavorCompat", "Core.TableKit", "Core.Constants", "Core.EventRouter", "Core.Slicer", "Core.PlayerName" }) do
     Fresh.require(path)
   end
   for _, path in ipairs({

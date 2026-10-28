@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local TableKit = ns.TableKit or require("CraftAlert.Core.TableKit")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local Defaults = ns.Defaults or require("CraftAlert.Persistence.Defaults")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
@@ -45,18 +46,9 @@ local function parseSlang(text)
   return slang
 end
 
-local function sortedKeys(map)
-  local keys = {}
-  for key in pairs(map) do
-    keys[#keys + 1] = key
-  end
-  table.sort(keys)
-  return keys
-end
-
 local function formatSlang(slang)
   local parts = {}
-  for _, word in ipairs(sortedKeys(slang)) do
+  for _, word in ipairs(TableKit.SortedKeys(slang)) do
     parts[#parts + 1] = word .. "=" .. slang[word]
   end
   return table.concat(parts, " ")

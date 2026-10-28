@@ -3,6 +3,8 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local TableKit = ns.TableKit or require("CraftAlert.Core.TableKit")
+
 -- Class-armor spec §4 rule 4: the armor type a class wears, keyed by the class token
 -- GetPlayerInfoByGUID returns. Data only. Every flavor uses this table: on Forever and the
 -- Classic flavors it is the max-level armor (hunters and shamans wear leather, warriors and
@@ -49,11 +51,7 @@ local TOKENS = {
 
 -- A new array of every class token, in armor order (plate, mail, leather, cloth). The caller may mutate it.
 function ClassArmor.Tokens()
-  local copy = {}
-  for i, token in ipairs(TOKENS) do
-    copy[i] = token
-  end
-  return copy
+  return TableKit.CopyList(TOKENS)
 end
 
 -- Armor word and why label for a class token, or nil, nil for any other value.
