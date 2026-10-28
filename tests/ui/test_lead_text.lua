@@ -31,6 +31,14 @@ local function testText()
   Assert.equal(ns.LeadText.Channel({}), nil)
   Assert.equal(ns.LeadText.RealmTag({ cannotOrder = true }), "Can't send an order (other realm)")
   Assert.equal(ns.LeadText.RealmTag({}), nil)
+  -- A stop reason as plain words; an unknown one keeps its code.
+  local S = ns.LeadText.StopText
+  Assert.equal(S("prefilter"), "No match: the line does not look like a request")
+  Assert.equal(S("intent"), "No match: no request word such as LF")
+  Assert.equal(S("blocker"), "No match: it reads like a crafter's ad, or has a blocked word")
+  Assert.equal(S("nomatch"), "No match: nothing in it that you can craft")
+  Assert.equal(S("noIndex"), "No match: the word list is not built yet, try /reload")
+  Assert.equal(S("weird"), "No match (weird)")
   Wow.reset()
 end
 

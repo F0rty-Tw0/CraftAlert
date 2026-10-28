@@ -123,7 +123,7 @@ end
 local function testTestCommandStops()
   local _, db, _, handler = setup()
   handler("test hello there")
-  Assert.same(SlashFixture.chat(), { "No match (stopped at: prefilter)" })
+  Assert.same(SlashFixture.chat(), { "No match: the line does not look like a request" })
   Assert.equal(rawget(_G, TOAST), nil, "no toast for a line that stopped")
   Wow.chat = {}
   handler("test")

@@ -549,7 +549,7 @@ local function testTestPage()
   shown = texts()
   Assert.truthy(shown:find("Profession: 333", 1, true), shown)
   Widgets.type(row("Test a line").input, "hello there")
-  Assert.truthy(texts():find("No match (stopped at: prefilter)", 1, true), texts())
+  Assert.truthy(texts():find("No match: the line does not look like a request", 1, true), texts())
   Assert.same(db.leads, {}, "no lead")
 end
 

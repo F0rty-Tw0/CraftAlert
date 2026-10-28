@@ -73,6 +73,24 @@ function LeadText.RealmTag(lead)
   return nil
 end
 
+-- Matcher.lastStop codes the Test page and /ca test explain in plain words.
+local STOP_WORDS = {
+  prefilter = "No match: the line does not look like a request",
+  intent = "No match: no request word such as LF",
+  blocker = "No match: it reads like a crafter's ad, or has a blocked word",
+  nomatch = "No match: nothing in it that you can craft",
+  noIndex = "No match: the word list is not built yet, try /reload",
+}
+
+-- The result line for a Matcher stop reason; a code without words is shown as itself.
+function LeadText.StopText(reason)
+  local words = STOP_WORDS[reason]
+  if words then
+    return Localization.Text(words)
+  end
+  return Localization.Text("No match (%s)", tostring(reason))
+end
+
 -- What each click on a lead does (UI/ClickRouter.lua), one tooltip instruction line each.
 function LeadText.ClickLines()
   return {
