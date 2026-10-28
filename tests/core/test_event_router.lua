@@ -148,6 +148,17 @@ local function testCallAll()
   Assert.same(reported, { "listener broke" })
   EventRouter.CallAll({})
   Assert.same(reported, { "listener broke" }, "an empty list calls nothing")
+
+  -- A nil in the middle and no arguments at all (Leads' "change", Ledger) pass through as given.
+  local counts = {}
+  local countArgs = {
+    function(...)
+      counts[#counts + 1] = select("#", ...)
+    end,
+  }
+  EventRouter.CallAll(countArgs, nil, "b")
+  EventRouter.CallAll(countArgs)
+  Assert.same(counts, { 2, 0 })
 end
 
 local function testFailedRegisterKeepsNoHandler()
