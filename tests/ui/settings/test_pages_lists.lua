@@ -314,6 +314,23 @@ local function testCraftersRecipeBar()
   Assert.equal(list.mouseWheelEnabled, false)
 end
 
+-- An empty list says why: nothing read yet (also with no profession shown), or the search found none.
+local function testCraftersEmptyList()
+  local readYet = "No recipes read yet. Open this profession's window in the game to read them."
+  local ns = SettingsFixture.load({ db = crafters })
+  open(ns, "Crafters")
+  Assert.falsy(texts():find("No recipes read yet", 1, true), "recipes listed: no empty line")
+  Widgets.pick(row("Character").input, "Far-Away")
+  Assert.truthy(texts():find(readYet, 1, true), texts())
+  Widgets.pick(row("Character").input, "Me-Realm")
+  Assert.falsy(texts():find("No recipes read yet", 1, true), "recipes listed: no empty line")
+  Widgets.type(row("Search recipes").input, "zzz")
+  Assert.truthy(texts():find("No recipe matches your search.", 1, true), texts())
+  Assert.falsy(texts():find("No recipes read yet", 1, true), "a search with no match is not the unread line")
+  Widgets.type(row("Search recipes").input, "")
+  Assert.falsy(texts():find("No recipe matches", 1, true), "search cleared: recipes listed again")
+end
+
 -- A tooltip hidden by the client (no OnLeave) while a row is hovered comes back when the scroll
 -- puts an item recipe under the cursor; after OnLeave the scroll shows none.
 local function testCraftersRecipeHoverAfterHide()
@@ -574,6 +591,7 @@ return function()
   testCraftersRecipeGroups()
   testCraftersRecipeIcons()
   testCraftersRecipeBar()
+  testCraftersEmptyList()
   testCraftersRecipeTooltip()
   testCraftersRecipeHoverAfterHide()
   testRecipeTooltipNameKey()

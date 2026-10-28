@@ -141,13 +141,25 @@ local function paintOnlyCurrent(button, line)
   button:Show()
 end
 
--- list: { search, recipes, character, prof, Show }; `character` and `prof` are what Show last got.
+-- The line over an empty list: the search found nothing, or no recipe was read yet.
+local function emptyText(search)
+  if search ~= "" then
+    return Localization.Text("No recipe matches your search.")
+  end
+  return Localization.Text("No recipes read yet. Open this profession's window in the game to read them.")
+end
+
+-- list: { search, recipes, empty, character, prof, Show }; `character` and `prof` are what Show last got.
 function RecipeList.Create(column)
   local list = {}
 
   local function render()
+    local search = list.search.input:GetText()
+    local items = recipeItems(list.character, list.prof, search)
     paintOnlyCurrent(list.onlyCurrent, currentLine(list.character, list.prof))
-    list.recipes.Render(recipeItems(list.character, list.prof, list.search.input:GetText()), list.showRecipe)
+    list.recipes.Render(items, list.showRecipe)
+    list.empty:SetText(emptyText(search))
+    list.empty:SetShown(#items == 0)
   end
 
   -- One index rebuild when any of the recipes changed, then the list again.
@@ -259,6 +271,11 @@ function RecipeList.Create(column)
   createMuteAll(column, muteAll)
   list.onlyCurrent = createOnlyCurrent(column, onlyCurrent)
   list.recipes = Controls.List(column, RECIPE_ROWS, createRecipeRow)
+  local frame, padding = list.recipes.frame, Theme.LAYOUT.PADDING
+  list.empty = FrameKit.Text(frame, Theme.FONTS.body, Theme.COLORS.textSecondary)
+  list.empty:SetWordWrap(true)
+  list.empty:SetPoint("TOPLEFT", frame, "TOPLEFT", padding, -padding)
+  list.empty:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -padding, -padding)
   -- A mute made elsewhere (the profession window) shows when the index rebuilds; the order stays.
   Index.OnRebuilt(repaintIfShown)
 
