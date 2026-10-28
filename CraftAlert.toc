@@ -87,6 +87,7 @@ UI/DetailsHeader.lua
 UI/LeadDetails.lua
 UI/LeadsList.lua
 UI/LedgerStrip.lua
+UI/ClearAllLink.lua
 UI/LeadsView.lua
 UI/WindowSize.lua
 UI/GhostResize.lua

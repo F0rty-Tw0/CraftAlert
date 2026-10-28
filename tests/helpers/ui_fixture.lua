@@ -53,6 +53,7 @@ local UI = {
   "UI.LeadDetails",
   "UI.LeadsList",
   "UI.LedgerStrip",
+  "UI.ClearAllLink",
   "UI.LeadsView",
   "UI.WindowSize",
   "UI.GhostResize",
