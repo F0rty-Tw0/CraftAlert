@@ -195,6 +195,22 @@ function FlavorCompat.OwnClass()
   return token
 end
 
+-- The player's AFK flag: true or false; nil when the API is missing or the value is secret (chat
+-- lockdown) or not a boolean, so each caller picks what unknown means. The secret test comes first: a
+-- secret value cannot be inspected. The API is read on each call, so tests that stub it after load
+-- still reach this code.
+function FlavorCompat.IsAfk()
+  local unitIsAfk = _G["UnitIsAFK"]
+  if type(unitIsAfk) ~= "function" then
+    return nil
+  end
+  local afk = unitIsAfk("player")
+  if FlavorCompat.issecretvalue(afk) or type(afk) ~= "boolean" then
+    return nil
+  end
+  return afk
+end
+
 -- Whether the player is in any instance (dungeon, raid, battleground, arena, delve, housing...);
 -- false when the API is missing. The one owner of the instance test: modules loaded before
 -- ScanGate read it here. The API is read on each call, so tests that stub it after load still

@@ -10,7 +10,6 @@ local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local SendGuard = {}
 
 local remove = table.remove
-local type = type
 
 local MAX_SENDS = 6
 local WINDOW_SECONDS = 60
@@ -23,14 +22,9 @@ local function now()
 end
 
 -- A secret flag or a missing API is unknown, and unknown counts as AFK (the flag is secret
--- during chat lockdown). The secret test comes first: a secret value cannot be compared.
+-- during chat lockdown).
 local function playerIsAway()
-  local isAfk = _G["UnitIsAFK"]
-  if type(isAfk) ~= "function" then
-    return true
-  end
-  local afk = isAfk("player")
-  return FlavorCompat.issecretvalue(afk) or afk ~= false
+  return FlavorCompat.IsAfk() ~= false
 end
 
 local function sendsInWindow()

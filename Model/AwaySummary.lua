@@ -45,12 +45,10 @@ end
 -- (unit). Only the player's own flags; nothing while the AFK flag is set or secret, nor on a client
 -- without UnitIsAFK.
 local function onFlagsChanged(unit)
-  local isAfk = _G["UnitIsAFK"]
-  if FlavorCompat.issecretvalue(unit) or unit ~= "player" or count == 0 or type(isAfk) ~= "function" then
+  if FlavorCompat.issecretvalue(unit) or unit ~= "player" or count == 0 then
     return
   end
-  local afk = isAfk("player")
-  if FlavorCompat.issecretvalue(afk) or afk then
+  if FlavorCompat.IsAfk() ~= false then
     return
   end
   local total, expired = count, expiredCount()
