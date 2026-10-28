@@ -87,6 +87,16 @@ end
 -- "LF hood" never complete an alias or a stat.
 Slang.wordGroupsOnly = { back = true, hand = true, band = true, hood = true, vest = true }
 
+-- User ruling 2026-10-25: the slot words that are everyday chat ("back in 5", "hand over", "ring me")
+-- never filter an alias hit (PhraseMatch R4) and, ring aside (user ruling 2026-10-28), never stop
+-- an "LF crafter" lead by themselves (WordGroups.NamedWant): Slang.wordGroupsOnly plus ring and
+-- head. Not Slang.ambiguous: legs, leg, hands and feet are gear far more often. "hand" is here;
+-- "off hand" is "offhand" (HandWord).
+Slang.everydaySlot = { ring = true, head = true }
+for word in pairs(Slang.wordGroupsOnly) do
+  Slang.everydaySlot[word] = true
+end
+
 -- User ruling 2026-10-24 (R1): "hand" directly after "main", "one" or "two" is no slot word, so
 -- no glove crafter hears of a weapon hand. User ruling 2026-10-25: after "off" ("off hand",
 -- "off-hand": a hyphen splits tokens) it is the off-hand slot, as "offhand". Only singular

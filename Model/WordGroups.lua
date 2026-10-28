@@ -36,7 +36,7 @@ local pairs = pairs
 local ipairs = ipairs
 local lower = string.lower
 local HandWord = Slang.HandWord
-local slangWords, ambiguous = Slang.wordSet, Slang.ambiguous
+local slangWords, ambiguous, everydaySlot = Slang.wordSet, Slang.ambiguous, Slang.everydaySlot
 local buyerWords = Constants.buyerWords
 local MAX_WORDS = 6 -- distinct slang words per line (§6.3 step 4.4; bounds the §4.4 max)
 
@@ -597,6 +597,29 @@ local function collect(index, tokens, count, breakBefore, hasSet)
   end
   inferable, enchantingNamed = not sawType and (sawPlainSlot or sawCuedSlot), enchanting
   return whyCount
+end
+
+-- Whether the line names a want: the last Match's collect counted a word or met a profession word
+-- (any profession, whether a character has it or not), or a token anywhere is a word collect
+-- knows (wordIndex or Slang.wordSet, collect's test) or an extraSlang key (indexed or not), even
+-- one collect left uncounted for want of a cue, apart from everyday chat words (Slang.everydaySlot:
+-- "LF crafter, back in 5" stays bare) other than "ring" (user ruling 2026-10-28: "LF crafter, ring
+-- me" names a ring; PhraseMatch R4 still reads it as everyday). Matcher's "LF crafter" step reads
+-- it, so a bare line is told from one step 4.4 just could not match (user ruling 2026-10-28: a named want beats the
+-- armor guess). Same tokens and count as that Match. No HandWord here: collect
+-- always counts an "off hand" ("offhand" is in Slang.wordSet), so such a line returns above.
+function WordGroups.NamedWant(index, tokens, count)
+  if lineCount > 0 or namedCount > 0 then
+    return true
+  end
+  local wordIndex, extraSlang = index.wordIndex, index.extraSlang
+  for i = 1, count do
+    local token = tokens[i]
+    if (token == "ring" or not everydaySlot[token]) and (wordIndex[token] or slangWords[token] or extraSlang[token]) then
+      return true
+    end
+  end
+  return false
 end
 
 -- Class-armor §4 rule 7: the sender's armor word joins the counted words (after the line's

@@ -16,8 +16,9 @@ local WordGroups = ns.WordGroups or require("CraftAlert.Model.WordGroups")
 
 -- Hot path, spec §6.3 steps 1-4: gate, prefilter + tokenize, intent, match. Reads only the
 -- index (never CraftAlertDB or settings), calls no Blizzard API but issecretvalue (except one
--- GetPlayerInfoByGUID per line in step 4.4 when the class-armor rule applies, see
--- docs/specs/2026-10-20-class-armor-design.md §4 rule 8), and creates no table or closure per
+-- GetPlayerInfoByGUID per line: in step 4.4 when the class-armor rule applies, see
+-- docs/specs/2026-10-20-class-armor-design.md §4 rule 8, or in step 4.7 on a bare "LF crafter"
+-- line, which step 4.4 never asks about), and creates no table or closure per
 -- line: buffers are module-level and reused. A match fills the one module-level `result`;
 -- callers copy what they keep.
 local Matcher = {}
@@ -187,6 +188,76 @@ local function matchProfessionWord()
   return true
 end
 
+-- Step 4.7 ("LF crafter" spec 2026-10-28): the profession word of the sender's armor type, the
+-- simplification ClassArmor uses on Classic.
+local armorProfession = { plate = "blacksmithing", mail = "leatherworking", leather = "leatherworking", cloth = "tailoring" }
+local crafterWords = { crafter = true, crafters = true }
+local lfFillerWords = { a = true, any = true, some = true }
+-- User ruling 2026-10-28: "crafter for flask", "crafter to make", "crafter who can": the line
+-- names something, even when nothing here can read what. "2" and "4" are chat shorthand for to
+-- and for ("LF crafter 2 make", "LF crafter 4 my alt").
+local namingWords = { ["for"] = true, to = true, who = true, that = true, ["2"] = true, ["4"] = true }
+
+-- The index of a "crafter" token right after an "lf" one (one lfFillerWords word between at
+-- most), with nothing but spaces between, else nil. BreakBefore, a string search, is asked only
+-- once the words fit.
+local function lfCrafterAt()
+  for i = 1, tokenCount - 1 do
+    if tokens[i] == "lf" then
+      local k = lfFillerWords[tokens[i + 1]] and i + 2 or i + 1
+      if crafterWords[tokens[k]] and not BreakBefore(i + 1) and (k == i + 1 or not BreakBefore(k)) then
+        return k
+      end
+    end
+  end
+  return nil
+end
+
+-- Whether step 4.2 hit anything, also a lone hit it set aside or a hit R4 dropped.
+local function phraseHit(hasSet)
+  if hasSet or PhraseMatch.setAside ~= nil then
+    return true
+  end
+  local dropped, run = PhraseMatch.dropped, PhraseMatch.dropRun
+  for i = 1, tokenCount do
+    if dropped[i] == run then
+      return true
+    end
+  end
+  return false
+end
+
+-- Step 4.7, only after steps 4.1-4.6 found nothing: "LF crafter" naming no want (no item link,
+-- step 4.2 hit, profession word, word step 4.4 knows anywhere in the line, or for / to / who /
+-- that / 2 / 4 right after "crafter") is a profession lead for the sender's armor type, behind the
+-- profession-word setting (user ruling 2026-10-28: the armor guess is for a bare line only).
+-- Step 4.4 counted no word on such a line, so it never asked the class: the class lookup here is
+-- still the line's only one. The profession is looked up in index.professionWords, so one no
+-- character has gives no match, as in step 4.6. Everyday words ("LF crafter, back in 5"), "ring"
+-- aside, count only when step 4.4 counted them: a cue word next to them, never across a break
+-- (.claude/rules/matcher-adjacent-words.md); a naming word names something only with no break
+-- after "crafter" ("LF crafter, for a friend" still leads).
+local function matchLfCrafter(hasSet)
+  if not index.professionWordAlerts then
+    return false
+  end
+  local at = lfCrafterAt()
+  if at == nil or Tokenizer.itemCount > 0 or (namingWords[tokens[at + 1]] and not BreakBefore(at + 1)) then
+    return false
+  end
+  if WordGroups.NamedWant(index, tokens, tokenCount) or phraseHit(hasSet) then
+    return false
+  end
+  local armor, label = senderArmor()
+  local key = armor and index.professionWords[armorProfession[armor]]
+  if key == nil then
+    return false
+  end
+  Candidates.Profession(intentToken, key, tokens[at])
+  Candidates.Why(label)
+  return true
+end
+
 local function matchTokens()
   if matchItemLink() then
     return true
@@ -196,7 +267,7 @@ local function matchTokens()
     return true
   end
   local hasSet = phrases == "set"
-  return matchStatSlot() or matchWords(hasSet) or matchTypos(hasSet) or matchProfessionWord()
+  return matchStatSlot() or matchWords(hasSet) or matchTypos(hasSet) or matchProfessionWord() or matchLfCrafter(hasSet)
 end
 
 -- Steps 2-4 on the text. → result or nil; lastStop says why.

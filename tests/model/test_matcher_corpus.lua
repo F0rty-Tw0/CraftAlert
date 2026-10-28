@@ -6,9 +6,17 @@ local Fixture = require("tests.helpers.matcher_fixture")
 -- the §6.2 item 6 fixture index. The corpus is the only file this test needs beyond the
 -- fixture helper; the user approved its lines and labels 2026-10-19 (Task 1.8 corpus gate).
 local SENDER = "Customer-Other"
+local GUID_PREFIX = "Player-0-"
 
-local function outcome(ns, text)
-  local result = ns.Matcher.Match("trade", text, SENDER)
+-- case.class: the sender's class token, served for the GUID GUID_PREFIX .. class.
+local function stubClasses()
+  Wow.stub("GetPlayerInfoByGUID", function(guid)
+    return "Localized", string.sub(guid, #GUID_PREFIX + 1)
+  end)
+end
+
+local function outcome(ns, text, class)
+  local result = ns.Matcher.Match("trade", text, SENDER, class and GUID_PREFIX .. class)
   if result == nil then
     return "silent:" .. ns.Matcher.lastStop
   end
@@ -33,9 +41,10 @@ return function()
   Assert.truthy(#corpus >= 100, "at least 100 labeled lines")
   local ns = Fixture.load()
   ns.Matcher.SetIndex(Fixture.index(ns))
+  stubClasses()
   local failures, hits = {}, 0
   for i, case in ipairs(corpus) do
-    local want, got = expected(case), outcome(ns, case.text)
+    local want, got = expected(case), outcome(ns, case.text, case.class)
     if want ~= got then
       failures[#failures + 1] = string.format("#%d %q: want %s, got %s", i, case.text, want, got)
     end
