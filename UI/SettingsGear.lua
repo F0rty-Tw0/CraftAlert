@@ -25,17 +25,24 @@ local function showTooltip(gear)
   tooltip:Show()
 end
 
+-- The gear's art on `button`: its normal texture (button.normal) and an additive copy as its
+-- highlight (button.highlight), the atlas or, without it, the file.
+local function addGearArt(button)
+  local art = Theme.ART
+  button.normal = button:CreateTexture(nil, "ARTWORK")
+  FrameKit.Art(button.normal, art.GEAR_ATLAS, art.GEAR_FILE)
+  button:SetNormalTexture(button.normal)
+  button.highlight = button:CreateTexture(nil, "HIGHLIGHT")
+  FrameKit.Art(button.highlight, art.GEAR_ATLAS, art.GEAR_FILE, "ADD")
+  button:SetHighlightTexture(button.highlight)
+end
+
 -- The gear Button under `parent`, sized and painted but not placed; a click runs onClick().
 function SettingsGear.Build(parent, onClick)
-  local size, art = Theme.LAYOUT.GEAR_SIZE, Theme.ART
+  local size = Theme.LAYOUT.GEAR_SIZE
   local gear = _G["CreateFrame"]("Button", nil, parent)
   gear:SetSize(size, size)
-  gear.normal = gear:CreateTexture(nil, "ARTWORK")
-  FrameKit.Art(gear.normal, art.GEAR_ATLAS, art.GEAR_FILE)
-  gear:SetNormalTexture(gear.normal)
-  gear.highlight = gear:CreateTexture(nil, "HIGHLIGHT")
-  FrameKit.Art(gear.highlight, art.GEAR_ATLAS, art.GEAR_FILE, "ADD")
-  gear:SetHighlightTexture(gear.highlight)
+  addGearArt(gear)
   gear:SetScript("OnClick", function()
     onClick()
   end)
@@ -51,14 +58,9 @@ end
 -- anchored after it: the highlight lights the gear, never the label. Never in settings mode (the
 -- line hides with the list), so no back arrow.
 function SettingsGear.BuildLabeled(parent, onClick)
-  local size, art = Theme.LAYOUT.GEAR_SIZE, Theme.ART
+  local size = Theme.LAYOUT.GEAR_SIZE
   local link = _G["CreateFrame"]("Button", nil, parent)
-  link.normal = link:CreateTexture(nil, "ARTWORK")
-  FrameKit.Art(link.normal, art.GEAR_ATLAS, art.GEAR_FILE)
-  link:SetNormalTexture(link.normal)
-  link.highlight = link:CreateTexture(nil, "HIGHLIGHT")
-  FrameKit.Art(link.highlight, art.GEAR_ATLAS, art.GEAR_FILE, "ADD")
-  link:SetHighlightTexture(link.highlight)
+  addGearArt(link)
   for _, texture in ipairs({ link.normal, link.highlight }) do
     texture:ClearAllPoints()
     texture:SetSize(size, size)
