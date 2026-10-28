@@ -405,7 +405,15 @@ return {
     expect = "silent",
     stop = "nomatch",
     src = "user",
-    note = "4.7 'crafter to' names a want; 'ring' sits too far from a cue for step 4.4 (ruling 2026-10-28)",
+    note = "4.7 'crafter to' names a want; so does 'ring', cued or not (ruling 2026-10-28)",
+  },
+  {
+    text = "LF crafter, ring me",
+    class = "WARRIOR",
+    expect = "silent",
+    stop = "nomatch",
+    src = "user",
+    note = "4.7 'ring' is a want anywhere in the line, even after a break (ruling 2026-10-28)",
   },
   {
     text = "LF crafter pls, legs",

@@ -99,7 +99,15 @@ local function testEverydayWords()
     local cued = "LF crafter " .. word
     Assert.equal(outcome(ns, cued), today[word], "today: " .. cued)
     check(ns, "cued " .. word, cued, W, today[word])
+  end
+  for _, word in ipairs({ "back", "hand", "head" }) do
     check(ns, word .. " after a break", "LF crafter, " .. word .. " me", W, "profession:" .. BS, 1)
+  end
+  -- "off hand" is "offhand", a want even after a break (Slang.HandWord).
+  check(ns, "off hand after a break", "LF crafter, off hand", W, "stop:nomatch", 0)
+  -- User ruling 2026-10-28: "ring" is a want anywhere in the line, after a break too.
+  for _, line in ipairs({ "LF crafter, need ring", "LF crafter pls ring", "LF crafter - ring", "LF crafter, ring me" }) do
+    check(ns, "ring anywhere", line, W, "stop:nomatch", 0)
   end
   -- A cue or buyer word counts an armor slot word (R3): a want, so today's result, and step 4.4's
   -- lookup is the line's only one (no plate legs indexed).
@@ -125,8 +133,8 @@ end
 -- "crafter(s)" then for / to / who / that in the same clause names something, even when Craft
 -- Alert cannot read what; a word step 4.4 knows anywhere in the line names a want, even one it
 -- did not count (an ambiguous word with no cue next to it), and so does an extraSlang key with
--- no recipe indexed. Everyday words (back, ring, hand, head...) after a break still need a cue
--- (testEverydayWords).
+-- no recipe indexed. Everyday words (back, hand, head...) after a break still need a cue
+-- (testEverydayWords); "ring" never does.
 local function testNamedSomething()
   local ns = fullIndex()
   check(ns, "for", "LF crafter for flask", W, "stop:nomatch", 0)

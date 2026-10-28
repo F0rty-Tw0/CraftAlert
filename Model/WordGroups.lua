@@ -603,8 +603,9 @@ end
 -- (any profession, whether a character has it or not), or a token anywhere is a word collect
 -- knows (wordIndex or Slang.wordSet, collect's test) or an extraSlang key (indexed or not), even
 -- one collect left uncounted for want of a cue, apart from everyday chat words (Slang.everydaySlot:
--- "LF crafter, back in 5" stays bare). Matcher's "LF crafter" step reads it, so a bare line is
--- told from one step 4.4 just could not match (user ruling 2026-10-28: a named want beats the
+-- "LF crafter, back in 5" stays bare) other than "ring" (user ruling 2026-10-28: "LF crafter, ring
+-- me" names a ring; PhraseMatch R4 still reads it as everyday). Matcher's "LF crafter" step reads
+-- it, so a bare line is told from one step 4.4 just could not match (user ruling 2026-10-28: a named want beats the
 -- armor guess). Same tokens, count and breakBefore as that Match.
 function WordGroups.NamedWant(index, tokens, count, breakBefore)
   if lineCount > 0 or namedCount > 0 then
@@ -616,7 +617,7 @@ function WordGroups.NamedWant(index, tokens, count, breakBefore)
     if token == "hand" then
       token = HandWord(tokens, i, breakBefore)
     end
-    if token and not everydaySlot[token] and (wordIndex[token] or slangWords[token] or extraSlang[token]) then
+    if token and (token == "ring" or not everydaySlot[token]) and (wordIndex[token] or slangWords[token] or extraSlang[token]) then
       return true
     end
   end
