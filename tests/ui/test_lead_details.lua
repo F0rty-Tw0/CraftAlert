@@ -557,17 +557,22 @@ local function testButtons()
     ns.LeadDetails.Layout(d, width)
     Assert.same({ b.greet:GetWidth(), b.whisper:GetWidth(), b.dismiss:GetWidth() }, { expected, expected, expected }, width)
   end
-  -- Greet's tooltip; the other buttons have none.
+  -- Each button's tooltip: Greet names who gets the whisper; Whisper and Dismiss have no click line.
   Widgets.fire(b.greet, "OnEnter")
-  Assert.same(
-    { tip().owner, tip().anchor, tip().lines },
-    { b.greet, "ANCHOR_RIGHT", { "Greet", " ", "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper" } }
-  )
-  Assert.same(tip().colors, { GOLD, {}, GREEN, GREEN, GREEN })
+  Assert.same({ tip().owner, tip().anchor, tip().lines }, {
+    b.greet,
+    "ANCHOR_RIGHT",
+    { "Greet", "Whispers Buyer-Realm", " ", "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper" },
+  })
+  Assert.same(tip().colors, { GOLD, WHITE, {}, GREEN, GREEN, GREEN })
   Widgets.fire(b.greet, "OnLeave")
   Assert.equal(tip().shown, false)
   Widgets.fire(b.whisper, "OnEnter")
+  Assert.same({ tip().owner, tip().lines, tip().colors }, { b.whisper, { "Whisper", "Open a whisper without the greeting" }, { GOLD, WHITE } })
+  Widgets.fire(b.whisper, "OnLeave")
   Widgets.fire(b.dismiss, "OnEnter")
+  Assert.same({ tip().owner, tip().lines }, { b.dismiss, { "Dismiss", "Remove this lead" } })
+  Widgets.fire(b.dismiss, "OnLeave")
   Assert.equal(tip().shown, false)
   -- The actions, once the lead has been up a second.
   Wow.clock.gettime = Wow.clock.gettime + 1
@@ -591,6 +596,9 @@ local function testButtons()
     Widgets.click(button)
   end
   Assert.equal(#calls, count)
+  -- Cleared: Greet's tooltip names no one.
+  Widgets.fire(b.greet, "OnEnter")
+  Assert.same(tip().lines, { "Greet", " ", "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper" })
 end
 
 -- Review Focus 3: the look rule runs on the details' own shownAt, reset whenever another lead shows.

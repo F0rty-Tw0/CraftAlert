@@ -31,8 +31,9 @@ local ANCHOR = "ANCHOR_RIGHT"
 -- apart, at most BUTTON_WIDTH wide (spec A.4 small hosts).
 local BUTTON_GAP, BUTTON_WIDTH, BUTTON_HEIGHT = 8, 100, 22
 
--- Left to right: each button's key in details.buttons, its label and what it does to the shown
--- lead, read at click time. Greet and Dismiss act as a left and a right click, look rule included.
+-- Left to right: each button's key in details.buttons, its label, what it does to the shown lead,
+-- read at click time, and its tooltip for that lead, read at hover time. Greet and Dismiss act as
+-- a left and a right click, look rule included.
 local ACTIONS = {
   {
     key = "greet",
@@ -40,6 +41,7 @@ local ACTIONS = {
     run = function(details)
       ClickRouter.Handle("LeftButton", details.lead, details.shownAt)
     end,
+    tip = CardTipText.Greet,
   },
   {
     key = "whisper",
@@ -47,6 +49,7 @@ local ACTIONS = {
     run = function(details)
       GreetAction.Empty(details.lead)
     end,
+    tip = CardTipText.Whisper,
   },
   {
     key = "dismiss",
@@ -54,6 +57,7 @@ local ACTIONS = {
     run = function(details)
       ClickRouter.Handle("RightButton", details.lead, details.shownAt)
     end,
+    tip = CardTipText.Dismiss,
   },
 }
 
@@ -93,6 +97,13 @@ local function createButton(details, action, previous)
       action.run(details)
     end
   end)
+  button:HookScript("OnEnter", function()
+    local tip = Tooltip.Get()
+    tip:SetOwner(button, ANCHOR)
+    action.tip(tip, details.lead)
+    tip:Show()
+  end)
+  button:HookScript("OnLeave", Tooltip.HideIfOwned)
   return button
 end
 
@@ -108,14 +119,6 @@ local function createBar(details)
     previous = createButton(details, action, previous)
     details.buttons[action.key] = previous
   end
-  local greet = details.buttons.greet
-  greet:HookScript("OnEnter", function()
-    local tip = Tooltip.Get()
-    tip:SetOwner(greet, ANCHOR)
-    CardTipText.Greet(tip)
-    tip:Show()
-  end)
-  greet:HookScript("OnLeave", Tooltip.HideIfOwned)
 end
 
 -- On screen again (the window reopened, UIParent back after Alt+Z): the lead counts as shown from

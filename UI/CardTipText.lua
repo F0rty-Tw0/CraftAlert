@@ -127,11 +127,26 @@ function CardTipText.Crafters(tip, lead)
   end
 end
 
--- "Greet" and the first three click lines (the fourth, dismiss, is not the button's).
-function CardTipText.Greet(tip)
+-- "Greet", who gets the whisper (when there is a lead), and the first three click lines (the
+-- fourth, dismiss, is not the button's).
+function CardTipText.Greet(tip, lead)
   title(tip, Localization.Text("Greet"))
+  if lead then
+    white(tip, Localization.Text("Whispers %s", tostring(lead.customer)))
+  end
   local lines = LeadText.ClickLines()
   instructions(tip, { lines[1], lines[2], lines[3] })
+end
+
+-- No click line on Whisper and Dismiss: the button's label is the click.
+function CardTipText.Whisper(tip)
+  title(tip, Localization.Text("Whisper"))
+  white(tip, Localization.Text("Open a whisper without the greeting"))
+end
+
+function CardTipText.Dismiss(tip)
+  title(tip, Localization.Text("Dismiss"))
+  white(tip, Localization.Text("Remove this lead"))
 end
 
 local function customerColor(lead, fallback)
