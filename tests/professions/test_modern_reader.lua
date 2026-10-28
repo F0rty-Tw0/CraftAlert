@@ -578,10 +578,47 @@ local function newestCases()
   Assert.equal(recipesOf(db)[2].muted, nil)
 end
 
+-- §5.3 learn path with a newestLine: a new older-line recipe at or below the newest line's rank
+-- starts muted; everything else stores as before.
+local function readOneCases()
+  local state, ModernReader, db, run = setup()
+  db.characters[CHAR].professions[BS].newestLine = 2883
+  recipesOf(db)[446001] = { item = 102, name = "Belt 446001", prof = BS, line = 2883 }
+  recipesOf(db)[446002] = { item = 103, name = "Belt 446002", prof = BS, line = 2883 }
+  local function learn(id, line)
+    local extra = { learned = false }
+    if line then
+      extra.profession = { professionID = line, parentProfessionID = BS }
+    end
+    state.recipes[#state.recipes + 1] = belt(id, id * 10, extra)
+    return ModernReader.ReadOne(id, BS)
+  end
+  Assert.equal(learn(2400, 2540), true)
+  Assert.equal(recipesOf(db)[2400].muted, true, "older line, ID below the newest line's rank: muted")
+  Wow.runTimers() -- the rebuild is a Slicer job, as in the existing learn test
+  Assert.same(run.reasons, { "learn" }, "stored, one rebuild")
+  learn(470000, 2918)
+  Assert.equal(recipesOf(db)[470000].muted, nil, "a newer line stores unmuted")
+  learn(2401, 2883)
+  Assert.equal(recipesOf(db)[2401].muted, nil, "the newest line stores unmuted")
+  learn(2402, nil)
+  Assert.equal(recipesOf(db)[2402].muted, nil, "no line stores unmuted")
+  learn(480000, 2540)
+  Assert.equal(recipesOf(db)[480000].muted, nil, "a stray high-ID older recipe is above the rank: unmuted")
+  recipesOf(db)[2400].muted = nil
+  Assert.equal(ModernReader.ReadOne(2400, BS), true)
+  Assert.equal(recipesOf(db)[2400].muted, nil, "an already stored recipe keeps the player's state")
+
+  db.characters[CHAR].professions[BS].newestLine = nil
+  learn(2403, 2540)
+  Assert.equal(recipesOf(db)[2403].muted, nil, "no newestLine yet: nothing muted")
+end
+
 return function()
   readFlow("retail")
   readFlow("forever")
   newestCases()
+  readOneCases()
   fieldsOfAnyRecipe()
 
   -- In an instance a profession window is never read, on show or on a list update.
