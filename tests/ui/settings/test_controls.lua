@@ -155,6 +155,15 @@ local function testSearch()
   box.text = "plate"
   box:ClearFocus()
   Assert.same(seen, { "belt", "", "plate" }, "focus loss commits")
+  box.text = "be"
+  Widgets.fire(box, "OnTextChanged", true)
+  box.text = "bel"
+  Widgets.fire(box, "OnTextChanged", true)
+  Assert.same({ seen[#seen - 1], seen[#seen] }, { "be", "bel" }, "each typed change commits")
+  local count = #seen
+  box.text = "other"
+  Widgets.fire(box, "OnTextChanged", false)
+  Assert.equal(#seen, count, "a programmatic change commits nothing")
 end
 
 local function testChoice()

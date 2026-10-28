@@ -104,6 +104,11 @@ local function testCraftersPage()
   Assert.same({ search.template, search.Instructions:GetText() }, { "SearchBoxTemplate", "Search recipes" }, "the native search box")
   Widgets.type(search, "BELT")
   Assert.falsy(texts():find("Plate Greaves", 1, true))
+  Widgets.type(search, "")
+  Assert.truthy(texts():find("Plate Greaves", 1, true), "an emptied search lists every recipe")
+  search.text = "belt"
+  Widgets.fire(search, "OnTextChanged", true)
+  Assert.falsy(texts():find("Plate Greaves", 1, true), "narrowed without Enter")
   -- The speaker, swapped for the crossed-out speaker while muted (one texture, never greyed).
   local mute = rowOf(9001).mute
   Assert.same({ #mute.regions, mute.icon.atlas, mute.icon.desaturated }, { 1, "voicechat-icon-speaker", false }, "not muted: the speaker")

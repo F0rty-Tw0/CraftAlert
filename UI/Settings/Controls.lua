@@ -276,8 +276,10 @@ function Controls.Input(column, label, onCommit, maxLetters, tip)
 end
 
 -- A search box (SearchBoxTemplate: magnifier, clear button) with `placeholder` as the template's
--- empty-box text in place of a label, committed as commitOn says. The clear button empties the
--- box and clears its focus; with no focus to lose, its click commits here. The template keeps its
+-- empty-box text in place of a label, committed as commitOn says and on every typed change
+-- (OnTextChanged with userInput; Set and other programmatic SetText commit nothing, and commit
+-- skips an unchanged text). The clear button empties the box and clears its focus; with no focus
+-- to lose, its click commits here. The template keeps its
 -- own font and insets (room for the magnifier and the clear button). `row.settingsLabel` is the
 -- placeholder, and the title of its tip.
 function Controls.Search(column, placeholder, onCommit, tip)
@@ -289,6 +291,11 @@ function Controls.Search(column, placeholder, onCommit, tip)
   box.Instructions:SetText(placeholder)
   local set, commit = commitOn(box, onCommit)
   box.clearButton:HookScript("OnClick", commit)
+  box:HookScript("OnTextChanged", function(_, userInput)
+    if userInput then
+      commit()
+    end
+  end)
   if tip then
     Controls.Tip(row, placeholder, tip, box)
   end
