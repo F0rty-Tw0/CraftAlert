@@ -489,7 +489,26 @@ local function testDismissedFlag()
   Assert.same({ dismissed.dismissed, ignored.dismissed, expired.dismissed }, { true, true, nil })
 end
 
+-- Clear all: every lead is dismissed (not expired, for the away summary) with one "change", and
+-- the saved db.leads table itself is emptied, so the leads stay gone after a reload. With no leads
+-- it fires nothing.
+local function testDismissAll()
+  local ns, db = setup()
+  local Leads = ns.Leads
+  local saved = db.leads
+  local first, second = newLead(ns, "LF plate belt"), newLead(ns, "LF plate greaves", "Other-Draenor")
+  local seen = listen(Leads)
+  Leads.DismissAll()
+  Assert.same({ first.dismissed, second.dismissed }, { true, true })
+  Assert.same({ #Leads.List(), Leads.HasActive(), seen.change }, { 0, false, 1 })
+  Assert.equal(db.leads, saved, "the bound table, not a new one")
+  Assert.equal(#saved, 0, "nothing left to save")
+  Leads.DismissAll()
+  Assert.equal(seen.change, 1, "no leads: no event")
+end
+
 return function()
+  testDismissAll()
   testDismissedFlag()
   testLinkArrivesLater()
   testLinkLoadFails()

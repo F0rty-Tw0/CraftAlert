@@ -624,6 +624,19 @@ function Leads.Dismiss(id)
   end
 end
 
+-- The player's own removal of every lead (Clear all): each is `dismissed`, as in Dismiss. The list
+-- is emptied in place: `leads` is the bound db.leads, and a new table would leave them saved.
+function Leads.DismissAll()
+  if #leads == 0 then
+    return
+  end
+  for i = #leads, 1, -1 do
+    leads[i].dismissed = true
+    leads[i] = nil
+  end
+  fire("change")
+end
+
 -- Blizzard's ignore list changed (IGNORELIST_UPDATE): drop the open leads of every ignored customer.
 function Leads.DismissIgnored()
   if dropIgnored(leads) then
