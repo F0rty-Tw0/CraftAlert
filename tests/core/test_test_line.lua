@@ -97,8 +97,8 @@ end
 
 local function testStops()
   local ns, _, _, handler = load()
-  Assert.same(run(handler, "hello"), { "No match (stopped at: prefilter)" })
-  Assert.same(run(handler, "xmog belt"), { "No match (stopped at: prefilter)" }, "an x word that is no burst is line text")
+  Assert.same(run(handler, "hello"), { "No match: the line does not look like a request" })
+  Assert.same(run(handler, "xmog belt"), { "No match: the line does not look like a request" }, "an x word that is no burst is line text")
   Assert.equal(rawget(_G, TOAST), nil)
 
   -- Matched, but the customer is on Blizzard's ignore list: no lead.

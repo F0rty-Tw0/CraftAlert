@@ -424,8 +424,8 @@ local function testCraftersZone()
     "Alt-Other",
     "Bob",
     "Picked for this lead: Me",
-    "Can't send an order (realm)",
-    "Click to choose the main crafter",
+    "Can't send an order (other realm)",
+    "Click: choose the main crafter",
   })
   Assert.same({ tip().colors[1], tip().colors[2], tip().colors[3], tip().colors[7] }, { GOLD, { MAGE.r, MAGE.g, MAGE.b }, WHITE, GREEN })
   Assert.same(tip().rights[2], { "R3 (conc)", GREY[1], GREY[2], GREY[3] })
@@ -446,10 +446,10 @@ local function testTipFollowsLead()
   old.crafter = "Bob-Realm"
   local ns, d = open({ old, UiFixture.lead(2, "Buyer-Realm") }, 2)
   Widgets.fire(d.zones.crafters, "OnEnter")
-  Assert.same(tip().lines, { "Crafters", "Me", "Picked for this lead: Me", "Click to choose the main crafter" })
+  Assert.same(tip().lines, { "Crafters", "Me", "Picked for this lead: Me", "Click: choose the main crafter" })
   ns.LeadDetails.Show(d, leadOf(ns, 1))
   Widgets.fire(d.zones.crafters, "OnEnter")
-  Assert.same(tip().lines, { "Crafters", "Bob", "Picked for this lead: Bob", "Click to choose the main crafter" })
+  Assert.same(tip().lines, { "Crafters", "Bob", "Picked for this lead: Bob", "Click: choose the main crafter" })
 end
 
 -- Main-crafter spec §3: a left-click on the Crafters zone (any modifier) opens the menu. Every other

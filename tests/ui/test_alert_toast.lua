@@ -116,7 +116,7 @@ local function testLazyFrameAndContent()
   ns.AlertToast.Show(ns.Leads.Latest())
   shown = texts()
   Assert.truthy(string.find(shown, "Wants " .. link .. " — you can craft it", 1, true), shown)
-  Assert.truthy(string.find(shown, "can't order (realm)", 1, true), shown)
+  Assert.truthy(string.find(shown, "Can't send an order (other realm)", 1, true), shown)
   Assert.falsy(string.find(shown, "R2", 1, true), "no rank, no R part: " .. shown)
 
   -- Native-HUD spec §4.1: the rank sits on the detail line; the crafter is not drawn.
@@ -144,7 +144,7 @@ local function testDetailLine()
     end,
   })
   ns.AlertToast.Show(ns.Leads.Latest())
-  Assert.equal(part("GameFontDisableSmall")[1].text, "R2 (conc) · can't order (realm)")
+  Assert.equal(part("GameFontDisableSmall")[1].text, "R2 (conc) · Can't send an order (other realm)")
 end
 
 local function testHeight()

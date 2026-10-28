@@ -11,7 +11,7 @@ local WARRIOR, MAGE_CODE = DetailsFixture.WARRIOR, DetailsFixture.MAGE_CODE
 -- The name starts right of the 36 px icon and a 10 px gap.
 local PAD = DetailsFixture.PAD
 local NAME_LEFT = PAD + 36 + 10
-local SEP = "  -  "
+local SEP = " · "
 local load, open = DetailsFixture.load, DetailsFixture.open
 local itemLead, gold = DetailsFixture.itemLead, DetailsFixture.gold
 

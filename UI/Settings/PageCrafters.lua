@@ -58,7 +58,7 @@ end
 
 -- page: { character, enabled, remove, profession, primary (the main crafter toggle), list, ... }
 local function createCharacterRows(column, page)
-  Controls.Section(column, Localization.Text("Character"))
+  Controls.Section(column, Localization.Text("This character"))
   page.character = Controls.Choice(column, Localization.Text("Character"), {}, function()
     page.ShowCharacter()
   end)
@@ -93,7 +93,7 @@ local function createCharacterRows(column, page)
 end
 
 local function createProfessionRows(column, page)
-  Controls.Section(column, Localization.Text("Professions"))
+  Controls.Section(column, Localization.Text("Recipes"))
   page.profession = Controls.Choice(column, Localization.Text("Profession"), {}, function()
     page.ShowProfession()
   end)

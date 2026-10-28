@@ -29,10 +29,18 @@ local CHANNEL_EVENT = "CHAT_MSG_CHANNEL"
 local GUILD_EVENT = "CHAT_MSG_GUILD"
 local COMMUNITIES_EVENT = "CHAT_MSG_COMMUNITIES_CHANNEL"
 
--- Settings keys in the order they are listed, with the event each one arrives on and the name
--- the status line shows. Retail Services (42) and LookingForGroup (26) were not seen in Phase
--- 0 (flavor-choices.md); 26 is the client's own ID for LookingForGroup.
-local CHANNELS = { "trade", "services", "general", "lfg", "guild", "communities" }
+-- Settings keys in the order they are listed, each with its name (the one table behind the
+-- status line, the General page's toggles and a lead's channel word), and below, the event each
+-- one arrives on. Retail Services (42) and LookingForGroup (26) were not seen in Phase 0
+-- (flavor-choices.md); 26 is the client's own ID for LookingForGroup.
+ScanGate.CHANNELS = {
+  { key = "trade", label = "Trade" },
+  { key = "services", label = "Services" },
+  { key = "general", label = "General" },
+  { key = "lfg", label = "LookingForGroup" },
+  { key = "guild", label = "Guild" },
+  { key = "communities", label = "Communities" },
+}
 local CHANNEL_EVENTS = {
   trade = CHANNEL_EVENT,
   services = CHANNEL_EVENT,
@@ -41,14 +49,12 @@ local CHANNEL_EVENTS = {
   guild = GUILD_EVENT,
   communities = COMMUNITIES_EVENT,
 }
-local CHANNEL_NAMES = {
-  trade = "Trade",
-  services = "Services",
-  general = "General",
-  lfg = "LookingForGroup",
-  guild = "Guild",
-  communities = "Communities",
-}
+local CHANNEL_NAMES = {}
+
+for _, channel in ipairs(ScanGate.CHANNELS) do
+  CHANNEL_NAMES[channel.key] = channel.label
+end
+
 -- CHAT_MSG_CHANNEL: the zone channel ID, never secret and the same on every client language.
 local TRADE_ZONE_CHANNEL = 2
 local ZONE_CHANNELS = { [1] = "general", [TRADE_ZONE_CHANNEL] = "trade", [42] = "services", [26] = "lfg" }
@@ -190,7 +196,8 @@ end
 local function enabledChannels()
   local keys = {}
   local switches = db and db.settings.channels or {}
-  for _, key in ipairs(CHANNELS) do
+  for _, channel in ipairs(ScanGate.CHANNELS) do
+    local key = channel.key
     if available[key] and switches[key] == true then
       keys[#keys + 1] = key
     end

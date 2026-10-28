@@ -14,8 +14,6 @@ local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 -- in flight (Begin..End), then says what the line did.
 local TestReport = {}
 
-local tostring = tostring
-
 local MATCH = "match"
 
 local delivering = false
@@ -57,7 +55,7 @@ function TestReport.Print()
     printLead(Leads.Latest())
     say("Updated the existing test lead (same customer asked again)")
   elseif Matcher.lastStop ~= MATCH then
-    say("No match (stopped at: %s)", tostring(Matcher.lastStop))
+    ChatPrint.Line(LeadText.StopText(Matcher.lastStop))
   else
     say("Matched, but none of your enabled characters can answer it, or the customer is on your ignore list")
   end

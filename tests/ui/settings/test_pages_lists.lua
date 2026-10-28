@@ -66,6 +66,10 @@ local function testCraftersPage()
   local me = db.characters["Me-Realm"]
   open(ns, "Crafters")
   take(refreshes)
+  local page = texts()
+  Assert.truthy(page:find("This character", 1, true), "the first section is named for the group, not the dropdown")
+  Assert.truthy(page:find("Recipes", 1, true), page)
+  Assert.falsy(page:find("Professions", 1, true), "no heading that echoes the Profession dropdown")
   local character = row("Character").input
   Assert.equal(character.Text:GetText(), "Me-Realm (this character)", "opens on the current character")
   Widgets.pick(character, "Alt-Realm")
@@ -549,7 +553,7 @@ local function testTestPage()
   shown = texts()
   Assert.truthy(shown:find("Profession: 333", 1, true), shown)
   Widgets.type(row("Test a line").input, "hello there")
-  Assert.truthy(texts():find("No match (stopped at: prefilter)", 1, true), texts())
+  Assert.truthy(texts():find("No match: the line does not look like a request", 1, true), texts())
   Assert.same(db.leads, {}, "no lead")
 end
 

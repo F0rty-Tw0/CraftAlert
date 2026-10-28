@@ -21,15 +21,6 @@ local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls
 -- flavor does not have is not shown (§6.1).
 local PageGeneral = { id = "general", title = Localization.Text("General") }
 
-local CHANNELS = {
-  { key = "trade", label = "Trade" },
-  { key = "services", label = "Services" },
-  { key = "general", label = "General" },
-  { key = "lfg", label = "LookingForGroup" },
-  { key = "guild", label = "Guild" },
-  { key = "communities", label = "Communities" },
-}
-
 local function settings()
   return _G["CraftAlertDB"].settings
 end
@@ -70,7 +61,7 @@ function PageGeneral.Create(parent)
   toggle("Only where Trade chat exists", settings, "onlyResting", evaluate)
   Controls.Section(column, Localization.Text("Channels"))
   local available = Constants.flavors[FlavorCompat.flavorKey].channels
-  for _, channel in ipairs(CHANNELS) do
+  for _, channel in ipairs(ScanGate.CHANNELS) do
     if available[channel.key] then
       toggle(channel.label, channels, channel.key, rebuildChannels)
     end

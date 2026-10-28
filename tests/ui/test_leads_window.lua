@@ -132,11 +132,11 @@ local function testContentFrameAndBand()
   Assert.equal(status:GetText(), "2 leads")
   -- The band follows the leads (Bootstrap's change subscription) and is empty in Settings.
   ns.Leads.Dismiss(ns.Leads.Latest().id)
-  Assert.equal(status:GetText(), "1 leads")
+  Assert.equal(status:GetText(), "1 lead")
   Widgets.click(frame.gear)
   Assert.equal(status:GetText(), "")
   Widgets.click(frame.gear)
-  Assert.equal(status:GetText(), "1 leads")
+  Assert.equal(status:GetText(), "1 lead")
   ns.Leads.Dismiss(ns.Leads.Latest().id)
   Assert.equal(status:GetText(), "")
 end

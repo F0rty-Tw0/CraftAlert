@@ -103,7 +103,7 @@ function PageGreetings.Create(parent)
     state.note.Set(prof ~= nil and settings.notes[prof] or "")
     for i, template in ipairs(TEMPLATES) do
       local greeting = Greeting.Build(sampleLead(template, prof, textOf(state.options, prof)), settings)
-      lines[i]:SetText(Localization.Text("%s: %s", template.label, greeting))
+      lines[i]:SetText(Localization.Text("%s: %s", Localization.Text(template.label), greeting))
     end
   end
   Controls.Section(column, Localization.Text("Templates ({item} {crafter} {profession} {customer})"))
