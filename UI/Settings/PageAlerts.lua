@@ -42,7 +42,7 @@ function PageAlerts.SoundName(kit, index)
     return Localization.Text("Sound %d", index)
   end
   local words = best:gsub("_", " ")
-  return words:sub(1, 1) .. words:sub(2):lower()
+  return Localization.Text(words:sub(1, 1) .. words:sub(2):lower())
 end
 
 local function soundOptions()
@@ -62,9 +62,10 @@ local function playSound()
 end
 
 local function addSound(column, add)
-  local choice = Controls.Choice(column, Localization.Text("Alert sound"), soundOptions(), function(value)
+  local label = Localization.Text("Alert sound")
+  local choice = Controls.Choice(column, label, soundOptions(), function(value)
     settings().sound = value
-  end, Localization.Text("The sound played with each new lead. Play tries the chosen one; None is silent."))
+  end)
   -- Under the label, Play first and the dropdown in the rest of the line; the 20 px button sits
   -- 2 px up, in the middle of the dropdown's 24.
   local layout = Theme.LAYOUT
@@ -73,6 +74,9 @@ local function addSound(column, add)
   choice.input:ClearAllPoints()
   choice.input:SetPoint("BOTTOMLEFT", play, "BOTTOMRIGHT", layout.PADDING, -2)
   choice.input:SetPoint("BOTTOMRIGHT", choice.row, "BOTTOMRIGHT", 0, 0)
+  -- Play takes the mouse inside the row, so it shows the row's tip too.
+  local tip = Localization.Text("The sound played with each new lead. Play tries the chosen one; None is silent.")
+  Controls.Tip(choice.row, label, tip, choice.input, play)
   add(function()
     choice.Set(settings().sound)
   end)

@@ -102,7 +102,7 @@ local CRAFTERS = {
 local function hover(frame)
   Widgets.fire(frame, "OnEnter")
   local tip = _G["CraftAlertTooltip"]
-  local seen = { owner = tip.owner, lines = tip.lines, colors = tip.colors }
+  local seen = { owner = tip.owner, lines = tip.lines, colors = tip.colors, wraps = tip.wraps, minWidth = tip.minWidth }
   Widgets.fire(frame, "OnLeave")
   return seen
 end
@@ -115,6 +115,8 @@ local function check(ns, entry)
   Assert.same(seen.lines, { label, text }, page .. " / " .. label)
   Assert.same(seen.colors, { { 1, 0.82, 0 }, { 1, 1, 1 } }, label)
   Assert.truthy(#text <= 240, label .. " tip is too long for a short tooltip")
+  -- The tip's own width, whatever the host: a narrow page (the WhisperMessenger rail) cannot squeeze it.
+  Assert.same({ seen.wraps[2], seen.minWidth }, { true, 300 }, label .. ": the text wraps at TIP_WIDTH")
 end
 
 return function()
@@ -122,6 +124,12 @@ return function()
   for _, entry in ipairs(TIPS) do
     check(ns, entry)
   end
+
+  -- A1: Play sits in the sound row, so it shows the row's tip.
+  SettingsFixture.open(ns, "Alerts")
+  local play = SettingsFixture.button(SettingsFixture.window(), "Play")
+  local soundTip = "The sound played with each new lead. Play tries the chosen one; None is silent."
+  Assert.same(hover(play).lines, { "Alert sound", soundTip })
 
   ns = SettingsFixture.load({ db = CraftersFixture.crafters })
   for _, entry in ipairs(CRAFTERS) do
