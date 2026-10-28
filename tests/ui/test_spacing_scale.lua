@@ -63,6 +63,18 @@ local function testDetailsActionBar()
   Assert.same({ b.greet:GetHeight(), b.whisper:GetHeight(), b.dismiss:GetHeight() }, { 22, 22, 22 })
 end
 
+-- Oracle: the CraftScan prompt's anchors at d4386b3 (text 16 in, buttons 4 up and 4 off the middle).
+local function testCraftScanPromptAnchors()
+  local ns, db = SettingsFixture.load()
+  Wow.stub("CraftScan_DB", dofile("tests/fixtures/craftscan_db.lua"))
+  ns.CraftScanPrompt.MaybeShow(db)
+  local window = rawget(_G, "CraftAlertCraftScanPrompt")
+  Assert.same(window.text.points[1], { "TOPLEFT", window.Inset, "TOPLEFT", 16, -16 })
+  Assert.same(window.accept.points[1], { "BOTTOMRIGHT", window, "BOTTOM", -4, 4 })
+  Assert.same(window.decline.points[1], { "BOTTOMLEFT", window, "BOTTOM", 4, 4 })
+  Assert.same({ window.accept:GetWidth(), window.decline:GetWidth() }, { 110, 110 })
+end
+
 local function nothing() end
 
 -- Fresh Controls on a parent `width` px wide, as test_controls_stacked.lua. → Controls, column
@@ -168,6 +180,7 @@ return function()
   testButtonWidthsKeepTheirPixels()
   testMuteAllHalves()
   testDetailsActionBar()
+  testCraftScanPromptAnchors()
   testHeadingGap()
   testToolbarGaps()
   testNoMagicSpacingLeft()
