@@ -16,10 +16,17 @@ local function testText()
   Assert.equal(H({ crafter = "Alt-Other", recipeName = "Plate Belt" }), "Wants Plate Belt — your alt Alt-Other can craft it")
   Assert.equal(H({ crafter = "Alt-Other", profName = "Blacksmithing" }), "Wants Blacksmithing — your alt Alt-Other has it")
   -- A lead's channel key as its word; an unknown key as itself; no key, nil.
-  local channels = { trade = "Trade", services = "Services", general = "General", lfg = "LFG", guild = "Guild", communities = "Community" }
+  local channels = { trade = "Trade", services = "Services", general = "General", lfg = "LookingForGroup", guild = "Guild", communities = "Communities" }
   for key, name in pairs(channels) do
     Assert.equal(ns.LeadText.Channel({ channel = key }), name, key)
   end
+  -- One table feeds the lead words and the settings toggles, in the toggles' order.
+  local keys, labels = {}, {}
+  for i, channel in ipairs(ns.LeadText.CHANNELS) do
+    keys[i], labels[i] = channel.key, channel.label
+  end
+  Assert.same(keys, { "trade", "services", "general", "lfg", "guild", "communities" })
+  Assert.same(labels, { "Trade", "Services", "General", "LookingForGroup", "Guild", "Communities" })
   Assert.equal(ns.LeadText.Channel({ channel = "weird" }), "weird")
   Assert.equal(ns.LeadText.Channel({}), nil)
   Wow.reset()

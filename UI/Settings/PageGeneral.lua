@@ -11,6 +11,7 @@ local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local ModernRows = ns.ModernRows or require("CraftAlert.UI.RecipeMarkers.ModernRows")
 local ClassicRows = ns.ClassicRows or require("CraftAlert.UI.RecipeMarkers.ClassicRows")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
+local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
 -- Spec §9 General: enable, only where Trade chat exists, channels, profession-word alerts,
@@ -20,15 +21,6 @@ local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls
 -- channel also re-evaluates the gate, which owns the registered chat events. A channel the
 -- flavor does not have is not shown (§6.1).
 local PageGeneral = { id = "general", title = Localization.Text("General") }
-
-local CHANNELS = {
-  { key = "trade", label = "Trade" },
-  { key = "services", label = "Services" },
-  { key = "general", label = "General" },
-  { key = "lfg", label = "LookingForGroup" },
-  { key = "guild", label = "Guild" },
-  { key = "communities", label = "Communities" },
-}
 
 local function settings()
   return _G["CraftAlertDB"].settings
@@ -70,7 +62,7 @@ function PageGeneral.Create(parent)
   toggle("Only where Trade chat exists", settings, "onlyResting", evaluate)
   Controls.Section(column, Localization.Text("Channels"))
   local available = Constants.flavors[FlavorCompat.flavorKey].channels
-  for _, channel in ipairs(CHANNELS) do
+  for _, channel in ipairs(LeadText.CHANNELS) do
     if available[channel.key] then
       toggle(channel.label, channels, channel.key, rebuildChannels)
     end

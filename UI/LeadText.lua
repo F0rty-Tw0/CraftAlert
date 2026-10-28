@@ -18,16 +18,21 @@ local floor = math.floor
 local max = math.max
 local tostring = tostring
 
--- A lead's channel key and its word, localized when shown. Only the keys come from
--- Core/ScanGate.lua:33; the words are the lead-cards spec's (§2.1), not the status line's.
-local CHANNEL_NAMES = {
-  trade = "Trade",
-  services = "Services",
-  general = "General",
-  lfg = "LFG",
-  guild = "Guild",
-  communities = "Community",
+-- A lead's channel key and its word, localized when shown, in the General page's toggle order.
+-- The keys come from Core/ScanGate.lua:33; the words are the channel names the player sees.
+LeadText.CHANNELS = {
+  { key = "trade", label = "Trade" },
+  { key = "services", label = "Services" },
+  { key = "general", label = "General" },
+  { key = "lfg", label = "LookingForGroup" },
+  { key = "guild", label = "Guild" },
+  { key = "communities", label = "Communities" },
 }
+
+local CHANNEL_NAMES = {}
+for _, channel in ipairs(LeadText.CHANNELS) do
+  CHANNEL_NAMES[channel.key] = channel.label
+end
 
 -- The matched item link, else the recipe, else the profession.
 function LeadText.What(lead)
