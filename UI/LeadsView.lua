@@ -10,12 +10,13 @@ local LeadDetails = ns.LeadDetails or require("CraftAlert.UI.LeadDetails")
 local LeadsList = ns.LeadsList or require("CraftAlert.UI.LeadsList")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local LedgerStrip = ns.LedgerStrip or require("CraftAlert.UI.LedgerStrip")
+local ClearAllLink = ns.ClearAllLink or require("CraftAlert.UI.ClearAllLink")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local Status = ns.Status or require("CraftAlert.Core.Status")
 
 -- Spec A.2, A.6, assumption 2: the leads split view, built into any parent frame (the leads
 -- window's content frame, or a WhisperMessenger panel host). The ledger line (UI/LedgerStrip.lua,
--- spec §8) across the top; under it the list pane (UI/LeadsList.lua) on the left, the details
+-- spec §8) across the top, "Clear all" at its right (UI/ClearAllLink.lua); under it the list pane (UI/LeadsList.lua) on the left, the details
 -- pane (UI/LeadDetails.lua) of the selected lead on the right, a 1 px divider between them; with
 -- no leads the details pane says so (the list may be WM's icon rail, too narrow for the text). Each pane paints its atlas behind an InsetFrameTemplate art frame, as
 -- WhisperMessenger's panes do (RetailChrome.lua:56-58,70,85-88, WM). The selection follows the
@@ -111,6 +112,7 @@ function LeadsView.Refresh(view, leads)
     Leads.MarkSeen(selected.id)
   end
   LedgerStrip.Refresh(view.strip)
+  ClearAllLink.SetEnabled(view.clearAll, #leads > 0)
   local height = view.getHeight() - Theme.LAYOUT.LEDGER_HEIGHT
   LeadsList.Refresh(view.list, leads, LeadsList.Fit(height), view.selectedId)
   view.empty:SetShown(#leads == 0)
@@ -146,6 +148,11 @@ function LeadsView.New(parent, opts)
   view.listPane = createPane(frame, Theme.ART.PANEL_BACKGROUND)
   view.listPane:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -Theme.LAYOUT.LEDGER_HEIGHT)
   view.listPane:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
+  -- In the band over the list, at its right (in the strip: it hides with it, in an instance); the
+  -- counts start right of the list.
+  view.clearAll = ClearAllLink.Build(view.strip)
+  view.clearAll:SetPoint("BOTTOMRIGHT", view.listPane, "TOPRIGHT", -Theme.LAYOUT.PADDING, 0)
+  LedgerStrip.SetLeftEdge(view.strip, view.listPane)
   view.detailsPane = createPane(frame, Theme.ART.WIDE_PANEL_BACKGROUND)
   -- off-scale: the 1 px divider between the panes.
   view.detailsPane:SetPoint("TOPLEFT", view.listPane, "TOPRIGHT", 1, 0)
@@ -166,10 +173,12 @@ function LeadsView.New(parent, opts)
 end
 
 -- Re-reads the list width; the details get the rest of the parent (0 wide: not known yet). A list
--- narrower than the minimum (WM's divider on its rail) is icon-only.
+-- narrower than the minimum (WM's divider on its rail) is icon-only, and "Clear all" hides when the
+-- band over the list cannot hold it.
 function LeadsView.Layout(view)
   local listWidth = view.getListWidth()
   view.listPane:SetWidth(listWidth)
+  view.clearAll:SetShown(listWidth >= view.clearAll:GetWidth() + 2 * Theme.LAYOUT.PADDING)
   LeadsList.SetCompact(view.list, listWidth < Theme.LAYOUT.LIST_MIN_WIDTH)
   LeadDetails.Layout(view.details, view.parent:GetWidth() - listWidth - 1)
 end

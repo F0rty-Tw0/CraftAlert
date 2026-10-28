@@ -95,15 +95,15 @@ local function enterSettings()
 end
 
 -- The gear and its "Settings" label sit at the ledger line's right, centred on it vertically; the
--- counts end before them. They start right of the list: WM's divider hairline and its resize
--- handle's line run down the host at the split, through the ledger band, over the host's children
--- (UI/MessengerWindow/LayoutBuilder/ContactsSection.lua:107-130, WM), so they never cross the text.
+-- counts end before them. They start right of the list (LeadsView sets that edge): WM's divider
+-- hairline and its resize handle's line run down the host at the split, through the ledger band,
+-- over the host's children (UI/MessengerWindow/LayoutBuilder/ContactsSection.lua:107-130, WM), so
+-- they never cross the text.
 local function placeLedger()
   local padding = Theme.LAYOUT.PADDING
   local link = SettingsGear.BuildLabeled(view.strip, BridgePanel.ToggleSettings)
   link:SetPoint("RIGHT", view.strip, "RIGHT", -padding, 0)
   LedgerStrip.SetRightInset(view.strip, padding + link:GetWidth() + padding)
-  LedgerStrip.SetLeftEdge(view.strip, view.listPane)
 end
 
 local function build(host)

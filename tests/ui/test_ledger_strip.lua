@@ -45,13 +45,14 @@ local function testLayout()
   Assert.equal(strip:GetHeight(), STRIP_HEIGHT)
   Assert.same(view.listPane.points[1], { "TOPLEFT", host, "TOPLEFT", 0, -STRIP_HEIGHT })
   Assert.equal(strip.text.font, ns.Theme.FONTS.body)
-  -- Bound on both sides, one line: a narrow host cuts the text instead of overflowing.
+  -- Bound on both sides, one line: a narrow host cuts the text instead of overflowing. It starts
+  -- right of the list ("Clear all" holds the band over it).
   local padding = ns.Theme.LAYOUT.PADDING
-  Assert.same(strip.text.points, { { "LEFT", strip, "LEFT", padding, 0 }, { "RIGHT", strip, "RIGHT", -padding, 0 } })
+  Assert.same(strip.text.points, { { "BOTTOMLEFT", view.listPane, "TOPRIGHT", padding, 0 }, { "TOPRIGHT", strip, "TOPRIGHT", -padding, 0 } })
   Assert.equal(strip.text.wordWrap, false)
   -- WhisperMessenger's panel ends the text before its "Settings" link; the left side stays.
   ns.LedgerStrip.SetRightInset(strip, 88)
-  Assert.same(strip.text.points, { { "LEFT", strip, "LEFT", padding, 0 }, { "RIGHT", strip, "RIGHT", -88, 0 } })
+  Assert.same(strip.text.points, { { "BOTTOMLEFT", view.listPane, "TOPRIGHT", padding, 0 }, { "TOPRIGHT", strip, "TOPRIGHT", -88, 0 } })
   -- A left edge keeps the right inset, and a later right inset keeps the edge.
   local edge = _G["CreateFrame"]("Frame")
   ns.LedgerStrip.SetLeftEdge(strip, edge)

@@ -299,7 +299,8 @@ local function testGearAfterRailSplit()
 end
 
 -- The gear and its "Settings" label sit at the ledger line's right, centred on it vertically; the
--- counts end before them (8 + 72 + 8). The lead header keeps its default 16 px inset.
+-- counts end before them (8 + 72 + 8). "Clear all" sits over the list. The lead header keeps its
+-- default 16 px inset.
 local function testLinkOnLedgerLine()
   local ns, _, _, wm = boot()
   local captured = capture(ns)
@@ -307,6 +308,7 @@ local function testLinkOnLedgerLine()
   local link, strip, details = gearOf(host), captured.view.strip, captured.view.details
   Assert.equal(link.parent, strip)
   Assert.same(link.points, { { "RIGHT", strip, "RIGHT", -8, 0 } })
+  Assert.same(captured.view.clearAll.points, { { "BOTTOMRIGHT", captured.view.listPane, "TOPRIGHT", -8, 0 } })
   Assert.same(strip.text.points[2], { "TOPRIGHT", strip, "TOPRIGHT", -88, 0 })
   for _, line in ipairs({ details.lineOne, details.lineTwo }) do
     Assert.same(line.points[2], { "RIGHT", details.header, "RIGHT", -16, 0 })
