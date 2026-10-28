@@ -28,13 +28,8 @@ local ipairs = ipairs
 local type = type
 local lower = string.lower
 local sort = table.sort
-local create = coroutine.create
-local resume = coroutine.resume
-local yield = coroutine.yield
-local status = coroutine.status
 
 local JOB = "index"
-local PAUSE_EVERY = 8 -- pause weight per clock read
 
 local function append(map, key, value)
   local list = map[key]
@@ -298,7 +293,6 @@ local current = nil
 local rebuilt = {}
 local pendingNames = {}
 local pendingSet = {} -- lowercase name -> the client's spelling
-local generation = 0 -- sliced jobs started; tells the running job whether it was replaced
 
 Index.lastBuildMs = nil -- CPU ms of the last build: the sum of its steps
 Index.lastBuildSteps = nil -- Slicer steps of the last build; 1 for a synchronous one
@@ -347,48 +341,17 @@ function Index.Rebuild()
   return index
 end
 
--- The sliced build: each step resumes the coroutine, which yields from pause once
--- Slicer.BUDGET_MS has passed since that resume (the clock is read once the weights passed to
--- pause add up to PAUSE_EVERY, so a run of heavy loop bodies reads it after each).
--- Pause runs only in plain Lua loop bodies: never in a sort comparator, a gsub callback, a
--- metamethod or under pcall (Lua 5.1 cannot yield across those). An abandoned coroutine (the
--- job restarted or cancelled) is never resumed, so StatSlot.Begin's reset holds for the next.
--- A step error carries the coroutine's stack, which the Slicer's pcall can't see.
+-- The sliced build runs through Slicer.Run, which yields at the pause points and carries a step
+-- error's coroutine stack. An abandoned coroutine (the job restarted or cancelled) is never
+-- resumed, so StatSlot.Begin's reset holds for the next. A subscriber may request a rebuild
+-- from swapIn: the new job replaces this one under the same name and runs on.
 local function startJob(db, opts)
-  generation = generation + 1
-  local mine = generation
-  local clock = _G["debugprofilestop"]
-  local resumedAt, work, spent, steps = 0, 0, 0, 0
-  local function pause(weight)
-    work = work + (weight or 1)
-    if work >= PAUSE_EVERY then
-      work = 0
-      if clock() - resumedAt >= Slicer.BUDGET_MS then
-        yield()
-      end
-    end
-  end
-  local thread = create(function()
+  local run
+  run = Slicer.Run(JOB, function(pause)
     return Index.Build(db, db.settings, buildOpts(opts, pause))
+  end, function(index)
+    swapIn(index, run.ms, run.steps)
   end)
-  Slicer.Start(JOB, {
-    step = function()
-      resumedAt = clock()
-      local ok, result = resume(thread)
-      spent, steps = spent + (clock() - resumedAt), steps + 1
-      if not ok then
-        local stack = _G["debugstack"]
-        error(type(stack) == "function" and tostring(result) .. "\n" .. stack(thread) or result, 0)
-      end
-      if status(thread) ~= "dead" then
-        return false
-      end
-      swapIn(result, spent, steps)
-      -- A subscriber that requested a rebuild replaced this job under the same name; false
-      -- keeps the Slicer from removing the new one as done.
-      return generation == mine
-    end,
-  })
 end
 
 -- Starts the sliced build, or restarts it: the db may have changed under a half-built index,

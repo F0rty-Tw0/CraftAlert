@@ -64,11 +64,15 @@ local function runStep()
   cursor = cursor % #entries + 1
   Slicer.stats.steps = Slicer.stats.steps + 1
   local ok, result = pcall(entry.job.step)
-  local index = indexOf(entry.name) -- nil when the step cancelled its own job
+  local index = indexOf(entry.name)
+  -- A step that cancelled or restarted its own job leaves its replacement (or nothing) here.
+  local ownEntry = index ~= nil and entries[index] == entry
   if not ok then
-    Slicer.Cancel(entry.name)
+    if ownEntry then
+      Slicer.Cancel(entry.name)
+    end
     EventRouter.ReportError(result)
-  elseif index and result == true then
+  elseif ownEntry and result == true then
     remove(index)
   end
 end
@@ -136,15 +140,17 @@ end
 
 -- A job that runs work(pause) in a coroutine, as Index's sliced build does: pause(weight) yields
 -- once BUDGET_MS has passed since the step began (the clock is read when the weights add up to
--- PAUSE_EVERY). When work returns, onDone gets what it returned; it must not start a job of
--- the same name (the Slicer would take that one for done). Pause only in plain Lua loop
--- bodies: never in a sort comparator, a gsub callback or under pcall (Lua 5.1 cannot yield
--- across those). A cancelled job is never resumed; onCancel (optional) runs instead.
+-- PAUSE_EVERY). When work returns, onDone gets what it returned; it may start a job of the
+-- same name, which runs on. Pause only in plain Lua loop bodies: never in a sort comparator, a
+-- gsub callback or under pcall (Lua 5.1 cannot yield across those). A cancelled job is never
+-- resumed; onCancel (optional) runs instead. → { ms, steps }: the CPU ms spent in the work and
+-- the steps it took so far, final by the time onDone runs.
 local PAUSE_EVERY = 8
 
 function Slicer.Run(name, work, onDone, onCancel)
   local clock = _G["debugprofilestop"]
   local resumedAt, weightSum = 0, 0
+  local run = { ms = 0, steps = 0 }
   local function pause(weight)
     weightSum = weightSum + (weight or 1)
     if weightSum >= PAUSE_EVERY then
@@ -158,6 +164,7 @@ function Slicer.Run(name, work, onDone, onCancel)
     return work(pause)
   end)
   local function finish(ok, ...)
+    run.ms, run.steps = run.ms + (clock() - resumedAt), run.steps + 1
     if not ok then
       local stack = _G["debugstack"]
       local err = ...
@@ -176,6 +183,7 @@ function Slicer.Run(name, work, onDone, onCancel)
     end,
     onCancel = onCancel,
   })
+  return run
 end
 
 -- The pause for work that runs outside a sliced job: never yields.
