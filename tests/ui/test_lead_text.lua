@@ -21,9 +21,10 @@ local function testText()
   for key, name in pairs(channels) do
     Assert.equal(ns.LeadText.Channel({ channel = key }), name, key)
   end
-  -- One table feeds the lead words and the settings toggles, in the toggles' order.
+  -- One table (ScanGate's) feeds the lead words, the status line and the settings toggles, in
+  -- the toggles' order.
   local keys, labels = {}, {}
-  for i, channel in ipairs(ns.LeadText.CHANNELS) do
+  for i, channel in ipairs(ns.ScanGate.CHANNELS) do
     keys[i], labels[i] = channel.key, channel.label
   end
   Assert.same(keys, { "trade", "services", "general", "lfg", "guild", "communities" })

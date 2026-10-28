@@ -9,28 +9,20 @@ local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local CrafterRank = ns.CrafterRank or require("CraftAlert.Model.CrafterRank")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 
 -- The words a lead shows as: the toast, the leads list rows, the details pane (header, Quality
--- row), the tooltips and WhisperMessenger's info lines.
+-- row), the tooltips and WhisperMessenger's info lines; also the test-line result words (StopText).
 local LeadText = {}
 
 local floor = math.floor
 local max = math.max
 local tostring = tostring
 
--- A lead's channel key and its word, localized when shown, in the General page's toggle order.
--- The keys come from Core/ScanGate.lua:33; the words are the channel names the player sees.
-LeadText.CHANNELS = {
-  { key = "trade", label = "Trade" },
-  { key = "services", label = "Services" },
-  { key = "general", label = "General" },
-  { key = "lfg", label = "LookingForGroup" },
-  { key = "guild", label = "Guild" },
-  { key = "communities", label = "Communities" },
-}
-
+-- A lead's channel key and its word, localized when shown; ScanGate.CHANNELS owns both.
 local CHANNEL_NAMES = {}
-for _, channel in ipairs(LeadText.CHANNELS) do
+
+for _, channel in ipairs(ScanGate.CHANNELS) do
   CHANNEL_NAMES[channel.key] = channel.label
 end
 
@@ -85,9 +77,11 @@ local STOP_WORDS = {
 -- The result line for a Matcher stop reason; a code without words is shown as itself.
 function LeadText.StopText(reason)
   local words = STOP_WORDS[reason]
+
   if words then
     return Localization.Text(words)
   end
+
   return Localization.Text("No match (%s)", tostring(reason))
 end
 

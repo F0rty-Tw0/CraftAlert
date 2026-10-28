@@ -11,7 +11,6 @@ local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local ModernRows = ns.ModernRows or require("CraftAlert.UI.RecipeMarkers.ModernRows")
 local ClassicRows = ns.ClassicRows or require("CraftAlert.UI.RecipeMarkers.ClassicRows")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
-local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 
 -- Spec §9 General: enable, only where Trade chat exists, channels, profession-word alerts,
@@ -62,7 +61,7 @@ function PageGeneral.Create(parent)
   toggle("Only where Trade chat exists", settings, "onlyResting", evaluate)
   Controls.Section(column, Localization.Text("Channels"))
   local available = Constants.flavors[FlavorCompat.flavorKey].channels
-  for _, channel in ipairs(LeadText.CHANNELS) do
+  for _, channel in ipairs(ScanGate.CHANNELS) do
     if available[channel.key] then
       toggle(channel.label, channels, channel.key, rebuildChannels)
     end
