@@ -87,12 +87,13 @@ local function fireTimer()
 end
 
 -- Mark all read: every listed lead of the ids is seen with one "seen" (no lead) and no "change";
--- nothing new to mark fires nothing. IsUnseen: neither greeted nor seen.
+-- nothing new to mark fires nothing. IsUnseen: neither greeted nor seen; CountUnseen counts them.
 local function testMarkAllSeen()
   local ns = setup()
   local Leads = ns.Leads
   local first, second = newLead(ns, "LF plate belt"), newLead(ns, "LF plate greaves", "Other-Draenor")
   Assert.same({ Leads.IsUnseen(first), Leads.IsUnseen(second) }, { true, true })
+  Assert.equal(Leads.CountUnseen({ first, second }), 2)
   local seen, events = listen(Leads), {}
   Leads.On("seen", function(...)
     events[#events + 1] = select("#", ...)
@@ -106,6 +107,8 @@ local function testMarkAllSeen()
   second.seen = false
   Leads.MarkGreeted(second.id)
   Assert.equal(Leads.IsUnseen(second), false, "greeted")
+  Assert.equal(Leads.CountUnseen({ first, second, { greeted = false, seen = false } }), 1, "only the unseen one")
+  Assert.equal(Leads.CountUnseen({}), 0)
 end
 
 -- Blizzard's ignore list: an ignored customer makes and refreshes no lead, and IGNORELIST_UPDATE

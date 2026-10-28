@@ -29,6 +29,8 @@ local function load()
   Fresh.require("Model.RealmTag")
   Fresh.require("Model.MainCrafter")
   local BindLookup = Fresh.require("Professions.BindLookup")
+  Fresh.require("Professions.RecipeStore")
+  Fresh.require("Professions.ReadJob")
   Fresh.require("Professions.ModernReader")
   local CraftScanImport = Fresh.require("Persistence.CraftScanImport")
   local calls = { queued = {}, rebuilds = {} }

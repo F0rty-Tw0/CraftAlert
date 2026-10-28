@@ -116,17 +116,6 @@ local function readFields(api, recipeID, info, profInfo)
   return { item = schematic and schematic.outputItemID, ranks = copyList(info.qualityItemIDs), name = info.name, line = lineOf(profInfo) }
 end
 
--- → changed, and queues the bind lookup when the output item's bind is unknown.
-local function store(recipes, recipeID, fields, professionKey)
-  local changed = RecipeStore.Merge(recipes, recipeID, fields, professionKey)
-  local recipe = recipes[recipeID]
-  if recipe.item and recipe.bind == nil then
-    BindLookup.Queue(recipe.item)
-    return changed, true
-  end
-  return changed, false
-end
-
 -- The base profession of the open window when it is one the current character stores.
 local function windowProfession(api)
   local getBase = api.GetBaseProfessionInfo
@@ -197,7 +186,7 @@ local OPS = {
   usableInfo = usableInfo,
   storeKey = storeKey,
   readFields = readFields,
-  store = store,
+  store = RecipeStore.Store,
   professionInfo = professionInfo,
 }
 
@@ -245,10 +234,7 @@ local function newJob(key, recipeIDs)
   -- A job cut off by a close, a guard, a replacing job or an error: what it stored so far goes
   -- to the index.
   job.onCancel = function()
-    if job.anyChanged then
-      job.anyChanged = false
-      Index.RequestRebuild("read")
-    end
+    ReadJob.CancelRebuild(job)
   end
   return job
 end
@@ -378,7 +364,7 @@ function ModernReader.ReadOne(recipeID, professionKey)
   local character = db.characters[PlayerName.Own()]
   local recipes = character.recipes
   local isNew = recipes[recipeID] == nil
-  local changed = store(recipes, recipeID, fields, professionKey)
+  local changed = RecipeStore.Store(recipes, recipeID, fields, professionKey)
   if isNew then
     muteIfOlder(character, recipeID, professionKey, fields.line)
   end

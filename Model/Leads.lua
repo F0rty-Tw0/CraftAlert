@@ -599,6 +599,17 @@ function Leads.IsUnseen(lead)
   return not lead.greeted and not lead.seen
 end
 
+-- How many leads of `list` are unseen (IsUnseen): the badge count of the caller's own list.
+function Leads.CountUnseen(list)
+  local count = 0
+  for _, lead in ipairs(list) do
+    if Leads.IsUnseen(lead) then
+      count = count + 1
+    end
+  end
+  return count
+end
+
 -- The customer's newest lead.
 function Leads.FindActiveByCustomer(key)
   for i = #leads, 1, -1 do

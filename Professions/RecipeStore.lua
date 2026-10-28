@@ -3,6 +3,8 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local BindLookup = ns.BindLookup or require("CraftAlert.Professions.BindLookup")
+
 -- Spec §5.2 stored recipe: how every window reader (ModernReader, ClassicReader) merges one
 -- recipe into a character's `recipes`. A merge only adds; the player's mute and a known bind
 -- survive it. Also ranks a profession's expansion lines by median recipe ID, names the newest,
@@ -52,6 +54,18 @@ function RecipeStore.Merge(recipes, recipeKey, fields, professionKey)
     old.line = fields.line or old.line
   end
   return changed
+end
+
+-- Merges the recipe (Merge) → changed, and queues the bind lookup when the output item's bind
+-- is unknown.
+function RecipeStore.Store(recipes, recipeKey, fields, professionKey)
+  local changed = RecipeStore.Merge(recipes, recipeKey, fields, professionKey)
+  local recipe = recipes[recipeKey]
+  if recipe.item and recipe.bind == nil then
+    BindLookup.Queue(recipe.item)
+    return changed, true
+  end
+  return changed, false
 end
 
 -- Number keys (spell IDs) of the profession's recipes, grouped by line, each list sorted.

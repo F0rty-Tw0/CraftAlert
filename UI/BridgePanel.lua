@@ -159,13 +159,7 @@ end
 -- (shown in the details, or Mark all read). WM calls it on every icon refresh, so one pass and no
 -- WM call.
 local function badge()
-  local count = 0
-  for _, lead in ipairs(visibleLeads()) do
-    if Leads.IsUnseen(lead) then
-      count = count + 1
-    end
-  end
-  return count
+  return Leads.CountUnseen(visibleLeads())
 end
 
 -- WM's Mark all read (it took the preview down already and re-reads the badge after): the count
