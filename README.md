@@ -4,11 +4,13 @@ Craft Alert watches Trade chat for people asking for something one of your chara
 
 ## Screenshots
 
-A toast beside the launcher when someone asks for something your alt can craft:
+These shots show Craft Alert inside WhisperMessenger; without it, Craft Alert shows the toast beside its own launcher ring and opens its own leads window.
 
-![Toast beside the launcher ring](.github/screenshots/toast.png)
+A toast when someone asks for something your alt can craft:
 
-The leads window, with the selected request, who can craft it and the greeting that Greet sends. These shots show Craft Alert inside WhisperMessenger; without it, the same window opens on its own.
+![Toast as WhisperMessenger's preview](.github/screenshots/toast.png)
+
+The leads window, with the selected request, who can craft it and the greeting that Greet sends:
 
 ![Leads window](.github/screenshots/leads-window.png)
 
