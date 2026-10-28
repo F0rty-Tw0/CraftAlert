@@ -154,6 +154,7 @@ function DetailsHeader.Create(details)
   local layout, fonts = Theme.LAYOUT, Theme.FONTS
   local header = _G["CreateFrame"]("Frame", nil, details.frame)
   header:SetHeight(layout.DETAILS_HEADER_HEIGHT)
+  -- off-scale: the header sits 2 px under the pane's top edge, kept as is.
   header:SetPoint("TOPLEFT", details.frame, "TOPLEFT", 0, -2)
   header:SetPoint("TOPRIGHT", details.frame, "TOPRIGHT", 0, -2)
   details.header = header

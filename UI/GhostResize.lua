@@ -33,6 +33,7 @@ local function createGrip(frame)
   local art = Theme.ART
   local grip = _G["CreateFrame"]("Button", nil, frame)
   grip:SetSize(GRIP_SIZE, GRIP_SIZE)
+  -- off-scale: the grip's inset from the window's corner art, kept as is.
   grip:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 4)
   grip:EnableMouse(true)
   grip:SetFrameLevel((frame.TitleContainer or frame):GetFrameLevel() + 20)
