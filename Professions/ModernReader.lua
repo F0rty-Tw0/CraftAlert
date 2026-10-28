@@ -34,7 +34,7 @@ local GUARDS = { "IsNPCCrafting", "IsTradeSkillGuild", "IsTradeSkillGuildMember"
 local db = nil
 local reads = {} -- by profession: { count, settled } of the last read that stored a recipe for it
 local windowOpen = false
-local updatePending = false -- a list update waits for the end of the frame
+local updatePending = false -- a list update waits for the next frame
 local activeJob = nil -- the job last started; running only while Slicer.IsRunning(JOB_NAME)
 local keptJob = nil -- a job its window cut off; the same key and recipe count resume it
 
@@ -318,7 +318,7 @@ function ModernReader.ForgetReads()
   end
 end
 
--- The frame's list updates, checked once on the list as it stands at the end of the frame: the
+-- The frame's list updates, checked once on the list as it stands on the next frame: the
 -- window may have closed since the first one came.
 local function onUpdateTimer()
   updatePending = false

@@ -339,7 +339,7 @@ local function countListReads()
 end
 
 -- TRADE_SKILL_LIST_UPDATE with the window closed checks nothing, and a burst of them in one
--- frame is checked once, on the list as it stands at the end of the frame.
+-- frame is checked once, on the list as it stands on the next frame.
 local function listUpdateCases()
   local state, _, db, _, Slicer = setup()
   state.recipes = threeBelts()
@@ -347,7 +347,7 @@ local function listUpdateCases()
   Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
   Assert.equal(reads.n, 0, "a window never opened: the list is not built")
   Assert.equal(Slicer.IsRunning("read"), false)
-  Assert.equal(Wow.pendingTimers(0), 0, "nothing waits for the end of the frame")
+  Assert.equal(Wow.pendingTimers(0), 0, "nothing waits for the next frame")
   Wow.fireEvent("TRADE_SKILL_SHOW")
   Slicer.Drain()
   Wow.runTimers()
@@ -371,7 +371,7 @@ local function listUpdateCases()
     state.recipes[i] = belt(i, i * 100)
     Wow.fireEvent("TRADE_SKILL_LIST_UPDATE")
   end
-  Assert.equal(reads.n, 0, "the burst waits for the end of the frame")
+  Assert.equal(reads.n, 0, "the burst waits for the next frame")
   Assert.equal(Wow.pendingTimers(0), 1, "one check for the whole burst")
   Wow.runTimers()
   Assert.equal(reads.n, 1, "five updates in one frame build the list once")
