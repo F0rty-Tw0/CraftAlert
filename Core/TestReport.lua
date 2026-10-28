@@ -7,7 +7,7 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
 local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
-local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
+local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 
 -- What `/ca test` prints (§7.3). Listens to the lead events, but only records while a test line is
@@ -34,7 +34,7 @@ local function printLead(lead)
   end
   say("Why: %s", lead.why)
   say("Crafter: %s", lead.crafter)
-  say("Greeting: %s", Greeting.Build(lead, _G["CraftAlertDB"].settings))
+  say("Greeting: %s", GreetAction.GreetingFor(lead))
 end
 
 -- Before a test line is delivered: forget the last one and start recording.

@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local SendGuard = ns.SendGuard or require("CraftAlert.Model.SendGuard")
@@ -16,7 +17,6 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local GreetAction = {}
 
 local find = string.find
-local match = string.match
 local pcall = pcall
 local type = type
 
@@ -27,7 +27,7 @@ local NOTICE = "Q:CraftAlert"
 -- (spec §10); elsewhere the stored Name-Realm key is the target.
 local function targetOf(lead)
   if FlavorCompat.isForever then
-    return match(lead.customer, "^[^-]*")
+    return PlayerName.NameOf(lead.customer)
   end
   return lead.customer
 end
@@ -54,7 +54,8 @@ local function dryRun(lead, text, ...)
   return true
 end
 
-local function greetingFor(lead)
+-- The greeting for `lead` from the saved settings; the details pane and `/ca test` show it too.
+function GreetAction.GreetingFor(lead)
   return Greeting.Build(lead, _G["CraftAlertDB"].settings)
 end
 
@@ -78,7 +79,7 @@ end
 -- is never sent: an empty whisper opens for the player to type into.
 -- shownAt: GetTime() when the toast or row showing the lead appeared, nil when none is visible.
 function GreetAction.Greet(lead, shownAt)
-  local greeting = greetingFor(lead)
+  local greeting = GreetAction.GreetingFor(lead)
   local target = targetOf(lead)
   if not find(greeting, "%S") then
     if not dryRun(lead, "Test, would open an empty whisper to %s", target) then
@@ -102,7 +103,7 @@ end
 
 -- Opens the edit box with the greeting; the player sends it (§7.1 shift-click).
 function GreetAction.Prefill(lead)
-  local target, greeting = targetOf(lead), greetingFor(lead)
+  local target, greeting = targetOf(lead), GreetAction.GreetingFor(lead)
   if not dryRun(lead, "Test, would open a whisper to %s with: %s", target, greeting) then
     opener(target, greeting)
   end

@@ -4,7 +4,6 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
-local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
@@ -218,7 +217,7 @@ end
 -- the whisper target in the customer's class colour (plain when unknown), left out when there is
 -- none.
 local function paintGreet(sections, lead)
-  local greeting = not lead.greeted and Greeting.Build(lead, _G["CraftAlertDB"].settings) or nil
+  local greeting = not lead.greeted and GreetAction.GreetingFor(lead) or nil
   setBubble(sections, "greet", greeting)
   local shown = sections.bubbles.greet:IsShown()
   local target = shown and GreetAction.Target(lead) or nil

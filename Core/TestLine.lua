@@ -44,12 +44,7 @@ end
 
 local function classToken(name)
   local wanted = upper(name)
-  for _, token in ipairs(ClassArmor.Tokens()) do
-    if token == wanted then
-      return token
-    end
-  end
-  return nil
+  return ClassArmor.For(wanted) and wanted or nil
 end
 
 -- → class token or nil, burst size, line; or nothing after printing the usage or the error.
