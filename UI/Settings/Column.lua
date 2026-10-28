@@ -100,9 +100,10 @@ function Column.Place(column, region, gap)
   measure(column)
 end
 
--- A collapsed region takes no gap above it and no height: the rows after it hang from the nearest
--- row above that is not collapsed, so its own height (an empty text's line, a frame) never shows,
--- and one gap stays between the neighbours. Uncollapsed, it gets its gap back.
+-- A collapsed region counts no gap above it and no height, and the rows after it hang from the
+-- nearest row above that is not collapsed, so one gap stays between the neighbours. It is not
+-- hidden: it sits under that row, over the next one, so the caller empties or hides it.
+-- Uncollapsed, it gets its gap back.
 function Column.Collapse(column, region, collapsed)
   local above
   for _, entry in ipairs(column.placed) do
