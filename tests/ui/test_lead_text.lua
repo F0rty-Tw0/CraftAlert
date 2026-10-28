@@ -29,6 +29,8 @@ local function testText()
   Assert.same(labels, { "Trade", "Services", "General", "LookingForGroup", "Guild", "Communities" })
   Assert.equal(ns.LeadText.Channel({ channel = "weird" }), "weird")
   Assert.equal(ns.LeadText.Channel({}), nil)
+  Assert.equal(ns.LeadText.RealmTag({ cannotOrder = true }), "Can't send an order (other realm)")
+  Assert.equal(ns.LeadText.RealmTag({}), nil)
   Wow.reset()
 end
 

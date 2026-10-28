@@ -106,10 +106,10 @@ function CardTipText.Crafters(tip, lead)
     white(tip, Localization.Text("Picked for this lead: %s", Greeting.CrafterName(lead.crafter)))
   end
   if lead.cannotOrder then
-    white(tip, Localization.Text("Can't send an order (realm)"))
+    white(tip, LeadText.RealmTag(lead))
   end
   if MainCrafterMenu.CanOpen(lead) then
-    instruction(tip, Localization.Text("Click to choose the main crafter"))
+    instruction(tip, Localization.Text("Click: choose the main crafter"))
   end
 end
 

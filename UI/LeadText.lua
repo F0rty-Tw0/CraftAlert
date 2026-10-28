@@ -64,10 +64,11 @@ function LeadText.Rank(lead)
   return Localization.Text("R%d", lead.rank)
 end
 
--- §7.2: "can't order (realm)" when the customer cannot send the crafter an order, else nil.
+-- §7.2: the one realm warning (toast, crafters tooltip, details pane) when the customer cannot
+-- send the crafter an order, else nil.
 function LeadText.RealmTag(lead)
   if lead.cannotOrder then
-    return Localization.Text("can't order (realm)")
+    return Localization.Text("Can't send an order (other realm)")
   end
   return nil
 end
