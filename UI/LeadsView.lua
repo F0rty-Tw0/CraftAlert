@@ -113,6 +113,7 @@ function LeadsView.New(parent, opts)
   view.listPane:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -Theme.LAYOUT.LEDGER_HEIGHT)
   view.listPane:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
   view.detailsPane = createPane(frame, Theme.ART.WIDE_PANEL_BACKGROUND)
+  -- off-scale: the 1 px divider between the panes.
   view.detailsPane:SetPoint("TOPLEFT", view.listPane, "TOPRIGHT", 1, 0)
   view.detailsPane:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
   view.divider = createDivider(view)

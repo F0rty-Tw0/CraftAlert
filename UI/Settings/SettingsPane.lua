@@ -143,6 +143,7 @@ local function build(host)
   nav:SetPoint("BOTTOMLEFT", container, "BOTTOMLEFT", 0, 0)
   nav:SetWidth(layout.LIST_WIDTH)
   local right = createPane(container, art.WIDE_PANEL_BACKGROUND)
+  -- off-scale: the 1 px divider between the panes.
   right:SetPoint("TOPLEFT", nav, "TOPRIGHT", 1, 0)
   right:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", 0, 0)
   createDivider(container, nav)

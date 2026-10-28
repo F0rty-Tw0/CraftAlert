@@ -287,6 +287,7 @@ end
 function Controls.Search(column, placeholder, onCommit, tip)
   local row = Column.Bar(column, Theme.LAYOUT.INPUT_HEIGHT)
   row.settingsLabel = placeholder
+  -- off-scale: the box starts 5 px in, clear of the template art.
   local box = create("EditBox", row, "SearchBoxTemplate")
   box:SetPoint("TOPLEFT", row, "TOPLEFT", 5, 0)
   box:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
