@@ -6,6 +6,7 @@ Player-friendly release notes for Craft Alert.
 
 - First release. Craft Alert watches chat for people asking for something one of your characters can craft and lets you greet them with one click. One folder works on Retail, WoW: Forever and the Classic flavors (Era, TBC Anniversary, Wrath, Cata, Mists of Pandaria).
 - Open each profession window once and Craft Alert knows that character's recipes, across every character on the account. On Era and TBC that includes Enchanting's craft window.
+- Recipes from older expansions start muted: Craft Alert alerts only for the newest expansion's recipes of each profession, and when you first open a profession after a new expansion it switches to that one (your own mutes for that profession are replaced, and a chat line says so). "Only <expansion>" on the Crafters page does the same on demand.
 - A recipe you learn while playing matches right away. On Classic it matches by name until you next open its profession window, which stores it for good.
 - Reading profession windows and building the recipe list happen in the background, a little each frame, without stalling the game.
 - Craft Alert listens in Trade and Services by default; General, LookingForGroup, Guild and Communities can be turned on where the game has them. "Only where Trade chat exists" keeps it listening wherever you have the Trade channel.
