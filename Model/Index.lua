@@ -319,6 +319,7 @@ function Index.Rebuild()
     return nil
   end
   Slicer.Cancel(JOB)
+  soonReason = nil
   local clock = _G["debugprofilestop"]
   local started = clock()
   local index = Index.Build(context.db, context.db.settings, buildOpts(context.opts))

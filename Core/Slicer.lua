@@ -142,7 +142,7 @@ end
 -- once BUDGET_MS has passed since the step began (the clock is read when the weights add up to
 -- PAUSE_EVERY). When work returns, onDone gets what it returned; it may start a job of the
 -- same name, which runs on. Pause only in plain Lua loop bodies: never in a sort comparator, a
--- gsub callback or under pcall (Lua 5.1 cannot yield across those). A cancelled job is never
+-- gsub callback, a metamethod or under pcall (Lua 5.1 cannot yield across those). A cancelled job is never
 -- resumed; onCancel (optional) runs instead. → { ms, steps }: the CPU ms spent in the work and
 -- the steps it took so far, final by the time onDone runs.
 local PAUSE_EVERY = 8
