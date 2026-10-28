@@ -63,6 +63,44 @@ local function testDetailsActionBar()
   Assert.same({ b.greet:GetHeight(), b.whisper:GetHeight(), b.dismiss:GetHeight() }, { 22, 22, 22 })
 end
 
+local function nothing() end
+
+-- Fresh Controls on a parent `width` px wide, as test_controls_stacked.lua. → Controls, column
+local function load(width)
+  Wow.reset()
+  Wow.flavor("retail")
+  Fresh.require("Core.FlavorCompat")
+  Fresh.require("UI.Theme")
+  Fresh.require("UI.FrameKit")
+  local Controls = Fresh.require("UI.Settings.Controls")
+  local parent = _G["CreateFrame"]("Frame", nil, _G["UIParent"])
+  parent:SetWidth(width)
+  return Controls, Controls.Column(parent)
+end
+
+local function create(parent)
+  return _G["CreateFrame"]("Frame", nil, parent)
+end
+
+-- The row under a heading hangs SPACE.S below it, once; a collapsed empty note spends it (the
+-- next row sits 16 below the heading until the note gets text).
+local function testHeadingGap()
+  local Controls, column = load(240)
+  Controls.Section(column, "A")
+  local note = Controls.Note(column)
+  local after = Controls.Toggle(column, "T", nothing).row
+  Assert.same({ -note.points[1][5], -after.points[1][5] }, { 0, 16 }, "a collapsed note spends the 8: the next row 16")
+  note:SetText("x") -- an empty note is collapsed to gap 0 (Task 5.9); text restores its baseGap
+  Assert.equal(-note.points[1][5], 8, "a note under a heading: 8")
+  Assert.equal(-after.points[1][5], 16, "the next row: 16, the 8 is spent once")
+  local other = Controls.Section(column, "B")
+  Assert.equal(-other.points[1][5], 32, "heading to heading: 32")
+  Controls.Section(column, "C")
+  local explicit = create(column.parent)
+  Controls.Place(column, explicit, 4) -- an explicit gap wins over the pending 8
+  Assert.equal(-explicit.points[1][5], 4)
+end
+
 -- Later tasks add rows: GONE["UI/X.lua"] = { "old declaration text", ... }.
 local GONE = {
   ["UI/Settings/PageAlerts.lua"] = { 'Localization.Text("Play"), 48,' },
@@ -109,5 +147,6 @@ return function()
   testButtonWidthsKeepTheirPixels()
   testMuteAllHalves()
   testDetailsActionBar()
+  testHeadingGap()
   testNoMagicSpacingLeft()
 end
