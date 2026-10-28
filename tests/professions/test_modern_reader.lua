@@ -557,8 +557,10 @@ local function newestCases()
   readWindow(Slicer)
   recipesOf(db)[446001].muted = true -- the player's pick
   state.recipes[2] = lined(2390, 105, 2540)
+  state.recipes[3] = belt(3, 106)
   readWindow(Slicer)
   Assert.equal(recipesOf(db)[2390].muted, true, "new older-line recipe starts muted")
+  Assert.equal(recipesOf(db)[3].muted, nil, "a new lineless recipe stays unmuted")
   Assert.equal(recipesOf(db)[446001].muted, true, "other mutes alone")
   Assert.equal(db.characters[CHAR].professions[BS].newestLine, 2883)
 
@@ -576,6 +578,13 @@ local function newestCases()
   readWindow(Slicer)
   Assert.equal(recipesOf(db)[1].muted, true, "a lineless recipe is left alone")
   Assert.equal(recipesOf(db)[2].muted, nil)
+
+  -- A saved newest line survives a read that finds no line at all.
+  state, _, db, _, Slicer = setup()
+  db.characters[CHAR].professions[BS].newestLine = 2883
+  state.recipes = { belt(1, 100) }
+  readWindow(Slicer)
+  Assert.equal(db.characters[CHAR].professions[BS].newestLine, 2883, "no line: the saved newestLine stays")
 
   -- A read newly stores an Enchanting recipe from the Blacksmithing window: Blacksmithing's
   -- rule skips it (its line is Enchanting's newest, not Blacksmithing's).
@@ -597,7 +606,7 @@ local function readOneCases()
   local state, ModernReader, db, run = setup()
   db.characters[CHAR].professions[BS].newestLine = 2883
   recipesOf(db)[446001] = { item = 102, name = "Belt 446001", prof = BS, line = 2883 }
-  recipesOf(db)[446002] = { item = 103, name = "Belt 446002", prof = BS, line = 2883 }
+  recipesOf(db)[446003] = { item = 103, name = "Belt 446003", prof = BS, line = 2883 }
   local function learn(id, line)
     local extra = { learned = false }
     if line then
@@ -610,6 +619,8 @@ local function readOneCases()
   Assert.equal(recipesOf(db)[2400].muted, true, "older line, ID below the newest line's rank: muted")
   Wow.runTimers() -- the rebuild is a Slicer job, as in the existing learn test
   Assert.same(run.reasons, { "learn" }, "stored, one rebuild")
+  learn(446002, 2540)
+  Assert.equal(recipesOf(db)[446002].muted, true, "an ID equal to the newest line's rank (446002) is muted")
   learn(470000, 2918)
   Assert.equal(recipesOf(db)[470000].muted, nil, "a newer line stores unmuted")
   learn(2401, 2883)
