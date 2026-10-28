@@ -36,13 +36,9 @@ local wordGroupsOnly = Slang.wordGroupsOnly
 local BreakBefore = Tokenizer.BreakBefore
 local HandWord = Slang.HandWord
 
--- User ruling 2026-10-25: the slot words that are everyday chat ("back in 5", "hand over", "ring me")
--- never filter an alias hit: Slang.wordGroupsOnly plus ring and head. Not Slang.ambiguous: legs,
--- leg, hands and feet still filter. "hand" is here; "off hand" filters as "offhand" (addHit).
-local everydaySlot = { ring = true, head = true }
-for word in pairs(wordGroupsOnly) do
-  everydaySlot[word] = true
-end
+-- The everyday-chat slot words never filter an alias hit (Slang.everydaySlot); "off hand"
+-- filters as "offhand" (addHit).
+local everydaySlot = Slang.everydaySlot
 ---@type table
 local index = nil
 -- The index's phraseKeys and phraseWordRange, read once per Run.
