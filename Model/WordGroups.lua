@@ -599,6 +599,13 @@ local function collect(index, tokens, count, breakBefore, hasSet)
   return whyCount
 end
 
+-- Whether the last Match's collect counted a word or met a profession word (any profession,
+-- whether a character has it or not): the line names a want. Matcher's "LF crafter" step reads
+-- it, so a bare line is told from one step 4.4 just could not match.
+function WordGroups.NamedWant()
+  return lineCount > 0 or namedCount > 0
+end
+
 -- Class-armor §4 rule 7: the sender's armor word joins the counted words (after the line's
 -- own, outside the MAX_WORDS cap) with its "<armor> (<class>)" why label. A cued ambiguous
 -- slot word (§4 rule 5) already counts through its cue word (collect).
