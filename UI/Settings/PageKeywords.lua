@@ -88,6 +88,11 @@ local function wordsInput(column, add, label, key, fallback, tip)
 end
 
 local function slangInput(column, add)
+  Controls.Note(column):SetText(
+    Localization.Text(
+      'Teach Craft Alert your own word for a slot or armor type, as word=target pairs separated by spaces. Example: kicks=boots makes "LF kicks" find boots. Targets are slot words (belt, boots, helm, chest) or type words (plate, mail, leather, cloth).'
+    )
+  )
   local input
   input = Controls.Input(column, Localization.Text("Extra slang (word=slot)"), function(text)
     db().settings.extraSlang = parseSlang(text)

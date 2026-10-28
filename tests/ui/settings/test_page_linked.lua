@@ -151,8 +151,15 @@ local function testClassic()
   Assert.falsy(SettingsFixture.texts():find("CraftScan", 1, true))
 end
 
+-- The import box says what goes in it.
+local function testImportHint()
+  load()
+  Assert.truthy(SettingsFixture.texts():find("Paste the string from your other account here, then click Import.", 1, true))
+end
+
 return function()
   testExport()
+  testImportHint()
   testImport()
   testCraftScan()
   testEnterImports()

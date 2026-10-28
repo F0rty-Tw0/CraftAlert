@@ -16,6 +16,10 @@ local function testKeywordsPage()
   local settings = db.settings
   open(ns, "Keywords")
   take(refreshes)
+  local shown = SettingsFixture.texts()
+  Assert.truthy(shown:find('Example: kicks=boots makes "LF kicks" find boots.', 1, true), shown)
+  local targets = "Targets are slot words (belt, boots, helm, chest) or type words (plate, mail, leather, cloth)."
+  Assert.truthy(shown:find(targets, 1, true), shown)
   Assert.equal(row("Intent words").input:GetText(), "lf lfc lfrc wtb wtc need needs looking any any1 anyone who recraft")
   Widgets.type(row("Intent words").input, "LF  need, wtb lf")
   Assert.same(settings.intentWords, { "lf", "need", "wtb" }, "lowercase, once each")
