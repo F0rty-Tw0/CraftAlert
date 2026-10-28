@@ -23,10 +23,6 @@ local subscribed = false
 
 local SECONDS_PER_DAY = 24 * 60 * 60
 local NOON = 12 * 60 * 60
--- Inline colour codes: a code replaces the FontString's rgb, never its alpha, so the strip's and
--- the tooltip's base colour is the opaque Theme grey.
-local GOLD_CODE = "|cffffd100"
-local CODE_END = "|r"
 local SEPARATOR = " · "
 -- Each counter in its lead dot's colour (UI/LeadText.lua); filled has no dot.
 local COUNTER_COLORS = {
@@ -68,7 +64,7 @@ end
 
 -- Gold "Today", then every counter.
 local function stripLine(counters)
-  return GOLD_CODE .. Localization.Text("Today") .. CODE_END .. "  " .. countsLine(counters, false)
+  return FrameKit.ThemeCode(Localization.Text("Today"), Theme.COLORS.gold) .. "  " .. countsLine(counters, false)
 end
 
 -- Row `i` (1 = today): "Today", "Yesterday", then "Sun 25 Oct". Stepped from today's noon, as

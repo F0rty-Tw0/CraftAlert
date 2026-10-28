@@ -7,6 +7,7 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
+local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local CardBody = ns.CardBody or require("CraftAlert.UI.CardBody")
 local CardTipText = ns.CardTipText or require("CraftAlert.UI.CardTipText")
@@ -45,7 +46,7 @@ local function infoText(lead)
   end
   local crafter = CardBody.Crafters(lead)[1]
   add(parts, crafter and FrameKit.ClassCode(crafter.name, crafter.color))
-  return "|cffffd100" .. Localization.Text("Craft Alert") .. ":|r " .. concat(parts, " · ")
+  return FrameKit.ThemeCode(Localization.Text("Craft Alert") .. ":", Theme.COLORS.gold) .. " " .. concat(parts, " · ")
 end
 
 -- Whether `entry` was built from `lead` as it is now; the customer's class colours the chat line
