@@ -271,6 +271,21 @@ local function testGreetingsPage()
   Widgets.type(row("Note").input, "")
   Assert.same(settings.notes, {}, "an emptied note is removed")
   Assert.same(take(refreshes), {})
+
+  -- The preview prefix is a localized label, like the template row above it.
+  local item = row("Item").input
+  local text = ns.Localization.Text
+  ns.Localization.Text = function(s, ...)
+    if select("#", ...) == 0 then
+      return "L:" .. s
+    end
+    return string.format(s, ...)
+  end
+  Widgets.type(item, "Hello {item}")
+  local tagged = SettingsFixture.texts()
+  ns.Localization.Text = text
+  Assert.truthy(tagged:find("L:Item: ", 1, true), tagged)
+  Assert.truthy(tagged:find("L:Alt item: ", 1, true), tagged)
 end
 
 return function()
