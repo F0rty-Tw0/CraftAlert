@@ -130,7 +130,7 @@ local function testWants()
 end
 
 -- User ruling 2026-10-28: the armor guess is for a bare line only; a named want always beats it.
--- "crafter(s)" then for / to / who / that in the same clause names something, even when Craft
+-- "crafter(s)" then for / to / who / that / 2 / 4 in the same clause names something, even when Craft
 -- Alert cannot read what; a word step 4.4 knows anywhere in the line names a want, even one it
 -- did not count (an ambiguous word with no cue next to it), and so does an extraSlang key with
 -- no recipe indexed. Everyday words (back, hand, head...) after a break still need a cue
