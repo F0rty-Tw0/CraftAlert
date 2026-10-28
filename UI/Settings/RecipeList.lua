@@ -106,7 +106,10 @@ local function createOnlyCurrent(column, onClick)
   local button = Controls.Button(bar, "", 0, onClick)
   button:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
   button:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
-  local tip = Localization.Text("Alerts only for this expansion's recipes: all older ones are muted and your own picks are replaced.")
+  local tip = Localization.Text(
+    "Alerts only for this expansion's recipes: all older ones are muted and your own picks are replaced."
+      .. " Craft Alert also does this on its own when a profession is first read and when a new expansion's recipes appear."
+  )
   Controls.Tip(button, function()
     return button:GetText()
   end, tip)
