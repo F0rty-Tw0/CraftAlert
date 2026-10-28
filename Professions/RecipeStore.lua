@@ -47,5 +47,79 @@ function RecipeStore.Merge(recipes, recipeKey, fields, professionKey)
   return changed
 end
 
+-- Number keys (spell IDs) of the profession's recipes, grouped by line, each list sorted.
+-- Name keys (Classic) and lineless recipes are skipped. `only` limits the pass to one line.
+local function keysByLine(recipes, prof, only)
+  local byLine = {}
+  for key, recipe in pairs(recipes) do
+    local line = recipe.line
+    if type(key) == "number" and recipe.prof == prof and line ~= nil and (only == nil or line == only) then
+      local keys = byLine[line] or {}
+      byLine[line] = keys
+      keys[#keys + 1] = key
+    end
+  end
+  for _, keys in pairs(byLine) do
+    table.sort(keys)
+  end
+  return byLine
+end
+
+local function median(keys)
+  local count = #keys
+  local middle = math.floor(count / 2)
+  if count % 2 == 1 then
+    return keys[middle + 1]
+  end
+  return (keys[middle] + keys[middle + 1]) / 2
+end
+
+-- Median recipe ID of the profession's recipes in the line, or nil when it has none. The
+-- median keeps one stray patched-in recipe from moving a line.
+function RecipeStore.LineRank(recipes, prof, line)
+  local keys = keysByLine(recipes, prof, line)[line]
+  return keys and median(keys) or nil
+end
+
+-- The profession's newest line: the highest LineRank (line IDs were renumbered in 8.0, recipe
+-- IDs only grow); a tie goes to the higher line ID. Nil when no recipe has a line.
+function RecipeStore.NewestLine(recipes, prof)
+  local best, bestRank
+  for line, keys in pairs(keysByLine(recipes, prof)) do
+    local rank = median(keys)
+    if bestRank == nil or rank > bestRank or (rank == bestRank and line > best) then
+      best, bestRank = line, rank
+    end
+  end
+  return best
+end
+
+-- Mutes every lined recipe of the profession outside `line`, unmutes those in it (never
+-- writes false) → how many changed. Lineless recipes are untouched.
+function RecipeStore.OnlyNewest(recipes, prof, line)
+  local changed = 0
+  for _, recipe in pairs(recipes) do
+    if recipe.prof == prof and recipe.line ~= nil then
+      local muted = recipe.line ~= line or nil
+      if recipe.muted ~= muted then
+        recipe.muted = muted
+        changed = changed + 1
+      end
+    end
+  end
+  return changed
+end
+
+-- The line's expansion name, or nil: an empty name and a client without the call give none.
+function RecipeStore.ExpansionName(line)
+  local api = _G["C_TradeSkillUI"]
+  if type(api) ~= "table" or type(api.GetProfessionInfoBySkillLineID) ~= "function" then
+    return nil
+  end
+  local info = api.GetProfessionInfoBySkillLineID(line)
+  local name = type(info) == "table" and info.expansionName
+  return type(name) == "string" and name ~= "" and name or nil
+end
+
 ns.RecipeStore = RecipeStore
 return RecipeStore
