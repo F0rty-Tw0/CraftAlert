@@ -83,8 +83,8 @@ end
 -- The strip: "Wants <link or recipe> · <profession> · <crafter>", each part (and the " · "
 -- before it) left out when missing; a profession lead "Wants a <profession> crafter" ("an"
 -- before a vowel). Colour codes for the profession (gold) and the crafter; the link keeps its own.
--- The crafter's class is read from CraftAlertDB (LeadText.ClassOf); the db argument goes unread.
-function DetailsHeader.Strip(lead, _db)
+-- The crafter's class is read from CraftAlertDB (LeadText.ClassOf).
+function DetailsHeader.Strip(lead)
   local profName = lead.profName
   local profession = profName and FrameKit.ThemeCode(profName, Theme.COLORS.gold)
   if lead.kind == "profession" and profession then
@@ -203,7 +203,7 @@ function DetailsHeader.Paint(details, lead)
   DetailsHeader.FitName(details)
   details.lineOne:SetText(DetailsHeader.LineOne(lead))
   details.lineTwo:SetText(DetailsHeader.LineTwo(lead))
-  details.stripText:SetText(DetailsHeader.Strip(lead, _G["CraftAlertDB"]))
+  details.stripText:SetText(DetailsHeader.Strip(lead))
   DetailsHeader.FitStrip(details)
 end
 
