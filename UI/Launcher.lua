@@ -103,17 +103,6 @@ local function createBadge(frame)
   return badge, count
 end
 
--- Listed leads neither greeted nor seen, the WhisperMessenger tab's rule (UI/BridgePanel.lua).
-local function unseenCount()
-  local count = 0
-  for _, lead in ipairs(Leads.List()) do
-    if Leads.IsUnseen(lead) then
-      count = count + 1
-    end
-  end
-  return count
-end
-
 local function create()
   local frame = _G["CreateFrame"]("Button", FRAME_NAME, _G["UIParent"])
   frame:SetSize(Theme.LAYOUT.ICON_SIZE, Theme.LAYOUT.ICON_SIZE)
@@ -211,7 +200,7 @@ function Launcher.Refresh()
   local lit = ScanGate.IsActive()
   launcher.icon:SetDesaturated(not lit)
   launcher:SetAlpha(lit and 1 or Theme.DIM_ALPHA)
-  local count = unseenCount()
+  local count = Leads.CountUnseen(Leads.List())
   launcher.badgeText:SetText(tostring(count))
   if count > 0 then
     launcher.badge:Show()
