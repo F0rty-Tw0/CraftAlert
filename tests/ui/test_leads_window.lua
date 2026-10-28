@@ -216,11 +216,11 @@ local function testRowFields()
   ns.LeadsWindow.Refresh()
   Assert.equal(rows()[1].age:GetText(), "1m")
 
-  -- No leads: the empty text in the list pane, no rows, nothing selected.
+  -- No leads: the empty text in the details pane, no rows, nothing selected.
   ns = load({})
   ns.LeadsWindow.Toggle()
   Assert.equal(#rows(), 0)
-  Assert.truthy(string.find(textOf(view().listPane), "No leads", 1, true), textOf(view().listPane))
+  Assert.truthy(string.find(textOf(view().detailsPane), "No leads", 1, true), textOf(view().detailsPane))
   Assert.equal(ns.LeadsView.Selected(view()), nil)
   Assert.equal(view().details.frame:IsShown(), false)
 end

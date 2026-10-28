@@ -3,6 +3,7 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadDetails = ns.LeadDetails or require("CraftAlert.UI.LeadDetails")
@@ -13,7 +14,8 @@ local LedgerStrip = ns.LedgerStrip or require("CraftAlert.UI.LedgerStrip")
 -- Spec A.2, A.6, assumption 2: the leads split view, built into any parent frame (the leads
 -- window's content frame, or a WhisperMessenger panel host). The ledger line (UI/LedgerStrip.lua,
 -- spec §8) across the top; under it the list pane (UI/LeadsList.lua) on the left, the details
--- pane (UI/LeadDetails.lua) of the selected lead on the right, a 1 px divider between them. Each pane paints its atlas behind an InsetFrameTemplate art frame, as
+-- pane (UI/LeadDetails.lua) of the selected lead on the right, a 1 px divider between them; with
+-- no leads the details pane says so (the list may be WM's icon rail, too narrow for the text). Each pane paints its atlas behind an InsetFrameTemplate art frame, as
 -- WhisperMessenger's panes do (RetailChrome.lua:56-58,70,85-88, WM). The selection follows the
 -- lead by id across refreshes; the root frame takes the mouse wheel and scrolls the list, as does
 -- a drag of the list's bar.
@@ -45,6 +47,22 @@ local function createDivider(view)
   divider:SetPoint("BOTTOMLEFT", listPane, "BOTTOMRIGHT", 0, 0)
   divider:SetColorTexture(color[1], color[2], color[3], color[4])
   return divider
+end
+
+-- A frame over the whole pane, at the details' level, holding the centred, wrapping text.
+local function createEmpty(pane)
+  local empty = _G["CreateFrame"]("Frame", nil, pane)
+  empty:SetAllPoints(pane)
+  empty:SetFrameLevel(pane:GetFrameLevel() + 2)
+  local text = FrameKit.Text(empty, Theme.FONTS.body, Theme.COLORS.textSecondary)
+  text:SetPoint("LEFT", pane, "LEFT", Theme.LAYOUT.PANE_PADDING, 0)
+  text:SetPoint("RIGHT", pane, "RIGHT", -Theme.LAYOUT.PANE_PADDING, 0)
+  text:SetWordWrap(true)
+  text:SetJustifyH("CENTER")
+  text:SetText(Localization.Text("No leads right now. Requests you can craft show up here."))
+  empty.text = text
+  empty:Hide()
+  return empty
 end
 
 local function positionOf(leads, id)
@@ -83,6 +101,7 @@ function LeadsView.Refresh(view, leads)
   LedgerStrip.Refresh(view.strip)
   local height = view.getHeight() - Theme.LAYOUT.LEDGER_HEIGHT
   LeadsList.Refresh(view.list, leads, LeadsList.Fit(height), view.selectedId)
+  view.empty:SetShown(#leads == 0)
   if selected then
     LeadDetails.Show(view.details, selected)
   else
@@ -126,6 +145,7 @@ function LeadsView.New(parent, opts)
   end)
   view.details = LeadDetails.New(view.detailsPane)
   view.details.frame:SetFrameLevel(view.detailsPane:GetFrameLevel() + 2)
+  view.empty = createEmpty(view.detailsPane)
   LeadsView.Layout(view)
   return view
 end
@@ -145,11 +165,12 @@ function LeadsView.ResetTop(view)
   view.selectedId = nil
 end
 
--- Empties the rows and the details, so the next refresh shows each lead afresh (a new shownAt);
--- the selection is kept.
+-- Empties the rows, the details and the empty text, so the next refresh shows each lead afresh
+-- (a new shownAt); the selection is kept.
 function LeadsView.Clear(view)
   LeadsList.Clear(view.list)
   LeadDetails.Clear(view.details)
+  view.empty:Hide()
 end
 
 function LeadsView.TopRow(view)
