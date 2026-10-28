@@ -141,10 +141,14 @@ local function paintOnlyCurrent(button, line)
   button:Show()
 end
 
--- The line over an empty list: the search found nothing, or no recipe was read yet.
-local function emptyText(search)
+-- The line over an empty list: the search found nothing, the character has no profession, or no
+-- recipe was read yet.
+local function emptyText(search, prof)
   if search ~= "" then
     return Localization.Text("No recipe matches your search.")
+  end
+  if prof == nil then
+    return Localization.Text("No professions read for this character yet.")
   end
   return Localization.Text("No recipes read yet. Open this profession's window in the game to read them.")
 end
@@ -158,7 +162,7 @@ function RecipeList.Create(column)
     local items = recipeItems(list.character, list.prof, search)
     paintOnlyCurrent(list.onlyCurrent, currentLine(list.character, list.prof))
     list.recipes.Render(items, list.showRecipe)
-    list.empty:SetText(emptyText(search))
+    list.empty:SetText(emptyText(search, list.prof))
     list.empty:SetShown(#items == 0)
   end
 
