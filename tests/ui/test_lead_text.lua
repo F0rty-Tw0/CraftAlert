@@ -15,6 +15,9 @@ local function testText()
   -- An alt on another realm keeps its realm.
   Assert.equal(H({ crafter = "Alt-Other", recipeName = "Plate Belt" }), "Wants Plate Belt — your alt Alt-Other can craft it")
   Assert.equal(H({ crafter = "Alt-Other", profName = "Blacksmithing" }), "Wants Blacksmithing — your alt Alt-Other has it")
+  -- The why text (the Matcher joins its tokens with " + ") split into its parts.
+  Assert.same(ns.LeadText.WhyParts("lf + blacksmith"), { "lf", "blacksmith" })
+  Assert.same(ns.LeadText.WhyParts("lf"), { "lf" })
   -- A lead's channel key as its word; an unknown key as itself; no key, nil.
   local channels =
     { trade = "Trade", services = "Services", general = "General", lfg = "LookingForGroup", guild = "Guild", communities = "Communities" }

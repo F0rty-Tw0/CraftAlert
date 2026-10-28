@@ -363,7 +363,13 @@ local function testCustomerZone()
   Widgets.fire(zone, "OnEnter")
   Assert.same({ tip().owner, tip().anchor, tip().shown }, { zone, "ANCHOR_RIGHT", true })
   Assert.same(tip().lines, { "Buyer-Realm", "Warrior", "Greeted", "Replied" })
-  Assert.same(tip().colors, { { WARRIOR.r, WARRIOR.g, WARRIOR.b }, WHITE, WHITE, WHITE })
+  local greeted, replied = ns.Theme.COLORS.greeted, ns.Theme.COLORS.replied
+  Assert.same(tip().colors, {
+    { WARRIOR.r, WARRIOR.g, WARRIOR.b },
+    WHITE,
+    { greeted[1], greeted[2], greeted[3] },
+    { replied[1], replied[2], replied[3] },
+  })
   Widgets.fire(zone, "OnLeave")
   Assert.equal(tip().shown, false)
   -- A customer of unknown class and not greeted: the name in gold, no more lines.
@@ -398,7 +404,10 @@ end
 local function testMatchedZone()
   local ns, d, _, lead = open({ itemLead() })
   Widgets.fire(d.zones.matched, "OnEnter")
-  Assert.same({ tip().owner, tip().lines, tip().colors }, { d.zones.matched, { "Matched", "lf", "bolt", "Tailoring" }, { GOLD, WHITE, WHITE, GOLD } })
+  Assert.same(
+    { tip().owner, tip().lines, tip().colors },
+    { d.zones.matched, { "Matched", "lf", "bolt", "Tailoring" }, { GOLD, WHITE, WHITE, WHITE } }
+  )
   lead.why = nil
   Widgets.fire(d.zones.matched, "OnEnter")
   Assert.same(tip().lines, { "Matched", "Tailoring" })
@@ -425,14 +434,18 @@ local function testCraftersZone()
     "Bob",
     "Picked for this lead: Me",
     "Can't send an order (other realm)",
+    " ",
     "Click: choose the main crafter",
   })
-  Assert.same({ tip().colors[1], tip().colors[2], tip().colors[3], tip().colors[7] }, { GOLD, { MAGE.r, MAGE.g, MAGE.b }, WHITE, GREEN })
+  Assert.same(
+    { tip().colors[1], tip().colors[2], tip().colors[3], tip().colors[7], tip().colors[8] },
+    { GOLD, { MAGE.r, MAGE.g, MAGE.b }, WHITE, {}, GREEN }
+  )
   Assert.same(tip().rights[2], { "R3 (conc)", GREY[1], GREY[2], GREY[3] })
   -- Nobody knows the profession: no menu, no instruction.
   lead.prof, lead.cannotOrder = 999, nil
   Widgets.fire(zone, "OnEnter")
-  Assert.same(tip().lines[#tip().lines], "Picked for this lead: Me")
+  Assert.same(tip().lines[#tip().lines], "Picked for this lead: Me", "no instruction: no dangling blank line")
   -- No MenuUtil: no instruction either.
   lead.prof = 164
   Wow.stub("MenuUtil", nil)
@@ -446,10 +459,10 @@ local function testTipFollowsLead()
   old.crafter = "Bob-Realm"
   local ns, d = open({ old, UiFixture.lead(2, "Buyer-Realm") }, 2)
   Widgets.fire(d.zones.crafters, "OnEnter")
-  Assert.same(tip().lines, { "Crafters", "Me", "Picked for this lead: Me", "Click: choose the main crafter" })
+  Assert.same(tip().lines, { "Crafters", "Me", "Picked for this lead: Me", " ", "Click: choose the main crafter" })
   ns.LeadDetails.Show(d, leadOf(ns, 1))
   Widgets.fire(d.zones.crafters, "OnEnter")
-  Assert.same(tip().lines, { "Crafters", "Bob", "Picked for this lead: Bob", "Click: choose the main crafter" })
+  Assert.same(tip().lines, { "Crafters", "Bob", "Picked for this lead: Bob", " ", "Click: choose the main crafter" })
 end
 
 -- Main-crafter spec §3: a left-click on the Crafters zone (any modifier) opens the menu. Every other
@@ -546,17 +559,22 @@ local function testButtons()
     ns.LeadDetails.Layout(d, width)
     Assert.same({ b.greet:GetWidth(), b.whisper:GetWidth(), b.dismiss:GetWidth() }, { expected, expected, expected }, width)
   end
-  -- Greet's tooltip; the other buttons have none.
+  -- Each button's tooltip: Greet names who gets the whisper; Whisper and Dismiss have no click line.
   Widgets.fire(b.greet, "OnEnter")
-  Assert.same(
-    { tip().owner, tip().anchor, tip().lines },
-    { b.greet, "ANCHOR_RIGHT", { "Greet", "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper" } }
-  )
-  Assert.same(tip().colors, { GOLD, GREEN, GREEN, GREEN })
+  Assert.same({ tip().owner, tip().anchor, tip().lines }, {
+    b.greet,
+    "ANCHOR_RIGHT",
+    { "Greet", "Whispers Buyer-Realm", " ", "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper" },
+  })
+  Assert.same(tip().colors, { GOLD, WHITE, {}, GREEN, GREEN, GREEN })
   Widgets.fire(b.greet, "OnLeave")
   Assert.equal(tip().shown, false)
   Widgets.fire(b.whisper, "OnEnter")
+  Assert.same({ tip().owner, tip().lines, tip().colors }, { b.whisper, { "Whisper", "Open a whisper without the greeting" }, { GOLD, WHITE } })
+  Widgets.fire(b.whisper, "OnLeave")
   Widgets.fire(b.dismiss, "OnEnter")
+  Assert.same({ tip().owner, tip().lines }, { b.dismiss, { "Dismiss", "Remove this lead" } })
+  Widgets.fire(b.dismiss, "OnLeave")
   Assert.equal(tip().shown, false)
   -- The actions, once the lead has been up a second.
   Wow.clock.gettime = Wow.clock.gettime + 1
@@ -580,6 +598,9 @@ local function testButtons()
     Widgets.click(button)
   end
   Assert.equal(#calls, count)
+  -- Cleared: Greet's tooltip names no one.
+  Widgets.fire(b.greet, "OnEnter")
+  Assert.same(tip().lines, { "Greet", " ", "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper" })
 end
 
 -- Review Focus 3: the look rule runs on the details' own shownAt, reset whenever another lead shows.

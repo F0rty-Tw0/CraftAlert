@@ -46,6 +46,8 @@ function RecipeTooltip.Show(row, character)
       _G["GameTooltip_AddHighlightLine"](tooltip, profession.name)
     end
   end
+  -- A blank line sets our lines apart from the item tooltip (or the title and profession).
+  _G["GameTooltip_AddBlankLineToTooltip"](tooltip)
   _G["GameTooltip_AddHighlightLine"](tooltip, Localization.Text("Known by: %s", knownBy(key)))
   if recipe.muted == true then
     tooltip:AddLine(Localization.Text("Muted"), GREY, GREY, GREY)

@@ -271,7 +271,7 @@ local function testInfoLines()
   local customer = ns.Leads.Latest().customer
   Assert.same(ns.CardTipText.InfoLines(ns.Leads.Latest()), {
     "|cffffd100Wants Blacksmithing — you have it|r",
-    "Matched: |cfffffffflf + blacksmith|r · |cffffd100Blacksmithing|r",
+    "Matched: |cfffffffflf + blacksmith|r · |cffffffffBlacksmithing|r",
     "|cffff7f00Me|r |cff7f7f7fR2 (conc)|r",
     "Bob",
     "[12:34] [Trade] [|cffffffff" .. customer .. "|r]: LF plate belt",
@@ -375,7 +375,7 @@ local function testPanel()
   local gear = gearOf(current)
   Widgets.fire(gear, "OnEnter")
   local tooltip = ns.Tooltip.Get()
-  Assert.same(tooltip.lines, { "Settings", " ", "Click: open settings" })
+  Assert.same(tooltip.lines, { "Settings", "Click: open settings" })
   Widgets.click(gear)
   Assert.equal(ns.BridgePanel.InSettings(), true)
   Assert.equal(rawget(_G, "CraftAlertLeadsWindow"), nil, "no own window")

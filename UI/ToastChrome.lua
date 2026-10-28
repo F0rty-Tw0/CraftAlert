@@ -55,16 +55,18 @@ function ToastChrome.HideAfter(frame, hide)
 end
 
 -- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua, every flavour): gold
--- title, the white `description` when given, a blank line, one green instruction line per entry of
--- `clicks`, then the drag (it moves the launcher).
+-- title, the `description` lines in white and a blank line when given, one green instruction line
+-- per entry of `clicks`, then the drag (it moves the launcher).
 function ToastChrome.ShowTooltip(frame, description, clicks)
   local tooltip = Tooltip.Get()
   tooltip:SetOwner(frame, "ANCHOR_TOP")
   _G["GameTooltip_SetTitle"](tooltip, Localization.Text("Craft Alert"), _G["NORMAL_FONT_COLOR"])
   if description then
-    _G["GameTooltip_AddHighlightLine"](tooltip, description)
+    for _, line in ipairs(description) do
+      _G["GameTooltip_AddHighlightLine"](tooltip, line)
+    end
+    _G["GameTooltip_AddBlankLineToTooltip"](tooltip)
   end
-  _G["GameTooltip_AddBlankLineToTooltip"](tooltip)
   for _, line in ipairs(clicks) do
     _G["GameTooltip_AddInstructionLine"](tooltip, line)
   end

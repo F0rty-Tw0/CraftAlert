@@ -378,20 +378,20 @@ local function testCraftersRecipeTooltip()
   Assert.equal(tooltip.owner, itemRow)
   Assert.equal(tooltip.anchor, "ANCHOR_RIGHT")
   Assert.same(tooltip.hyperlinks, { "item:501" }, "the crafted item's tooltip")
-  Assert.same(tooltip.lines, { "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other" })
-  Assert.same(tooltip.colors[1], { 1, 1, 1 })
+  Assert.same(tooltip.lines, { " ", "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other" })
+  Assert.same(tooltip.colors[2], { 1, 1, 1 })
   Assert.equal(tooltip.shown, true)
   Widgets.fire(itemRow, "OnLeave")
   Assert.equal(tooltip.shown, false)
   db.characters["Me-Realm"].recipes[9001].muted = true
   Widgets.fire(itemRow, "OnEnter")
-  Assert.same(tooltip.lines, { "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other", "Muted" })
-  Assert.same(tooltip.colors[2], { 0.5, 0.5, 0.5 })
+  Assert.same(tooltip.lines, { " ", "Known by: Alt, Alt-Other, Bob-Other, Me, Zed-Other", "Muted" })
+  Assert.same(tooltip.colors[3], { 0.5, 0.5, 0.5 })
   Widgets.fire(itemRow, "OnLeave")
   db.characters["Me-Realm"].recipes[9001].muted = nil
 
   Widgets.fire(mutedRow, "OnEnter")
-  Assert.same(tooltip.lines, { "B Bracer", "Blacksmithing", "Known by: Me", "Muted" }, "no item: our own lines")
+  Assert.same(tooltip.lines, { "B Bracer", "Blacksmithing", " ", "Known by: Me", "Muted" }, "no item: our own lines")
   Assert.same(tooltip.colors[1], { 1, 0.82, 0 })
   Assert.equal(#tooltip.hyperlinks, 2, "no item: no item tooltip")
   Assert.equal(tooltip.owner, mutedRow)
@@ -432,7 +432,7 @@ local function testRecipeTooltipNameKey()
   })
   open(ns, "Crafters")
   Widgets.fire(rowOf("Old Recipe"), "OnEnter")
-  Assert.same(ns.Tooltip.Get().lines, { "C Old Recipe", "Blacksmithing", "Known by: Me" })
+  Assert.same(ns.Tooltip.Get().lines, { "C Old Recipe", "Blacksmithing", " ", "Known by: Me" })
 end
 
 -- GameTooltip_OnUpdate (Blizzard GameTooltip.lua): the owner's UpdateTooltip when it has one;
@@ -461,21 +461,21 @@ local function testRecipeTooltipItemLoads()
   open(ns, "Crafters")
   local tooltip, itemRow = ns.Tooltip.Get(), rowOf(9001)
   Widgets.fire(itemRow, "OnEnter")
-  local ours = tooltip.lines[1]
+  local ours = tooltip.lines[2] -- lines[1] is the blank above it
   Assert.truthy(ours:find("^Known by: "), ours)
   tooltip.shouldRefreshData = true -- the item loaded
   for _ = 1, 3 do
     clientUpdate(tooltip)
-    Assert.same(tooltip.lines, { ours }, "every update keeps our lines")
+    Assert.same(tooltip.lines, { " ", ours }, "every update keeps our lines")
   end
   Assert.same(tooltip.hyperlinks, { "item:501", "item:501", "item:501", "item:501" })
   db.characters["Me-Realm"].recipes[9001].muted = true
   clientUpdate(tooltip)
-  Assert.same(tooltip.lines, { ours, "Muted" }, "read anew")
+  Assert.same(tooltip.lines, { " ", ours, "Muted" }, "read anew")
 
   tooltip.badLinks = { ["item:501"] = true }
   Widgets.fire(itemRow, "OnEnter")
-  Assert.same(tooltip.lines, { "A Belt", "Blacksmithing", ours, "Muted" }, "rejected link: our own tooltip")
+  Assert.same(tooltip.lines, { "A Belt", "Blacksmithing", " ", ours, "Muted" }, "rejected link: our own tooltip")
 end
 
 -- Removing the current character stores it again from the client at once (as at login), so its

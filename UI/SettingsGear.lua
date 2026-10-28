@@ -14,13 +14,12 @@ local SettingsGear = {}
 
 local LABEL_GAP = 4
 
--- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua): gold title, a
--- blank line, one green instruction line naming what a click does now.
+-- Blizzard's tooltip hierarchy (Blizzard_SharedXML/SharedTooltipTemplates.lua): gold title, then
+-- one green instruction line naming what a click does now (no body, so no gap above it).
 local function showTooltip(gear)
   local tooltip = Tooltip.Get()
   tooltip:SetOwner(gear, "ANCHOR_BOTTOMLEFT")
   _G["GameTooltip_SetTitle"](tooltip, Localization.Text("Settings"), _G["NORMAL_FONT_COLOR"])
-  _G["GameTooltip_AddBlankLineToTooltip"](tooltip)
   local instruction = gear.inSettings and "Click: back to leads" or "Click: open settings"
   _G["GameTooltip_AddInstructionLine"](tooltip, Localization.Text(instruction))
   tooltip:Show()

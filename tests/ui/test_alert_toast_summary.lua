@@ -46,8 +46,8 @@ local function testFaceAndTooltip()
   local tip = ns.Tooltip.Get()
   frame.scripts.OnEnter(frame)
   local gold, green = { 1, 0.82, 0 }, { 0.1, 1, 0.1 }
-  Assert.same(tip.lines, { "Craft Alert", " ", "Left-click: open the leads", "Right-click: dismiss", "Drag: move" })
-  Assert.same(tip.colors, { gold, {}, green, green, green })
+  Assert.same(tip.lines, { "Craft Alert", "Left-click: open the leads", "Right-click: dismiss", "Drag: move" })
+  Assert.same(tip.colors, { gold, green, green, green })
 end
 
 -- Left opens the leads window (an open one stays open), right hides the toast and dismisses no
