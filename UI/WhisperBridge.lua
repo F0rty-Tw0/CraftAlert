@@ -218,10 +218,14 @@ function WhisperBridge.Activate()
   return true
 end
 
+-- Three rows on WM's widget: the customer, their chat line (the item when the line is empty), and
+-- who of yours can craft it (`detail`; a WM without the field ignores it).
 local function previewFor(lead, entry)
+  local message = LeadText.Message(lead)
   return {
     sender = lead.customer,
-    text = LeadText.What(lead),
+    text = message ~= "" and message or LeadText.What(lead),
+    detail = LeadText.CrafterLine(lead),
     classTag = FlavorCompat.ClassOf(lead.guid),
     pulse = true,
     onClick = function()
