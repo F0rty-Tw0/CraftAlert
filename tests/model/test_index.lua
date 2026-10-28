@@ -186,7 +186,7 @@ local function testIndexes()
   -- Class-armor spec §4 rule 1 tags; the extra slang word takes its target's tag.
   Assert.equal(index.armorTags.cuffs, "slot")
   Assert.equal(index.armorTags.plate, "type")
-  -- Phrases are normalized like Tokenizer.normalized: runs of non-word characters -> one space.
+  -- Phrases are normalized like Tokenizer.Normalized(): runs of non-word characters -> one space.
   local enchant = index.nameIndex.enchant[1]
   Assert.equal(enchant.phrase, "enchant bracer minor health")
   Assert.equal(enchant.full, true)
