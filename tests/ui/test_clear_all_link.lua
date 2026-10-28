@@ -33,14 +33,13 @@ local function testLayout()
   Assert.same(link.points, { { "BOTTOMRIGHT", view.listPane, "TOPRIGHT", -8, 0 } })
   Assert.same(strip.text.points[1], { "BOTTOMLEFT", view.listPane, "TOPRIGHT", 8, 0 })
   Assert.equal(link:IsShown(), true)
+  local listWidth = 69
   view.getListWidth = function()
-    return 69
+    return listWidth
   end
   ns.LeadsView.Layout(view)
   Assert.equal(link:IsShown(), false, "69 < 70")
-  view.getListWidth = function()
-    return 70
-  end
+  listWidth = 70
   ns.LeadsView.Layout(view)
   Assert.equal(link:IsShown(), true, "70 fits")
 end
