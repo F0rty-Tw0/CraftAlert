@@ -116,7 +116,8 @@ local function testShowLeadPreview()
   local lead = ns.Leads.Latest()
   ns.WhisperBridge.ShowLead(lead)
   local preview = wm.preview.CraftAlert
-  Assert.same({ preview.sender, preview.text, preview.classTag }, { lead.customer, "Blacksmithing", nil })
+  -- Three rows: the customer, their trimmed chat line, who of yours can craft it.
+  Assert.same({ preview.sender, preview.text, preview.detail, preview.classTag }, { lead.customer, "LF plate belt", "You have Blacksmithing", nil })
   Assert.equal(preview.pulse, true, "a new lead pulses WM's widget (spec 7)")
   Assert.equal(#UiFixture.callsTo(calls, "sound"), 1)
   Assert.equal(#UiFixture.callsTo(calls, "flash"), 1)
@@ -140,6 +141,27 @@ local function testShowPreviewRefusedFallsBackToToast()
   Assert.equal(#UiFixture.callsTo(calls, "sound"), 1, "alerted once, by the toast")
   Assert.same({ ns.WhisperBridge.VisibleLead() }, { ns.Leads.Latest(), 50 }, "fallback toast counts")
   Assert.same(rawget(_G, "CraftAlertToast").points[1][2], rawget(_G, "UIParent"), "docked at the no-launcher spot")
+end
+
+-- The third row per crafter and lead kind; an empty chat line falls back to the item; no crafter,
+-- no third row.
+local function testPreviewRows()
+  local ns, _, _, _, wm = boot()
+  ns.WhisperBridge.Activate()
+  local lead = ns.Leads.Latest()
+  lead.itemLink, lead.kind = "[Thick Plate Belt]", "item"
+  ns.WhisperBridge.ShowLead(lead)
+  Assert.equal(wm.preview.CraftAlert.detail, "You can craft it")
+  lead.crafter, lead.message = "Alt-Realm", "   "
+  ns.WhisperBridge.ShowLead(lead)
+  local preview = wm.preview.CraftAlert
+  Assert.same({ preview.text, preview.detail }, { "[Thick Plate Belt]", "Your alt Alt can craft it" })
+  lead.itemLink, lead.kind = nil, "profession"
+  ns.WhisperBridge.ShowLead(lead)
+  Assert.equal(wm.preview.CraftAlert.detail, "Your alt Alt has Blacksmithing")
+  lead.crafter = nil
+  ns.WhisperBridge.ShowLead(lead)
+  Assert.equal(wm.preview.CraftAlert.detail, nil)
 end
 
 local function testPreviewClick()
@@ -731,6 +753,7 @@ return function()
   testOpenerGoesToWm()
   testShowLeadPreview()
   testShowPreviewRefusedFallsBackToToast()
+  testPreviewRows()
   testInfoStripColoursTheCrafter()
   testInfoLines()
   testInfoLinesCapAndMatched()

@@ -31,7 +31,6 @@ local AlertToast = {}
 AlertToast.more = 0
 
 local concat = table.concat
-local match = string.match
 local tostring = tostring
 local type = type
 local unpack = unpack
@@ -50,10 +49,6 @@ end
 
 local function settings()
   return _G["CraftAlertDB"].settings
-end
-
-local function trim(text)
-  return match(text or "", "^%s*(.-)%s*$")
 end
 
 -- The rank and the realm tag (quality-rank spec §4.5, design spec §7.2), whichever the lead
@@ -105,7 +100,7 @@ local function paint(name, guid, headline, detail, message)
 end
 
 local function render(lead)
-  paint(tostring(lead.customer), lead.guid, LeadText.Headline(lead), detailText(lead), trim(lead.message))
+  paint(tostring(lead.customer), lead.guid, LeadText.Headline(lead), detailText(lead), LeadText.Message(lead))
 end
 
 local function hide()

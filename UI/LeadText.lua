@@ -16,6 +16,7 @@ local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local LeadText = {}
 
 local floor = math.floor
+local match = string.match
 local max = math.max
 local tostring = tostring
 
@@ -45,6 +46,29 @@ function LeadText.Headline(lead)
   local alt = Greeting.CrafterName(lead.crafter)
 
   return Localization.Text(craftable and "Wants %s — your alt %s can craft it" or "Wants %s — your alt %s has it", what, alt)
+end
+
+-- The customer's chat line, trimmed.
+function LeadText.Message(lead)
+  return match(lead.message or "", "^%s*(.-)%s*$")
+end
+
+-- WhisperMessenger's preview, third row: "You can craft it" / "Your alt <name> can craft it"; a
+-- lead without an item or recipe "You have <profession>" / "Your alt <name> has <profession>". nil
+-- without a crafter.
+function LeadText.CrafterLine(lead)
+  if lead.crafter == nil then
+    return nil
+  end
+  local craftable = lead.itemLink or lead.recipeName
+  if lead.crafter == PlayerName.Own() then
+    return craftable and Localization.Text("You can craft it") or Localization.Text("You have %s", LeadText.What(lead))
+  end
+  local alt = Greeting.CrafterName(lead.crafter)
+  if craftable then
+    return Localization.Text("Your alt %s can craft it", alt)
+  end
+  return Localization.Text("Your alt %s has %s", alt, LeadText.What(lead))
 end
 
 -- §4.5: "R2 (conc)" when the rank counts on concentration, "R2" when it needs none, else nil.
