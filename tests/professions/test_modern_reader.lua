@@ -469,9 +469,119 @@ local function isBlockedCases()
   Assert.equal(ModernReader.IsBlocked(), false, "no trade skill api")
 end
 
+local function lined(id, item, line)
+  return belt(id, item, { profession = { professionID = line, parentProfessionID = BS } })
+end
+
+local function readWindow(Slicer)
+  Wow.fireEvent("TRADE_SKILL_SHOW")
+  Slicer.Drain()
+  Wow.runTimers()
+end
+
+-- Chat lines the addon printed from now on.
+local function captureChat()
+  local lines = {}
+  Wow.stub("DEFAULT_CHAT_FRAME", {
+    AddMessage = function(_, text)
+      lines[#lines + 1] = text
+    end,
+  })
+  return lines
+end
+
+local PREFIX = "|cffffd100Craft Alert:|r "
+
+-- Only the newest expansion line alerts: applied when a window read finishes.
+local function newestCases()
+  -- Lines {Classic 2540, Khaz Algar 2883} → older muted, newest on, silent; a manual unmute
+  -- survives a re-read; a newer line 2918 drops picks, mutes both and prints once.
+  local state, ModernReader, db, run, Slicer = setup()
+  local chat = captureChat()
+  state.recipes = {
+    lined(2385, 100, 2540),
+    lined(2386, 101, 2540),
+    lined(446001, 102, 2883),
+    lined(446002, 103, 2883),
+  }
+  readWindow(Slicer)
+  Assert.same({ recipesOf(db)[2385].muted, recipesOf(db)[2386].muted }, { true, true }, "older line muted")
+  Assert.same({ recipesOf(db)[446001].muted, recipesOf(db)[446002].muted }, {}, "newest line unmuted")
+  Assert.equal(db.characters[CHAR].professions[BS].newestLine, 2883)
+  Assert.same(chat, {}, "the first apply is silent")
+  Assert.same(run.reasons, { "read" })
+
+  recipesOf(db)[2385].muted = nil -- the player's own pick
+  ModernReader.ForgetReads() -- same count + settled would skip the walk
+  readWindow(Slicer)
+  Assert.equal(recipesOf(db)[2385].muted, nil, "same newest line: picks kept")
+  Assert.equal(#run.reasons, 1, "an unchanged re-read requests no rebuild")
+
+  rawset(_G["C_TradeSkillUI"], "GetProfessionInfoBySkillLineID", function(id)
+    return { professionID = id, expansionName = id == 2918 and "Midnight" or nil }
+  end)
+  state.recipes[#state.recipes + 1] = lined(450001, 104, 2918)
+  state.recipes[#state.recipes + 1] = lined(450002, 105, 2918)
+  readWindow(Slicer)
+  Assert.same({ recipesOf(db)[2385].muted, recipesOf(db)[446001].muted, recipesOf(db)[450001].muted }, { true, true, nil }, "new line: picks dropped")
+  Assert.equal(db.characters[CHAR].professions[BS].newestLine, 2918)
+  Assert.same(chat, { PREFIX .. "Blacksmithing now alerts only for Midnight recipes." }, "one notice")
+  ModernReader.ForgetReads()
+  readWindow(Slicer)
+  Assert.equal(#chat, 1, "a re-read prints nothing more")
+
+  -- A first read on an existing character whose recipes otherwise match still requests exactly
+  -- one rebuild.
+  state, _, db, run, Slicer = setup()
+  state.recipes = { lined(2385, 100, 2540), lined(446001, 102, 2883) }
+  recipesOf(db)[2385] = { item = 100, name = "Belt 2385", prof = BS, line = 2540 }
+  recipesOf(db)[446001] = { item = 102, name = "Belt 446001", prof = BS, line = 2883 }
+  readWindow(Slicer)
+  Assert.equal(recipesOf(db)[2385].muted, true)
+  Assert.same(run.reasons, { "read" }, "only-newest alone forces the rebuild")
+
+  -- Saved newest line with none of its recipes left: mutes kept, no notice.
+  state, _, db, _, Slicer = setup()
+  chat = captureChat()
+  db.characters[CHAR].professions[BS].newestLine = 2540
+  recipesOf(db)[446002] = { item = 103, name = "Manual", prof = BS, line = 2883, muted = true }
+  state.recipes = { lined(446001, 102, 2883) }
+  readWindow(Slicer)
+  Assert.equal(db.characters[CHAR].professions[BS].newestLine, 2883)
+  Assert.equal(recipesOf(db)[446002].muted, true, "mutes kept")
+  Assert.same(chat, {}, "no notice")
+
+  -- Same newest line: a read that newly stores an older-line recipe mutes only that one.
+  state, _, db, _, Slicer = setup()
+  state.recipes = { lined(446001, 102, 2883) }
+  readWindow(Slicer)
+  recipesOf(db)[446001].muted = true -- the player's pick
+  state.recipes[2] = lined(2390, 105, 2540)
+  readWindow(Slicer)
+  Assert.equal(recipesOf(db)[2390].muted, true, "new older-line recipe starts muted")
+  Assert.equal(recipesOf(db)[446001].muted, true, "other mutes alone")
+  Assert.equal(db.characters[CHAR].professions[BS].newestLine, 2883)
+
+  -- Lineless recipes and lineless professions: untouched / no-op.
+  state, _, db, run, Slicer = setup()
+  chat = captureChat()
+  state.recipes = { belt(1, 100), belt(2, 200) }
+  readWindow(Slicer)
+  Assert.same({ recipesOf(db)[1].muted, recipesOf(db)[2].muted }, {})
+  Assert.equal(db.characters[CHAR].professions[BS].newestLine, nil, "no line: newestLine untouched")
+  Assert.same(chat, {})
+  Assert.same(run.reasons, { "read" })
+  state.recipes[3] = lined(446001, 102, 2883)
+  recipesOf(db)[1].muted = true
+  readWindow(Slicer)
+  Assert.equal(recipesOf(db)[1].muted, true, "a lineless recipe is left alone")
+  Assert.equal(recipesOf(db)[2].muted, nil)
+end
+
 return function()
   readFlow("retail")
   readFlow("forever")
+  newestCases()
   fieldsOfAnyRecipe()
 
   -- In an instance a profession window is never read, on show or on a list update.

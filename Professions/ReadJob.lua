@@ -4,17 +4,20 @@ if type(ns) ~= "table" then
 end
 
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
+local RecipeStore = ns.RecipeStore or require("CraftAlert.Professions.RecipeStore")
+local ChatPrint = ns.ChatPrint or require("CraftAlert.Core.ChatPrint")
+local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 
 -- The steps of ModernReader's Slicer job "read" (spec 2026-10-22 §4.2): phase 1 stores one
 -- recipe per step, phase 2 drops one foreign recipe per step. ModernReader owns the window
 -- state and the storing helpers; it hands them in as `ops` so this file holds only the walk.
 local ReadJob = {}
 
-local pairs = pairs
+local ipairs, pairs = ipairs, pairs
 
 -- base: { db, charKey, key, recipeIDs, ops = { usableInfo, storeKey, readFields, store,
 -- professionInfo } }. → the base table, with the walk's counters added (`lineless`: a stored
--- recipe had no expansion line).
+-- recipe had no expansion line; `newIDs`: the recipes this read stored first).
 function ReadJob.New(base)
   base.phase = 1
   base.cursor = 1
@@ -25,6 +28,7 @@ function ReadJob.New(base)
   base.named = false
   base.lineless = false
   base.storedIDs = {}
+  base.newIDs = {}
   base.ms = 0
   base.steps = 0
   return base
@@ -59,12 +63,16 @@ local function readRecipe(job, api, character)
   end
   local fields = ops.readFields(api, recipeID, info, profInfo)
   job.lineless = job.lineless or fields.line == nil
+  local isNew = character.recipes[recipeID] == nil
   local changed, unknownBind = ops.store(character.recipes, recipeID, fields, professionKey)
   job.stored = job.stored + 1
   job.anyChanged = job.anyChanged or changed
   job.pendingBind = job.pendingBind + (unknownBind and 1 or 0)
   job.readKeys[professionKey] = true
   job.storedIDs[#job.storedIDs + 1] = recipeID
+  if isNew then
+    job.newIDs[#job.newIDs + 1] = recipeID
+  end
 end
 
 -- Phase 2 unit: drops the saved recipe at the cursor when it is tagged with the window's
@@ -120,10 +128,51 @@ function ReadJob.Step(job, api)
   return done
 end
 
--- Marks read only the professions that got a recipe. → { prof, stored, pendingBind, ms, steps }.
+-- Mutes the recipes this read first stored when their line is not `newest`. → whether any changed.
+local function muteNewOlder(job, recipes, professionKey, newest)
+  local changed = false
+  for _, recipeID in ipairs(job.newIDs) do
+    local recipe = recipes[recipeID]
+    local older = recipe and recipe.prof == professionKey and recipe.line ~= nil and recipe.line ~= newest
+    if older and not recipe.muted then
+      recipe.muted = true
+      changed = true
+    end
+  end
+  return changed
+end
+
+-- Only the newest expansion line alerts. A first sight of a line, or a newer line than the
+-- saved one, mutes every older recipe (the notice says so once); the same newest line mutes
+-- just the recipes this read newly stored, so the player's own picks stay. A saved line with no
+-- recipe left cannot be told "replaced", so it gets no notice. → whether any recipe changed.
+local function applyNewest(job, professionKey)
+  local character = job.db.characters[job.charKey]
+  local recipes, record = character.recipes, character.professions[professionKey]
+  local newest = record and RecipeStore.NewestLine(recipes, professionKey)
+  if newest == nil then
+    return false
+  end
+  local saved = record.newestLine
+  record.newestLine = newest
+  if saved == nil then
+    return RecipeStore.OnlyNewest(recipes, professionKey, newest) > 0
+  end
+  if saved == newest or RecipeStore.LineRank(recipes, professionKey, saved) == nil then
+    return muteNewOlder(job, recipes, professionKey, newest)
+  end
+  local changed = RecipeStore.OnlyNewest(recipes, professionKey, newest) > 0
+  local expansion = RecipeStore.ExpansionName(newest) or Localization.Text("the newest expansion")
+  ChatPrint.Line(Localization.Text("%s now alerts only for %s recipes.", record.name or "", expansion))
+  return changed
+end
+
+-- Marks read only the professions that got a recipe, then applies only-newest to each.
+-- → { prof, stored, pendingBind, ms, steps }.
 function ReadJob.Finish(job)
   for professionKey in pairs(job.readKeys) do
     job.db.characters[job.charKey].professions[professionKey].read = true
+    job.anyChanged = applyNewest(job, professionKey) or job.anyChanged
   end
   return { prof = job.key, stored = job.stored, pendingBind = job.pendingBind, ms = job.ms, steps = job.steps }
 end
