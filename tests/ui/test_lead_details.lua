@@ -3,6 +3,7 @@ local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 local DetailsFixture = require("tests.helpers.details_fixture")
+local PainterLooks = require("tests.helpers.painter_looks")
 
 -- Spec A.4 and details spec A.3-A.5: the split view's details pane below its header (the header
 -- and the strip: tests/ui/test_details_header.lua). A clipping body (the Request bubble, the
@@ -652,6 +653,25 @@ local function testNoOnUpdate()
   check()
 end
 
+-- Spec "Looks", Request / Greet sends box: today's colours for native, retail and classic; bg_input centre and divider border for flat.
+local function testBubblesFollowLook()
+  local ns, d, _, lead = open({ itemLead() })
+  local colors = PainterLooks.COLORS
+  local today = { request = { REQUEST_CENTER, REQUEST_BORDER }, greet = { GREET_CENTER, GREET_BORDER } }
+  local flatBox = { colors.bg_input, colors.divider }
+  local wanted = { native = today, retail = today, classic = today, flat = { request = flatBox, greet = flatBox } }
+  for _, mode in ipairs(PainterLooks.SEQUENCE) do
+    ns.DetailsBody.ApplyLook(d.sections, PainterLooks.look(mode))
+    for _, key in ipairs({ "request", "greet" }) do
+      local nine = d.sections.bubbles[key].NineSlice
+      Assert.same({ nine.centerColor, nine.borderColor }, wanted[mode][key], mode .. " " .. key)
+    end
+  end
+  ns.DetailsBody.ApplyLook(d.sections, PainterLooks.look("flat"))
+  ns.LeadDetails.Show(d, lead)
+  Assert.same(d.sections.bubbles.request.NineSlice.centerColor, colors.bg_input, "a later Show keeps the look")
+end
+
 return function()
   testBodySections()
   testGrid()
@@ -675,5 +695,6 @@ return function()
   testButtons()
   testShownAtAndLookRule()
   testNoOnUpdate()
+  testBubblesFollowLook()
   Wow.reset()
 end

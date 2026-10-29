@@ -14,6 +14,7 @@ local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
 local LeadRow = ns.LeadRow or require("CraftAlert.UI.LeadRow")
+local PanelLook = ns.PanelLook or require("CraftAlert.UI.PanelLook")
 local BridgePanel = ns.BridgePanel or require("CraftAlert.UI.BridgePanel")
 local BridgeInfo = ns.BridgeInfo or require("CraftAlert.UI.BridgeInfo")
 
@@ -73,6 +74,14 @@ end
 local function ask(name, ...)
   local ok, result = pcall(api[name], ...)
   return ok and result
+end
+
+-- The tab's look, asked on every call (BridgePanel reads it per onShow).
+function WhisperBridge.Look()
+  if api == nil or type(api.GetLook) ~= "function" then
+    return PanelLook.NATIVE
+  end
+  return PanelLook.FromWM(ask("GetLook"))
 end
 
 -- /ca config: the panel on settings. Shown in settings → closes it (as the own window does); shown

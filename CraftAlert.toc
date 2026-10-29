@@ -71,6 +71,7 @@ Persistence/CraftScanImport.lua
 Core/Status.lua
 Core/ScanGate.lua
 UI/Theme.lua
+UI/PanelLook.lua
 UI/FrameKit.lua
 UI/ScrollBar.lua
 UI/ScrollView.lua

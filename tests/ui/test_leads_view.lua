@@ -2,6 +2,9 @@ local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
+local LookFixture = require("tests.helpers.look_fixture")
+
+local COLORS, NATIVE = LookFixture.COLORS, LookFixture.NATIVE
 
 -- Spec A.2, A.3, assumption 2: the split view in a bare host the size of the default window's
 -- content frame (840 x 560 less the 4 / 6 sides and the 60 / 4 top and bottom). The list pane
@@ -391,6 +394,60 @@ local function testNoOnUpdate()
   end
 end
 
+local function testApplyLookFlat()
+  local ns, view = open(3)
+  local flat = LookFixture.flat()
+  ns.LeadsView.Refresh(view, leadsDown(3))
+  ns.LeadsView.ApplyLook(view, flat)
+  Assert.same(
+    { view.listPane.bg.color, view.detailsPane.bg.color },
+    { COLORS.bg_secondary, COLORS.bg_primary },
+    "list bg_secondary, details bg_primary"
+  )
+  Assert.same({ view.listPane.art:IsShown(), view.detailsPane.art:IsShown() }, { false, false }, "borders hidden")
+  Assert.same(view.divider.color, COLORS.contacts_divider, "divider: contacts_divider")
+  local selected, hover = view.list.rows[1].selected, view.list.rows[2].hover
+  Assert.same({ selected.color, selected.blendMode, selected.alpha }, { COLORS.bg_contact_selected, "BLEND", 1 }, "selected row: flat")
+  Assert.same({ hover.color, hover.blendMode }, { COLORS.bg_contact_hover, "BLEND" }, "hovered row: flat")
+  ns.LeadsView.Refresh(view, leadsDown(3))
+  Assert.same(selected.color, COLORS.bg_contact_selected, "a refresh keeps the look")
+end
+
+local function testApplyLookReachesEveryPainter()
+  local ns, view = open(3)
+  local flat = LookFixture.flat()
+  local bars = LookFixture.spy(ns.ScrollBar, "ApplyLook")
+  local headers = LookFixture.spy(ns.DetailsHeader, "ApplyLook")
+  local bodies = LookFixture.spy(ns.DetailsBody, "ApplyLook")
+  ns.LeadsView.ApplyLook(view, flat)
+  Assert.equal(LookFixture.saw(bars, view.list.bar, flat), true, "the list's scroll bar")
+  Assert.equal(LookFixture.saw(bars, view.details.scroll.bar, flat), true, "the details body's scroll bar")
+  Assert.equal(LookFixture.saw(headers, view.details, flat), true, "header and strip")
+  Assert.equal(LookFixture.saw(bodies, view.details.sections, flat), true, "the Request and Greet boxes")
+end
+
+-- A look applied before any row exists: rows built later use it.
+local function testRowsBuiltLaterUseTheLook()
+  local ns, view = open(0)
+  ns.LeadsView.ApplyLook(view, LookFixture.flat())
+  ns.LeadsView.Refresh(view, leadsDown(3))
+  local selected, hover = view.list.rows[1].selected, view.list.rows[2].hover
+  Assert.same({ selected.color, selected.blendMode, selected.alpha }, { COLORS.bg_contact_selected, "BLEND", 1 }, "a row built after the look")
+  Assert.same({ hover.color, hover.blendMode }, { COLORS.bg_contact_hover, "BLEND" }, "its hover too")
+end
+
+local function testNativeAfterFlatRestoresToday()
+  local ns, view = open(3)
+  ns.LeadsView.Refresh(view, leadsDown(3))
+  ns.LeadsView.ApplyLook(view, LookFixture.flat())
+  ns.LeadsView.ApplyLook(view, NATIVE)
+  local art, selected = ns.Theme.ART, view.list.rows[1].selected
+  Assert.same({ view.listPane.art:IsShown(), view.detailsPane.art:IsShown() }, { true, true }, "borders back")
+  Assert.same(view.divider.color, ns.Theme.COLORS.divider, "divider back")
+  Assert.same({ selected.texture, selected.blendMode, selected.alpha }, { art.LIST_SELECTED, "ADD", art.LIST_SELECTED_ALPHA }, "selected row back")
+  Assert.same({ view.listPane.bg.atlas, view.detailsPane.bg.atlas }, { LIST_ATLAS, DETAILS_ATLAS }, "atlases")
+end
+
 return function()
   testStructure()
   testNoAtlas()
@@ -407,5 +464,9 @@ return function()
   testClicks()
   testReopen()
   testNoOnUpdate()
+  testApplyLookFlat()
+  testApplyLookReachesEveryPainter()
+  testRowsBuiltLaterUseTheLook()
+  testNativeAfterFlatRestoresToday()
   Wow.reset()
 end

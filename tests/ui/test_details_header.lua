@@ -2,6 +2,7 @@ local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local UiFixture = require("tests.helpers.ui_fixture")
 local DetailsFixture = require("tests.helpers.details_fixture")
+local PainterLooks = require("tests.helpers.painter_looks")
 
 -- Spec A.4 and details spec A.1-A.2: the details pane's 62 px header (round icon with a status
 -- dot, the customer, class / status / age and channel / time lines) and its 24 px info strip
@@ -204,6 +205,31 @@ local function testHeaderLineFits()
   Assert.equal(nameRight(), NAME_LEFT + 54, "the next lead refits the name")
 end
 
+-- Spec "Looks": header and strip fill, and the strip's 1 px lines, per look; the sequence ends with native after flat.
+local function testApplyLook()
+  local ns, d, _, lead = open({ itemLead() })
+  local theme, colors = ns.Theme.COLORS, PainterLooks.COLORS
+  local wanted = {
+    native = { fill = theme.headerFill, line = theme.divider },
+    retail = { fill = colors.bg_header, line = colors.divider },
+    classic = { fill = colors.bg_header, line = colors.divider },
+    flat = { fill = colors.bg_header, line = colors.divider },
+  }
+  for _, mode in ipairs(PainterLooks.SEQUENCE) do
+    ns.DetailsHeader.ApplyLook(d, PainterLooks.look(mode))
+    local want = wanted[mode]
+    Assert.same(
+      { d.fill.color, d.stripFill.color, d.stripLines.top.color, d.stripLines.bottom.color },
+      { want.fill, want.fill, want.line, want.line },
+      mode
+    )
+    Assert.same({ d.stripLines.top:GetHeight(), d.stripLines.bottom:GetHeight() }, { 1, 1 }, mode .. ": still 1 px lines")
+  end
+  ns.DetailsHeader.ApplyLook(d, PainterLooks.look("flat"))
+  ns.LeadDetails.Show(d, lead)
+  Assert.same({ d.fill.color, d.stripFill.color }, { colors.bg_header, colors.bg_header }, "a later Show keeps the look")
+end
+
 return function()
   testHeader()
   testHeaderLines()
@@ -211,5 +237,6 @@ return function()
   testStripFrame()
   testHeaderLineFits()
   testStripWraps()
+  testApplyLook()
   Wow.reset()
 end

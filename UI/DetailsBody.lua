@@ -7,6 +7,7 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
+local PanelLook = ns.PanelLook or require("CraftAlert.UI.PanelLook")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local LinkHover = ns.LinkHover or require("CraftAlert.UI.LinkHover")
 local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
@@ -27,6 +28,7 @@ local DetailsBody = {}
 
 local find = string.find
 local ipairs = ipairs
+local pairs = pairs
 local max = math.max
 local min = math.min
 local unpack = unpack
@@ -163,6 +165,20 @@ function DetailsBody.Create(body)
   createGreetExtras(sections)
   createZones(sections)
   return sections
+end
+
+-- Spec "Looks", Request / Greet sends box: flat paints each bubble WM's bg_input inside its
+-- divider; the other looks keep the bubble's own colours.
+function DetailsBody.ApplyLook(sections, look)
+  for key, spec in pairs(BUBBLES) do
+    local center, border = spec.center, spec.border
+    if look.mode == "flat" then
+      center = PanelLook.Color(look, "bg_input", center)
+      border = PanelLook.Color(look, "divider", border)
+    end
+    sections.bubbles[key]:SetBackdropColor(unpack(center))
+    sections.bubbles[key]:SetBackdropBorderColor(unpack(border))
+  end
 end
 
 -- Shows `text` in the bubble `key` with its label, or hides both when it is nil or only spaces

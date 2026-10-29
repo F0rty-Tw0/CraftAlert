@@ -1,6 +1,7 @@
 local Assert = require("tests.helpers.assert")
 local Fresh = require("tests.helpers.fresh")
 local Wow = require("tests.helpers.wow")
+local PainterLooks = require("tests.helpers.painter_looks")
 require("tests.helpers.widgets")
 
 -- Spec D1, D3, D5, D10: the art the lead rows and the details header share, as WhisperMessenger
@@ -118,10 +119,73 @@ local function testHover()
   Assert.same({ hover.shown, hover.alpha, fadeIn:IsPlaying(), fadeOut:IsPlaying() }, { true, 0.18, false, false })
 end
 
+local PEAK = { native = 0.18, retail = 0.18, classic = 0.18, flat = 1 }
+
+local function testApplyLookOverlays()
+  local RowArt, Theme, row = load()
+  local want = PainterLooks.overlays(Theme, Theme.COLORS.selectedTint)
+  local hover, selected = RowArt.Overlays(row)
+  for _, mode in ipairs(PainterLooks.SEQUENCE) do
+    RowArt.ApplyLook(hover, selected, PainterLooks.look(mode), Theme.COLORS.selectedTint)
+    PainterLooks.checkOverlay(selected, want.selected[mode], mode .. " selected")
+    Assert.equal(selected.alpha, want.selected[mode].alpha, mode .. " selected alpha")
+    PainterLooks.checkOverlay(hover, want.hover[mode], mode .. " hover")
+    Assert.same({ selected.shown, hover.shown, hover.alpha }, { false, false, 0 }, mode .. ": shown flags and the hidden hover's alpha untouched")
+    RowArt.Hover(hover, true, true)
+    Assert.equal(hover.alpha, want.hover[mode].alpha, mode .. " hover alpha once shown")
+    RowArt.Hover(hover, false, true)
+  end
+end
+
+-- Every fade value follows the look: fade-in to the peak, fade-out from it, OnFinished and the instant alpha.
+local function testHoverFadesPerLook()
+  local RowArt, Theme, row = load()
+  local hover, selected = RowArt.Overlays(row)
+  for _, mode in ipairs(PainterLooks.SEQUENCE) do
+    local peak = PEAK[mode]
+    RowArt.ApplyLook(hover, selected, PainterLooks.look(mode), Theme.COLORS.selectedTint)
+    RowArt.Hover(hover, true)
+    local grow = hover.fadeIn.animations[1]
+    Assert.same({ lastCall(grow, "SetFromAlpha"), lastCall(grow, "SetToAlpha") }, { { 0 }, { peak } }, mode .. " fade-in")
+    hover.fadeIn:Finish()
+    Assert.equal(hover.alpha, peak, mode .. ": fade-in settles at the peak")
+    RowArt.Hover(hover, false)
+    local shrink = hover.fadeOut.animations[1]
+    Assert.same({ lastCall(shrink, "SetFromAlpha"), lastCall(shrink, "SetToAlpha") }, { { peak }, { 0 } }, mode .. " fade-out")
+    hover.fadeOut:Finish()
+    Assert.same({ hover.shown, hover.alpha }, { false, 0 }, mode .. ": fade-out hides")
+    RowArt.Hover(hover, true, true)
+    Assert.equal(hover.alpha, peak, mode .. ": instant")
+    RowArt.Hover(hover, false, true)
+  end
+end
+
+-- Review Focus 3: the look flips while a fade runs; alpha never stays at 0.18 under flat.
+local function testLookFlipDuringFade()
+  local RowArt, Theme, row = load()
+  local hover, selected = RowArt.Overlays(row)
+  local flat, native, tint = PainterLooks.look("flat"), PainterLooks.look("native"), Theme.COLORS.selectedTint
+  RowArt.Hover(hover, true)
+  RowArt.ApplyLook(hover, selected, flat, tint)
+  Assert.same({ hover.fadeIn:IsPlaying(), hover.shown, hover.alpha }, { false, true, 1 }, "fade-in running at the flip to flat")
+  RowArt.ApplyLook(hover, selected, native, tint)
+  Assert.same({ hover.shown, hover.alpha }, { true, 0.18 }, "a shown hover follows native back to 0.18")
+  RowArt.Hover(hover, false)
+  Assert.equal(hover.fadeOut:IsPlaying(), true)
+  RowArt.ApplyLook(hover, selected, flat, tint)
+  Assert.same({ hover.fadeOut:IsPlaying(), hover.shown, hover.alpha }, { false, false, 0 }, "fade-out running at the flip ends hidden")
+  RowArt.Hover(hover, true)
+  hover.fadeIn:Finish()
+  Assert.equal(hover.alpha, 1, "a fade finishing after the flip lands on the new peak")
+end
+
 return function()
   testRoundIcon()
   testDot()
   testOverlays()
   testHover()
+  testApplyLookOverlays()
+  testHoverFadesPerLook()
+  testLookFlipDuringFade()
   Wow.reset()
 end

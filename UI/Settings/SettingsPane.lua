@@ -7,6 +7,9 @@ local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local ScrollView = ns.ScrollView or require("CraftAlert.UI.ScrollView")
+local ScrollBar = ns.ScrollBar or require("CraftAlert.UI.ScrollBar")
+local RowArt = ns.RowArt or require("CraftAlert.UI.RowArt")
+local PanelLook = ns.PanelLook or require("CraftAlert.UI.PanelLook")
 
 -- Native-HUD spec §7.1, UI uplift spec B.1: Craft Alert's settings, a pane with the split view's
 -- two-pane look: navigation on the left, one page at a time on the right. One pane, in whichever
@@ -23,7 +26,8 @@ local BUILT_IN = { "PageGeneral", "PageAlerts", "PageGreetings", "PageKeywords",
 local added = {} -- pages from AddPage, after the built-ins
 local pages = {} -- every page in nav order, filled by the first Attach
 ---@type table
-local pane = nil -- { host, onBack, onDetach, container, nav, right, back, content = { [id] = { frame, view } }, buttons = { [id] = button }, selected }
+local pane = nil -- { host, onBack, onDetach, container, nav, right, divider, back, content = { [id] = { frame, view, bar } }, buttons = { [id] = button }, selected }
+local lastLook = PanelLook.NATIVE -- what pages and nav buttons built later paint with
 
 local function pageById(id)
   for _, page in ipairs(pages) do
@@ -45,7 +49,8 @@ local function createContent(page)
   box:SetPoint("BOTTOMRIGHT", pane.right, "BOTTOMRIGHT", -inset, inset)
   box:SetFrameLevel(pane.right:GetFrameLevel() + 2)
   local scroll = ScrollView.Create(box)
-  local entry = { frame = box, view = page.Create(scroll.content) }
+  local entry = { frame = box, view = page.Create(scroll.content), bar = scroll.bar }
+  ScrollBar.ApplyLook(scroll.bar, lastLook)
   pane.content[page.id] = entry
   return entry
 end
@@ -72,7 +77,7 @@ local function showPage(id)
 end
 
 local function addNavButton(page, index)
-  local layout, art = Theme.LAYOUT, Theme.ART
+  local layout = Theme.LAYOUT
   local button = _G["CreateFrame"]("Button", nil, pane.nav)
   button:SetHeight(layout.NAV_BUTTON_HEIGHT)
   button:SetFrameLevel(pane.nav:GetFrameLevel() + 2)
@@ -83,13 +88,11 @@ local function addNavButton(page, index)
   button.label = FrameKit.Text(button, Theme.FONTS.name)
   button.label:SetPoint("LEFT", button, "LEFT", layout.SPACE.M, 0)
   button.label:SetText(page.title)
-  FrameKit.ListHighlight(button)
+  button.hover = FrameKit.ListHighlight(button)
   button.selected = button:CreateTexture(nil, "ARTWORK")
   button.selected:SetAllPoints(button)
-  button.selected:SetTexture(art.LIST_SELECTED)
-  button.selected:SetBlendMode("ADD")
-  button.selected:SetAlpha(art.LIST_SELECTED_ALPHA)
   button.selected:Hide()
+  RowArt.ApplyLook(button.hover, button.selected, lastLook, nil)
   button:SetScript("OnClick", function()
     showPage(page.id)
   end)
@@ -120,8 +123,8 @@ local function build(host)
   -- off-scale: the 1 px divider between the panes.
   right:SetPoint("TOPLEFT", nav, "TOPRIGHT", 1, 0)
   right:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", 0, 0)
-  FrameKit.Divider(container, nav)
-  pane = { container = container, nav = nav, right = right, content = {}, buttons = {}, selected = nil }
+  local divider = FrameKit.Divider(container, nav)
+  pane = { container = container, nav = nav, right = right, divider = divider, content = {}, buttons = {}, selected = nil }
   for _, name in ipairs(BUILT_IN) do
     pages[#pages + 1] = ns[name] or require("CraftAlert.UI.Settings." .. name)
   end
@@ -169,6 +172,22 @@ end
 -- The nav's width (the pane is built at LIST_WIDTH); Back's anchors follow it.
 function SettingsPane.SetNavWidth(width)
   pane.nav:SetWidth(width)
+end
+
+-- Repaints both panes, their divider, the nav buttons and every built page's scroll bar for `look`;
+-- the pages and buttons built later paint with it too. Callers apply it after Attach: the bridge
+-- its WM look, the leads window NATIVE.
+function SettingsPane.ApplyLook(look)
+  lastLook = look
+  FrameKit.PaintPane(pane.nav, Theme.ART.PANEL_BACKGROUND, look, "bg_secondary")
+  FrameKit.PaintPane(pane.right, Theme.ART.WIDE_PANEL_BACKGROUND, look, "bg_primary")
+  FrameKit.PaintDivider(pane.divider, look)
+  for _, button in pairs(pane.buttons) do
+    RowArt.ApplyLook(button.hover, button.selected, look, nil)
+  end
+  for _, entry in pairs(pane.content) do
+    ScrollBar.ApplyLook(entry.bar, look)
+  end
 end
 
 -- Shows the pane on the page last shown (the first page at first), refreshed from the db.
