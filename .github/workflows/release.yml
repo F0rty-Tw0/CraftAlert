@@ -1,0 +1,125 @@
+name: Package and release
+
+on:
+  push:
+    tags:
+      - "**"
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.0.0 or v1.0.0)"
+        required: true
+        type: string
+      release_type:
+        description: "Release type"
+        required: true
+        type: choice
+        options:
+          - release
+          - beta
+          - alpha
+        default: release
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run StyLua
+        run: npx --yes @johnnymorganz/stylua-bin@2.5.2 --check .
+
+      - name: Run Luacheck
+        uses: lunarmodules/luacheck@v1
+
+  release:
+    needs: lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+      ZIPOPT: "-9 -D"
+
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump version, update TOCs, tag (manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          INPUT_VERSION="${{ inputs.version }}"
+          NORMALIZED_VERSION="${INPUT_VERSION#v}"
+          TAG_VERSION="v${NORMALIZED_VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git show-ref --verify --quiet "refs/tags/${TAG_VERSION}"; then
+            echo "Tag ${TAG_VERSION} already exists; nothing to do."
+            exit 0
+          fi
+
+          # Single source of truth for the version + TOC bump.
+          bash scripts/release.sh "$INPUT_VERSION"
+
+          # scripts/release.sh creates the commit + annotated tag locally;
+          # push both so the package step picks up the tag.
+          git push origin HEAD:master
+          git push origin "${TAG_VERSION}"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install lupa
+        run: pip install lupa==2.7
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends lua5.1
+
+      - name: Minify release Lua
+        env:
+          LUASRCDIET_REV: e9ceefdd1b3a03bc6c444e8fbb41c506adbbf25f
+        run: |
+          set -euo pipefail
+          MINIFIER_DIR="${RUNNER_TEMP}/luasrcdiet"
+          git clone --quiet https://github.com/jirutka/luasrcdiet.git "${MINIFIER_DIR}"
+          git -C "${MINIFIER_DIR}" checkout --quiet --detach "${LUASRCDIET_REV}"
+          export LUA_PATH="${MINIFIER_DIR}/?.lua;${MINIFIER_DIR}/?/init.lua;;"
+
+          while IFS= read -r -d '' file; do
+            lua5.1 "${MINIFIER_DIR}/bin/luasrcdiet" \
+              --basic \
+              --noopt-emptylines \
+              --noopt-locals \
+              --quiet \
+              "${file}" \
+              -o "${file}.min"
+            mv "${file}.min" "${file}"
+          done < <(
+            find Bootstrap.lua Core Model Persistence Professions UI \
+              -type f -name '*.lua' -print0
+          )
+
+      - name: Test minified release
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' test_file; do
+            lua5.1 tests/run.lua "${test_file}"
+          done < <(find tests -type f -name 'test_*.lua' -print0 | sort -z)
+
+      - name: Package and release
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -u
