@@ -14,7 +14,7 @@
 ## Notes: Alerts you when someone in trade chat asks for something you can craft.
 ## Author: F0rty_tw0
 ## Category: Chat
-## IconTexture: Interface\Icons\INV_Misc_Bell_01
+## IconTexture: Interface\AddOns\CraftAlert\Media\Icon
 ## Version: 1.0.0
 ## SavedVariables: CraftAlertDB
 

@@ -233,17 +233,17 @@ local function testIconAndPulse()
   ns.Launcher.ShowLead(nil)
   Assert.equal(frame.pulseLoop:IsPlaying(), false)
   Assert.equal(frame.icon.texture, "tex164")
-  -- Bell: key not a number, API returns nil, API missing.
+  -- Addon icon: key not a number, API returns nil, API missing.
   lead.prof = "Blacksmithing"
   ns.Launcher.ShowLead(lead)
-  Assert.equal(frame.icon.texture, "Interface\\Icons\\INV_Misc_Bell_01")
+  Assert.equal(frame.icon.texture, ns.Theme.ICON)
   lead.prof = 999
   ns.Launcher.ShowLead(lead)
-  Assert.equal(frame.icon.texture, "Interface\\Icons\\INV_Misc_Bell_01")
+  Assert.equal(frame.icon.texture, ns.Theme.ICON)
   Wow.stub("C_TradeSkillUI", nil)
   lead.prof = 171
   ns.Launcher.ShowLead(lead)
-  Assert.equal(frame.icon.texture, "Interface\\Icons\\INV_Misc_Bell_01")
+  Assert.equal(frame.icon.texture, ns.Theme.ICON)
 end
 
 local function testDragApi()

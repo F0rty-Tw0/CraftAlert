@@ -1,22 +1,36 @@
+<p align="center"><img src=".github/screenshots/logo.png" alt="Craft Alert logo" width="160"></p>
+
 # Craft Alert
 
 Craft Alert watches Trade chat for people asking for something one of your characters can craft, then shows a toast so you can greet them with one click. Open each profession window once and it knows your recipes across every character on the account. It never whispers on its own: every message comes from your click or keybind. Works on Retail, WoW: Forever, and the Classic flavors (Era, TBC Anniversary, Wrath, Cata, MoP) from one folder.
 
 ## Screenshots
 
-These shots show Craft Alert inside WhisperMessenger; without it, Craft Alert shows the toast beside its own launcher ring and opens its own leads window.
+A toast beside the launcher ring when someone asks for something your alt can craft:
 
-A toast when someone asks for something your alt can craft:
+![Toast for an item link](.github/screenshots/toast.png)
 
-![Toast as WhisperMessenger's preview](.github/screenshots/toast.png)
+![Toast for a profession request](.github/screenshots/toast-profession.png)
 
 The leads window, with the selected request, who can craft it and the greeting that Greet sends:
 
 ![Leads window](.github/screenshots/leads-window.png)
 
-Settings, opened with the gear on the window's title bar:
+Hover the day's counts for the last 7 days:
 
-![Settings, General page](.github/screenshots/settings-general.png)
+![Last 7 days of leads](.github/screenshots/stats-week.png)
+
+Settings, opened with the gear on the window's title bar. The Crafters page picks a main crafter per profession and mutes recipes:
+
+![Settings, Crafters page](.github/screenshots/settings-crafters.png)
+
+The same mute switch sits on each recipe in your profession window: click the speaker to mute or unmute it.
+
+![Speakers in the profession window](.github/screenshots/profession-window.png)
+
+With WhisperMessenger installed, the leads move into its Craft Alert tab:
+
+![Leads in WhisperMessenger](.github/screenshots/whisper-messenger.png)
 
 ## What it does
 

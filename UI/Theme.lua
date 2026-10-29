@@ -126,7 +126,7 @@ Theme.LAYOUT = {
   CONTENT_INSET = { 4, -60, -6, 4 },
 }
 
-Theme.ICON = "Interface\\Icons\\INV_Misc_Bell_01"
+Theme.ICON = "Interface\\AddOns\\CraftAlert\\Media\\Icon"
 -- Textures every flavor's UI source references (ui_live, ui_forever, ui_classic, ui_classic_era).
 Theme.BADGE_TEXTURE = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
 Theme.GREETED_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
