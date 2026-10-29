@@ -10,7 +10,7 @@ A toast beside the launcher ring when someone asks for something your alt can cr
 
 ![Toast for an item link](.github/screenshots/toast.png)
 
-![Toast for a profession request](.github/screenshots/toast-profession.png)
+![Toast for a profession request](.github/screenshots/toast-chat.png)
 
 The leads window, with the selected request, who can craft it and the greeting that Greet sends:
 
