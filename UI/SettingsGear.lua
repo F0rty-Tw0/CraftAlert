@@ -12,8 +12,6 @@ local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 -- between the list and the settings pane; the gear turns into a back arrow while the pane shows.
 local SettingsGear = {}
 
-local LABEL_GAP = Theme.LAYOUT.SPACE.XS
-
 -- One green instruction line naming what a click does now (Tooltip.ShowHint, no body).
 local function showTooltip(gear)
   local instruction = gear.inSettings and "Click: back to leads" or "Click: open settings"
@@ -47,25 +45,16 @@ function SettingsGear.Build(parent, onClick)
   return gear
 end
 
--- The gear with a gold "Settings" label on its right, for WhisperMessenger's ledger line: one
--- Button under `parent`, sized and painted but not placed; a click runs onClick(). The client
--- stretches a state texture over the whole button on assignment, so the gear and its highlight are
--- anchored after it: the highlight lights the gear, never the label. Never in settings mode (the
--- line hides with the list), so no back arrow.
+-- A gold "Settings" label alone, no gear, for WhisperMessenger's ledger line: one Button under
+-- `parent`, sized but not placed; a click runs onClick(), the label turns white on hover. Never in
+-- settings mode (the line hides with the list), so no back arrow.
 function SettingsGear.BuildLabeled(parent, onClick)
-  local size = Theme.LAYOUT.GEAR_SIZE
   local link = _G["CreateFrame"]("Button", nil, parent)
-  addGearArt(link)
-  for _, texture in ipairs({ link.normal, link.highlight }) do
-    texture:ClearAllPoints()
-    texture:SetSize(size, size)
-    texture:SetPoint("LEFT", link, "LEFT", 0, 0)
-  end
   link.label = FrameKit.Text(link, Theme.FONTS.body, Theme.COLORS.gold)
   link.label:SetText(Localization.Text("Settings"))
-  link.label:SetPoint("LEFT", link.normal, "RIGHT", LABEL_GAP, 0)
+  link.label:SetPoint("LEFT", link, "LEFT", 0, 0)
   -- English only: the label never changes, so it is measured once.
-  link:SetSize(size + LABEL_GAP + link.label:GetStringWidth(), size)
+  link:SetSize(link.label:GetStringWidth(), Theme.LAYOUT.GEAR_SIZE)
   link:SetScript("OnClick", function()
     onClick()
   end)

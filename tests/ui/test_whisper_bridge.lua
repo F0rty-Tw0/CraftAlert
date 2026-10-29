@@ -35,11 +35,11 @@ local function descendantOf(frame, host)
   return false
 end
 
--- The embedded view's settings gear: the one Button under the host with the gear's art (.normal).
+-- The embedded view's settings gear: the one Settings link Button under the host.
 local function gearOf(host)
   local found
   for _, frame in ipairs(Wow.frames) do
-    if frame.frameType == "Button" and frame.normal and descendantOf(frame, host) then
+    if frame.frameType == "Button" and frame.label and frame.label:GetText() == "Settings" and descendantOf(frame, host) then
       Assert.equal(found, nil, "exactly one gear")
       found = frame
     end

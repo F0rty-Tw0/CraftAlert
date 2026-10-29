@@ -3,9 +3,8 @@ local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 
--- The gear with a gold "Settings" label WhisperMessenger's panel puts on its ledger line: the gear's
--- art and ADD highlight stay 20 x 20 at the left (the client stretches a state texture over the
--- whole button on assignment), the label turns white on hover.
+-- The gold "Settings" link WhisperMessenger's panel puts on its ledger line: the label alone, no
+-- gear; the label turns white on hover.
 
 local function build()
   local ns = UiFixture.load()
@@ -23,14 +22,22 @@ local function testLayout()
   local ns, link = build()
   Assert.equal(link.label:GetText(), "Settings")
   Assert.same(link.label.textColor, ns.Theme.COLORS.gold)
-  Assert.same({ link:GetWidth(), link:GetHeight() }, { 72, 20 }, "20 + 4 + 8 characters * 6 px")
-  Assert.same(link.normal.points, { { "LEFT", link, "LEFT", 0, 0 } })
-  Assert.same(link.highlight.points, { { "LEFT", link, "LEFT", 0, 0 } })
-  Assert.same({ link.normal:GetWidth(), link.normal:GetHeight() }, { 20, 20 })
-  Assert.same({ link.highlight:GetWidth(), link.highlight:GetHeight() }, { 20, 20 }, "lights the gear only")
-  Assert.equal(link:GetHighlightTexture().blendMode, "ADD")
-  Assert.equal(link:GetNormalTexture().atlas, "QuestLog-icon-setting")
-  Assert.same(link.label.points, { { "LEFT", link.normal, "RIGHT", 4, 0 } })
+  Assert.same({ link:GetWidth(), link:GetHeight() }, { 48, 20 }, "label width only: 8 characters * 6 px")
+  Assert.same(link.label.points, { { "LEFT", link, "LEFT", 0, 0 } })
+end
+
+local function testNoGearArt()
+  local ns, link = build()
+  Assert.equal(link.normal, nil)
+  Assert.equal(link.highlight, nil)
+  Assert.equal(link:GetNormalTexture(), nil)
+  Assert.equal(link:GetHighlightTexture(), nil)
+  for _, region in ipairs(link.regions) do
+    Assert.equal(region.SetAtlas, nil, "only the label is drawn")
+  end
+  -- The standalone title-bar gear keeps its art.
+  local gear = ns.SettingsGear.Build(_G["CreateFrame"]("Frame", nil, _G["UIParent"]), function() end)
+  Assert.equal(gear:GetNormalTexture().atlas, "QuestLog-icon-setting")
 end
 
 local function testHoverAndClick()
@@ -47,6 +54,7 @@ end
 
 return function()
   testLayout()
+  testNoGearArt()
   testHoverAndClick()
   Wow.reset()
 end

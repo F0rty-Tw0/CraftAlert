@@ -199,7 +199,7 @@ local function testToggleAndConfigRows()
   Assert.equal(G("CraftAlertLeadsWindow"):IsShown(), false, "own window stays hidden")
 end
 
--- "Gear in embedded view": the one Button with the gear's art (.normal) opens Settings inside the host.
+-- "Gear in embedded view": the one Settings link Button opens Settings inside the host.
 local function testGearRow()
   local ns, _, _, _, wm = boot()
   ns.WhisperBridge.Activate()
@@ -208,7 +208,7 @@ local function testGearRow()
   wm.showPanel("CraftAlert", host)
   local gear
   for _, frame in ipairs(Wow.frames) do
-    if frame.frameType == "Button" and frame.normal then
+    if frame.frameType == "Button" and frame.label and frame.label:GetText() == "Settings" then
       local parent = frame.parent
       while parent and parent ~= host do
         parent = parent.parent
