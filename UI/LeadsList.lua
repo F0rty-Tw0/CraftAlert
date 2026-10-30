@@ -47,6 +47,9 @@ local function rowAt(list, index)
   row:SetFrameLevel(list.level)
   placeRow(list, row, index)
   list.rows[index] = row
+  if list.look then
+    LeadRow.ApplyLook(row, list.look)
+  end
   return row
 end
 
@@ -82,6 +85,15 @@ function LeadsList.SetCompact(list, compact)
     LeadRow.SetCompact(row, compact)
     placeRow(list, row, index)
   end
+end
+
+-- Repaints the rows and the scroll bar for `look`; rows made later paint with it too.
+function LeadsList.ApplyLook(list, look)
+  list.look = look
+  for _, row in ipairs(list.rows) do
+    LeadRow.ApplyLook(row, look)
+  end
+  ScrollBar.ApplyLook(list.bar, look)
 end
 
 -- Re-reads `leads` (newest first) into the rows from the scroll offset, at most `fit` of them;

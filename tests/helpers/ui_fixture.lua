@@ -36,6 +36,7 @@ local CHAIN = {
 }
 local UI = {
   "UI.Theme",
+  "UI.PanelLook",
   "UI.FrameKit",
   "UI.ScrollBar",
   "UI.ScrollView",

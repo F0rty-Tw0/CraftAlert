@@ -145,6 +145,16 @@ function LeadsView.New(parent, opts)
   return view
 end
 
+-- Repaints both panes, the divider, the rows (the ones built later too), the details header, strip
+-- and boxes, and the list's and the body's scroll bars for `look` (UI/PanelLook.lua).
+function LeadsView.ApplyLook(view, look)
+  FrameKit.PaintPane(view.listPane, Theme.ART.PANEL_BACKGROUND, look, "bg_secondary")
+  FrameKit.PaintPane(view.detailsPane, Theme.ART.WIDE_PANEL_BACKGROUND, look, "bg_primary")
+  FrameKit.PaintDivider(view.divider, look)
+  LeadsList.ApplyLook(view.list, look)
+  LeadDetails.ApplyLook(view.details, look)
+end
+
 -- Re-reads the list width; the details get the rest of the parent (0 wide: not known yet). A list
 -- narrower than the minimum (WM's divider on its rail) is icon-only, and "Clear all" hides when the
 -- band over the list cannot hold it.

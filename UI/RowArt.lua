@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
+local PanelLook = ns.PanelLook or require("CraftAlert.UI.PanelLook")
 
 -- Spec D1, D3, D5, D10: the art the lead rows and the details header share, as WhisperMessenger
 -- draws it. The round icon (UI/Helpers/Shapes.lua:184-211, WM), the status dot
@@ -13,6 +14,7 @@ local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local RowArt = {}
 
 local type = type
+local unpack = unpack
 
 -- The texture outgrows its holder so the mask's soft edge falls outside the clip.
 local ICON_ZOOM = 1.15
@@ -75,24 +77,27 @@ local function overlay(row, path)
   return texture
 end
 
--- One 0.1 s Alpha fade of `hover` from `from` to `to`; on finishing it settles there, hidden at 0.
-local function fade(hover, from, to)
+-- One 0.1 s Alpha fade of `hover` between 0 and hover.peak, up when `grow`; on finishing it
+-- settles at the end read then (the look may have moved the peak), hidden at 0. → group, animation
+local function fade(hover, grow)
   local group = hover:CreateAnimationGroup()
   local alpha = group:CreateAnimation("Alpha")
   alpha:SetDuration(FADE_SECONDS)
-  alpha:SetFromAlpha(from)
-  alpha:SetToAlpha(to)
+  alpha:SetFromAlpha(grow and 0 or hover.peak)
+  alpha:SetToAlpha(grow and hover.peak or 0)
   group:SetToFinalAlpha(true)
   group:SetScript("OnFinished", function()
+    local to = grow and hover.peak or 0
     hover:SetAlpha(to)
     hover:SetShown(to > 0)
   end)
 
-  return group
+  return group, alpha
 end
 
 -- The row's hover and selected overlays, both hidden. The selected one is tinted; the hover one
--- carries its fades as hover.fadeIn and hover.fadeOut (RowArt.Hover plays them).
+-- carries its alpha while shown as hover.peak and its fades as hover.fadeIn and hover.fadeOut
+-- (RowArt.Hover plays them; their Alpha animations are hover.inAnimation and hover.outAnimation).
 function RowArt.Overlays(row)
   local art = Theme.ART
   local tint = Theme.COLORS.selectedTint
@@ -101,8 +106,9 @@ function RowArt.Overlays(row)
   selected:SetAlpha(art.LIST_SELECTED_ALPHA)
   local hover = overlay(row, art.LIST_HOVER)
   hover:SetAlpha(0)
-  hover.fadeIn = fade(hover, 0, art.LIST_HOVER_ALPHA)
-  hover.fadeOut = fade(hover, art.LIST_HOVER_ALPHA, 0)
+  hover.peak = art.LIST_HOVER_ALPHA
+  hover.fadeIn, hover.inAnimation = fade(hover, true)
+  hover.fadeOut, hover.outAnimation = fade(hover, false)
 
   return hover, selected
 end
@@ -117,12 +123,54 @@ function RowArt.Hover(hover, on, instant)
   other:Stop()
   if instant then
     play:Stop()
-    hover:SetAlpha(on and Theme.ART.LIST_HOVER_ALPHA or 0)
+    hover:SetAlpha(on and hover.peak or 0)
     hover:SetShown(on)
   elseif on or hover:IsShown() then
     hover:Show()
     play:Play()
   end
+end
+
+local WHITE = { 1, 1, 1 }
+
+-- Paints one overlay for `look`: flat fills it with the look's `key` colour; the others draw `art`
+-- additively, tinted by that colour (native: `nativeTint`, nil: white). → its alpha while shown
+local function paint(texture, look, key, nativeTint, art, artAlpha)
+  if look.mode == "flat" then
+    texture:SetColorTexture(unpack(PanelLook.Color(look, key)))
+    texture:SetBlendMode("BLEND")
+    texture:SetVertexColor(1, 1, 1)
+    return 1
+  end
+  local tint = PanelLook.Color(look, key, nativeTint or WHITE)
+  texture:SetTexture(art)
+  texture:SetBlendMode("ADD")
+  texture:SetVertexColor(tint[1], tint[2], tint[3])
+  return artAlpha
+end
+
+-- Spec "Looks", row overlays: repaints a row's (or nav button's) hover and selected overlays for
+-- `look`, never showing or hiding the selected one. A hover with fades retargets them to the new
+-- peak; a fade-out running now ends at once, hidden. A hover without fades (a HIGHLIGHT texture
+-- the client shows while hovered) keeps the peak as its alpha.
+function RowArt.ApplyLook(hover, selected, look, nativeTint)
+  local art = Theme.ART
+  selected:SetAlpha(paint(selected, look, "bg_contact_selected", nativeTint, art.LIST_SELECTED, art.LIST_SELECTED_ALPHA))
+  local peak = paint(hover, look, "bg_contact_hover", nil, art.LIST_HOVER, art.LIST_HOVER_ALPHA)
+  hover.peak = peak
+  if hover.fadeIn == nil then
+    hover:SetAlpha(peak)
+    return
+  end
+  local fadingOut = hover.fadeOut:IsPlaying()
+  hover.fadeIn:Stop()
+  hover.fadeOut:Stop()
+  hover.inAnimation:SetToAlpha(peak)
+  hover.outAnimation:SetFromAlpha(peak)
+  if fadingOut then
+    hover:Hide()
+  end
+  hover:SetAlpha(hover:IsShown() and peak or 0)
 end
 
 ns.RowArt = RowArt

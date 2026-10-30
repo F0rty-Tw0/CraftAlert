@@ -180,17 +180,24 @@ local function newTexture(parent, layer)
   local texture = { shown = true, parent = parent, layer = layer }
   addRegion(texture)
 
+  -- Each fill replaces the others, as in the client.
   function texture:SetColorTexture(r, g, b, a)
     self.color = { r, g, b, a }
+    self.texture = nil
+    self.atlas = nil
   end
 
   function texture:SetTexture(path, horizontalWrap, verticalWrap)
     self.texture = path
     self.wrap = { horizontalWrap, verticalWrap }
+    self.color = nil
+    self.atlas = nil
   end
 
   function texture:SetAtlas(atlas)
     self.atlas = atlas
+    self.color = nil
+    self.texture = nil
   end
 
   function texture:SetBlendMode(mode)

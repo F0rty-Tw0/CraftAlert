@@ -1,6 +1,7 @@
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local Fresh = require("tests.helpers.fresh")
+local LookFixture = require("tests.helpers.look_fixture")
 
 local FALLBACK = { "TOP", 0, -160 }
 
@@ -258,12 +259,138 @@ local function testLookCodeGone()
   end
 end
 
+local ATLAS = "Professions-background-summarylist"
+
+local function knowAtlases()
+  Wow.stub("C_Texture", {
+    GetAtlasInfo = function()
+      return { width = 1, height = 1 }
+    end,
+  })
+end
+
+local function looks()
+  local PanelLook = require("CraftAlert.UI.PanelLook")
+  local answers = { retail = LookFixture.answer("retail"), classic = LookFixture.answer("classic"), flat = LookFixture.answer("off") }
+  return {
+    native = PanelLook.NATIVE,
+    retail = PanelLook.FromWM(answers.retail),
+    classic = PanelLook.FromWM(answers.classic),
+    flat = PanelLook.FromWM(answers.flat),
+  },
+    answers.flat.colors
+end
+
+local function newPane(FrameKit)
+  return FrameKit.InsetPane(_G["CreateFrame"]("Frame"), ATLAS)
+end
+
+local function spy(texture)
+  local log = {}
+  for _, name in ipairs({ "SetTexture", "SetAtlas", "SetColorTexture" }) do
+    local original = texture[name]
+    texture[name] = function(self, ...)
+      log[#log + 1] = name
+      return original(self, ...)
+    end
+  end
+  return log
+end
+
+local function callCount(log, name)
+  local n = 0
+  for _, entry in ipairs(log) do
+    n = n + (entry == name and 1 or 0)
+  end
+  return n
+end
+
+-- Each look paints the pane as the spec's Looks table: atlas + border (native, retail), nothing
+-- (classic), a flat colour from the answer under the given key and no border (flat).
+local function testPaintPane()
+  local FrameKit = load({})
+  knowAtlases()
+  local set, flatColors = looks()
+  for _, mode in ipairs({ "native", "retail" }) do
+    local pane = newPane(FrameKit)
+    FrameKit.PaintPane(pane, ATLAS, set[mode], "bg_secondary")
+    Assert.same({ pane.bg.atlas, pane.bg.shown, pane.art.shown, pane.art.Bg.shown }, { ATLAS, true, true, false }, mode)
+  end
+  local pane = newPane(FrameKit)
+  FrameKit.PaintPane(pane, ATLAS, set.classic, "bg_secondary")
+  Assert.same({ pane.bg.shown, pane.art.shown }, { false, false }, "classic: no fill, no border")
+  pane = newPane(FrameKit)
+  FrameKit.PaintPane(pane, ATLAS, set.flat, "bg_secondary")
+  Assert.same({ pane.bg.color, pane.bg.shown, pane.art.shown }, { flatColors.bg_secondary, true, false }, "flat list fill")
+  FrameKit.PaintPane(pane, ATLAS, set.flat, "bg_primary")
+  Assert.same(pane.bg.color, flatColors.bg_primary, "flat details fill is the other key")
+  FrameKit.PaintPane(pane, ATLAS, set.flat, "bg_primary")
+  Assert.same({ pane.bg.color, pane.art.shown }, { flatColors.bg_primary, false }, "idempotent")
+end
+
+-- Native after classic or flat restores today's pane: atlas, border, marble hidden.
+local function testPaintPaneNativeRestores()
+  local FrameKit = load({})
+  knowAtlases()
+  local set = looks()
+  for _, mode in ipairs({ "classic", "flat" }) do
+    local pane = newPane(FrameKit)
+    FrameKit.PaintPane(pane, ATLAS, set[mode], "bg_secondary")
+    FrameKit.PaintPane(pane, ATLAS, set.native)
+    Assert.same({ pane.bg.atlas, pane.bg.blendMode, pane.bg.shown, pane.art.shown, pane.art.Bg.shown }, { ATLAS, "BLEND", true, true, false }, mode)
+  end
+end
+
+-- A client without the atlas (Classic flavors): native and retail clear pane.bg and show the
+-- inset's own Bg, also after flat; with the atlas nothing is cleared.
+local function testPaintPaneNativeWithoutAtlas()
+  local FrameKit = load({})
+  local set = looks()
+  for _, mode in ipairs({ "native", "retail" }) do
+    knowAtlases()
+    local pane = newPane(FrameKit)
+    FrameKit.PaintPane(pane, ATLAS, set.flat, "bg_secondary")
+    local log = spy(pane.bg)
+    FrameKit.PaintPane(pane, ATLAS, set[mode])
+    Assert.equal(callCount(log, "SetTexture"), 0, mode .. ": atlas known, nothing cleared")
+    FrameKit.PaintPane(pane, ATLAS, set.flat, "bg_secondary")
+    Wow.stub("C_Texture", nil)
+    FrameKit.PaintPane(pane, ATLAS, set[mode])
+    Assert.equal(callCount(log, "SetTexture"), 1, mode .. ": bg cleared")
+    Assert.same({ pane.bg.texture, pane.bg.shown, pane.art.shown, pane.art.Bg.shown }, { nil, true, true, true }, mode)
+  end
+end
+
+local function testPaintDivider()
+  local FrameKit = load({})
+  local Theme = require("CraftAlert.UI.Theme")
+  local set, colors = looks()
+  local container = _G["CreateFrame"]("Frame")
+  local divider = FrameKit.Divider(container, newPane(FrameKit))
+  local native = Theme.COLORS.divider
+  FrameKit.PaintDivider(divider, set.native)
+  Assert.same(divider.color, { native[1], native[2], native[3], native[4] }, "native")
+  for _, mode in ipairs({ "retail", "classic", "flat" }) do
+    FrameKit.PaintDivider(divider, set[mode])
+    local c = colors.contacts_divider
+    Assert.same(divider.color, { c[1], c[2], c[3], c[4] }, mode)
+  end
+  FrameKit.PaintDivider(divider, { mode = "flat", colors = { divider = colors.divider } })
+  Assert.same(divider.color, { colors.divider[1], colors.divider[2], colors.divider[3], colors.divider[4] }, "no contacts_divider: divider")
+  FrameKit.PaintDivider(divider, set.native)
+  Assert.same(divider.color, { native[1], native[2], native[3], native[4] }, "native again")
+end
+
 return function()
   testSavedPosition()
   testMalformedFallsBack()
   testArt()
   testAtlasExists()
   testPaintPanel()
+  testPaintPane()
+  testPaintPaneNativeRestores()
+  testPaintPaneNativeWithoutAtlas()
+  testPaintDivider()
   testListHighlight()
   testProfessionIcon()
   testClassColor()

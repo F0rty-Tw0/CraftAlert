@@ -3,6 +3,10 @@ local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 local SettingsFixture = require("tests.helpers.settings_fixture")
+local PainterLooks = require("tests.helpers.painter_looks")
+local LookFixture = require("tests.helpers.look_fixture")
+
+local COLORS = LookFixture.COLORS
 
 local function regionOf(owner, layer)
   for _, region in ipairs(owner.regions) do
@@ -83,6 +87,84 @@ local function testNavButtonsAndBack()
   Assert.equal(back:GetHeight(), 28)
   Assert.truthy(back:GetFrameLevel() > art:GetFrameLevel())
   Assert.equal(right.parent, nav.parent)
+end
+
+-- Spec "Looks": the nav button's selected texture and its HIGHLIGHT hover follow the leads-row rows, the native selected one untinted.
+local function testNavButtonLooks()
+  local ns = SettingsFixture.load()
+  panes(ns)
+  local RowArt = require("CraftAlert.UI.RowArt")
+  local button = SettingsFixture.navButton("General")
+  local art = ns.Theme.ART
+  Assert.same(
+    { button.hover.layer, button.hover.texture, button.hover.blendMode, button.hover.alpha },
+    { "HIGHLIGHT", art.LIST_HOVER, "ADD", 0.18 },
+    "the nav button keeps its HIGHLIGHT texture"
+  )
+  local want = PainterLooks.overlays(ns.Theme, nil)
+  for _, mode in ipairs(PainterLooks.SEQUENCE) do
+    RowArt.ApplyLook(button.hover, button.selected, PainterLooks.look(mode), nil)
+    PainterLooks.checkOverlay(button.selected, want.selected[mode], mode .. " nav selected")
+    PainterLooks.checkOverlay(button.hover, want.hover[mode], mode .. " nav hover")
+    Assert.same(
+      { button.selected.alpha, button.hover.alpha, button.selected.shown },
+      { want.selected[mode].alpha, want.hover[mode].alpha, false },
+      mode .. ": alphas (the highlight keeps its peak, the client shows it while hovered); General is not the selected page"
+    )
+  end
+end
+
+local function testApplyLookFlat()
+  local ns = SettingsFixture.load()
+  local _, container, nav, right, box = panes(ns)
+  local flat = LookFixture.flat()
+  local bars = LookFixture.spy(ns.ScrollBar, "ApplyLook")
+  ns.SettingsPane.ApplyLook(flat)
+  Assert.same(
+    { regionOf(nav, "BACKGROUND").color, regionOf(right, "BACKGROUND").color },
+    { COLORS.bg_secondary, COLORS.bg_primary },
+    "nav bg_secondary, page pane bg_primary"
+  )
+  Assert.same({ insetArt(nav):IsShown(), insetArt(right):IsShown() }, { false, false }, "borders hidden")
+  Assert.same(regionOf(container, "BORDER").color, COLORS.contacts_divider, "divider")
+  local button = SettingsFixture.navButton("Alerts")
+  Assert.same(
+    { button.selected.color, button.selected.blendMode, button.selected.alpha },
+    { COLORS.bg_contact_selected, "BLEND", 1 },
+    "selected nav button"
+  )
+  Assert.same({ button.hover.color, button.hover.blendMode }, { COLORS.bg_contact_hover, "BLEND" }, "hovered nav button")
+  Assert.equal(LookFixture.saw(bars, SettingsFixture.pageBar(box), flat), true, "a built page's scroll bar")
+  -- Built later: a page opened and a nav button added after the look.
+  local before = #bars
+  Widgets.click(SettingsFixture.navButton("Greetings"), "LeftButton")
+  local last = bars[#bars]
+  Assert.same({ #bars > before, last[1].parent.parent == right, last[2] == flat }, { true, true, true }, "a page built later: the last look")
+  ns.SettingsPane.AddPage({
+    id = "extra",
+    title = "Extra",
+    Create = function()
+      return { Refresh = function() end }
+    end,
+  })
+  Assert.same(SettingsFixture.navButton("Extra").selected.color, COLORS.bg_contact_selected, "a nav button built later")
+end
+
+local function testApplyLookNativeAfterFlat()
+  local ns = SettingsFixture.load()
+  local _, container, nav, right = panes(ns)
+  ns.SettingsPane.ApplyLook(LookFixture.flat())
+  ns.SettingsPane.ApplyLook(LookFixture.NATIVE)
+  local art, button = ns.Theme.ART, SettingsFixture.navButton("Alerts")
+  Assert.same({ insetArt(nav):IsShown(), insetArt(right):IsShown() }, { true, true }, "borders back")
+  Assert.same(regionOf(container, "BORDER").color, ns.Theme.COLORS.divider, "divider back")
+  Assert.same(
+    { button.selected.texture, button.selected.blendMode, button.selected.alpha },
+    { art.LIST_SELECTED, "ADD", art.LIST_SELECTED_ALPHA },
+    "nav selected back"
+  )
+  Assert.equal(button.selected.color, nil, "nav selected: no flat colour left")
+  Assert.same({ button.hover.blendMode, button.hover.alpha }, { "ADD", art.LIST_HOVER_ALPHA }, "nav hover back")
 end
 
 local function newHost()
@@ -194,6 +276,9 @@ end
 return function()
   testPaneFrames()
   testNavButtonsAndBack()
+  testNavButtonLooks()
+  testApplyLookFlat()
+  testApplyLookNativeAfterFlat()
   testAttachMovesBetweenHosts()
   testSetNavWidth()
   testNoAtlasNoFill()

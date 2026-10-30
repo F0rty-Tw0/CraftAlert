@@ -266,6 +266,11 @@ function LeadRow.SetSelected(row, selected)
   row.what:SetTextColor(color[1], color[2], color[3], color[4])
 end
 
+-- The hover and selected overlays for `look`; the selected one keeps today's tint when native.
+function LeadRow.ApplyLook(row, look)
+  RowArt.ApplyLook(row.hover, row.selected, look, Theme.COLORS.selectedTint)
+end
+
 -- Hiding the row hides its chat tooltip and its hover too (the OnHide hook).
 function LeadRow.Clear(row)
   row.lead, row.shownAt = nil, nil

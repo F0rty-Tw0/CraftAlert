@@ -5,14 +5,16 @@ end
 
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
+local PanelLook = ns.PanelLook or require("CraftAlert.UI.PanelLook")
 
 -- Builders the toast, leads window, cards, launcher and settings share: text, colour codes, the
--- customer's class colour, atlas-or-file art, inset panes and the divider between them, the window
+-- customer's class colour, atlas-or-file art, inset panes (and their look) and the divider between them, the window
 -- portrait, list highlight, and dragging with the position saved
 -- account-wide in `CraftAlertDB.ui[key]`.
 local FrameKit = {}
 
 local type = type
+local unpack = unpack
 
 local ANCHORS = {
   TOPLEFT = true,
@@ -93,9 +95,32 @@ function FrameKit.PaintPanel(texture, atlas)
   return true
 end
 
+-- Paints `pane` (an InsetPane) for `look`, one state per mode so a repeat or a switch back is exact.
+-- Native and retail: the atlas and the border; the inset's marble Bg would cover the atlas, so it
+-- hides when the atlas paints and shows when it cannot (Classic flavors: bg cleared, the inset's
+-- own fill). Classic: neither fill nor border. Flat: the look's `colorKey` colour, no border.
+function FrameKit.PaintPane(pane, atlas, look, colorKey)
+  if look.mode == "classic" then
+    pane.art:Hide()
+    pane.bg:Hide()
+  elseif look.mode == "flat" then
+    pane.art:Hide()
+    pane.bg:Show()
+    pane.bg:SetColorTexture(unpack(PanelLook.Color(look, colorKey, { 0, 0, 0, 0 })))
+  else
+    pane.art:Show()
+    pane.bg:Show()
+    if FrameKit.PaintPanel(pane.bg, atlas) then
+      pane.art.Bg:Hide()
+    else
+      pane.bg:SetTexture(nil)
+      pane.art.Bg:Show()
+    end
+  end
+end
+
 -- A pane: its atlas in a BACKGROUND texture (pane.bg), then an InsetFrameTemplate border one level
--- above (pane.art), as WhisperMessenger's panes. The inset's marble Bg would cover the atlas, so it
--- hides when the atlas paints and stays when it cannot (Classic flavors: no fill but the inset's own).
+-- above (pane.art), as WhisperMessenger's panes, painted native (PaintPane repaints it for a look).
 function FrameKit.InsetPane(parent, atlas)
   local pane = _G["CreateFrame"]("Frame", nil, parent)
   pane.bg = pane:CreateTexture(nil, "BACKGROUND")
@@ -103,14 +128,12 @@ function FrameKit.InsetPane(parent, atlas)
   pane.art = _G["CreateFrame"]("Frame", nil, pane, "InsetFrameTemplate")
   pane.art:SetAllPoints(pane)
   pane.art:SetFrameLevel(pane:GetFrameLevel() + 1)
-  if FrameKit.PaintPanel(pane.bg, atlas) then
-    pane.art.Bg:Hide()
-  end
+  FrameKit.PaintPane(pane, atlas, PanelLook.NATIVE)
   return pane
 end
 
 -- The 1 px line down the right edge of `leftPane`, a texture of `container`: the pane's inset art
--- would cover a line of its own.
+-- would cover a line of its own. Native colour; PaintDivider sets it for a look.
 function FrameKit.Divider(container, leftPane)
   local color = Theme.COLORS.divider
   local divider = container:CreateTexture(nil, "BORDER")
@@ -119,6 +142,16 @@ function FrameKit.Divider(container, leftPane)
   divider:SetPoint("BOTTOMLEFT", leftPane, "BOTTOMRIGHT", 0, 0)
   divider:SetColorTexture(color[1], color[2], color[3], color[4])
   return divider
+end
+
+-- The divider's colour for `look`: native is Theme's; the others take WM's contacts divider (the
+-- split line of its list), else its divider.
+function FrameKit.PaintDivider(texture, look)
+  local color = Theme.COLORS.divider
+  if look.mode ~= "native" then
+    color = PanelLook.Color(look, "contacts_divider", PanelLook.Color(look, "divider", color))
+  end
+  texture:SetColorTexture(color[1], color[2], color[3], color[4])
 end
 
 -- `icon` in a ButtonFrameTemplate's portrait; a template without SetPortraitToAsset gets the texture

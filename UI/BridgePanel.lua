@@ -8,6 +8,7 @@ local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local LeadsView = ns.LeadsView or require("CraftAlert.UI.LeadsView")
+local PanelLook = ns.PanelLook or require("CraftAlert.UI.PanelLook")
 local LedgerStrip = ns.LedgerStrip or require("CraftAlert.UI.LedgerStrip")
 local SettingsGear = ns.SettingsGear or require("CraftAlert.UI.SettingsGear")
 local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.SettingsPane")
@@ -15,9 +16,10 @@ local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.Settings
 -- Spec C.2, C.4: the leads in WhisperMessenger's panel. The RegisterPanel table the bridge hands
 -- over (UI/WhisperBridge.lua) and the split view WM's host frame shows: built once per host, sent
 -- back to the top with the newest lead selected on every show, refreshed on lead changes while
--- shown. A gear with a "Settings" label at the ledger line's right swaps the view for the settings
--- pane inside the host (Back returns; the mode is not saved, so every show starts on the leads). The tab's badge
--- counts the unseen leads; WM's Mark all read marks them all seen at once.
+-- shown, painted in WM's look, read at every show (UI/PanelLook.lua). A "Settings" link at the
+-- ledger line's right swaps the view for the settings pane inside the host (Back returns; the mode
+-- is not saved, so every show starts on the leads). The tab's badge counts the unseen leads; WM's
+-- Mark all read marks them all seen at once.
 local BridgePanel = {}
 
 local max = math.max
@@ -37,6 +39,7 @@ local currentHost = nil -- set before the view is built: LeadsView.New lays out 
 local panelShown = false
 local mode = "list" -- "list" | "settings"; the settings pane replaces the view in the host
 local splitWidth = nil -- WM's divider position from onSplit; nil until it calls, reset by a new host
+local look = PanelLook.NATIVE -- WM's look as read at the last show; the settings pane paints with it too
 
 -- Leads keeps its leads in an instance, where the addon shows none (spec C.3).
 local function visibleLeads()
@@ -87,6 +90,7 @@ end
 local function enterSettings()
   -- First: attaching to a new host runs the previous owner's showLeads, which must not undo the rest.
   SettingsPane.Attach(view.parent, enterLeads, showLeads, SETTINGS_LIFT)
+  SettingsPane.ApplyLook(look)
   mode = "settings"
   LeadsView.Clear(view)
   view.frame:Hide()
@@ -94,8 +98,8 @@ local function enterSettings()
   SettingsPane.Show()
 end
 
--- The gear and its "Settings" label sit at the ledger line's right, centred on it vertically; the
--- counts end before them. They start right of the list (LeadsView sets that edge): WM's divider
+-- The Settings link sits at the ledger line's right, centred on it vertically; the
+-- counts end before it. They start right of the list (LeadsView sets that edge): WM's divider
 -- hairline and its resize handle's line run down the host at the split, through the ledger band,
 -- over the host's children (UI/MessengerWindow/LayoutBuilder/ContactsSection.lua:107-130, WM), so
 -- they never cross the text.
@@ -130,6 +134,9 @@ local function onShow(host)
   if mode == "settings" then
     enterLeads()
   end
+  -- Resolved here: WhisperBridge loads after this module and requires it.
+  look = (ns.WhisperBridge or require("CraftAlert.UI.WhisperBridge")).Look()
+  LeadsView.ApplyLook(view, look)
   LeadsView.ResetTop(view)
   LeadsView.Clear(view)
   refresh()

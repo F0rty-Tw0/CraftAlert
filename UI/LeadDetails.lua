@@ -13,6 +13,7 @@ local CardTipText = ns.CardTipText or require("CraftAlert.UI.CardTipText")
 local DetailsHeader = ns.DetailsHeader or require("CraftAlert.UI.DetailsHeader")
 local DetailsBody = ns.DetailsBody or require("CraftAlert.UI.DetailsBody")
 local ScrollView = ns.ScrollView or require("CraftAlert.UI.ScrollView")
+local ScrollBar = ns.ScrollBar or require("CraftAlert.UI.ScrollBar")
 
 -- Spec A.4: the split view's details pane, the selected lead in full. The header and the info
 -- strip under it (UI/DetailsHeader.lua, details spec A.1-A.2), the body (UI/DetailsBody.lua,
@@ -212,6 +213,13 @@ function LeadDetails.Layout(details, width)
   for _, button in pairs(details.buttons) do
     button:SetWidth(buttonWidth)
   end
+end
+
+-- The header and strip, the Request and Greet boxes and the body's scroll bar for `look`.
+function LeadDetails.ApplyLook(details, look)
+  DetailsHeader.ApplyLook(details, look)
+  DetailsBody.ApplyLook(details.sections, look)
+  ScrollBar.ApplyLook(details.scroll.bar, look)
 end
 
 ns.LeadDetails = LeadDetails

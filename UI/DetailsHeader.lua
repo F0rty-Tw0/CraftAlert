@@ -10,6 +10,7 @@ local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local LinkHover = ns.LinkHover or require("CraftAlert.UI.LinkHover")
 local RowArt = ns.RowArt or require("CraftAlert.UI.RowArt")
+local PanelLook = ns.PanelLook or require("CraftAlert.UI.PanelLook")
 
 -- Details spec A.1-A.2: the details pane's header and the info strip under it. The header: the
 -- round profession or item icon with a status dot, the customer at 17 px in class colour, then
@@ -116,13 +117,14 @@ local function createName(header)
   return name
 end
 
--- A 1 px line along the frame's `edge` ("TOP" or "BOTTOM"), as the mock's borders.
+-- A 1 px line along the frame's `edge` ("TOP" or "BOTTOM"), as the mock's borders. → the line
 local function divider(frame, edge)
   local line = frame:CreateTexture(nil, "BORDER")
   line:SetHeight(1)
   line:SetPoint(edge .. "LEFT", frame, edge .. "LEFT", 0, 0)
   line:SetPoint(edge .. "RIGHT", frame, edge .. "RIGHT", 0, 0)
   line:SetColorTexture(unpack(Theme.COLORS.divider))
+  return line
 end
 
 local function createStrip(details)
@@ -134,8 +136,8 @@ local function createStrip(details)
   local fill = strip:CreateTexture(nil, "BACKGROUND")
   fill:SetAllPoints(strip)
   fill:SetColorTexture(unpack(Theme.COLORS.headerFill))
-  divider(strip, "TOP")
-  divider(strip, "BOTTOM")
+  details.stripFill = fill
+  details.stripLines = { top = divider(strip, "TOP"), bottom = divider(strip, "BOTTOM") }
   local text = FrameKit.Wrapped(strip, Theme.FONTS.body, PLAIN_COLOR, STRIP_LINES)
   text:SetPoint("LEFT", strip, "LEFT", padding, 0)
   LinkHover.Attach(strip, nil)
@@ -143,7 +145,8 @@ local function createStrip(details)
 end
 
 -- The header (details.header: fill, icon, dot, name, lineOne, lineTwo) at the pane's top and
--- the strip (details.strip, its text details.stripText) under it.
+-- the strip (details.strip, its text details.stripText, details.stripFill, its top and bottom
+-- details.stripLines) under it.
 function DetailsHeader.Create(details)
   local layout, fonts = Theme.LAYOUT, Theme.FONTS
   local header = _G["CreateFrame"]("Frame", nil, details.frame)
@@ -168,6 +171,18 @@ function DetailsHeader.Create(details)
     details[key], previous = line, line
   end
   createStrip(details)
+end
+
+-- Spec "Looks", details header: the header's and the strip's fill WM's bg_header, the strip's
+-- lines its divider; native keeps the theme's.
+function DetailsHeader.ApplyLook(details, look)
+  local colors = Theme.COLORS
+  local fill = PanelLook.Color(look, "bg_header", colors.headerFill)
+  local line = PanelLook.Color(look, "divider", colors.divider)
+  details.fill:SetColorTexture(unpack(fill))
+  details.stripFill:SetColorTexture(unpack(fill))
+  details.stripLines.top:SetColorTexture(unpack(line))
+  details.stripLines.bottom:SetColorTexture(unpack(line))
 end
 
 -- Cuts the name with an ellipsis so it ends details.rightInset before the header's right edge.

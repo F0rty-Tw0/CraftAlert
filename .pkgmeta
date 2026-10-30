@@ -8,6 +8,8 @@ ignore:
   - scripts
   - docs
   - tools
+  - archive
+  - dist
   - .editorconfig
   - .gitignore
   - .gitattributes

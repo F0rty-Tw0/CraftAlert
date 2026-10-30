@@ -7,6 +7,8 @@
 --   wm.callsTo(name)                       those entries
 --   wm.refuse[name] = true                 that function records the call, changes nothing, returns false
 --   wm.raise[name] = true                  that function records the call, then raises
+--   wm.look                                what GetLook answers (nil: no look); GetLook is not recorded in
+--                                            wm.calls, and honours wm.refuse.GetLook (false) and wm.raise.GetLook
 --   wm.preview[key]                        the preview table while shown (ShowPreview sets it, HidePreview clears it)
 --   wm.registered                          { { key, panel }, ... }; wm.panels[key] = a copy of the panel's
 --                                            fields taken at RegisterPanel, as WM's copyPanel does
@@ -207,6 +209,16 @@ function FakeWm.install(opts)
     end
     return wm.unread[name] or 0
   end)
+
+  api.GetLook = function()
+    if wm.raise.GetLook then
+      error("WhisperMessengerAPI.GetLook raised")
+    end
+    if wm.refuse.GetLook then
+      return false
+    end
+    return wm.look
+  end
 
   for _, name in ipairs(opts.without or {}) do
     api[name] = nil

@@ -3,12 +3,15 @@ local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 local FakeWm = require("tests.helpers.fake_wm_api")
+local LookFixture = require("tests.helpers.look_fixture")
 
--- Spec C.2, C.4: the leads in WhisperMessenger's panel has a settings mode. The gear swaps the
+local COLORS = LookFixture.COLORS
+
+-- Spec C.2, C.4: the leads in WhisperMessenger's panel has a settings mode. The link swaps the
 -- leads view for the settings pane inside the host; Back returns; the mode is never saved.
-local function boot(opts)
+local function boot(opts, fakeOpts)
   local ns, db, calls = UiFixture.load(opts or { leads = 2 })
-  local _, wm = FakeWm.install()
+  local _, wm = FakeWm.install(fakeOpts)
   ns.WhisperBridge.Activate()
   return ns, db, calls, wm
 end
@@ -30,12 +33,12 @@ local function descendantOf(frame, host)
   return false
 end
 
--- The embedded view's settings gear: the one Button under the host with the gear's art (.normal).
-local function gearOf(host)
+-- The embedded view's Settings link: the one Settings link Button under the host.
+local function linkOf(host)
   local found
   for _, frame in ipairs(Wow.frames) do
-    if frame.frameType == "Button" and frame.normal and descendantOf(frame, host) then
-      Assert.equal(found, nil, "exactly one gear")
+    if frame.frameType == "Button" and frame.label and frame.label:GetText() == "Settings" and descendantOf(frame, host) then
+      Assert.equal(found, nil, "exactly one link")
       found = frame
     end
   end
@@ -76,13 +79,13 @@ local function splitOf(view)
   return view.listPane:GetWidth(), dividerX
 end
 
-local function testGearOpensSettingsInTheHost()
+local function testLinkOpensSettingsInTheHost()
   local ns, _, _, wm = boot()
   local captured = capture(ns)
   local host = showWith(wm)
   Assert.equal(ns.BridgePanel.InSettings(), false)
   Assert.equal(captured.view.frame:IsShown(), true)
-  Widgets.click(gearOf(host))
+  Widgets.click(linkOf(host))
   local back, _, container = backOf(host)
   Assert.equal(captured.view.frame:IsShown(), false, "the leads view is hidden")
   Assert.same({ container.parent, container:IsShown(), back:IsVisible() }, { host, true, true }, "the pane fills the host")
@@ -96,13 +99,13 @@ local function testBackReturnsToLeads()
   local ns, _, _, wm = boot()
   local captured = capture(ns)
   local host = showWith(wm)
-  Widgets.click(gearOf(host))
+  Widgets.click(linkOf(host))
   local back, _, container = backOf(host)
   Widgets.click(back)
   Assert.same({ container:IsShown(), ns.BridgePanel.InSettings(), captured.view.frame:IsShown() }, { false, false, true })
   Assert.same({ ns.WhisperBridge.VisibleLead() }, { ns.Leads.Latest(), 50 }, "the leads view is back, refreshed")
-  Widgets.click(gearOf(host))
-  Assert.equal(container:IsShown(), true, "the gear opens settings again")
+  Widgets.click(linkOf(host))
+  Assert.equal(container:IsShown(), true, "the link opens settings again")
 end
 
 local function testToggleSettings()
@@ -123,8 +126,8 @@ local function testToggleSettings()
   Assert.equal(container:IsShown(), true)
 end
 
--- In an instance the gear does nothing: the panel stays on its (empty) leads.
-local function testGearOffInInstance()
+-- In an instance the link does nothing: the panel stays on its (empty) leads.
+local function testLinkOffInInstance()
   local ns, _, _, wm = boot()
   local captured = capture(ns)
   showWith(wm)
@@ -141,7 +144,7 @@ local function testInstanceGateLeavesSettings()
   local ns, _, _, wm = boot()
   local captured = capture(ns)
   local host = showWith(wm)
-  Widgets.click(gearOf(host))
+  Widgets.click(linkOf(host))
   Assert.equal(ns.BridgePanel.InSettings(), true)
   Wow.stub("IsInInstance", function()
     return true, "party"
@@ -152,11 +155,11 @@ local function testInstanceGateLeavesSettings()
   Wow.stub("IsInInstance", nil)
 end
 
--- In an instance the gear still closes settings that are open (it only refuses to open them).
-local function testGearClosesSettingsInInstance()
+-- In an instance the link still closes settings that are open (it only refuses to open them).
+local function testLinkClosesSettingsInInstance()
   local ns, _, _, wm = boot()
   local host = showWith(wm)
-  Widgets.click(gearOf(host))
+  Widgets.click(linkOf(host))
   Wow.stub("IsInInstance", function()
     return true, "party"
   end)
@@ -168,25 +171,25 @@ end
 local function testModeIsNotSaved()
   local ns, _, _, wm = boot()
   local host = showWith(wm)
-  Widgets.click(gearOf(host))
+  Widgets.click(linkOf(host))
   wm.hidePanel("CraftAlert")
   wm.showPanel("CraftAlert", host)
   local _, _, container = backOf(host)
   Assert.same({ ns.BridgePanel.InSettings(), container:IsShown() }, { false, false }, "every show starts on the leads")
   Assert.same({ ns.WhisperBridge.VisibleLead() }, { ns.Leads.Latest(), 50 })
   -- a new host, shown while the old one was left in settings
-  Widgets.click(gearOf(host))
+  Widgets.click(linkOf(host))
   wm.hidePanel("CraftAlert")
   local other = showWith(wm)
   Assert.equal(ns.BridgePanel.InSettings(), false, "a new host starts on the leads too")
   Assert.same({ ns.WhisperBridge.VisibleLead() }, { ns.Leads.Latest(), 50 })
-  Assert.equal(gearOf(other) ~= nil, true)
+  Assert.equal(linkOf(other) ~= nil, true)
 end
 
 local function testRefreshSkippedInSettings()
   local ns, _, _, wm = boot()
   local host = showWith(wm)
-  Widgets.click(gearOf(host))
+  Widgets.click(linkOf(host))
   local refreshed = 0
   local refresh = ns.LeadsView.Refresh
   ns.LeadsView.Refresh = function(...)
@@ -204,11 +207,11 @@ end
 local function testNavWidthInWm()
   local ns, _, _, wm = boot()
   local wide = showWith(wm, 600) -- 600 - 340 = 260
-  Widgets.click(gearOf(wide))
+  Widgets.click(linkOf(wide))
   local _, nav = backOf(wide)
   Assert.equal(nav:GetWidth(), 260)
   local narrow = showWith(wm, 500) -- 500 - 340 = 160 -> 180
-  Widgets.click(gearOf(narrow))
+  Widgets.click(linkOf(narrow))
   _, nav = backOf(narrow)
   Assert.equal(nav:GetWidth(), 180)
 end
@@ -272,9 +275,9 @@ local function testSplitInSettings()
   local ns, _, _, wm = boot()
   local captured = capture(ns)
   local host = showWith(wm, 600, 220)
-  Widgets.click(gearOf(host))
+  Widgets.click(linkOf(host))
   local back, nav = backOf(host)
-  Assert.equal(nav:GetWidth(), 220, "the gear: the nav takes the split")
+  Assert.equal(nav:GetWidth(), 220, "the link: the nav takes the split")
   wm.split("CraftAlert", 300)
   Assert.equal(nav:GetWidth(), 300)
   Assert.same(back.points, {
@@ -289,27 +292,27 @@ local function testSplitInSettings()
   Assert.equal(captured.view.listPane:GetWidth(), 50, "Back: the list follows the rail")
 end
 
--- The gear after a snap to the rail: the nav is 180, not the rail's width.
-local function testGearAfterRailSplit()
+-- The link after a snap to the rail: the nav is 180, not the rail's width.
+local function testLinkAfterRailSplit()
   local _, _, _, wm = boot()
   local host = showWith(wm, 600, 50)
-  Widgets.click(gearOf(host))
+  Widgets.click(linkOf(host))
   local _, nav = backOf(host)
   Assert.equal(nav:GetWidth(), 180)
 end
 
--- The gear and its "Settings" label sit at the ledger line's right, centred on it vertically; the
--- counts end before them (8 + 72 + 8). "Clear all" sits over the list. The lead header keeps its
+-- The "Settings" link sits at the ledger line's right, centred on it vertically; the counts end
+-- before it (8 + 48 + 8). "Clear all" sits over the list. The lead header keeps its
 -- default 16 px inset.
 local function testLinkOnLedgerLine()
   local ns, _, _, wm = boot()
   local captured = capture(ns)
   local host = showWith(wm)
-  local link, strip, details = gearOf(host), captured.view.strip, captured.view.details
+  local link, strip, details = linkOf(host), captured.view.strip, captured.view.details
   Assert.equal(link.parent, strip)
   Assert.same(link.points, { { "RIGHT", strip, "RIGHT", -8, 0 } })
   Assert.same(captured.view.clearAll.points, { { "BOTTOMRIGHT", captured.view.listPane, "TOPRIGHT", -8, 0 } })
-  Assert.same(strip.text.points[2], { "TOPRIGHT", strip, "TOPRIGHT", -88, 0 })
+  Assert.same(strip.text.points[2], { "TOPRIGHT", strip, "TOPRIGHT", -64, 0 })
   for _, line in ipairs({ details.lineOne, details.lineTwo }) do
     Assert.same(line.points[2], { "RIGHT", details.header, "RIGHT", -16, 0 })
   end
@@ -351,7 +354,7 @@ local function testCountsEndBeforeLink()
   local function check(message)
     ns.BridgePanel.Refresh()
     local _, textRight = Layout.edges(strip.text)
-    local linkLeft = Layout.edges(gearOf(host))
+    local linkLeft = Layout.edges(linkOf(host))
     Assert.truthy(textRight <= linkLeft, message .. ": the counts end before the link")
   end
   check("narrow")
@@ -396,7 +399,7 @@ local function testSettingsCoverWmDivider()
   host:SetFrameLevel(5)
   wm.showPanel("CraftAlert", host)
   local viewLevel = captured.view.frame:GetFrameLevel()
-  Widgets.click(gearOf(host))
+  Widgets.click(linkOf(host))
   local back, _, container = backOf(host)
   Assert.truthy(container:GetFrameLevel() > host:GetFrameLevel() + 50, "above WM's handle")
   Assert.equal(container.mouseEnabled, true, "the handle under the pane takes no drag")
@@ -406,14 +409,14 @@ end
 
 -- The pane belongs to the last host to attach it: the standalone window in Settings falls back to
 -- its list when the panel takes the pane, and the panel's settings do not follow the window back.
-local function testStandaloneInSettingsThenWmGear()
+local function testStandaloneInSettingsThenWmLink()
   local ns, _, _, wm = boot()
   ns.LeadsWindow.SetSettingsRouter(nil) -- the own window, as when WM refuses
   ns.LeadsWindow.ToggleSettings()
   local window = rawget(_G, "CraftAlertLeadsWindow")
   Assert.equal(window:GetTitleText():GetText(), "Craft Alert — Settings")
   local host = showWith(wm)
-  Widgets.click(gearOf(host))
+  Widgets.click(linkOf(host))
   Assert.equal(window:GetTitleText():GetText(), "Craft Alert — Leads", "the window fell back to its list")
   Assert.same({ window.view.frame:IsShown(), window.gear.inSettings }, { true, false })
   local _, _, container = backOf(host)
@@ -428,13 +431,138 @@ local function testStandaloneInSettingsThenWmGear()
   )
 end
 
+-- What the tab's view shows of its look: list border, divider colour, selected row's blend.
+local function seen(view)
+  return { view.listPane.art:IsShown(), view.divider.color, view.list.rows[1].selected.blendMode }
+end
+
+local function dividerOf(container)
+  for _, region in ipairs(container.regions) do
+    if region.layer == "BORDER" then
+      return region
+    end
+  end
+end
+
+local NATIVE_SEEN = { true, { 1, 1, 1, 0.08 }, "ADD" } -- Theme.COLORS.divider, today's overlay
+
+-- Each HUD style paints its Looks-table value on show; flat also fills the list pane.
+local function testOnShowPaintsEachStyle()
+  local expected = {
+    { "off", { false, COLORS.contacts_divider, "BLEND" } },
+    { "retail", { true, COLORS.contacts_divider, "ADD" } },
+    { "classic", { false, COLORS.contacts_divider, "ADD" } },
+  }
+  for _, case in ipairs(expected) do
+    local ns, _, _, wm = boot()
+    local captured = capture(ns)
+    wm.look = LookFixture.answer(case[1])
+    showWith(wm)
+    Assert.same(seen(captured.view), case[2], "hud " .. case[1])
+  end
+  local ns, _, _, wm = boot()
+  local captured = capture(ns)
+  wm.look = LookFixture.answer("off")
+  showWith(wm)
+  Assert.same(captured.view.listPane.bg.color, COLORS.bg_secondary, "hud off: flat list fill")
+end
+
+-- No GetLook, `false` (integration off), an error: today's look, no Lua error.
+local function testOnShowFallsBackToNative()
+  local cases = {
+    { "no GetLook", { without = { "GetLook" } }, function(_) end },
+    {
+      "false",
+      nil,
+      function(wm)
+        wm.look = false
+      end,
+    },
+    {
+      "refused",
+      nil,
+      function(wm)
+        wm.refuse.GetLook = true
+      end,
+    },
+    {
+      "raises",
+      nil,
+      function(wm)
+        wm.raise.GetLook = true
+      end,
+    },
+    {
+      "bad shape",
+      nil,
+      function(wm)
+        wm.look = { hud = "off" }
+      end,
+    },
+  }
+  for _, case in ipairs(cases) do
+    local ns, _, _, wm = boot(nil, case[2])
+    local captured = capture(ns)
+    case[3](wm)
+    showWith(wm)
+    Assert.same(seen(captured.view), NATIVE_SEEN, case[1])
+  end
+end
+
+-- The look is read on every show: flat, then retail, then none (same host, same view).
+local function testLookFollowsEveryShow()
+  local ns, _, _, wm = boot()
+  local captured = capture(ns)
+  local host = newHost(600)
+  wm.look = LookFixture.answer("off")
+  wm.showPanel("CraftAlert", host)
+  Assert.equal(seen(captured.view)[3], "BLEND", "flat")
+  wm.hidePanel("CraftAlert")
+  wm.look = LookFixture.answer("retail")
+  wm.showPanel("CraftAlert", host)
+  Assert.same(seen(captured.view), { true, COLORS.contacts_divider, "ADD" }, "retail on the second show")
+  wm.hidePanel("CraftAlert")
+  wm.look = false
+  wm.showPanel("CraftAlert", host)
+  Assert.same(seen(captured.view), NATIVE_SEEN, "native on the third")
+end
+
+-- Settings entered in the tab get the look read at the show.
+local function testSettingsGetTheTabsLook()
+  local ns, _, _, wm = boot()
+  wm.look = LookFixture.answer("off")
+  local host = showWith(wm)
+  ns.BridgePanel.ToggleSettings()
+  local _, nav, container = backOf(host)
+  Assert.same(
+    { nav.bg.color, nav.art:IsShown(), dividerOf(container).color },
+    { COLORS.bg_secondary, false, COLORS.contacts_divider },
+    "settings pane flat"
+  )
+end
+
+-- The pane painted flat in the tab, then the standalone window takes it: native again.
+local function testStandaloneSettingsAfterFlatIsNative()
+  local ns, _, _, wm = boot()
+  wm.look = LookFixture.answer("off")
+  local host = showWith(wm)
+  ns.BridgePanel.ToggleSettings()
+  local _, nav, container = backOf(host)
+  Assert.equal(nav.art:IsShown(), false, "flat in the tab first")
+  ns.LeadsWindow.SetSettingsRouter(nil) -- the own window, as when WM refuses
+  ns.LeadsWindow.ToggleSettings()
+  local window = rawget(_G, "CraftAlertLeadsWindow")
+  Assert.equal(container.parent, window.content, "the pane moved to the window")
+  Assert.same({ nav.art:IsShown(), dividerOf(container).color }, { true, ns.Theme.COLORS.divider }, "native again")
+end
+
 return function()
-  testGearOpensSettingsInTheHost()
+  testLinkOpensSettingsInTheHost()
   testBackReturnsToLeads()
   testToggleSettings()
-  testGearOffInInstance()
+  testLinkOffInInstance()
   testInstanceGateLeavesSettings()
-  testGearClosesSettingsInInstance()
+  testLinkClosesSettingsInInstance()
   testModeIsNotSaved()
   testRefreshSkippedInSettings()
   testNavWidthInWm()
@@ -444,12 +572,17 @@ return function()
   testNonNumberSplitKeepsTheClamp()
   testRebuildResetsSplit()
   testSplitInSettings()
-  testGearAfterRailSplit()
+  testLinkAfterRailSplit()
   testLinkOnLedgerLine()
   testCountsStartRightOfSplit()
   testCountsEndBeforeLink()
   testNameCutAtHeaderInset()
   testSettingsCoverWmDivider()
-  testStandaloneInSettingsThenWmGear()
+  testStandaloneInSettingsThenWmLink()
+  testOnShowPaintsEachStyle()
+  testOnShowFallsBackToNative()
+  testLookFollowsEveryShow()
+  testSettingsGetTheTabsLook()
+  testStandaloneSettingsAfterFlatIsNative()
   Wow.reset()
 end
