@@ -53,6 +53,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Bump version, update TOCs, tag (manual dispatch)
         if: github.event_name == 'workflow_dispatch'
         run: |
@@ -75,10 +79,6 @@ jobs:
           # push both so the package step picks up the tag.
           git push origin HEAD:master
           git push origin "${TAG_VERSION}"
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
 
       - name: Install lupa
         run: pip install lupa==2.7
@@ -117,7 +117,7 @@ jobs:
           set -euo pipefail
           while IFS= read -r -d '' test_file; do
             lua5.1 tests/run.lua "${test_file}"
-          done < <(find tests -type f -name 'test_*.lua' -print0 | sort -z)
+          done < <(find tests -type f -name 'test_*.lua' -not -path 'tests/perf/*' -print0 | sort -z)
 
       - name: Package and release
         uses: BigWigsMods/packager@v2

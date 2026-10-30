@@ -4,7 +4,7 @@ Player-friendly release notes for Craft Alert.
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-10-29
+## [1.0.0] - 2026-10-30
 
 - First release. Craft Alert watches chat for people asking for something one of your characters can craft and lets you greet them with one click. One folder works on Retail, WoW: Forever and the Classic flavors (Era, TBC Anniversary, Wrath, Cata, Mists of Pandaria).
 - Open each profession window once and Craft Alert knows that character's recipes, across every character on the account. On Era and TBC that includes Enchanting's craft window.
