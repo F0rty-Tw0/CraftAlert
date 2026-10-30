@@ -158,7 +158,12 @@ local function testApplyLookNativeAfterFlat()
   local art, button = ns.Theme.ART, SettingsFixture.navButton("Alerts")
   Assert.same({ insetArt(nav):IsShown(), insetArt(right):IsShown() }, { true, true }, "borders back")
   Assert.same(regionOf(container, "BORDER").color, ns.Theme.COLORS.divider, "divider back")
-  Assert.same({ button.selected.blendMode, button.selected.alpha }, { "ADD", art.LIST_SELECTED_ALPHA }, "nav selected back")
+  Assert.same(
+    { button.selected.texture, button.selected.blendMode, button.selected.alpha },
+    { art.LIST_SELECTED, "ADD", art.LIST_SELECTED_ALPHA },
+    "nav selected back"
+  )
+  Assert.equal(button.selected.color, nil, "nav selected: no flat colour left")
   Assert.same({ button.hover.blendMode, button.hover.alpha }, { "ADD", art.LIST_HOVER_ALPHA }, "nav hover back")
 end
 
