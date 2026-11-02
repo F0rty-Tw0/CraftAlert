@@ -95,6 +95,18 @@ else
   LUALS_CMD=""
 fi
 
+# Ketho's WoW API annotations (github.com/Ketho/vscode-wow-api, its Annotations/Core folder)
+# type Blizzard's globals and widgets. Without them LuaLS checks the plain count, which flags
+# the WoW type names the code uses. Get them once (core.longpaths for Windows):
+#   git -c core.longpaths=true clone --depth 1 https://github.com/Ketho/vscode-wow-api .tools/vscode-wow-api
+WOW_API=""
+for candidate in .tools/vscode-wow-api/Annotations/Core "$FALLBACK_TOOLS/vscode-wow-api/Annotations/Core"; do
+  if [[ -d "$candidate" ]]; then
+    WOW_API="$candidate"
+    break
+  fi
+done
+
 # --- StyLua (formatting) ---
 if [[ -n "$STYLUA_CMD" ]]; then
   echo "=== StyLua ==="
@@ -136,8 +148,18 @@ echo ""
 if [[ -n "$LUALS_CMD" ]]; then
   echo "=== LuaLS Diagnostics (count only) ==="
   LUALS_LOG="$(mktemp)"
-  "$LUALS_CMD" --check=. --check_format=pretty --checklevel=Warning \
-    --logpath=.tmp_luals >"$LUALS_LOG" 2>&1 || true
+  LUALS_ARGS=(--check=. --check_format=pretty --checklevel=Warning --logpath=.tmp_luals)
+  if [[ -n "$WOW_API" ]]; then
+    echo "  with WoW API annotations from $WOW_API"
+    mkdir -p .tmp_luals
+    # .luarc.json plus a workspace.library entry: drop its closing brace, then append the entry.
+    {
+      sed '$d' .luarc.json | sed '$s/$/,/'
+      printf '  "workspace.library": ["%s"]\n}\n' "$WOW_API"
+    } >.tmp_luals/luarc.json
+    LUALS_ARGS+=(--configpath=.tmp_luals/luarc.json)
+  fi
+  "$LUALS_CMD" "${LUALS_ARGS[@]}" >"$LUALS_LOG" 2>&1 || true
   LUALS_COUNT="$(grep -Eo '[0-9]+ problems? found' "$LUALS_LOG" | grep -Eo '^[0-9]+' | tail -n 1 || true)"
   if grep -q 'no problems found' "$LUALS_LOG"; then
     LUALS_COUNT=0
