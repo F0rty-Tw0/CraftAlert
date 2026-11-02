@@ -61,7 +61,7 @@ local function wordsInput(column, add, label, key, restoreDefault, tip)
   input = Controls.Input(column, Localization.Text(label), function(text)
     local words = splitWords(text)
     if #words == 0 and restoreDefault then
-      words = Defaults.Settings()[key]
+      words = Defaults.Settings()[key] --[[@as string[] ]]
     end
     db().settings[key] = words
     input.Set(table.concat(words, " "))

@@ -273,7 +273,7 @@ function WhisperBridge.ShowLead(lead)
     AlertToast.Show(lead)
     return
   end
-  AlertToast.Alert(lead)
+  AlertToast.Alert()
   shown, summary = entry, nil
   hideLater(function()
     return shown == entry

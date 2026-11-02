@@ -59,6 +59,7 @@ function ReachQuery.Ask(recipeID, recipe)
   if not ok or not isReachAnswer(answer) then
     return nil, nil, nil
   end
+  ---@cast answer table
 
   return answer.craftingQuality, answer.concentrationCost, answer.concentrationCurrencyID
 end

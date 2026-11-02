@@ -414,12 +414,12 @@ local function testRaisingLeadsRestore(db)
   local freshExpiryDelay = EXPIRY_DELAY + LEAD_AGE -- no minute has passed since the lead
   local ns = login(session, function()
     local after = _G["C_Timer"].After
-    _G["C_Timer"].After = function(delay, fn)
+    rawset(_G["C_Timer"], "After", function(delay, fn)
       if delay == freshExpiryDelay then
         error("timer failed", 0)
       end
       after(delay, fn)
-    end
+    end)
   end)
   Assert.same(errors, { "timer failed" }, "the error reaches the error handler")
   Assert.equal(ns.ScanGate.IsActive(), false)

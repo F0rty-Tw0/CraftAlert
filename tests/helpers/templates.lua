@@ -411,6 +411,19 @@ function Templates.fakes.SearchBoxTemplate(box)
   box.scripts.OnEscapePressed = box.scripts.OnEnterPressed
 end
 
+-- What the fake tooltip below records, for tests that read it back.
+---@class TooltipSpy: GameTooltip
+---@field owner table?
+---@field anchor string?
+---@field lines string[]
+---@field colors table[]
+---@field rights table
+---@field wraps table
+---@field hyperlinks string[]
+---@field badLinks table?
+---@field minWidth number?
+---@field shown boolean
+
 -- Blizzard_SharedXML/SharedTooltipTemplates.xml (SharedTooltipTemplate, hidden) under
 -- GameTooltipTemplate: the addon's own tooltip (UI/Tooltip.lua). It records what it was given:
 -- lines, their colours as { r, g, b } or {}, rights[line] = { text, r, g, b } of an

@@ -157,6 +157,7 @@ function SettingsPane.Attach(host, onBack, onDetach, lift)
   if pane == nil then
     build(host)
   end
+  ---@cast pane -nil
   if pane.host ~= host and pane.onDetach then
     pane.onDetach()
   end

@@ -65,9 +65,9 @@ local function testReadyOnlyAfterLoadFinishes()
   Assert.equal(SavedState.Ready(), true, "Load not run yet: the global is as the client stored it")
   local Schema = require("CraftAlert.Persistence.Schema") -- the copy SavedState holds
   local validate = Schema.Validate
-  Schema.Validate = function()
+  rawset(Schema, "Validate", function()
     error("validate failed", 0)
-  end
+  end)
   Assert.equal(pcall(SavedState.Load), false)
   Assert.equal(rawget(_G, "CraftAlertDB"), stored, "the stored table is left in place")
   Assert.equal(SavedState.Ready(), false, "a Load that raised")

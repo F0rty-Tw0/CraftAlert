@@ -47,7 +47,7 @@ return function()
   -- GetCenter, masks, animation groups, SetItemRef and the atlas default.
   Assert.equal(parent:GetCenter(), 960)
   Assert.equal(box:GetCenter(), nil)
-  local tex = box:CreateTexture()
+  local tex = box:CreateTexture() --[[@as TextureSpy]]
   tex:AddMaskTexture(box:CreateMaskTexture())
   Assert.equal(tex.masks[1].isMask, true)
   local group, seen = tex:CreateAnimationGroup(), {}

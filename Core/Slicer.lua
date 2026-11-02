@@ -166,6 +166,8 @@ function Slicer.Run(name, work, onDone, onCancel)
   local function finish(ok, ...)
     run.ms, run.steps = run.ms + (clock() - resumedAt), run.steps + 1
     if not ok then
+      -- debugstack([thread,] start, count1, count2); Ketho's stub lacks the optional thread.
+      ---@type fun(thread: thread, start: number?, count1: number?, count2: number?): string
       local stack = _G["debugstack"]
       local err = ...
       error(type(stack) == "function" and tostring(err) .. "\n" .. stack(thread) or err, 0)

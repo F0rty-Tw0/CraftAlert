@@ -23,6 +23,18 @@ Widgets.mouse = {}
 Widgets.LINE_HEIGHT = 12
 Widgets.CHAR_WIDTH = 6
 
+-- What a stub texture records, for tests that read it back; the client's Texture has no such fields.
+---@class TextureSpy: Texture
+---@field atlas string?
+---@field texture string?
+---@field blendMode string?
+---@field shown boolean
+---@field masks table[]?
+
+-- A stub font string's recorded word wrap.
+---@class FontStringSpy: FontString
+---@field wordWrap boolean?
+
 local ceil = math.ceil
 local unpack = unpack
 

@@ -187,9 +187,9 @@ local function testUnnamedProfessionTakesClientName()
   local db = ns.Defaults.Db()
   CraftScanImport.Run(db, src)
   Assert.equal(db.characters["Me-OwnRealm"].professions[BS].name, "Blacksmithing", "no client call: the English name")
-  rawget(_G, "C_TradeSkillUI").GetTradeSkillDisplayName = function(skillLineID)
+  rawset(rawget(_G, "C_TradeSkillUI"), "GetTradeSkillDisplayName", function(skillLineID)
     return skillLineID == BS and "Schmiedekunst" or ""
-  end
+  end)
   db = ns.Defaults.Db()
   CraftScanImport.Run(db, src)
   local name = db.characters["Me-OwnRealm"].professions[BS].name

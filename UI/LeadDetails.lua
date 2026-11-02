@@ -83,7 +83,7 @@ local function hideOwned(details)
 end
 
 local function createButton(details, action, previous)
-  local button = _G["CreateFrame"]("Button", nil, details.bar, "UIPanelButtonTemplate")
+  local button = _G["CreateFrame"]("Button", nil, details.bar, "UIPanelButtonTemplate") --[[@as Button]]
   button:SetSize(BUTTON_WIDTH, BUTTON_HEIGHT)
   if action.key == "dismiss" then
     button:SetPoint("RIGHT", details.bar, "RIGHT", -Theme.LAYOUT.DETAILS_PADDING, 0)
