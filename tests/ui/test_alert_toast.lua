@@ -578,7 +578,7 @@ end
 
 local function testAlertExport()
   local ns, db, calls = UiFixture.load({ leads = 1 })
-  ns.AlertToast.Alert(ns.Leads.Latest())
+  ns.AlertToast.Alert()
   Assert.same(UiFixture.callsTo(calls, "sound"), { { "sound", db.settings.sound, "Master" } })
   Assert.equal(#UiFixture.callsTo(calls, "flash"), 1)
   Assert.equal(rawget(_G, "CraftAlertToast"), nil, "Alert shows no toast")
