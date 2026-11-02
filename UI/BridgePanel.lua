@@ -35,6 +35,7 @@ local SETTINGS_LIFT = 60
 
 ---@type table
 local view = nil -- the LeadsView in the current host, nil until the first show
+---@type table
 local currentHost = nil -- set before the view is built: LeadsView.New lays out once, at once
 local panelShown = false
 local mode = "list" -- "list" | "settings"; the settings pane replaces the view in the host

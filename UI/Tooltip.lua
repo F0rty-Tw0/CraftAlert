@@ -17,7 +17,7 @@ local NAME = "CraftAlertTooltip"
 -- A minimum width (a lead row's tooltip sets one) lasts until the tooltip hides, so the next
 -- owner starts from none.
 local function create()
-  local tip = _G["CreateFrame"]("GameTooltip", NAME, _G["UIParent"], "GameTooltipTemplate")
+  local tip = _G["CreateFrame"]("GameTooltip", NAME, _G["UIParent"], "GameTooltipTemplate") --[[@as GameTooltip]]
   tip:HookScript("OnHide", function(self)
     self:SetMinimumWidth(0)
   end)
@@ -25,6 +25,7 @@ local function create()
 end
 
 -- The tooltip, made on first use; its global frame name is the cache.
+---@return GameTooltip
 function Tooltip.Get()
   return _G[NAME] or create()
 end
