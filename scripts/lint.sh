@@ -149,6 +149,11 @@ if [[ -n "$LUALS_CMD" ]]; then
   echo "=== LuaLS Diagnostics (count only) ==="
   LUALS_LOG="$(mktemp)"
   LUALS_ARGS=(--check=. --check_format=pretty --checklevel=Warning --logpath=.tmp_luals)
+  # The splice below needs .luarc.json's closing brace alone on its last line.
+  if [[ -n "$WOW_API" && "$(tail -n 1 .luarc.json | tr -d '[:space:]')" != "}" ]]; then
+    echo "  WoW API annotations skipped: .luarc.json must end with } on its own line"
+    WOW_API=""
+  fi
   if [[ -n "$WOW_API" ]]; then
     echo "  with WoW API annotations from $WOW_API"
     mkdir -p .tmp_luals
