@@ -46,9 +46,9 @@ end
 
 -- Makes the recipe-to-profession lookup raise `message`: proves a handler stopped before it.
 local function trapProfessionApi(message)
-  _G["C_TradeSkillUI"].GetProfessionInfoByRecipeID = function()
+  rawset(_G["C_TradeSkillUI"], "GetProfessionInfoByRecipeID", function()
     error(message)
-  end
+  end)
 end
 
 -- Each recipe read costs 3 ms of the frame budget, so a read spans several Slicer ticks.

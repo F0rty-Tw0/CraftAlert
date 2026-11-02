@@ -62,18 +62,18 @@ local function testArt()
       return known[name] and { width = 1 } or nil
     end,
   })
-  local t = frame:CreateTexture()
+  local t = frame:CreateTexture() --[[@as TextureSpy]]
   Assert.equal(FrameKit.Art(t, "Known", "InterfaceX", "ADD"), true)
   Assert.equal(t.atlas, "Known")
   Assert.equal(t.texture, nil)
   Assert.equal(t.blendMode, "ADD")
-  t = frame:CreateTexture()
+  t = frame:CreateTexture() --[[@as TextureSpy]]
   Assert.equal(FrameKit.Art(t, "Missing", "InterfaceX", "ADD"), false)
   Assert.equal(t.atlas, nil)
   Assert.equal(t.texture, "InterfaceX")
   Assert.equal(t.blendMode, "ADD")
   Assert.equal(t.shown, true)
-  t = frame:CreateTexture()
+  t = frame:CreateTexture() --[[@as TextureSpy]]
   Assert.equal(FrameKit.Art(t, "Missing"), false)
   Assert.equal(t.shown, false)
   -- A raising GetAtlasInfo and a missing C_Texture both count as "atlas missing".
@@ -82,11 +82,11 @@ local function testArt()
       error("boom")
     end,
   })
-  t = frame:CreateTexture()
+  t = frame:CreateTexture() --[[@as TextureSpy]]
   Assert.equal(FrameKit.Art(t, "Known", "InterfaceX"), false)
   Assert.equal(t.texture, "InterfaceX")
   Wow.stub("C_Texture", nil)
-  t = frame:CreateTexture()
+  t = frame:CreateTexture() --[[@as TextureSpy]]
   Assert.equal(FrameKit.Art(t, "Known"), false)
   Assert.equal(t.shown, false)
 end
@@ -114,7 +114,7 @@ end
 -- PaintPanel draws a pane atlas when the client has it; with no atlas it touches nothing (never hides).
 local function testPaintPanel()
   local FrameKit = load({})
-  local texture = _G["CreateFrame"]("Frame"):CreateTexture(nil, "BACKGROUND")
+  local texture = _G["CreateFrame"]("Frame"):CreateTexture(nil, "BACKGROUND") --[[@as TextureSpy]]
   Assert.equal(FrameKit.PaintPanel(texture, "Professions-background-summarylist"), true)
   Assert.same({ texture.atlas, texture.blendMode }, { "Professions-background-summarylist", "BLEND" })
   Wow.stub("C_Texture", {
@@ -122,7 +122,7 @@ local function testPaintPanel()
       return nil
     end,
   })
-  local bare = _G["CreateFrame"]("Frame"):CreateTexture(nil, "BACKGROUND")
+  local bare = _G["CreateFrame"]("Frame"):CreateTexture(nil, "BACKGROUND") --[[@as TextureSpy]]
   Assert.equal(FrameKit.PaintPanel(bare, "x"), false)
   Assert.same({ bare.atlas, bare.blendMode }, { nil, nil }) -- left empty, never hidden
   Assert.equal(bare.shown, true)
@@ -207,7 +207,8 @@ local function testWrapped()
   local parent = rawget(_G, "CreateFrame")("Frame")
   local text = FrameKit.Wrapped(parent, "GameFontNormal", { 1, 1, 1, 1 }, 2)
   Assert.same({ text.wordWrap, text.maxLines, text.font, text.textColor }, { true, 2, "GameFontNormal", { 1, 1, 1, 1 } })
-  local spy, capped = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal"), false
+  local spy = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal") --[[@as FontStringSpy]]
+  local capped = false
   function spy:SetMaxLines()
     capped = true
   end

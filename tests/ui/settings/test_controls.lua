@@ -214,7 +214,7 @@ local GOLD, WHITE = { 1, 0.82, 0 }, { 1, 1, 1 }
 -- tooltip (gold label, white text) and hide it on leave. A control without one shows none.
 local function testTips()
   local Controls, column, _, Theme = load()
-  local tip = require("CraftAlert.UI.Tooltip").Get()
+  local tip = require("CraftAlert.UI.Tooltip").Get() --[[@as TooltipSpy]]
   local toggle = Controls.Toggle(column, "Enable", function() end, "Turns scanning on or off.")
   Assert.equal(toggle.row.mouseEnabled, true, "the row takes the hover")
   Widgets.fire(toggle.row, "OnEnter")

@@ -215,17 +215,17 @@ local function testRankOnLead()
     data.characters["Alt-Realm"].recipes[7] = { item = 502, name = "Other Belt", prof = BS }
   end)
   local pick = ns.CrafterRank.Pick
-  ns.CrafterRank.Pick = function()
+  rawset(ns.CrafterRank, "Pick", function()
     return "Alt-Realm", false, 2, true, 7
-  end
+  end)
   local lead = newLead(ns, "LF plate belt")
   Assert.same({ lead.crafter, lead.rank, lead.rankConc, lead.recipeName }, { "Alt-Realm", 2, true, "Other Belt" })
   Assert.equal(lead.recipeKey, 7, "the lead keeps the key of the entry that won")
   Assert.same(db.leads, { lead })
 
-  ns.CrafterRank.Pick = function()
+  rawset(ns.CrafterRank, "Pick", function()
     return "Alt-Realm", false, nil, nil, nil
-  end
+  end)
   local plain = newLead(ns, "LF plate belt", "Other-Realm")
   Assert.same({ plain.rank, plain.rankConc }, { nil, nil }, "no rank, no fields")
   Assert.equal(plain.recipeKey, 1, "Pick named none: the first entry's key")

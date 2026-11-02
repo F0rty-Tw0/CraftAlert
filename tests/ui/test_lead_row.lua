@@ -446,6 +446,7 @@ local function testUnreadDot()
   local function dot()
     return row.dot.texture.vertexColor
   end
+  ---@type number|string|boolean
   local unread = 2
   local asked = {}
   local function paint()
