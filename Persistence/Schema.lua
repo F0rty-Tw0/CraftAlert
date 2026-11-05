@@ -38,8 +38,16 @@ local RECIPE_FIELDS = {
   reachCost = "number",
   reachConc = "number",
 }
-local CHARACTER_FIELDS =
-  { source = "string", class = "string", importedAt = "number", realms = "table", professions = "table", recipes = "table", concentration = "table" }
+local CHARACTER_FIELDS = {
+  source = "string",
+  class = "string",
+  importedAt = "number",
+  realms = "table",
+  linkedRealms = "table",
+  professions = "table",
+  recipes = "table",
+  concentration = "table",
+}
 local LEAD_FIELDS = {
   id = "number",
   customer = "string",
@@ -278,6 +286,8 @@ local function fixCharacter(record)
   end
   fixShape(record, { enabled = true }, CHARACTER_FIELDS)
   record.realms = fixRealms(record.realms)
+  local linked = record.linkedRealms and fixRealms(record.linkedRealms)
+  record.linkedRealms = linked and #linked > 0 and linked or nil
   record.professions = fixRecords(record.professions, isKey, fixProfession)
   record.recipes = fixRecords(record.recipes, isKey, fixRecipe)
   record.concentration = fixConcentration(record.concentration)

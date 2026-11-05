@@ -234,8 +234,9 @@ function ExportString.Decode(text, flavorKey, pause)
 end
 
 -- The stored record of one decoded character. An earlier import's enabled flag and main crafter
--- choices are kept; its recipes and realms are replaced (a recipe whose item did not change keeps
--- the bind already looked up). Every item without a bind is queued for the lookup.
+-- choices and linkedRealms (local, never exported) are kept; its recipes and realms are replaced (a
+-- recipe whose item did not change keeps the bind already looked up). Every item without a bind is
+-- queued for the lookup.
 local function imported(old, incoming, now, pause)
   local professions = {}
   for key, name in pairs(incoming.professions) do
@@ -264,7 +265,14 @@ local function imported(old, incoming, now, pause)
     end
     pause(1)
   end
-  local record = { source = "import", importedAt = now, enabled = old == nil or old.enabled ~= false, class = incoming.class }
+  local linkedRealms = old and old.linkedRealms
+  local record = {
+    source = "import",
+    importedAt = now,
+    enabled = old == nil or old.enabled ~= false,
+    class = incoming.class,
+    linkedRealms = linkedRealms,
+  }
   record.realms, record.professions, record.recipes = realms, professions, recipes
   return record, count
 end

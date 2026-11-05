@@ -258,6 +258,21 @@ local function testReimportKeepsChoices()
   Assert.same(calls.queued, { 190004 })
 end
 
+-- linkedRealms is local to this account: never exported, kept through a re-import.
+local function testLinkedRealmsKeptNotExported()
+  local ExportString = load()
+  local source = sourceDb()
+  source.characters["Smith-Area52"].linkedRealms = { "LinkedOnlyRealm" }
+  Assert.falsy(ExportString.Encode(source, "retail"):find("LinkedOnlyRealm", 1, true))
+  local target = {
+    characters = {
+      ["Smith-Area52"] = { source = "import", enabled = true, linkedRealms = { "RealmA" }, realms = {}, professions = {}, recipes = {} },
+    },
+  }
+  ExportString.Apply(target, assert(ExportString.Decode(ExportString.Encode(sourceDb(), "retail"), "retail")))
+  Assert.same(target.characters["Smith-Area52"].linkedRealms, { "RealmA" })
+end
+
 local function testLocalCharacterSkipped()
   local ExportString = load()
   local mine = { source = "local", enabled = true, realms = {}, professions = {}, recipes = {} }
@@ -484,6 +499,7 @@ return function()
   testFieldSplitStopsEarly()
   testLongFieldRefusedUnscanned()
   testReimportKeepsChoices()
+  testLinkedRealmsKeptNotExported()
   testLocalCharacterSkipped()
   testRejected()
   testDamagedIsCheap()
