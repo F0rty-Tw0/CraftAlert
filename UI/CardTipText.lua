@@ -20,7 +20,6 @@ local MainCrafterMenu = ns.MainCrafterMenu or require("CraftAlert.UI.MainCrafter
 local CardTipText = {}
 
 local format = string.format
-local tostring = tostring
 
 -- As GameTooltip_SetTitle: replaces the lines, wrapping.
 local function title(tip, text)

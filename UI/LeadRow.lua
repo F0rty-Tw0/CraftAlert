@@ -30,7 +30,6 @@ local RowArt = ns.RowArt or require("CraftAlert.UI.RowArt")
 local LeadRow = {}
 
 local select = select
-local tostring = tostring
 local type = type
 
 -- Whisper pink for a lead whose customer has an unread whisper, when ChatTypeInfo has no WHISPER.

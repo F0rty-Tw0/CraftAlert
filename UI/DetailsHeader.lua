@@ -24,7 +24,6 @@ local find = string.find
 local max = math.max
 local min = math.min
 local select = select
-local tostring = tostring
 local type = type
 local unpack = unpack
 
