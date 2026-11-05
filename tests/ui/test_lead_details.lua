@@ -160,7 +160,7 @@ local function testGreetSends()
   Assert.same(bubble.points[1], { "TOPLEFT", d.body, "TOPLEFT", PAD, -(top(s.labels.greet) + LABEL + LABEL_GAP) })
   Assert.same(
     { s.labels.greet:GetText(), target:GetText(), target.font, target.textColor, target:IsShown() },
-    { "Greet sends", "to Buyer-Realm", "GameFontHighlightSmall", ns.FrameKit.Opaque(ns.Theme.COLORS.textSecondary), true }
+    { "Greet sends", "to Buyer", "GameFontHighlightSmall", ns.FrameKit.Opaque(ns.Theme.COLORS.textSecondary), true }
   )
   Assert.same(target.points, { { "TOP", s.labels.greet, "TOP", 0, 0 }, { "RIGHT", d.body, "RIGHT", -PAD, 0 } })
   Assert.same(
@@ -196,10 +196,10 @@ local function testGreetTargetClassColour()
   lead.guid = "Player-1-0001"
   local ns, d = open({ lead })
   local target = d.sections.texts.target
-  Assert.equal(target:GetText(), "to " .. ns.FrameKit.ColorCode("Buyer-Realm", WARRIOR.r, WARRIOR.g, WARRIOR.b))
+  Assert.equal(target:GetText(), "to " .. ns.FrameKit.ColorCode("Buyer", WARRIOR.r, WARRIOR.g, WARRIOR.b))
   lead.guid = nil
   ns.LeadDetails.Show(d, lead)
-  Assert.equal(target:GetText(), "to Buyer-Realm", "unknown class: plain")
+  Assert.equal(target:GetText(), "to Buyer", "unknown class: plain")
 end
 
 -- A chat line of only spaces leaves the Request bubble nothing to show: it hides with its label.
@@ -363,7 +363,7 @@ local function testCustomerZone()
   local zone = d.zones.name
   Widgets.fire(zone, "OnEnter")
   Assert.same({ tip().owner, tip().anchor, tip().shown }, { zone, "ANCHOR_RIGHT", true })
-  Assert.same(tip().lines, { "Buyer-Realm", "Warrior", "Greeted", "Replied" })
+  Assert.same(tip().lines, { "Buyer", "Warrior", "Greeted", "Replied" })
   local greeted, replied = ns.Theme.COLORS.greeted, ns.Theme.COLORS.replied
   Assert.same(tip().colors, {
     { WARRIOR.r, WARRIOR.g, WARRIOR.b },
@@ -377,7 +377,7 @@ local function testCustomerZone()
   lead.guid, lead.greeted, lead.replied = nil, false, false
   ns.LeadDetails.Show(d, lead)
   Widgets.fire(zone, "OnEnter")
-  Assert.same({ tip().lines, tip().colors }, { { "Buyer-Realm" }, { GOLD } })
+  Assert.same({ tip().lines, tip().colors }, { { "Buyer" }, { GOLD } })
   -- Leaving hides only a tooltip the zone owns.
   tip().owner = d.buttons.whisper
   Widgets.fire(zone, "OnLeave")
@@ -565,7 +565,7 @@ local function testButtons()
   Assert.same({ tip().owner, tip().anchor, tip().lines }, {
     b.greet,
     "ANCHOR_RIGHT",
-    { "Greet", "Whispers Buyer-Realm", " ", "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper" },
+    { "Greet", "Whispers Buyer", " ", "Click: greet", "Shift-click: edit first", "Ctrl-click: empty whisper" },
   })
   Assert.same(tip().colors, { GOLD, WHITE, {}, GREEN, GREEN, GREEN })
   Widgets.fire(b.greet, "OnLeave")

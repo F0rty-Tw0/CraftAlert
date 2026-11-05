@@ -34,6 +34,11 @@ function LeadText.What(lead)
   return lead.itemLink or lead.recipeName or lead.profName or ""
 end
 
+-- The customer's name as the lead shows it.
+function LeadText.Customer(lead)
+  return tostring(PlayerName.Display(lead.customer))
+end
+
 -- The class token saved with the character `key`, or nil.
 function LeadText.ClassOf(key)
   local db = _G["CraftAlertDB"]

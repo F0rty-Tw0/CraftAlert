@@ -516,6 +516,21 @@ local function compactHovered(edit)
   return ns, row, lead
 end
 
+-- A customer on the player's own realm (Me on Realm) shows without the realm: row, tooltip, compact tooltip.
+local function testOwnRealmName()
+  local own = function(e)
+    e.customer = "Ann-Realm"
+  end
+  local ns, row, _, lead = load(own)
+  ns.LeadRow.Show(row, lead)
+  Assert.equal(row.name:GetText(), "Ann")
+  hovered(own)
+  Assert.equal(tip().lines[1], "Ann")
+  Assert.falsy(string.find(tip().lines[2], "Ann-Realm", 1, true), tip().lines[2])
+  compactHovered(own)
+  Assert.equal(tip().lines[1], "Ann")
+end
+
 -- The compact tooltip names the customer and what they asked for, as the hidden text did; the chat
 -- line when there is one, and it shows without one.
 local function testCompactTooltip()
@@ -552,6 +567,7 @@ return function()
   testStatusDot()
   testUnreadDot()
   testCompactSelect()
+  testOwnRealmName()
   testCompactTooltip()
   testCompactTooltipRepaint()
   testChatTooltip()

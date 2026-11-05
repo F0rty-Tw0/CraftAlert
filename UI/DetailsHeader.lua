@@ -24,7 +24,6 @@ local find = string.find
 local max = math.max
 local min = math.min
 local select = select
-local tostring = tostring
 local type = type
 local unpack = unpack
 
@@ -213,7 +212,7 @@ function DetailsHeader.Paint(details, lead)
   local _, dotColor = LeadText.State(lead)
   details.icon.texture:SetTexture(iconOf(lead))
   RowArt.PaintDot(details.dot, dotColor)
-  details.name:SetText(tostring(lead.customer))
+  details.name:SetText(LeadText.Customer(lead))
   FrameKit.PaintName(details.name, lead.guid)
   DetailsHeader.FitName(details)
   details.lineOne:SetText(DetailsHeader.LineOne(lead))

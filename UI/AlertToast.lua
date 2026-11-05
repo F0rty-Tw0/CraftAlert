@@ -31,7 +31,6 @@ local AlertToast = {}
 AlertToast.more = 0
 
 local concat = table.concat
-local tostring = tostring
 local type = type
 local unpack = unpack
 
@@ -100,7 +99,7 @@ local function paint(name, guid, headline, detail, message)
 end
 
 local function render(lead)
-  paint(tostring(lead.customer), lead.guid, LeadText.Headline(lead), detailText(lead), LeadText.Message(lead))
+  paint(LeadText.Customer(lead), lead.guid, LeadText.Headline(lead), detailText(lead), LeadText.Message(lead))
 end
 
 local function hide()
