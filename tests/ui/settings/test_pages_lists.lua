@@ -229,7 +229,7 @@ local function testCraftersLinkToggle()
   Assert.same({ far.enabled, far.linkedRealms }, { true, { "Realm" } })
   Widgets.click(toggle)
   Assert.same({ far.enabled, far.linkedRealms }, { true, nil })
-  far, toggle = show("Far-Away")
+  toggle = select(2, show("Far-Away"))
   Assert.equal(toggle:GetChecked(), false)
 end
 
