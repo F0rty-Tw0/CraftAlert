@@ -4,6 +4,8 @@ Player-friendly release notes for Craft Alert.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-05
+
 - Characters on another realm no longer get alerts or greetings unless Craft Alert knows they're connected to your realm. To turn one back on, pick it on the Crafters page and turn on "Listen for this character".
 - Names show a realm only when it matters, and never on WoW: Forever.
 - The main crafter is now one per profession in each group of realms.
