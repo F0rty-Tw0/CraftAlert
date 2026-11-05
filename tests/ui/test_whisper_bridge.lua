@@ -117,7 +117,10 @@ local function testShowLeadPreview()
   ns.WhisperBridge.ShowLead(lead)
   local preview = wm.preview.CraftAlert
   -- Three rows: the customer, their trimmed chat line, who of yours can craft it.
-  Assert.same({ preview.sender, preview.text, preview.detail, preview.classTag }, { ns.PlayerName.Display(lead.customer), "LF plate belt", "You have Blacksmithing", nil })
+  Assert.same(
+    { preview.sender, preview.text, preview.detail, preview.classTag },
+    { ns.PlayerName.Display(lead.customer), "LF plate belt", "You have Blacksmithing", nil }
+  )
   Assert.equal(preview.pulse, true, "a new lead pulses WM's widget (spec 7)")
   Assert.equal(#UiFixture.callsTo(calls, "sound"), 1)
   Assert.equal(#UiFixture.callsTo(calls, "flash"), 1)
