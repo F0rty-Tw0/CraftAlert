@@ -55,4 +55,51 @@ return function()
   MainCrafter.Set(db, "A-Realm", BS, true)
   MainCrafter.Set(db, "B-Realm", BS, false)
   Assert.equal(MainCrafter.Of(db, BS), "A-Realm")
+
+  -- One main per group: the player is Me-RealmA; X and Y are linked to RealmA, so both are in scope
+  -- without being SameGroup with each other; Far-RealmZ and Far2-RealmZ are another group.
+  Wow.reset()
+  Wow.stub("UnitName", function()
+    return "Me"
+  end)
+  Wow.stub("GetNormalizedRealmName", function()
+    return "RealmA"
+  end)
+  Fresh.require("Core.FlavorCompat")
+  Fresh.require("Core.PlayerName").Init()
+  Fresh.require("Model.RealmTag")
+  MainCrafter = Fresh.require("Model.MainCrafter")
+  db = {
+    characters = {
+      ["Near-RealmA"] = character(BS),
+      ["Far-RealmZ"] = character(BS),
+      ["Far2-RealmZ"] = character(BS),
+      ["X-RealmB"] = character(BS),
+      ["Y-RealmC"] = character(BS),
+    },
+  }
+  db.characters["X-RealmB"].linkedRealms = { "RealmA" }
+  db.characters["Y-RealmC"].linkedRealms = { "RealmA" }
+
+  MainCrafter.Set(db, "Far-RealmZ", BS, true)
+  MainCrafter.Set(db, "Near-RealmA", BS, true)
+  Assert.equal(prim("Far-RealmZ"), true, "another group keeps its main")
+  Assert.equal(MainCrafter.Of(db, BS), "Near-RealmA")
+  Assert.equal(MainCrafter.Of(db, BS, "Far-RealmZ"), "Far-RealmZ")
+
+  MainCrafter.Set(db, "X-RealmB", BS, true)
+  MainCrafter.Set(db, "Y-RealmC", BS, true)
+  Assert.same({ prim("X-RealmB"), prim("Y-RealmC"), prim("Near-RealmA") }, { false, true, false })
+  Assert.equal(MainCrafter.Of(db, BS, "X-RealmB"), "Y-RealmC")
+
+  MainCrafter.Clear(db, BS)
+  Assert.equal(prim("Y-RealmC"), false)
+  Assert.equal(prim("Far-RealmZ"), true, "out of scope, kept")
+
+  -- Off touches only that character; an out-of-scope main clears only its own group.
+  MainCrafter.Set(db, "Y-RealmC", BS, true)
+  MainCrafter.Set(db, "Near-RealmA", BS, false)
+  Assert.equal(prim("Y-RealmC"), true)
+  MainCrafter.Set(db, "Far2-RealmZ", BS, true)
+  Assert.same({ prim("Far-RealmZ"), prim("Far2-RealmZ"), prim("Y-RealmC") }, { false, true, true })
 end
