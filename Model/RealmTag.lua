@@ -10,8 +10,8 @@ local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 -- stores its connected realms at login, and a lead is tagged "Can't send an order (other
 -- realm)" when the customer's realm is not among the chosen crafter's. An empty list means
 -- "unknown" (Phase 0: GetAutoCompleteRealms returned {} on every probed flavor), never "own
--- realm only" -- for that warning. InScope treats an empty list as no connection. The group
--- rules (Connected, SameGroup, InScope) also read each character's manual linkedRealms.
+-- realm only" -- for that warning. InScope treats an empty list as no connection. SameGroup
+-- and InScope also read a character's manual linkedRealms.
 local RealmTag = {}
 
 local gsub = string.gsub
@@ -107,28 +107,31 @@ function RealmTag.SameGroup(db, a, b)
   return holds(charA and charA.linkedRealms, realmB) or holds(charB and charB.linkedRealms, realmA)
 end
 
--- True when the key is in the player's group. With the own realm unknown nothing can be
+-- True when the key is in the player's group: connected to the player's realm, or linked to it
+-- (IsLinked, the key's own linkedRealms). The player's own linkedRealms are left out on purpose:
+-- they say who may see the player, and reading them would put every alt on a linked realm in
+-- scope whenever that character is logged in. With the own realm unknown nothing can be
 -- filtered, so everything is in scope.
 function RealmTag.InScope(db, key)
   local own = PlayerName.Own()
   if PlayerName.RealmOf(own) == nil then
     return true
   end
-  return RealmTag.SameGroup(db, own, key)
+  return RealmTag.Connected(db, own, key) or RealmTag.IsLinked(db, key)
 end
 
 -- Links or unlinks the own realm on a character's linkedRealms. Does nothing when the
 -- character or own realm is unknown.
 function RealmTag.SetLinked(db, key, on)
   local character = db.characters[key]
-  local own = PlayerName.RealmOf(PlayerName.Own())
-  if character == nil or own == nil then
+  local ownRealm = PlayerName.RealmOf(PlayerName.Own())
+  if character == nil or ownRealm == nil then
     return
   end
   if on then
-    if not holds(character.linkedRealms, own) then
+    if not holds(character.linkedRealms, ownRealm) then
       local list = character.linkedRealms or {}
-      list[#list + 1] = own
+      list[#list + 1] = ownRealm
       character.linkedRealms = list
     end
     return
@@ -139,7 +142,7 @@ function RealmTag.SetLinked(db, key, on)
   end
   local kept = {}
   for i = 1, #list do
-    if list[i] ~= own then
+    if list[i] ~= ownRealm then
       kept[#kept + 1] = list[i]
     end
   end

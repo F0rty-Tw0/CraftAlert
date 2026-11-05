@@ -144,11 +144,11 @@ return function()
   Assert.equal(RealmTag.SameGroup(db, "X-RealmB", "Y-RealmC"), false)
 
   -- Linked from realm A is out of scope when the player is on unrelated realm C.
-  local function loadOn(own)
+  local function loadOn(own, name)
     Wow.reset()
     Wow.flavor("retail")
     Wow.stub("UnitName", function()
-      return "Me"
+      return name or "Me"
     end)
     Wow.stub("GetNormalizedRealmName", function()
       return own
@@ -163,6 +163,22 @@ return function()
   RealmTag = loadOn("RealmC")
   db = groupDb({ ["Far-Other"] = { linkedRealms = { "Kel'Thuzad" } } })
   Assert.equal(RealmTag.InScope(db, "Far-Other"), false)
+
+  -- The player's own linkedRealms never widen scope: Ann (RealmA) linked to RealmB does not put
+  -- the unlinked Bee-RealmB in scope, and Abe, another RealmA character, gets the same answer.
+  db = groupDb({
+    ["Ann-RealmA"] = { linkedRealms = { "RealmB" } },
+    ["Abe-RealmA"] = {},
+    ["Bee-RealmB"] = {},
+  })
+  for _, name in ipairs({ "Ann", "Abe" }) do
+    RealmTag = loadOn("RealmA", name)
+    Assert.equal(RealmTag.InScope(db, "Bee-RealmB"), false, name)
+    Assert.equal(RealmTag.InScope(db, "Abe-RealmA"), true, name)
+  end
+  -- An alt that links the player's realm is in scope.
+  db.characters["Bee-RealmB"].linkedRealms = { "RealmA" }
+  Assert.equal(RealmTag.InScope(db, "Bee-RealmB"), true)
 
   -- Own realm unknown: everything is in scope.
   RealmTag = loadOn(nil)
