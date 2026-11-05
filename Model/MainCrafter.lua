@@ -3,12 +3,12 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
+local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
+
 -- The main crafter of a profession: the one character whose `professions[prof].primary` is
 -- set. This module is the only writer, so there is one flag per profession (spec §1). Reads
 -- are by CrafterRank (§6.3 step 5); nothing here rebuilds the index.
 local MainCrafter = {}
-
-local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
 
 local pairs = pairs
 
@@ -19,7 +19,8 @@ local function reaches(db, anchor, key)
   if anchor == nil then
     return RealmTag.InScope(db, key)
   end
-  return RealmTag.SameGroup(db, anchor, key) or (RealmTag.InScope(db, anchor) and RealmTag.InScope(db, key))
+  local bothInScope = RealmTag.InScope(db, anchor) and RealmTag.InScope(db, key)
+  return RealmTag.SameGroup(db, anchor, key) or bothInScope
 end
 
 -- Setting the flag clears every other character's it reaches; turning it off touches only `charKey`.
@@ -52,7 +53,9 @@ function MainCrafter.Of(db, prof, anchor)
   local main
   for key, character in pairs(db.characters) do
     local profession = character.professions[prof]
-    if profession and profession.primary == true and (main == nil or key < main) and reaches(db, anchor, key) then
+    local flagged = profession and profession.primary == true
+    local lower = main == nil or key < main
+    if flagged and lower and reaches(db, anchor, key) then
       main = key
     end
   end
