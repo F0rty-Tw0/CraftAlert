@@ -176,7 +176,8 @@ local function testCraftersDropdownOrder()
 end
 
 -- A character on a realm not connected to the player's is off until it is turned on from here
--- (spec §3.6): the toggle sets `enabled` for a connected character and links the realm for the others.
+-- (Crafter-groups spec §3.6): the toggle sets `enabled` for a connected character and links the
+-- realm for the others.
 local function testCraftersLinkToggle()
   local ns, db, refreshes = SettingsFixture.load({
     db = function(accountDb)

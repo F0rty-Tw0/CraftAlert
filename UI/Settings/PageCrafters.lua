@@ -25,8 +25,8 @@ local function db()
   return _G["CraftAlertDB"]
 end
 
--- Spec §3.6: a connected character is on when `enabled`; one that is not connected also needs
--- the player's realm linked on it.
+-- Crafter-groups spec §3.6: a connected character is on when `enabled`; one that is not connected
+-- also needs the player's realm linked on it.
 local function listening(character, key)
   if character == nil or character.enabled == false then
     return false
@@ -47,6 +47,25 @@ local function shownCharacter(page)
   return db().characters[page.character.Value()]
 end
 
+-- The "Listen for this character" toggle: a connected character is enabled or disabled; any
+-- other also gets the player's realm linked or unlinked on it.
+local function setListening(page, on)
+  local key = page.character.Value()
+  local character = shownCharacter(page)
+  if character == nil then
+    return
+  end
+  if RealmTag.Connected(db(), PlayerName.Own(), key) then
+    character.enabled = on
+  else
+    if on then
+      character.enabled = true
+    end
+    RealmTag.SetLinked(db(), key, on)
+  end
+  Index.RequestRebuild("crafter")
+end
+
 -- page: { character, enabled, remove, profession, primary (the main crafter toggle), list, ... }
 local function createCharacterRows(column, page)
   Controls.Section(column, Localization.Text("This character"))
@@ -57,20 +76,7 @@ local function createCharacterRows(column, page)
     column,
     Localization.Text("Listen for this character"),
     function(on)
-      local key = page.character.Value()
-      local character = shownCharacter(page)
-      if character == nil then
-        return
-      end
-      if RealmTag.Connected(db(), PlayerName.Own(), key) then
-        character.enabled = on
-      else
-        if on then
-          character.enabled = true
-        end
-        RealmTag.SetLinked(db(), key, on)
-      end
-      Index.RequestRebuild("crafter")
+      setListening(page, on)
     end,
     Localization.Text(
       "Alerts for this character's recipes. Off, its recipes are left out of matching. A character on another realm starts off: turn it on only if it can craft for customers you see here."
