@@ -213,11 +213,12 @@ local function importCharacter(ctx, csKey, record, realms)
   ctx.counts.characters = ctx.counts.characters + 1
 end
 
--- Several CraftScan primaries for one profession: the lowest key, and only when Craft Alert has none.
+-- Several CraftScan primaries for one profession: the lowest key, and only when Craft Alert has none
+-- among the characters that key reaches (its realm group).
 local function setPrimaries(db, primaries)
   for prof, keys in pairs(primaries) do
     table.sort(keys)
-    if MainCrafter.Of(db, prof) == nil then
+    if MainCrafter.Of(db, prof, keys[1]) == nil then
       MainCrafter.Set(db, keys[1], prof, true)
     end
   end
