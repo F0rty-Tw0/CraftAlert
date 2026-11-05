@@ -12,6 +12,7 @@ local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.Prof
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls")
 local RecipeList = ns.RecipeList or require("CraftAlert.UI.Settings.RecipeList")
+local CrafterOptions = ns.CrafterOptions or require("CraftAlert.UI.Settings.CrafterOptions")
 
 -- Spec §9 Crafters: one character at a time (current, same-account, imported) with enable,
 -- remove (asks for a second click) and, per profession, the main crafter flag (stored as
@@ -24,17 +25,13 @@ local function db()
   return _G["CraftAlertDB"]
 end
 
-local function characterOptions()
-  local options = {}
-  for key, character in pairs(db().characters) do
-    local imported = character.source == "import"
-    local source = key == PlayerName.Own() and "this character" or (imported and "imported" or "same account")
-    options[#options + 1] = { value = key, text = Localization.Text("%s (%s)", key, Localization.Text(source)), key = key }
+-- Spec §3.6: a connected character is on when `enabled`; one that is not connected also needs
+-- the player's realm linked on it.
+local function listening(character, key)
+  if character == nil or character.enabled == false then
+    return false
   end
-  table.sort(options, function(a, b)
-    return a.key < b.key
-  end)
-  return options
+  return RealmTag.Connected(db(), PlayerName.Own(), key) or RealmTag.IsLinked(db(), key)
 end
 
 local function professionOptions(character)
@@ -56,13 +53,29 @@ local function createCharacterRows(column, page)
   page.character = Controls.Choice(column, Localization.Text("Character"), {}, function()
     page.ShowCharacter()
   end, Localization.Text("Pick whose professions and recipes this page shows."))
-  page.enabled = Controls.Toggle(column, Localization.Text("Listen for this character"), function(on)
-    local character = shownCharacter(page)
-    if character then
-      character.enabled = on
+  page.enabled = Controls.Toggle(
+    column,
+    Localization.Text("Listen for this character"),
+    function(on)
+      local key = page.character.Value()
+      local character = shownCharacter(page)
+      if character == nil then
+        return
+      end
+      if RealmTag.Connected(db(), PlayerName.Own(), key) then
+        character.enabled = on
+      else
+        if on then
+          character.enabled = true
+        end
+        RealmTag.SetLinked(db(), key, on)
+      end
       Index.RequestRebuild("crafter")
-    end
-  end, Localization.Text("Alerts for this character's recipes. Off, its recipes are left out of matching."))
+    end,
+    Localization.Text(
+      "Alerts for this character's recipes. Off, its recipes are left out of matching. A character on another realm starts off: turn it on only if it can craft for customers you see here."
+    )
+  )
   local removeTip = Localization.Text(
     "Deletes this character's saved professions and recipes. It asks for a second click. Your logged-in character comes back empty until you open a profession window."
   )
@@ -103,7 +116,7 @@ local function createProfessionRows(column, page)
       end
     end,
     Localization.Text(
-      "When several of your characters can craft a request, this one is chosen first and gets the greeting. One main crafter per profession."
+      "When several of your characters can craft a request, this one is chosen first and gets the greeting. One main crafter per profession in each group of realms."
     )
   )
   page.list = RecipeList.Create(column)
@@ -124,7 +137,7 @@ function PageCrafters.Create(parent)
     local character = shownCharacter(page)
     page.confirming = false
     page.remove.label:SetText(Localization.Text("Remove character"))
-    page.enabled.Set(character ~= nil and character.enabled ~= false)
+    page.enabled.Set(listening(character, page.character.Value()))
     page.profession.SetOptions(professionOptions(character), nil)
     page.ShowProfession()
   end
@@ -133,7 +146,7 @@ function PageCrafters.Create(parent)
     if current == nil or db().characters[current] == nil then
       current = PlayerName.Own()
     end
-    page.character.SetOptions(characterOptions(), current)
+    page.character.SetOptions(CrafterOptions.Characters(db()), current)
     page.ShowCharacter()
   end
   return page

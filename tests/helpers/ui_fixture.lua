@@ -82,6 +82,7 @@ local UI = {
   "UI.Settings.RecipeTooltip",
   "UI.Settings.RecipeRarity",
   "UI.Settings.RecipeList",
+  "UI.Settings.CrafterOptions",
   "UI.Settings.PageCrafters",
   "UI.Settings.PageLinked",
   "UI.Settings.PageTest",
