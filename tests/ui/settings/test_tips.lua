@@ -82,7 +82,11 @@ local TIPS = {
 local MUTE_TEXT = "%s every recipe the list shows. With a search typed, only the recipes it finds."
 local CRAFTERS = {
   { "Crafters", "Character", "Pick whose professions and recipes this page shows." },
-  { "Crafters", "Listen for this character", "Alerts for this character's recipes. Off, its recipes are left out of matching." },
+  {
+    "Crafters",
+    "Listen for this character",
+    "Alerts for this character's recipes. Off, its recipes are left out of matching. A character on another realm starts off: turn it on only if it can craft for customers you see here.",
+  },
   {
     "Crafters",
     "Remove character",
@@ -92,7 +96,7 @@ local CRAFTERS = {
   {
     "Crafters",
     "Main crafter for this profession",
-    "When several of your characters can craft a request, this one is chosen first and gets the greeting. One main crafter per profession.",
+    "When several of your characters can craft a request, this one is chosen first and gets the greeting. One main crafter per profession in each group of realms.",
   },
   { "Crafters", "Search recipes", "Type part of a recipe's name. The list narrows as you type." },
   { "Crafters", "Mute all", MUTE_TEXT:format("Mutes"), true },

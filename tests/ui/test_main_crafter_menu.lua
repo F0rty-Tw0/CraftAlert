@@ -1,7 +1,6 @@
 local Assert = require("tests.helpers.assert")
 local Wow = require("tests.helpers.wow")
 local UiFixture = require("tests.helpers.ui_fixture")
-local MainCrafter = require("CraftAlert.Model.MainCrafter")
 
 -- Main-crafter spec §3: the menu a lead card's Crafters zone opens. One radio per enabled character
 -- that knows the lead's profession, then None; choosing one writes the flag and re-picks that lead.
@@ -101,7 +100,7 @@ local function testChoose()
   local lead = ns.Leads.List()[1]
   ns.MainCrafterMenu.Open({}, lead)
   choose("Alt")
-  Assert.equal(MainCrafter.Of(db, BS), "Alt-Realm")
+  Assert.equal(ns.MainCrafter.Of(db, BS), "Alt-Realm")
   Assert.same(repicks, { { lead.id, true } })
   Assert.equal(lead.crafter, "Alt-Realm")
   -- Already the main: nothing written (Set would turn Me's nil into false), nothing re-picked.
@@ -111,7 +110,7 @@ local function testChoose()
   -- None with two flags from old data clears both.
   db.characters["Zed-Realm"].professions[BS].primary = true
   choose("None")
-  Assert.same({ MainCrafter.Of(db, BS), db.characters["Zed-Realm"].professions[BS].primary }, { nil, false })
+  Assert.same({ ns.MainCrafter.Of(db, BS), db.characters["Zed-Realm"].professions[BS].primary }, { nil, false })
   Assert.equal(#repicks, 2)
   Assert.equal(selected(), "None")
   -- None again: already selected.
@@ -136,7 +135,7 @@ local function testLeadGone()
   ns.MainCrafterMenu.Open({}, lead)
   ns.Leads.Dismiss(lead.id)
   choose("Zed")
-  Assert.equal(MainCrafter.Of(db, BS), "Zed-Realm")
+  Assert.equal(ns.MainCrafter.Of(db, BS), "Zed-Realm")
   Assert.same(repicks, { { lead.id, false } })
   Assert.same(ns.Leads.List(), {})
 end
@@ -156,6 +155,24 @@ local function testCanOpen()
   Assert.equal(ns.MainCrafterMenu.CanOpen({ prof = BS }), false)
 end
 
+-- A character in another realm group (the player is on Realm) is not listed, does not open the menu
+-- alone, and its flag is neither selected nor a reason to rewrite the in-scope main.
+local function testOutOfScope()
+  local ns, db, repicks = load()
+  local lead = ns.Leads.List()[1]
+  db.characters["Far-RealmZ"] = blacksmith()
+  db.characters["Far-RealmZ"].professions[BS].primary = true
+  ns.MainCrafterMenu.Open({}, lead)
+  Assert.same(radioTexts(), { "Alt", "Me", "Zed", "None" })
+  Assert.equal(selected(), "None")
+  choose("Alt")
+  choose("Alt")
+  Assert.same({ #repicks, db.characters["Far-RealmZ"].professions[BS].primary }, { 1, true })
+  db.characters["Ench-Realm"] = nil
+  db.characters["Far-RealmZ"].professions[ENCH] = { name = "Enchanting" }
+  Assert.equal(ns.MainCrafterMenu.CanOpen({ prof = ENCH }), false)
+end
+
 local function testNoMenuUtil()
   local ns = load()
   Wow.stub("MenuUtil", nil)
@@ -169,6 +186,7 @@ return function()
   testChoose()
   testLeadGone()
   testCanOpen()
+  testOutOfScope()
   testNoMenuUtil()
   Wow.reset()
 end

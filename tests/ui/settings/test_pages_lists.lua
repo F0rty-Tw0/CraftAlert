@@ -75,9 +75,9 @@ local function testCraftersPage()
   Assert.truthy(page:find("Recipes", 1, true), page)
   Assert.falsy(page:find("Professions", 1, true), "no heading that echoes the Profession dropdown")
   local character = row("Character").input
-  Assert.equal(character.Text:GetText(), "Me-Realm (this character)", "opens on the current character")
+  Assert.equal(character.Text:GetText(), "Me (this character)", "opens on the current character, the realm left out on its own realm")
   Widgets.pick(character, "Alt-Realm")
-  Assert.equal(character.Text:GetText(), "Alt-Realm (same account)")
+  Assert.equal(character.Text:GetText(), "Alt (same account)")
   Widgets.pick(character, "Far-Away")
   Assert.equal(character.Text:GetText(), "Far-Away (imported)")
   Widgets.pick(character, "Me-Realm")
@@ -141,7 +141,96 @@ local function testCraftersPage()
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Click again to remove"))
   Assert.equal(db.characters["Me-Realm"], nil)
   Assert.same(take(refreshes), { "rebuild:crafter" })
-  Assert.equal(character.Text:GetText(), "Alt-Realm (same account)")
+  Assert.equal(character.Text:GetText(), "Alt (same account)")
+end
+
+-- The dropdown lists the player's realm first, then the other realms by realm and name. Only a
+-- row on another realm shows its realm, Forever included.
+local function testCraftersDropdownOrder()
+  for _, flavor in ipairs({ "retail", "forever" }) do
+    local ns = SettingsFixture.load({
+      flavor = flavor,
+      db = function(accountDb)
+        crafters(accountDb)
+        for _, key in ipairs({ "Zed-Realm", "Bob-Alpha", "Amy-Alpha", "Cy-Beta" }) do
+          accountDb.characters[key] = { source = "local", enabled = true, realms = {}, professions = {}, recipes = {} }
+        end
+      end,
+    })
+    open(ns, "Crafters")
+    local character = row("Character").input
+    local seen = {}
+    for _, entry in ipairs(character.menuEntries) do
+      seen[#seen + 1] = entry.data .. " = " .. entry.text
+    end
+    Assert.same(seen, {
+      "Alt-Realm = Alt (same account)",
+      "Me-Realm = Me (this character)",
+      "Zed-Realm = Zed (same account)",
+      "Amy-Alpha = Amy-Alpha (same account)",
+      "Bob-Alpha = Bob-Alpha (same account)",
+      "Far-Away = Far-Away (imported)",
+      "Cy-Beta = Cy-Beta (same account)",
+    }, flavor)
+  end
+end
+
+-- A character on a realm not connected to the player's is off until it is turned on from here
+-- (Crafter-groups spec §3.6): the toggle sets `enabled` for a connected character and links the
+-- realm for the others.
+local function testCraftersLinkToggle()
+  local ns, db, refreshes = SettingsFixture.load({
+    db = function(accountDb)
+      crafters(accountDb)
+      accountDb.characters["Me-Realm"].realms = { "Realm", "Joined" }
+      accountDb.characters["Near-Joined"] = { source = "local", enabled = true, realms = {}, professions = {}, recipes = {} }
+    end,
+  })
+  open(ns, "Crafters")
+  local character = row("Character").input
+  local function show(key)
+    Widgets.pick(character, key)
+    take(refreshes)
+    return db.characters[key], row("Listen for this character").input
+  end
+
+  -- Connected: the toggle is `enabled`, linkedRealms untouched.
+  local near, toggle = show("Near-Joined")
+  Assert.equal(toggle:GetChecked(), true)
+  Widgets.click(toggle)
+  Assert.same({ near.enabled, near.linkedRealms }, { false, nil })
+  Assert.same(take(refreshes), { "rebuild:crafter" })
+  Widgets.click(toggle)
+  Assert.same({ near.enabled, near.linkedRealms }, { true, nil })
+  Assert.same(take(refreshes), { "rebuild:crafter" })
+
+  -- Not connected, unlinked: off. On enables and links; off unlinks and leaves `enabled`.
+  local far
+  far, toggle = show("Far-Away")
+  Assert.equal(toggle:GetChecked(), false, "enabled but not linked")
+  Widgets.click(toggle)
+  Assert.same({ far.enabled, far.linkedRealms }, { true, { "Realm" } })
+  Assert.same(take(refreshes), { "rebuild:crafter" })
+  Widgets.click(toggle)
+  Assert.same({ far.enabled, far.linkedRealms }, { true, nil })
+  Assert.same(take(refreshes), { "rebuild:crafter" })
+
+  -- Not connected, disabled and linked: off. On enables it.
+  far.enabled, far.linkedRealms = false, { "Realm" }
+  far, toggle = show("Far-Away")
+  Assert.equal(toggle:GetChecked(), false, "linked but disabled")
+  Widgets.click(toggle)
+  Assert.same({ far.enabled, far.linkedRealms }, { true, { "Realm" } })
+
+  -- Not connected, disabled and unlinked: on, then off ends unlinked, enabled, and shows off.
+  far.enabled, far.linkedRealms = false, nil
+  far, toggle = show("Far-Away")
+  Widgets.click(toggle)
+  Assert.same({ far.enabled, far.linkedRealms }, { true, { "Realm" } })
+  Widgets.click(toggle)
+  Assert.same({ far.enabled, far.linkedRealms }, { true, nil })
+  toggle = select(2, show("Far-Away"))
+  Assert.equal(toggle:GetChecked(), false)
 end
 
 -- A mute made outside the page (the profession window) shows when the index rebuilds: the open
@@ -547,7 +636,7 @@ local function testRemoveOwnCharacter()
   -- Another character is not the client's: it stays removed.
   local character = row("Character").input
   Widgets.pick(character, "Alt-Realm")
-  Assert.equal(character.Text:GetText(), "Alt-Realm (same account)")
+  Assert.equal(character.Text:GetText(), "Alt (same account)")
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Remove character"))
   Widgets.click(SettingsFixture.button(SettingsFixture.window(), "Click again to remove"))
   Assert.equal(db.characters["Alt-Realm"], nil, "an alt is not stored again")
@@ -598,6 +687,8 @@ end
 return function()
   testKeywordsPage()
   testCraftersPage()
+  testCraftersDropdownOrder()
+  testCraftersLinkToggle()
   testCraftersRepaintsOnRebuild()
   testCraftersRecipeOrder()
   testCraftersRecipeGroups()

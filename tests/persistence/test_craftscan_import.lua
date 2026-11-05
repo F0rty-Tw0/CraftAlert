@@ -128,6 +128,56 @@ local function testExistingDataWins()
   Assert.equal(db.settings.templates.item, "My own greeting {item}")
 end
 
+-- One main per realm group: a main on another group does not block the import's main, a main on an
+-- alt linked from the player's realm does (and stays the main).
+local function testPrimaryPerGroup()
+  local CraftScanImport, ns = load()
+  local function imported(key, realm)
+    local record = { parent_professions = { [BS] = { primary_crafter = true } }, professions = { [2872] = { parentProfID = BS, recipes = {} } } }
+    return { realms = { [realm] = { characters = { [key] = record } } } }
+  end
+  local db = ns.Defaults.Db()
+  db.characters["Far-RealmZ"] = Fixture.character({ BS }, {})
+  db.characters["Far-RealmZ"].professions[BS].primary = true
+  db.characters["Near-OwnRealm"] = Fixture.character({ BS }, {})
+  CraftScanImport.Run(db, imported("Near-OwnRealm", "OwnRealm"))
+  Assert.equal(db.characters["Near-OwnRealm"].professions[BS].primary, true, "another group's main does not block")
+  Assert.equal(db.characters["Far-RealmZ"].professions[BS].primary, true)
+  -- A second alt of that other group is blocked by the main there, which is not in scope.
+  db.characters["Near-OwnRealm"].professions[BS].primary = false
+  db.characters["Far2-RealmZ"] = Fixture.character({ BS }, {})
+  CraftScanImport.Run(db, imported("Far2-RealmZ", "RealmZ"))
+  Assert.same({ db.characters["Far-RealmZ"].professions[BS].primary, db.characters["Far2-RealmZ"].professions[BS].primary }, { true, false })
+
+  db = ns.Defaults.Db()
+  for _, key in ipairs({ "X-RealmB", "Y-RealmC" }) do
+    db.characters[key] = Fixture.character({ BS }, {})
+    db.characters[key].linkedRealms = { "OwnRealm" }
+  end
+  db.characters["X-RealmB"].professions[BS].primary = true
+  CraftScanImport.Run(db, imported("Y-RealmC", "RealmC"))
+  Assert.same({ db.characters["X-RealmB"].professions[BS].primary, db.characters["Y-RealmC"].professions[BS].primary }, { true, false })
+
+  -- CraftScan mains in two groups: the lowest key (Aaa-RealmA) does not use up the player's group,
+  -- whose own main (Zed-OwnRealm) is set too. Within one group the lowest key still wins.
+  db = ns.Defaults.Db()
+  for _, key in ipairs({ "Aaa-RealmA", "Zed-OwnRealm", "Zzz-OwnRealm" }) do
+    db.characters[key] = Fixture.character({ BS }, {})
+  end
+  local record = { parent_professions = { [BS] = { primary_crafter = true } }, professions = { [2872] = { parentProfID = BS, recipes = {} } } }
+  CraftScanImport.Run(db, {
+    realms = {
+      RealmA = { characters = { ["Aaa-RealmA"] = record } },
+      OwnRealm = { characters = { ["Zed-OwnRealm"] = record, ["Zzz-OwnRealm"] = record } },
+    },
+  })
+  Assert.same({
+    db.characters["Aaa-RealmA"].professions[BS].primary,
+    db.characters["Zed-OwnRealm"].professions[BS].primary,
+    db.characters["Zzz-OwnRealm"].professions[BS].primary,
+  }, { true, true, false })
+end
+
 -- Malformed pieces are skipped and counted without stopping the rest; "|" never reaches a key.
 local function testMalformed()
   local CraftScanImport, ns = load()
@@ -295,6 +345,7 @@ end
 return function()
   testFreshImport()
   testExistingDataWins()
+  testPrimaryPerGroup()
   testMalformed()
   testProfessionNamedByAnyExpansion()
   testUnnamedProfessionTakesClientName()
