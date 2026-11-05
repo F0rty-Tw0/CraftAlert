@@ -17,6 +17,7 @@ local CHAIN = {
   "Model.Greeting",
   "Model.SendGuard",
   "Model.RealmTag",
+  "Model.MainCrafter",
   "Model.CrafterRank",
   "Model.Leads",
   "Model.Ledger",

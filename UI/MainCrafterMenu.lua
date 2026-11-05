@@ -6,6 +6,7 @@ end
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local MainCrafter = ns.MainCrafter or require("CraftAlert.Model.MainCrafter")
+local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 
@@ -21,11 +22,11 @@ local function db()
   return _G["CraftAlertDB"]
 end
 
--- The keys of the enabled characters that know `prof`, by the name the greeting uses, then key.
+-- The keys of the enabled characters in the player's realm group that know `prof`, by the name the greeting uses, then key.
 local function craftersOf(prof)
   local keys = {}
   for key, character in pairs(db().characters) do
-    if character.enabled ~= false and character.professions[prof] ~= nil then
+    if character.enabled ~= false and character.professions[prof] ~= nil and RealmTag.InScope(db(), key) then
       keys[#keys + 1] = key
     end
   end
@@ -40,25 +41,25 @@ local function craftersOf(prof)
 end
 
 -- Whether a click can open the menu: Blizzard's menu API is there and an enabled character knows the
--- lead's profession. Asked on every hover, so it stops at the first one and builds no list.
+-- lead's profession (in the player's realm group). Asked on every hover, so it stops at the first one and builds no list.
 function MainCrafterMenu.CanOpen(lead)
   local prof = lead.prof
   if prof == nil or _G["MenuUtil"] == nil then
     return false
   end
-  for _, character in pairs(db().characters) do
-    if character.enabled ~= false and character.professions[prof] ~= nil then
+  for key, character in pairs(db().characters) do
+    if character.enabled ~= false and character.professions[prof] ~= nil and RealmTag.InScope(db(), key) then
       return true
     end
   end
   return false
 end
 
--- Whether a character other than `key` carries the profession's flag; old data can flag several.
+-- Whether an in-scope character other than `key` carries the profession's flag; old data can flag several.
 local function flaggedBesides(key, prof)
   for other, character in pairs(db().characters) do
     local profession = character.professions[prof]
-    if other ~= key and profession and profession.primary == true then
+    if other ~= key and profession and profession.primary == true and RealmTag.InScope(db(), other) then
       return true
     end
   end
