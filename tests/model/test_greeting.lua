@@ -62,6 +62,9 @@ return function()
     Assert.equal(greeting.Build(itemLead("Me-Realm"), flavorSettings), "Hi! I can craft " .. LINK .. ".", flavor)
   end
 
+  -- Forever shows no realm at all: its realm is never the one that matters.
+  Assert.equal(load("forever").CrafterName("Alt-Other"), "Alt")
+
   -- Every tag works in every template; the customer is greeted by name.
   local all = "{customer}/{crafter}/{item}/{profession}"
   settings.templates = { item = all, altItem = all, profession = all, altProfession = all }

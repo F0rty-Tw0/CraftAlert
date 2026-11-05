@@ -21,12 +21,10 @@ local MAX_LENGTH = 255
 local OWN_TEMPLATE = { item = "item", profession = "profession" }
 local ALT_TEMPLATE = { item = "altItem", profession = "altProfession" }
 
--- The player's own realm is dropped, as Ambiguate does; an alt on another realm keeps it.
+-- The player's own realm is dropped, as Ambiguate does; an alt on another realm keeps it
+-- (Forever drops every realm).
 function Greeting.CrafterName(key)
-  if PlayerName.RealmOf(key) == PlayerName.RealmOf(PlayerName.Own()) then
-    return PlayerName.NameOf(key)
-  end
-  return key
+  return PlayerName.Display(key)
 end
 
 local PIPE = 124 -- "|"
