@@ -6,8 +6,20 @@ end
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 
--- The Crafters page's character dropdown rows ({ value, text, key }).
+-- The Crafters page's character dropdown rows ({ value, text, key, other, realm, name }).
 local CrafterOptions = {}
+
+-- Own realm first, then the other realms in order; within a realm by name. Same realm and name
+-- mean the same key, so the name decides last.
+local function byRealmThenName(a, b)
+  if a.other ~= b.other then
+    return b.other
+  end
+  if a.realm ~= b.realm then
+    return a.realm < b.realm
+  end
+  return a.name < b.name
+end
 
 -- The player's realm first, then the other realms by realm and name. This is the one place the
 -- realm stays visible: a row on another realm shows the whole key, on every flavor.
@@ -28,18 +40,7 @@ function CrafterOptions.Characters(db)
       name = PlayerName.NameOf(key),
     }
   end
-  table.sort(options, function(a, b)
-    if a.other ~= b.other then
-      return b.other
-    end
-    if a.realm ~= b.realm then
-      return a.realm < b.realm
-    end
-    if a.name ~= b.name then
-      return a.name < b.name
-    end
-    return a.key < b.key
-  end)
+  table.sort(options, byRealmThenName)
   return options
 end
 
