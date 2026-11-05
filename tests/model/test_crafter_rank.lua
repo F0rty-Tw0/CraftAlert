@@ -533,4 +533,27 @@ return function()
   picked, cannotOrder = CrafterRank.Pick(result({ "Me-Realm", "Alt-Realm" }), CUSTOMER, data)
   Assert.equal(picked, "Me-Realm")
   Assert.equal(cannotOrder, nil)
+
+  -- Crafting is limited to the player's realm group: a character on another realm, not linked,
+  -- is never picked for a profession word and never kept by Repick.
+  CrafterRank = load("retail")
+  local RealmTag = require("CraftAlert.Model.RealmTag")
+  local word = { kind = "profession", entries = {}, entryCount = 0, prof = BS }
+  data = { characters = { ["Far-Other"] = character("import", BS, {}) } }
+  Assert.equal(CrafterRank.Pick(word, CUSTOMER, data), nil, "unlinked: not picked")
+  Assert.equal(CrafterRank.Pick(word, CUSTOMER, data, { skipIgnore = true }), nil, "unlinked: not picked, skipIgnore")
+  RealmTag.SetLinked(data, "Far-Other", true)
+  Assert.equal(CrafterRank.Pick(word, CUSTOMER, data), "Far-Other", "linked: picked")
+  data.characters["Alt-Realm"] = character("local", nil, {})
+  RealmTag.SetLinked(data, "Far-Other", false)
+  Assert.equal(CrafterRank.Pick(word, CUSTOMER, data), "Alt-Realm", "unlinked: the own-realm alt answers")
+
+  -- The lead was made while Far-Other was linked and would win as the main; unlinked since, it is skipped.
+  RealmTag.SetLinked(data, "Far-Other", true)
+  local lead = { customer = CUSTOMER, prof = BS, crafters = select(6, CrafterRank.Pick(word, CUSTOMER, data)) }
+  Assert.equal((CrafterRank.Repick(lead, data)), "Far-Other", "linked: the main wins")
+  RealmTag.SetLinked(data, "Far-Other", false)
+  Assert.equal((CrafterRank.Repick(lead, data)), "Alt-Realm", "unlinked: skipped")
+  data.characters["Alt-Realm"] = nil
+  Assert.equal(CrafterRank.Repick(lead, data), nil, "unlinked and alone: no candidate")
 end

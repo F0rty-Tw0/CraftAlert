@@ -141,7 +141,7 @@ end
 -- and recipeKey come from the winning entry (nil for a profession word). `candidates` is one
 -- { key, rank, byConc, top, recipeKey, prof } per qualifying character, its best entry, in no set
 -- order; CrafterRank.Repick judges them again. `result` is the Matcher's reused result: only read
--- here. A match without entries (a profession word) is answered by every enabled character with
+-- here. A match without entries (a profession word) is answered by every enabled, in-scope character with
 -- that profession that still listens for it.
 function CrafterRank.Pick(result, customerKey, db, opts)
   if not (opts and opts.skipIgnore) and CrafterRank.IsIgnored(customerKey) then
@@ -167,7 +167,7 @@ function CrafterRank.Pick(result, customerKey, db, opts)
     end
   else
     for key, character in pairs(db.characters) do
-      local candidate = character.enabled ~= false and character.professions[result.prof] ~= nil
+      local candidate = character.enabled ~= false and RealmTag.InScope(db, key) and character.professions[result.prof] ~= nil
       if candidate and listensFor(key, result.prof) then
         consider(key, result.prof, nil)
       end
@@ -210,8 +210,8 @@ function CrafterRank.Repick(lead, db)
   for i = 1, #candidates do
     local c = candidates[i]
     local character = db.characters[c.key]
-    -- Pick never offers a removed or disabled character; one that became so since is skipped.
-    if character and character.enabled ~= false then
+    -- Pick never offers a removed, disabled or out-of-scope character; one that became so since is skipped.
+    if character and character.enabled ~= false and RealmTag.InScope(db, c.key) then
       fill(probe, db, c.key, c.prof, c.recipeKey, c.rank, c.top, c.byConc, cannotOrder(c.key) == true)
       if better(probe, best) then
         best, probe = probe, best or {}

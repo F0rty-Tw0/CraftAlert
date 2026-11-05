@@ -314,6 +314,17 @@ local function testRepick()
   Assert.equal(ns.Leads.Repick(lead.id), false, "main outside the lead")
   Assert.equal(lead.crafter, "Alt-Realm")
 
+  -- Unlinked since the lead was made, with no other candidate: the lead keeps its crafter.
+  ns, db = setup(nil, function(data)
+    data.characters["Smith-Other"], data.characters["Smith-Realm"] = data.characters["Smith-Realm"], nil
+    data.characters["Smith-Other"].linkedRealms = { "Realm" }
+  end)
+  lead = newLead(ns, "LF plate greaves")
+  Assert.equal(lead.crafter, "Smith-Other")
+  db.characters["Smith-Other"].linkedRealms = nil
+  Assert.equal(ns.Leads.Repick(lead.id), false, "unlinked, no other candidate")
+  Assert.equal(lead.crafter, "Smith-Other")
+
   -- A candidate disabled or removed since the lead was made is never chosen, even when it would win.
   for _, change in ipairs({
     function(characters)
