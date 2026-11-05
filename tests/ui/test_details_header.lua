@@ -41,7 +41,7 @@ local function testHeader()
   Assert.equal(d.icon.texture.texture, ns.Theme.ICON)
   -- The name: the customer in class colour; GameFontNormalLarge's file at 17 px when the client
   -- has it, else GameFontNormal as it is.
-  Assert.same({ d.name:GetText(), d.name.textColor, d.name.font }, { "Buyer-Realm", { WARRIOR.r, WARRIOR.g, WARRIOR.b, 1 }, "GameFontNormal" })
+  Assert.same({ d.name:GetText(), d.name.textColor, d.name.font }, { "Buyer", { WARRIOR.r, WARRIOR.g, WARRIOR.b, 1 }, "GameFontNormal" })
   Assert.same({ d.name.points[1], d.name.fontSize }, { { "TOPLEFT", header, "TOPLEFT", NAME_LEFT, -8 }, nil })
   Wow.stub("GameFontNormalLarge", {})
   local large = ns.LeadDetails.New(_G["CreateFrame"]("Frame")).name
@@ -80,6 +80,19 @@ local function testHeader()
 end
 
 -- The pure line builders: an unknown class leaves its part out, no channel leaves the time alone.
+-- Forever never shows a realm: "First Last-OwnRealm" reads "First Last".
+local function testForeverName()
+  local ns = UiFixture.load({
+    flavor = "forever",
+    db = function(accountDb)
+      accountDb.leads[1] = UiFixture.lead(1, "First Last-OwnRealm")
+    end,
+  })
+  local d = ns.LeadDetails.New(_G["CreateFrame"]("Frame"))
+  ns.LeadDetails.Show(d, ns.Leads.List()[1])
+  Assert.equal(d.name:GetText(), "First Last")
+end
+
 local function testHeaderLines()
   local ns = load({})
   local Header = ns.DetailsHeader
@@ -184,7 +197,7 @@ local function testHeaderLineFits()
     ns.LeadDetails.Layout(d, width)
   end
   layout(449)
-  Assert.equal(nameRight(), NAME_LEFT + 66, "a short name: as wide as its text")
+  Assert.equal(nameRight(), NAME_LEFT + 30, "a short name: as wide as its text")
   lead.customer = "Telchiness-Kazzak"
   ns.LeadDetails.Show(d, lead)
   Assert.equal(nameRight(), NAME_LEFT + 102, "a long name fits a wide header")
@@ -202,7 +215,7 @@ local function testHeaderLineFits()
   layout(150)
   lead.customer = "Bob-Realm"
   ns.LeadDetails.Show(d, lead)
-  Assert.equal(nameRight(), NAME_LEFT + 54, "the next lead refits the name")
+  Assert.equal(nameRight(), NAME_LEFT + 18, "the next lead refits the name")
 end
 
 -- Spec "Looks": header and strip fill, and the strip's 1 px lines, per look; the sequence ends with native after flat.
@@ -232,6 +245,7 @@ end
 
 return function()
   testHeader()
+  testForeverName()
   testHeaderLines()
   testStrip()
   testStripFrame()
