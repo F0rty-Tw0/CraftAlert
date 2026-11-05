@@ -10,9 +10,10 @@ local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 
--- Main-crafter spec §3: the menu the details pane's Crafters zone opens (UI/LeadDetails.lua). Blizzard's
--- context menu: a title, one radio per enabled character that knows the lead's profession, then
--- None. Choosing writes the flag (MainCrafter) and re-picks this lead only (Leads.Repick).
+-- Main-crafter spec §3: the menu the details pane's Crafters zone opens (UI/LeadDetails.lua).
+-- Blizzard's context menu: a title, one radio per enabled character that knows the lead's
+-- profession, then None. Choosing writes the flag (MainCrafter) and re-picks this lead only
+-- (Leads.Repick).
 local MainCrafterMenu = {}
 
 local pairs = pairs
@@ -22,11 +23,17 @@ local function db()
   return _G["CraftAlertDB"]
 end
 
--- The keys of the enabled characters in the player's realm group that know `prof`, by the name the greeting uses, then key.
+-- Whether the enabled character in the player's realm group knows `prof`.
+local function canServe(key, character, prof)
+  return character.enabled ~= false and character.professions[prof] ~= nil and RealmTag.InScope(db(), key)
+end
+
+-- The keys of the enabled characters in the player's realm group that know `prof`, by the name
+-- the greeting uses, then key.
 local function craftersOf(prof)
   local keys = {}
   for key, character in pairs(db().characters) do
-    if character.enabled ~= false and character.professions[prof] ~= nil and RealmTag.InScope(db(), key) then
+    if canServe(key, character, prof) then
       keys[#keys + 1] = key
     end
   end
@@ -40,22 +47,24 @@ local function craftersOf(prof)
   return keys
 end
 
--- Whether a click can open the menu: Blizzard's menu API is there and an enabled character knows the
--- lead's profession (in the player's realm group). Asked on every hover, so it stops at the first one and builds no list.
+-- Whether a click can open the menu: Blizzard's menu API is there and an enabled character knows
+-- the lead's profession (in the player's realm group). Asked on every hover, so it stops at the
+-- first one and builds no list.
 function MainCrafterMenu.CanOpen(lead)
   local prof = lead.prof
   if prof == nil or _G["MenuUtil"] == nil then
     return false
   end
   for key, character in pairs(db().characters) do
-    if character.enabled ~= false and character.professions[prof] ~= nil and RealmTag.InScope(db(), key) then
+    if canServe(key, character, prof) then
       return true
     end
   end
   return false
 end
 
--- Whether an in-scope character other than `key` carries the profession's flag; old data can flag several.
+-- Whether an in-scope character other than `key` carries the profession's flag; old data can flag
+-- several.
 local function flaggedBesides(key, prof)
   for other, character in pairs(db().characters) do
     local profession = character.professions[prof]
