@@ -157,6 +157,25 @@ local function testPrimaryPerGroup()
   db.characters["X-RealmB"].professions[BS].primary = true
   CraftScanImport.Run(db, imported("Y-RealmC", "RealmC"))
   Assert.same({ db.characters["X-RealmB"].professions[BS].primary, db.characters["Y-RealmC"].professions[BS].primary }, { true, false })
+
+  -- CraftScan mains in two groups: the lowest key (Aaa-RealmA) does not use up the player's group,
+  -- whose own main (Zed-OwnRealm) is set too. Within one group the lowest key still wins.
+  db = ns.Defaults.Db()
+  for _, key in ipairs({ "Aaa-RealmA", "Zed-OwnRealm", "Zzz-OwnRealm" }) do
+    db.characters[key] = Fixture.character({ BS }, {})
+  end
+  local record = { parent_professions = { [BS] = { primary_crafter = true } }, professions = { [2872] = { parentProfID = BS, recipes = {} } } }
+  CraftScanImport.Run(db, {
+    realms = {
+      RealmA = { characters = { ["Aaa-RealmA"] = record } },
+      OwnRealm = { characters = { ["Zed-OwnRealm"] = record, ["Zzz-OwnRealm"] = record } },
+    },
+  })
+  Assert.same({
+    db.characters["Aaa-RealmA"].professions[BS].primary,
+    db.characters["Zed-OwnRealm"].professions[BS].primary,
+    db.characters["Zzz-OwnRealm"].professions[BS].primary,
+  }, { true, true, false })
 end
 
 -- Malformed pieces are skipped and counted without stopping the rest; "|" never reaches a key.
