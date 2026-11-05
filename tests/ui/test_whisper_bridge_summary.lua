@@ -67,7 +67,7 @@ local function testTimersAndLeads()
   ns.WhisperBridge.ShowLead(leads[1])
   local leadTimer = Wow.timers[#Wow.timers]
   summaryTimer.fn()
-  Assert.equal(wm.preview.CraftAlert.sender, leads[1].customer, "the summary's timer leaves the lead's preview")
+  Assert.equal(wm.preview.CraftAlert.sender, ns.PlayerName.Display(leads[1].customer), "the summary's timer leaves the lead's preview")
   ns.WhisperBridge.ShowSummary(2, 0)
   leadTimer.fn()
   ns.Leads.Dismiss(leads[1].id)
