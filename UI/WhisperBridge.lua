@@ -4,8 +4,8 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
-local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local AwaySummary = ns.AwaySummary or require("CraftAlert.Model.AwaySummary")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
