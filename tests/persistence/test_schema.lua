@@ -219,6 +219,24 @@ local function testCharacterClass()
   Assert.equal(db.characters["Bad-Realm"].class, nil)
 end
 
+-- linkedRealms is optional: stripped like realms, nil when empty, removed when not a table.
+local function testLinkedRealms()
+  local Schema = load()
+  local db = Schema.Validate({
+    characters = {
+      ["A-Realm"] = { linkedRealms = { "Area 52", "" } },
+      ["B-Realm"] = { linkedRealms = {} },
+      ["C-Realm"] = { linkedRealms = "Area52" },
+      ["D-Realm"] = { source = "local" },
+    },
+  })
+  Assert.same(db.characters["A-Realm"].linkedRealms, { "Area52" })
+  Assert.equal(db.characters["B-Realm"].linkedRealms, nil)
+  Assert.equal(db.characters["C-Realm"].linkedRealms, nil)
+  Assert.equal(db.characters["D-Realm"].linkedRealms, nil)
+  Assert.equal(db.schema, 1)
+end
+
 -- A profession's newestLine is optional: kept when a number, cleared otherwise.
 local function testProfessionNewestLine()
   local Schema = load()
@@ -579,6 +597,7 @@ return function()
   testCharactersUnknownKeysAndBadRecords()
   testImportCharacter()
   testCharacterClass()
+  testLinkedRealms()
   testProfessionNewestLine()
   testLedgerRecentIgnoredLeadsUi()
   testListWithHoles()
