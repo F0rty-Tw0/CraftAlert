@@ -10,7 +10,8 @@ local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 -- stores its connected realms at login, and a lead is tagged "Can't send an order (other
 -- realm)" when the customer's realm is not among the chosen crafter's. An empty list means
 -- "unknown" (Phase 0: GetAutoCompleteRealms returned {} on every probed flavor), never "own
--- realm only".
+-- realm only" -- for that warning. InScope treats an empty list as no connection. The group
+-- rules (Connected, SameGroup, InScope) also read each character's manual linkedRealms.
 local RealmTag = {}
 
 local gsub = string.gsub
@@ -70,6 +71,84 @@ function RealmTag.CannotOrder(db, crafterKey, customerKey)
     end
   end
   return true
+end
+
+local function holds(list, realm)
+  if type(list) ~= "table" or realm == nil then
+    return false
+  end
+  for i = 1, #list do
+    if list[i] == realm then
+      return true
+    end
+  end
+  return false
+end
+
+-- Same realm (two unknown realms count as the same), or either character's connected-realms
+-- list holds the other's realm. A missing record or list is no match.
+function RealmTag.Connected(db, a, b)
+  local realmA, realmB = PlayerName.RealmOf(a), PlayerName.RealmOf(b)
+  if realmA == realmB then
+    return true
+  end
+  local charA, charB = db.characters[a], db.characters[b]
+  return holds(charA and charA.realms, realmB) or holds(charB and charB.realms, realmA)
+end
+
+-- Connected, or either character's manual linkedRealms holds the other's realm. Not
+-- transitive: two alts linked from one realm are not SameGroup with each other.
+function RealmTag.SameGroup(db, a, b)
+  if RealmTag.Connected(db, a, b) then
+    return true
+  end
+  local realmA, realmB = PlayerName.RealmOf(a), PlayerName.RealmOf(b)
+  local charA, charB = db.characters[a], db.characters[b]
+  return holds(charA and charA.linkedRealms, realmB) or holds(charB and charB.linkedRealms, realmA)
+end
+
+-- True when the key is in the player's group. With the own realm unknown nothing can be
+-- filtered, so everything is in scope.
+function RealmTag.InScope(db, key)
+  local own = PlayerName.Own()
+  if PlayerName.RealmOf(own) == nil then
+    return true
+  end
+  return RealmTag.SameGroup(db, own, key)
+end
+
+-- Links or unlinks the own realm on a character's linkedRealms. Does nothing when the
+-- character or own realm is unknown.
+function RealmTag.SetLinked(db, key, on)
+  local character = db.characters[key]
+  local own = PlayerName.RealmOf(PlayerName.Own())
+  if character == nil or own == nil then
+    return
+  end
+  if on then
+    if not holds(character.linkedRealms, own) then
+      local list = character.linkedRealms or {}
+      list[#list + 1] = own
+      character.linkedRealms = list
+    end
+    return
+  end
+  local list = character.linkedRealms
+  if type(list) ~= "table" then
+    return
+  end
+  local kept = {}
+  for i = 1, #list do
+    if list[i] ~= own then
+      kept[#kept + 1] = list[i]
+    end
+  end
+  character.linkedRealms = #kept > 0 and kept or nil
+end
+
+function RealmTag.IsLinked(db, key)
+  local character = db.characters[key]
+  return holds(character and character.linkedRealms, PlayerName.RealmOf(PlayerName.Own()))
 end
 
 ns.RealmTag = RealmTag

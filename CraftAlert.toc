@@ -41,9 +41,9 @@ Model/PhraseMatch.lua
 Model/Aliases.lua
 Model/TypoPass.lua
 Model/WordGroups.lua
+Model/RealmTag.lua
 Model/Index.lua
 Model/Matcher.lua
-Model/RealmTag.lua
 Model/MainCrafter.lua
 Model/CrafterRank.lua
 Model/Leads.lua
