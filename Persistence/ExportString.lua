@@ -265,12 +265,13 @@ local function imported(old, incoming, now, pause)
     end
     pause(1)
   end
+  local linkedRealms = old and old.linkedRealms
   local record = {
     source = "import",
     importedAt = now,
     enabled = old == nil or old.enabled ~= false,
     class = incoming.class,
-    linkedRealms = old and old.linkedRealms or nil,
+    linkedRealms = linkedRealms,
   }
   record.realms, record.professions, record.recipes = realms, professions, recipes
   return record, count
