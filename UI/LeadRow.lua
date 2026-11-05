@@ -4,7 +4,6 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
-local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
@@ -219,7 +218,7 @@ function LeadRow.Show(row, lead)
   row.lead = lead
   row.icon:SetTexture(iconOf(lead))
   RowArt.PaintDot(row.dot, dotColor(lead))
-  row.name:SetText(tostring(PlayerName.Display(lead.customer)))
+  row.name:SetText(LeadText.Customer(lead))
   -- A customer of unknown class: white on the row (spec D6).
   local r, g, b = FrameKit.ClassRGB(FrameKit.GuidClassColor(lead.guid), Theme.COLORS.white)
   row.name:SetTextColor(r, g, b, 1)

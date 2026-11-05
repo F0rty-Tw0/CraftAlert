@@ -4,7 +4,6 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
-local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
@@ -214,7 +213,7 @@ function DetailsHeader.Paint(details, lead)
   local _, dotColor = LeadText.State(lead)
   details.icon.texture:SetTexture(iconOf(lead))
   RowArt.PaintDot(details.dot, dotColor)
-  details.name:SetText(tostring(PlayerName.Display(lead.customer)))
+  details.name:SetText(LeadText.Customer(lead))
   FrameKit.PaintName(details.name, lead.guid)
   DetailsHeader.FitName(details)
   details.lineOne:SetText(DetailsHeader.LineOne(lead))

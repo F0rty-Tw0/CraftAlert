@@ -4,7 +4,6 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
-local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local AwaySummary = ns.AwaySummary or require("CraftAlert.Model.AwaySummary")
@@ -101,7 +100,7 @@ local function paint(name, guid, headline, detail, message)
 end
 
 local function render(lead)
-  paint(tostring(PlayerName.Display(lead.customer)), lead.guid, LeadText.Headline(lead), detailText(lead), LeadText.Message(lead))
+  paint(LeadText.Customer(lead), lead.guid, LeadText.Headline(lead), detailText(lead), LeadText.Message(lead))
 end
 
 local function hide()

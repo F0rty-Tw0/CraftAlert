@@ -4,7 +4,6 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
-local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
@@ -54,7 +53,7 @@ end
 -- (green). The class name needs the token anyway, so it is read once, with or without a colour table.
 function CardTipText.Customer(tip, lead)
   local token = FlavorCompat.ClassOf(lead.guid)
-  tip:SetText(tostring(PlayerName.Display(lead.customer)), FrameKit.ClassRGB(FrameKit.ClassColor(token), Theme.COLORS.gold))
+  tip:SetText(LeadText.Customer(lead), FrameKit.ClassRGB(FrameKit.ClassColor(token), Theme.COLORS.gold))
   local className = FrameKit.ClassName(token)
   if className then
     white(tip, className)
@@ -110,7 +109,7 @@ end
 function CardTipText.Greet(tip, lead)
   title(tip, Localization.Text("Greet"))
   if lead then
-    white(tip, Localization.Text("Whispers %s", tostring(PlayerName.Display(lead.customer))))
+    white(tip, Localization.Text("Whispers %s", LeadText.Customer(lead)))
   end
   local lines = LeadText.ClickLines()
   instructions(tip, { lines[1], lines[2], lines[3] })
@@ -134,7 +133,7 @@ end
 -- Row-chat-tooltip spec: "[HH:MM] [Channel] [Name]: message", the customer in class colour, the
 -- message with its links; a lead without a channel has no channel part.
 local function chatText(lead)
-  local name = FrameKit.ColorCode(tostring(PlayerName.Display(lead.customer)), customerColor(lead, Theme.COLORS.white))
+  local name = FrameKit.ColorCode(LeadText.Customer(lead), customerColor(lead, Theme.COLORS.white))
   local channel = LeadText.Channel(lead)
   local channelPart = channel and format("[%s] ", channel) or ""
   return format("[%s] %s[%s]: %s", _G["date"]("%H:%M", lead.time), channelPart, name, lead.message)
@@ -147,7 +146,7 @@ end
 
 -- The lead's latest chat line, then the row's click lines.
 function CardTipText.Chat(tip, lead)
-  tip:SetText(tostring(PlayerName.Display(lead.customer)), customerColor(lead, Theme.COLORS.gold))
+  tip:SetText(LeadText.Customer(lead), customerColor(lead, Theme.COLORS.gold))
   tip:AddLine(chatText(lead), 1, 1, 1, true)
   rowClickLines(tip)
 end
@@ -155,7 +154,7 @@ end
 -- An icon-only row (spec 6a): the customer in class colour and what they asked for, the text the
 -- row hides; the chat line when there is one; the click lines. A lead without a message still has one.
 function CardTipText.Compact(tip, lead)
-  tip:SetText(tostring(PlayerName.Display(lead.customer)), customerColor(lead, Theme.COLORS.gold))
+  tip:SetText(LeadText.Customer(lead), customerColor(lead, Theme.COLORS.gold))
   white(tip, LeadText.What(lead))
   if lead.message then
     tip:AddLine(chatText(lead), 1, 1, 1, true)
