@@ -31,6 +31,14 @@ local function load(flavor)
   for _, path in ipairs({ "Core.FlavorCompat", "Core.TableKit", "Core.Constants", "Core.EventRouter", "Core.Slicer", "Core.PlayerName" }) do
     Fresh.require(path)
   end
+  Wow.stub("UnitName", function()
+    return "Me"
+  end)
+  Wow.stub("GetNormalizedRealmName", function()
+    return "Realm"
+  end)
+  require("CraftAlert.Core.PlayerName").Init()
+  Fresh.require("Model.RealmTag")
   for _, path in ipairs({
     "Model.Tokenizer",
     "Model.Slang",
@@ -472,7 +480,31 @@ local function testPendingSharesStoredGroup()
   Assert.equal(index.nameIndex.iron[2].entries[1].group, "iron shield")
 end
 
+-- Crafting is limited to the player's realm group (the player is Me-Realm): a character on
+-- another realm, local or imported, gets no entries until linked.
+local function testScope()
+  for _, source in ipairs({ "local", "import" }) do
+    local Index, Defaults = load()
+    local db = fixtureDb(Defaults)
+    db.characters["Far-Other"] = {
+      source = source,
+      enabled = true,
+      realms = {},
+      professions = { [BS] = profession("Blacksmithing") },
+      recipes = { [1001] = { item = 501, name = "Thick Plate Belt", prof = BS, bind = 1 } },
+    }
+    local index = build(Index, db)
+    Assert.same(characters(index.itemIndex[501]), { "Alt-Realm", "Smith-Realm" }, source .. ": unlinked, no entries")
+    Assert.equal(index.crafterCount, 2, source .. ": unlinked, not counted")
+    db.characters["Far-Other"].linkedRealms = { "Realm" }
+    index = build(Index, db)
+    Assert.same(characters(index.itemIndex[501]), { "Alt-Realm", "Far-Other", "Smith-Realm" }, source .. ": linked, entries return")
+    Assert.equal(index.crafterCount, 3, source .. ": linked, counted")
+  end
+end
+
 return function()
+  testScope()
   testUnboundFilter()
   testMutedAndDisabledAbsent()
   testMutedProfessions()

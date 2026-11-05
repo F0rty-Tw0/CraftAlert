@@ -23,6 +23,7 @@ local MODULES = {
   "Core.EventRouter",
   "Core.Slicer",
   "Core.PlayerName",
+  "Model.RealmTag",
   "Model.Tokenizer",
   "Model.Slang",
   "Model.ItemKeywords",

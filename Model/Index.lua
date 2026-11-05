@@ -8,6 +8,7 @@ local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local Slicer = ns.Slicer or require("CraftAlert.Core.Slicer")
 local TableKit = ns.TableKit or require("CraftAlert.Core.TableKit")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
+local RealmTag = ns.RealmTag or require("CraftAlert.Model.RealmTag")
 local ItemKeywords = ns.ItemKeywords or require("CraftAlert.Model.ItemKeywords")
 local ProfessionWords = ns.ProfessionWords or require("CraftAlert.Model.ProfessionWords")
 local Aliases = ns.Aliases or require("CraftAlert.Model.Aliases")
@@ -250,7 +251,7 @@ function Index.Build(db, settings, opts)
   -- Sorted, so entry lists come out in the same order on every build.
   for _, key in ipairs(TableKit.SortedKeys(characters)) do
     local character = characters[key]
-    if character and character.enabled ~= false and addCharacter(index, ctx, key, character, pause) then
+    if character and character.enabled ~= false and RealmTag.InScope(db, key) and addCharacter(index, ctx, key, character, pause) then
       crafters[key] = true
       index.crafterCount = index.crafterCount + 1
     end
