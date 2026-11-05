@@ -78,6 +78,27 @@ local function testOwnAndRealmOf()
   Assert.equal(retailWithRealm.Own(), "Hero-OwnRealm")
 end
 
+-- Display is for screens only: the realm goes when it is the player's own, or on Forever.
+local function testDisplay()
+  local PlayerName = load()
+  Assert.equal(PlayerName.Display("Bob-OwnRealm"), "Bob")
+  Assert.equal(PlayerName.Display("Bob-Area52"), "Bob-Area52")
+  Assert.equal(PlayerName.Display("Bob"), "Bob")
+  Assert.equal(PlayerName.Display(nil), nil)
+  Assert.equal(PlayerName.Display(5), 5)
+
+  local forever = load("forever", "First", "Last")
+  Assert.equal(forever.Display("First Last-OwnRealm"), "First Last")
+  Assert.equal(forever.Display("First Last-ClassicBetaPvE"), "First Last")
+
+  Wow.stub("GetNormalizedRealmName", function()
+    return "Kel'Thuzad"
+  end)
+  local apostrophe = Fresh.require("Core.PlayerName")
+  apostrophe.Init()
+  Assert.equal(apostrophe.Display("Bob-Kel'Thuzad"), "Bob")
+end
+
 -- /ca test and the Test page send as "Test" on the player's own realm (spec §7.3).
 local function testTestCustomer()
   Assert.equal(load().TestCustomer(), "Test-OwnRealm")
@@ -134,6 +155,7 @@ return function()
   testNonAsciiAndApostrophes()
   testForeverNames()
   testOwnAndRealmOf()
+  testDisplay()
   testTestCustomer()
   testNoApiCallsAfterInit()
   testRealmFallbacks()
