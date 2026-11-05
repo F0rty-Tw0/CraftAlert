@@ -79,7 +79,6 @@ local function testHeader()
   end
 end
 
--- The pure line builders: an unknown class leaves its part out, no channel leaves the time alone.
 -- Forever never shows a realm: "First Last-OwnRealm" reads "First Last".
 local function testForeverName()
   local ns = UiFixture.load({
@@ -93,6 +92,7 @@ local function testForeverName()
   Assert.equal(d.name:GetText(), "First Last")
 end
 
+-- The pure line builders: an unknown class leaves its part out, no channel leaves the time alone.
 local function testHeaderLines()
   local ns = load({})
   local Header = ns.DetailsHeader
