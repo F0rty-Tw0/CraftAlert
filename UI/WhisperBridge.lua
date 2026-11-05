@@ -5,6 +5,7 @@ end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local AwaySummary = ns.AwaySummary or require("CraftAlert.Model.AwaySummary")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
@@ -232,7 +233,7 @@ end
 local function previewFor(lead, entry)
   local message = LeadText.Message(lead)
   return {
-    sender = lead.customer,
+    sender = PlayerName.Display(lead.customer),
     text = message ~= "" and message or LeadText.What(lead),
     detail = LeadText.CrafterLine(lead),
     classTag = FlavorCompat.ClassOf(lead.guid),

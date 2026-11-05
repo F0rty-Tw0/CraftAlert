@@ -4,6 +4,7 @@ if type(ns) ~= "table" then
 end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
+local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local GreetAction = ns.GreetAction or require("CraftAlert.Model.GreetAction")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
@@ -234,7 +235,7 @@ local function paintGreet(sections, lead)
   local shown = sections.bubbles.greet:IsShown()
   local target = shown and GreetAction.Target(lead) or nil
   sections.texts.target:SetShown(target ~= nil)
-  local name = target and FrameKit.ClassCode(target, FrameKit.GuidClassColor(lead.guid))
+  local name = target and FrameKit.ClassCode(PlayerName.Display(target), FrameKit.GuidClassColor(lead.guid))
   sections.texts.target:SetText(name and Localization.Text("to %s", name) or nil)
   sections.texts.hint:SetShown(shown)
 end

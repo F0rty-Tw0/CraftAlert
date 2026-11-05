@@ -30,7 +30,6 @@ local RowArt = ns.RowArt or require("CraftAlert.UI.RowArt")
 local LeadRow = {}
 
 local select = select
-local tostring = tostring
 local type = type
 
 -- Whisper pink for a lead whose customer has an unread whisper, when ChatTypeInfo has no WHISPER.
@@ -218,7 +217,7 @@ function LeadRow.Show(row, lead)
   row.lead = lead
   row.icon:SetTexture(iconOf(lead))
   RowArt.PaintDot(row.dot, dotColor(lead))
-  row.name:SetText(tostring(lead.customer))
+  row.name:SetText(LeadText.Customer(lead))
   -- A customer of unknown class: white on the row (spec D6).
   local r, g, b = FrameKit.ClassRGB(FrameKit.GuidClassColor(lead.guid), Theme.COLORS.white)
   row.name:SetTextColor(r, g, b, 1)

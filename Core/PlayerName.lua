@@ -99,6 +99,18 @@ function PlayerName.NameOf(key)
   return (match(key, "^[^-]*"))
 end
 
+-- A key as shown on screen: the realm is dropped on Forever and on the player's own realm.
+-- Display only; saved keys and whisper targets keep the full key.
+function PlayerName.Display(key)
+  if type(key) ~= "string" then
+    return key
+  end
+  if FlavorCompat.isForever or PlayerName.RealmOf(key) == ownRealm then
+    return PlayerName.NameOf(key)
+  end
+  return key
+end
+
 -- The customer the Test page pretends to be: "Test" on the player's own realm.
 function PlayerName.TestCustomer()
   return "Test-" .. (PlayerName.RealmOf(ownKey or "") or "")

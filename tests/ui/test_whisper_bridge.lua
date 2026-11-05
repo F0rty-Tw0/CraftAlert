@@ -117,7 +117,10 @@ local function testShowLeadPreview()
   ns.WhisperBridge.ShowLead(lead)
   local preview = wm.preview.CraftAlert
   -- Three rows: the customer, their trimmed chat line, who of yours can craft it.
-  Assert.same({ preview.sender, preview.text, preview.detail, preview.classTag }, { lead.customer, "LF plate belt", "You have Blacksmithing", nil })
+  Assert.same(
+    { preview.sender, preview.text, preview.detail, preview.classTag },
+    { ns.PlayerName.Display(lead.customer), "LF plate belt", "You have Blacksmithing", nil }
+  )
   Assert.equal(preview.pulse, true, "a new lead pulses WM's widget (spec 7)")
   Assert.equal(#UiFixture.callsTo(calls, "sound"), 1)
   Assert.equal(#UiFixture.callsTo(calls, "flash"), 1)
@@ -188,6 +191,25 @@ local function testPreviewClick()
   wm2.preview.CraftAlert.onClick()
   Assert.same(wm2.callsTo("OpenConversation"), { { "OpenConversation", lead2.customer, GREETING } })
   Assert.same(UiFixture.callsTo(calls2, "chat"), {}, "nothing sent")
+end
+
+-- The preview names the customer without the player's own realm; the click still targets the full key.
+local function testPreviewSenderRealm()
+  for _, case in ipairs({ { "Ann-Draenor", "Ann-Draenor" }, { "Ann-Realm", "Ann" } }) do
+    local ns, _, _, _, wm = boot({
+      db = function(accountDb)
+        accountDb.leads[1] = UiFixture.lead(1, case[1])
+      end,
+    })
+    ns.WhisperBridge.Activate()
+    local lead = ns.Leads.Latest()
+    ns.WhisperBridge.ShowLead(lead)
+    Assert.equal(wm.preview.CraftAlert.sender, case[2])
+    Assert.equal(ns.GreetAction.Target(lead), case[1], "the whisper target keeps the full key")
+    Wow.clock.gettime = 51
+    wm.preview.CraftAlert.onClick()
+    Assert.equal(wm.callsTo("OpenConversation")[1][2], ns.GreetAction.Target(lead))
+  end
 end
 
 local function testTimerAndLeadGone()
@@ -767,6 +789,7 @@ return function()
   testFakeRefusesBadTooltips()
   testPreviewCarriesClassTag()
   testPreviewClick()
+  testPreviewSenderRealm()
   testTimerAndLeadGone()
   testNoShowInInstance()
   testOnGateHidesPreviewInInstance()

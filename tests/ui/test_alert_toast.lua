@@ -367,6 +367,17 @@ local function loadTestLeads(count)
   return ns, leads, calls
 end
 
+local function testOwnRealmName()
+  local ns = UiFixture.load({
+    db = function(accountDb)
+      accountDb.leads[1] = UiFixture.lead(1, "Ann-Realm")
+    end,
+  })
+  ns.AlertToast.Show(ns.Leads.Latest())
+  fontStringWith("Ann")
+  Assert.falsy(string.find(texts(), "Ann-Realm", 1, true), texts())
+end
+
 local function testRealPathTestLead()
   -- A lead flagged `test` by Leads.OnMatch is badged "Test" and clicks through ClickRouter.
   local ns, leads, calls = loadTestLeads(1)
@@ -596,6 +607,7 @@ return function()
   testClicks()
   testNoTestToast()
   testRealPathTestLead()
+  testOwnRealmName()
   testClassColor()
   testAltCrafterColor()
   testDock()
