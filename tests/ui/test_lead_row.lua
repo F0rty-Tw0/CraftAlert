@@ -16,8 +16,9 @@ local MUTED, WHITE = { 1, 1, 1, 0.55 }, { 1, 1, 1, 1 }
 
 -- The fixture with one lead (id 1, Bob-Draenor, 30 s old) and a fresh row built over it, as the
 -- list builds it. → ns, the row, the sends, the lead, what onSelect got ({ row } per call).
-local function load(edit)
+local function load(edit, flavor)
   local ns, _, calls = UiFixture.load({
+    flavor = flavor,
     db = function(accountDb)
       local lead = UiFixture.lead(1, "Bob-Draenor")
       lead.time = UiFixture.T0 - 30
@@ -243,6 +244,43 @@ local function testClicks()
   Widgets.click(row, "RightButton")
   Assert.equal(ns.Leads.IsActive(1), false)
   Assert.equal(#selected, 3, "right never selects")
+end
+
+-- WhoCity.TryFor as a spy: each call lands in the returned list as { lead, #selected then }; it
+-- raises while `spy.raise` is set.
+local function spyTryFor(ns, selected)
+  local spy = { calls = {} }
+  ns.WhoCity.TryFor = function(clicked)
+    if spy.raise then
+      error("boom")
+    end
+    spy.calls[#spy.calls + 1] = { clicked, #selected }
+  end
+  return spy
+end
+
+-- Spec §9 B2: on Forever and Classic a left click asks WhoCity for the row's lead, then selects;
+-- a TryFor that raises still selects. Right click never asks; Retail never asks.
+local function testWhoClick()
+  for _, flavor in ipairs({ "forever", "tbc" }) do
+    local ns, row, _, lead, selected = load(nil, flavor)
+    Assert.equal(ns.FlavorCompat.isRetail, false, flavor)
+    ns.LeadRow.Show(row, lead)
+    local spy = spyTryFor(ns, selected)
+    Widgets.click(row, "LeftButton")
+    Assert.same(spy.calls, { { lead, 0 } }, flavor .. ": asked before onSelect")
+    Assert.same(selected, { row }, flavor)
+    Widgets.click(row, "RightButton")
+    Assert.equal(#spy.calls, 1, flavor .. ": right click never asks")
+    spy.raise = true
+    Widgets.click(row, "LeftButton")
+    Assert.same(selected, { row, row }, flavor .. ": a raising TryFor still selects")
+  end
+  local ns, row, _, lead, selected = load()
+  ns.LeadRow.Show(row, lead)
+  local spy = spyTryFor(ns, selected)
+  Widgets.click(row, "LeftButton")
+  Assert.same({ #spy.calls, #selected }, { 0, 1 }, "Retail never asks")
 end
 
 -- shownAt: a lead new to the row and the row shown again count from now; the same lead keeps it.
@@ -584,6 +622,7 @@ return function()
   testHover()
   testHoverHide()
   testClicks()
+  testWhoClick()
   testShownAt()
   Wow.reset()
 end

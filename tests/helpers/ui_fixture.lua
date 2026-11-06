@@ -34,6 +34,7 @@ local CHAIN = {
   "Persistence.CraftScanImport",
   "Core.Status",
   "Core.ScanGate",
+  "Core.WhoCity",
 }
 local UI = {
   "UI.Theme",

@@ -110,6 +110,38 @@ local function testHeaderLines()
   Wow.reset()
 end
 
+-- Spec §9 B9: line 2 adds the /who answer: "Looking up…" while asked, "in <zone>" (red when the
+-- zone is a capital other than the one the player stands in), "not found by /who"; nothing when
+-- failed or never asked.
+local function testWhoLine()
+  local ns = load({})
+  local LineTwo, colors = ns.DetailsHeader.LineTwo, ns.Theme.COLORS
+  local map = nil
+  Wow.stub("C_Map", {
+    GetBestMapForUnit = function()
+      return map
+    end,
+  })
+  local lead = itemLead()
+  local base = "Trade" .. SEP .. os.date("%H:%M", lead.time)
+  local function line(state, zone, mapID)
+    lead.whoState, lead.whoZone, map = state, zone, mapID
+    return LineTwo(lead)
+  end
+  Assert.equal(line("pending"), base .. SEP .. "Looking up…")
+  Assert.equal(line("done", "Tirisfal Glades", 1458), base .. SEP .. "in Tirisfal Glades", "a field zone: plain")
+  Assert.equal(line("done", "Orgrimmar", 1458), base .. SEP .. ns.FrameKit.ThemeCode("in Orgrimmar", colors.danger), "Org while in Undercity: red")
+  Assert.equal(line("done", "orgrimmar", 1458), base .. SEP .. ns.FrameKit.ThemeCode("in orgrimmar", colors.danger), "any case")
+  Assert.equal(line("done", "Orgrimmar", 1454), base .. SEP .. "in Orgrimmar", "the player's own capital: plain")
+  Assert.equal(line("done", "Orgrimmar", 1415), base .. SEP .. "in Orgrimmar", "the player in no capital: plain")
+  Assert.equal(line("done", "Orgrimmar", nil), base .. SEP .. "in Orgrimmar", "no map: plain")
+  Assert.equal(line("none"), base .. SEP .. "not found by /who")
+  Assert.equal(line("failed"), base)
+  Assert.equal(line(nil), base)
+  Assert.same(colors.danger, { 1.0, 0.25, 0.25, 1.0 })
+  Wow.reset()
+end
+
 -- Details spec A.2: what the lead wants, its profession in gold and the crafter in their class
 -- colour (white unknown), " · " apart, each part left out when missing; a profession lead wants
 -- "a" (or "an") crafter of its profession.
@@ -247,6 +279,7 @@ return function()
   testHeader()
   testForeverName()
   testHeaderLines()
+  testWhoLine()
   testStrip()
   testStripFrame()
   testHeaderLineFits()

@@ -6,6 +6,7 @@ end
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
+local WhoCity = ns.WhoCity or require("CraftAlert.Core.WhoCity")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
@@ -25,7 +26,8 @@ local RowArt = ns.RowArt or require("CraftAlert.UI.RowArt")
 -- rail the row is compact (spec 6a): only the icon, centred. No link hover; one tooltip while the
 -- cursor is on the row: the latest chat line (row-chat-tooltip spec), or when compact the
 -- customer, the request and that line. The details pane has the other tooltips. Left click selects
--- the row (onSelect), right click dismisses through ClickRouter with the look rule. The row
+-- the row (onSelect), on Forever and Classic after asking /who for the asker (Core/WhoCity.lua),
+-- right click dismisses through ClickRouter with the look rule. The row
 -- carries its lead and the GetTime() at which that lead appeared in it (§7.5 rule 3).
 local LeadRow = {}
 
@@ -119,8 +121,13 @@ local function onHide(row)
   Tooltip.HideIfOwned(row)
 end
 
+-- Spec §9 B2: a left click on Forever and Classic first asks /who for the asker (a hardware event,
+-- which SendWho needs); a lookup that raises never stops the select.
 local function onClick(row, button)
   if button == "LeftButton" then
+    if not FlavorCompat.isRetail then
+      pcall(WhoCity.TryFor, row.lead)
+    end
     row.onSelect(row)
   elseif button == "RightButton" then
     ClickRouter.Handle("RightButton", row.lead, row.shownAt)
