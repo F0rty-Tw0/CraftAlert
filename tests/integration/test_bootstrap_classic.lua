@@ -73,6 +73,7 @@ local function startClient(flavor)
   end
   Wow.stub("C_ChatInfo", { SendAddonMessage = record("addon"), SendChatMessage = record("chat") })
   Wow.stub("ChatFrameUtil", { SendTellWithMessage = record("prefill"), SendTell = record("empty") })
+  Wow.stub("C_FriendList", { SendWho = function() end })
   Wow.stub("SlashCmdList", {})
   Wow.stub("UISpecialFrames", {})
   Wow.stub("IsResting", function()
@@ -171,6 +172,7 @@ local function testFlow(flavor)
     Assert.equal(isRegistered(event), flavor == "tbc", flavor .. ": " .. event)
   end
   Assert.equal(ns.ScanGate.IsActive(), false, flavor .. ": paused, nothing read yet")
+  Assert.truthy(isRegistered("WHO_LIST_UPDATE"), flavor .. ": WhoCity installed (spec §9)")
 
   -- Opening Blacksmithing reads it (the Slicer job and the rebuild run on frame timers); the
   -- Retail reader's handlers never run.

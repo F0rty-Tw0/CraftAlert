@@ -27,6 +27,7 @@ local QualityReach = ns.QualityReach or require("CraftAlert.Professions.QualityR
 local LearnWatcher = ns.LearnWatcher or require("CraftAlert.Professions.LearnWatcher")
 local Status = ns.Status or require("CraftAlert.Core.Status")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
+local WhoCity = ns.WhoCity or require("CraftAlert.Core.WhoCity")
 local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
 local WhisperBridge = ns.WhisperBridge or require("CraftAlert.UI.WhisperBridge")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
@@ -127,6 +128,13 @@ local function wireLeads()
   PageAlerts.SetOnOpacity(LeadsWindow.Refresh)
   WhisperTracker.Install()
   TestLine.Install()
+end
+
+-- After wireLeads: a lead row's click asks /who for the asker (spec §9). Forever and Classic only.
+local function installWhoCity()
+  if not FlavorCompat.isRetail then
+    WhoCity.Init()
+  end
 end
 
 -- The status line printLoginLines could not judge yet: the sliced login build was still running.
@@ -232,6 +240,7 @@ local LOGIN_STEPS = {
   installOrdersFilled,
   installAwaySummary,
   wireLeads,
+  installWhoCity,
   WhisperBridge.SyncInfo,
   installReaders,
   installQualityReach,
