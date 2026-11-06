@@ -4,6 +4,10 @@ Player-friendly release notes for Craft Alert.
 
 ## [Unreleased]
 
+- WoW: Forever and Classic: while you stand in a capital, a request that names only another capital ("LF enchanter in Org" when you're in Undercity) no longer alerts. Short names like org, uc, tb, sw or if count after "in", "at", "to", "from", "near" or "@"; full city names count anywhere. Turn it off with "Hide askers in another capital" in Settings → General.
+- WoW: Forever and Classic: left-click a lead to see where its asker is. Craft Alert asks /who quietly, without opening the Who window, and the lead shows "in Orgrimmar", in red when that's another capital.
+- New greeting tag `{city}`: "I'm in Undercity." while you stand in a capital, nothing anywhere else. New default greetings on Forever and Classic end with it. Greetings you already have stay as they are: add `{city}` yourself, or clear a greeting's box in Settings → Greetings to get the new default.
+
 ## [1.0.1] - 2026-11-05
 
 - Characters on another realm no longer get alerts or greetings unless Craft Alert knows they're connected to your realm. To turn one back on, pick it on the Crafters page and turn on "Listen for this character".
