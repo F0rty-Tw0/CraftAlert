@@ -19,6 +19,7 @@ local PREFIX = "^|cffffd100Craft Alert:|r "
 
 function SlashFixture.load(opts)
   local ns, db, calls = UiFixture.load({
+    flavor = opts and opts.flavor,
     db = function(accountDb)
       local fixtureDb = Fixture.db({ Defaults = require("CraftAlert.Persistence.Defaults") })
       for key, character in pairs(fixtureDb.characters) do

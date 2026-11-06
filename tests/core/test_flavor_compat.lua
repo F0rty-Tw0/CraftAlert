@@ -359,7 +359,31 @@ local function testInInstance()
   Assert.equal(FlavorCompat.InInstance(), false, "API missing")
 end
 
+-- The player's uiMapID: the API is read per call; a missing API, a secret or a non-number is nil.
+local function testPlayerMapID()
+  local FlavorCompat = load("forever")
+  Wow.stub("C_Map", nil)
+  Assert.equal(FlavorCompat.PlayerMapID(), nil, "no C_Map")
+  Wow.stub("C_Map", {})
+  Assert.equal(FlavorCompat.PlayerMapID(), nil, "no GetBestMapForUnit")
+  local id = 1458
+  Wow.stub("C_Map", {
+    GetBestMapForUnit = function(unit)
+      Assert.equal(unit, "player")
+      return id
+    end,
+  })
+  Assert.equal(FlavorCompat.PlayerMapID(), 1458, "stubbed after load: read per call")
+  id = nil
+  Assert.equal(FlavorCompat.PlayerMapID(), nil, "no map (loading screen)")
+  id = Wow.secret(1458)
+  Assert.equal(FlavorCompat.PlayerMapID(), nil, "secret")
+  id = "1458"
+  Assert.equal(FlavorCompat.PlayerMapID(), nil, "non-number")
+end
+
 return function()
+  testPlayerMapID()
   testOwnClass()
   testInInstance()
   testIsAfk()

@@ -220,5 +220,19 @@ function FlavorCompat.InInstance()
   return type(isInInstance) == "function" and isInInstance() == true
 end
 
+-- The player's uiMapID, or nil when C_Map or the call is missing or the value is secret or not a
+-- number. The API is read on each call, so tests that stub it after load still reach this code.
+function FlavorCompat.PlayerMapID()
+  local map = _G["C_Map"]
+  if type(map) ~= "table" or type(map.GetBestMapForUnit) ~= "function" then
+    return nil
+  end
+  local id = map.GetBestMapForUnit("player")
+  if FlavorCompat.issecretvalue(id) or type(id) ~= "number" then
+    return nil
+  end
+  return id
+end
+
 ns.FlavorCompat = FlavorCompat
 return FlavorCompat

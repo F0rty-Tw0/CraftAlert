@@ -22,6 +22,7 @@ function Defaults.Settings()
     professionWordAlerts = true,
     includeUnbound = false,
     recipeMarkers = true,
+    hideOtherCities = true, -- Forever and Classic only; Retail ignores it (ScanGate)
     sound = Constants.flavors[flavorKey].soundKits[1], -- 0 = none
     flash = true,
     toastDuration = 20,

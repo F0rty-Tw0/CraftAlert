@@ -111,7 +111,7 @@ local Sim = {}
 Sim.lastNs = nil
 
 -- Flags taking exactly one value; the parser checks the value where it is not free text.
-local ONE_VALUE = { "--flavor", "--db", "--sender", "--class", "--cmd", "--click", "--afk", "--resting", "--import", "--craftscan" }
+local ONE_VALUE = { "--flavor", "--db", "--sender", "--class", "--cmd", "--click", "--afk", "--resting", "--map", "--import", "--craftscan" }
 
 local function isOneValueFlag(flag)
   for _, name in ipairs(ONE_VALUE) do
@@ -141,6 +141,12 @@ local function acceptOption(plan, flag, value)
       return "error: " .. flag .. " takes on|off"
     end
     plan.steps[#plan.steps + 1] = { kind = string.sub(flag, 3), on = ON_OFF[value] }
+  elseif flag == "--map" then
+    local id = tonumber(value)
+    if not id then
+      return "error: --map takes a uiMapID"
+    end
+    plan.steps[#plan.steps + 1] = { kind = "map", id = id }
   elseif flag == "--sender" then
     plan.steps[#plan.steps + 1] = { kind = "sender", name = value }
   elseif flag == "--class" then
@@ -300,6 +306,12 @@ local function newContext(plan, out)
   Wow.stub("IsResting", function()
     return ctx.resting
   end)
+  -- The --map uiMapID the player stands on; nil (no --map yet) is an unknown map.
+  Wow.stub("C_Map", {
+    GetBestMapForUnit = function()
+      return ctx.map
+    end,
+  })
   -- The --class sender (STEPS.class) of the line in flight; any other GUID has no class.
   Wow.stub("GetPlayerInfoByGUID", function(guid)
     if ctx.class and guid == SIM_CLASS_GUID then
@@ -611,6 +623,11 @@ function STEPS.afk(ctx, step)
   if ctx.started then
     Wow.fireEvent("PLAYER_FLAGS_CHANGED", "player")
   end
+end
+
+-- --map ID: the player's uiMapID from here on (the other-capital filter reads it per line).
+function STEPS.map(ctx, step)
+  ctx.map = step.id
 end
 
 function STEPS.resting(ctx, step)

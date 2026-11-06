@@ -13,8 +13,9 @@ local UPDATED = "Updated the existing test lead (same customer asked again)"
 
 -- The default SlashFixture recipes have no item IDs; this crafter owns the plate (501), leather
 -- (701) and cloth (601) belts. → ns, db, calls, the /ca handler.
-local function load()
+local function load(flavor)
   local ns, db, calls = SlashFixture.load({
+    flavor = flavor,
     db = function(accountDb)
       Fixture.stubItems()
       accountDb.characters["Armor-Realm"] = Fixture.character({ Fixture.BS, Fixture.LW, Fixture.TAILOR }, {
@@ -110,6 +111,23 @@ local function testStops()
   Assert.same(run(handler, "LF plate belt"), { MATCHED_NO_ONE })
   Wow.stub("C_FriendList", nil)
   Assert.same({ #ns.Leads.List(), rawget(_G, TOAST) }, { 0, nil })
+end
+
+-- Spec R5: /ca test goes through HandleChat, so on Forever in Undercity a line naming Orgrimmar
+-- is dropped and the report says why; the same line in Orgrimmar makes a lead.
+local function testOtherCity()
+  local ns, _, _, handler = load("forever")
+  local mapID = 1458
+  Wow.stub("C_Map", {
+    GetBestMapForUnit = function()
+      return mapID
+    end,
+  })
+  Assert.same(run(handler, "LF plate belt in org"), { "No alert: the line names another capital (Hide askers in another capital is on)" })
+  Assert.same({ #ns.Leads.List(), rawget(_G, TOAST) }, { 0, nil })
+  mapID = 1454
+  run(handler, "LF plate belt in org")
+  Assert.equal(#ns.Leads.List(), 1, "own capital")
 end
 
 -- Test1..TestN for a burst; the toast counts the replaced ones.
@@ -310,6 +328,7 @@ return function()
   testNewAndRepeat()
   testGate()
   testStops()
+  testOtherCity()
   testBurst()
   testBurstOverShownToast()
   testUsage()

@@ -392,6 +392,29 @@ return function()
   assert(string.find(Sim.Run({ "--flavor" })[1], "^error: .* needs a value"))
   assert(string.find(Sim.Run({ "--db", "tools/does_not_exist.lua" })[1], "^error: cannot read db"))
   assert(string.find(Sim.Run({ "--click", "middle" })[1], "^error: "))
+  Assert.equal(Sim.Run({ "--map", "uc" })[1], "error: --map takes a uiMapID")
+
+  -- --map stands the player on a uiMapID (C_Map stub): on Forever in Undercity a line naming
+  -- Orgrimmar stops at the other-capital filter; one naming Undercity still makes a lead, and
+  -- without --map (map unknown) nothing is hidden.
+  local function stops(argv)
+    local found = {}
+    for _, line in ipairs(Sim.Run(argv)) do
+      if string.find(line, "^stop: ") or string.find(line, "^lead: new") then
+        found[#found + 1] = string.match(line, "^%a+: %S+")
+      end
+    end
+    return found
+  end
+  Assert.same(stops({ "--flavor", "forever", "--map", "1458", "LF plate belt in org", "--sender", "Two-OtherRealm", "LF plate belt in uc" }), {
+    "stop: otherCity",
+    "lead: new",
+  })
+  Assert.same(stops({ "--flavor", "forever", "LF plate belt in org" }), { "lead: new" })
+  Assert.same(stops({ "--flavor", "forever", "--map", "1458", "LF plate belt in org", "--map", "1454", "LF plate belt in org" }), {
+    "stop: otherCity",
+    "lead: new",
+  })
 
   -- The default fixture is the account DB before any module touches it.
   Sim.Run({})
