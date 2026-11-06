@@ -118,6 +118,7 @@ function Greeting.Build(lead, settings)
   local own = lead.crafter == PlayerName.Own()
   local templates = own and OWN_TEMPLATE or ALT_TEMPLATE
   local text = settings.templates[templates[lead.kind == "profession" and "profession" or "item"]] or ""
+  local hasCity = string.find(text, "{city}", 1, true) ~= nil
   local values = {
     customer = PlayerName.NameOf(lead.customer),
     crafter = Greeting.CrafterName(lead.crafter),
@@ -133,7 +134,12 @@ function Greeting.Build(lead, settings)
   if type(note) == "string" and note ~= "" then
     text = text .. " " .. note
   end
-  return Greeting.Cap(tidy((gsub(text, "[\r\n]+", " "))))
+  text = gsub(text, "[\r\n]+", " ")
+  -- Only a template with {city} can leave a gap; any other stays exactly as written.
+  if hasCity then
+    text = tidy(text)
+  end
+  return Greeting.Cap(text)
 end
 
 ns.Greeting = Greeting

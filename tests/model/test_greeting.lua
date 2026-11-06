@@ -224,4 +224,12 @@ return function()
   standIn(1458, "")
   noMapSettings.templates.item = "A. {city}"
   Assert.equal(noMap.Build(cityLead, noMapSettings), "A.", "no zone text")
+  -- A template without {city} keeps the player's own spacing, on any flavor.
+  local retail, retailSettings = load("retail")
+  retailSettings.templates.item = " Hi!  I can craft {item}. "
+  Assert.equal(retail.Build(cityLead, retailSettings), " Hi!  I can craft " .. LINK .. ". ", "Retail: spacing kept")
+  local forever, foreverSettings = load("forever")
+  foreverSettings.templates.item = " Hi!  I can craft {item}. "
+  standIn(1458, "Undercity")
+  Assert.equal(forever.Build(cityLead, foreverSettings), " Hi!  I can craft " .. LINK .. ". ", "Forever, no {city}: spacing kept")
 end
