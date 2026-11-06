@@ -4,6 +4,8 @@ if type(ns) ~= "table" then
 end
 
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+local CityMention = ns.CityMention or require("CraftAlert.Model.CityMention")
 
 -- Spec §7.4: the greeting whisper for a lead. Pure text; nothing here is sent.
 local Greeting = {}
@@ -90,16 +92,39 @@ function Greeting.Cap(text)
   return kept
 end
 
+-- Spec §10 C1/C5: "I'm in <city>." while a non-Retail player stands in a capital, else "". The
+-- zone text is the client's own (localized); read per build, never cached.
+local function cityText()
+  if FlavorCompat.isRetail or not CityMention.ForMap(FlavorCompat.PlayerMapID()) then
+    return ""
+  end
+  local getZone = _G["GetRealZoneText"]
+  local zone = type(getZone) == "function" and getZone() or nil
+  if type(zone) ~= "string" or zone == "" then
+    return ""
+  end
+  return "I'm in " .. zone .. "."
+end
+
+-- Spec §10 C2: an empty tag leaves a doubled space or a dangling end; runs of spaces become one
+-- and the ends are trimmed. Run once on the finished text: that covers the template before the
+-- note and the whole after it.
+local function tidy(text)
+  return match(gsub(text, "  +", " "), "^ *(.-) *$")
+end
+
 -- → the greeting text for `lead` (Leads.OnMatch record) from settings.templates and notes.
 function Greeting.Build(lead, settings)
   local own = lead.crafter == PlayerName.Own()
   local templates = own and OWN_TEMPLATE or ALT_TEMPLATE
   local text = settings.templates[templates[lead.kind == "profession" and "profession" or "item"]] or ""
+  local hasCity = string.find(text, "{city}", 1, true) ~= nil
   local values = {
     customer = PlayerName.NameOf(lead.customer),
     crafter = Greeting.CrafterName(lead.crafter),
     item = lead.itemLink or lead.recipeName or lead.profName or "",
     profession = lead.profName or "",
+    city = cityText(),
   }
   -- A function replacement keeps `%` in names literal; an unknown tag returns nil and stays.
   text = gsub(text, "{(%w+)}", function(tag)
@@ -109,7 +134,12 @@ function Greeting.Build(lead, settings)
   if type(note) == "string" and note ~= "" then
     text = text .. " " .. note
   end
-  return Greeting.Cap((gsub(text, "[\r\n]+", " ")))
+  text = gsub(text, "[\r\n]+", " ")
+  -- Only a template with {city} can leave a gap; any other stays exactly as written.
+  if hasCity then
+    text = tidy(text)
+  end
+  return Greeting.Cap(text)
 end
 
 ns.Greeting = Greeting

@@ -366,6 +366,32 @@ local function testGreetingsPage()
   Assert.truthy(tagged:find("L:Alt item: ", 1, true), tagged)
 end
 
+-- Spec §10 C4: the placeholder help names {city} on Forever and the Classic flavors, never on Retail
+-- (the tag is empty there). isRetail is computed at load, so the fixture sets it beside flavorKey.
+local function testGreetingsCityHelp()
+  local help = '{customer} the buyer, {city} "I\'m in <capital>." while you stand in one.'
+  for _, flavor in ipairs({ "forever", "era" }) do
+    local ns = SettingsFixture.load({
+      before = function(chain)
+        chain.FlavorCompat.flavorKey = flavor
+        chain.FlavorCompat.isRetail = false
+        chain.FlavorCompat.isForever = flavor == "forever"
+        chain.FlavorCompat.isClassic = flavor ~= "forever"
+      end,
+    })
+    open(ns, "Greetings")
+    Assert.truthy(SettingsFixture.texts():find(help, 1, true), flavor)
+  end
+  local ns = SettingsFixture.load({
+    before = function(chain)
+      chain.FlavorCompat.flavorKey = "retail"
+      chain.FlavorCompat.isRetail = true
+    end,
+  })
+  open(ns, "Greetings")
+  Assert.falsy(SettingsFixture.texts():find("{city}", 1, true), "Retail")
+end
+
 return function()
   testLazyWindow()
   testAddPage()
@@ -376,4 +402,5 @@ return function()
   testAlertsPage()
   testAlertsPageNeedsNoWindow()
   testGreetingsPage()
+  testGreetingsCityHelp()
 end

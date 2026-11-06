@@ -15,8 +15,10 @@ local function load(flavor)
   Wow.stub("GetNormalizedRealmName", function()
     return "Realm"
   end)
-  Fresh.require("Core.FlavorCompat")
+  Fresh.require("Core.FlavorCompat").isRetail = flavor == "retail"
   Fresh.require("Core.Constants")
+  Fresh.require("Model.Tokenizer")
+  Fresh.require("Model.CityMention")
   Fresh.require("Core.PlayerName").Init()
   local Defaults = Fresh.require("Persistence.Defaults")
   return Fresh.require("Model.Greeting"), Defaults.Settings()
@@ -179,4 +181,57 @@ return function()
   -- A real link after an escaped pipe ("|||H...") is still cut whole.
   settings.templates.item = string.rep("x", 200) .. "|||Hitem:1|h[" .. string.rep("a", 60) .. "]|h"
   Assert.equal(Greeting.Build(lead, settings), string.rep("x", 200) .. "||", "a real link after an escaped pipe")
+
+  -- Spec §10 {city}: "I'm in <zone>." while a non-Retail player stands in a capital (read per
+  -- build), else empty; spaces left by an empty tag collapse and the ends are trimmed.
+  local function standIn(mapID, zone)
+    Wow.stub("C_Map", {
+      GetBestMapForUnit = function()
+        return mapID
+      end,
+    })
+    Wow.stub("GetRealZoneText", function()
+      return zone
+    end)
+  end
+  local cityLead = itemLead("Me-Realm")
+  local function cityGreeting(flavor, mapID, zone, note)
+    local greeting, flavorSettings = load(flavor)
+    flavorSettings.templates.item = "Hi! I can craft {item}. {city}"
+    flavorSettings.notes = { [BS] = note }
+    standIn(mapID, zone)
+    return greeting.Build(cityLead, flavorSettings)
+  end
+  local plain = "Hi! I can craft " .. LINK .. "."
+  Assert.equal(cityGreeting("forever", 1458, "Undercity"), plain .. " I'm in Undercity.", "in a capital")
+  Assert.equal(cityGreeting("forever", 1415, "Tirisfal Glades"), plain, "a field zone: no trailing space")
+  Assert.equal(cityGreeting("era", 90, "Undercity"), plain .. " I'm in Undercity.", "Classic too")
+  Assert.equal(cityGreeting("forever", 1458, "Undercity", "tips"), plain .. " I'm in Undercity. tips", "then the note")
+  Assert.equal(cityGreeting("forever", 1415, "Tirisfal Glades", "tips"), plain .. " tips", "no gap before the note")
+  Assert.equal(cityGreeting("retail", 1458, "Undercity"), plain, "Retail: empty")
+  local noMap, noMapSettings = load("forever")
+  noMapSettings.templates.item = "Hi! I can craft {item}. {city}"
+  Wow.stub("C_Map", nil)
+  Assert.equal(noMap.Build(cityLead, noMapSettings), plain, "no C_Map")
+  -- The city is read on every build, not cached.
+  standIn(1458, "Undercity")
+  Assert.equal(noMap.Build(cityLead, noMapSettings), plain .. " I'm in Undercity.")
+  standIn(1415, "Tirisfal Glades")
+  Assert.equal(noMap.Build(cityLead, noMapSettings), plain)
+  -- A tag in the middle leaves one space; an empty zone name adds nothing.
+  noMapSettings.templates.item = "A {city} B"
+  Assert.equal(noMap.Build(cityLead, noMapSettings), "A B")
+  standIn(1458, "")
+  noMapSettings.templates.item = "A. {city}"
+  Assert.equal(noMap.Build(cityLead, noMapSettings), "A.", "no zone text")
+  -- A template without {city} keeps the player's own spacing, on any flavor.
+  local retail, retailSettings = load("retail")
+  retailSettings.templates.item = " Hi!  I can craft {item}. "
+  Assert.equal(retail.Build(cityLead, retailSettings), " Hi!  I can craft " .. LINK .. ". ", "Retail: spacing kept")
+  local forever, foreverSettings = load("forever")
+  foreverSettings.templates.item = " Hi!  I can craft {item}. "
+  standIn(1458, "Undercity")
+  Assert.equal(forever.Build(cityLead, foreverSettings), " Hi!  I can craft " .. LINK .. ". ", "Forever, no {city}: spacing kept")
+  foreverSettings.templates.item = "Hi!  {city}"
+  Assert.equal(forever.Build(cityLead, foreverSettings), "Hi! I'm in Undercity.", "in a capital: spaces tidied too")
 end

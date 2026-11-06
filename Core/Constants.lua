@@ -100,23 +100,26 @@ Constants.craftCueWords = { "crafter", "craft", "crafted", "maker", "recraft", "
 Constants.cueFillerWords = { "for", "a", "my", "the", "some", "me" }
 
 -- §7.4: greeting templates. Only Retail has crafting orders to point an alt's customer to.
-local function templates(altItemTail)
+-- Spec §10 C3: the other flavors end each one in {city}, which is empty outside a capital.
+local function templates(altItemTail, cityTail)
   return {
-    item = "Hi! I can craft {item}.",
-    altItem = "Hi! My alt {crafter} can craft {item}, " .. altItemTail,
-    profession = "Hi! I have {profession}, what do you need?",
-    altProfession = "Hi! My alt {crafter} has {profession}, what do you need?",
+    item = "Hi! I can craft {item}." .. cityTail,
+    altItem = "Hi! My alt {crafter} can craft {item}, " .. altItemTail .. cityTail,
+    profession = "Hi! I have {profession}, what do you need?" .. cityTail,
+    altProfession = "Hi! My alt {crafter} has {profession}, what do you need?" .. cityTail,
   }
 end
 
+local CITY_TAIL = " {city}"
+
 Constants.templates = {
-  retail = templates("send the order there."),
-  forever = templates("whisper them."),
-  era = templates("whisper them."),
-  tbc = templates("whisper them."),
-  wrath = templates("whisper them."),
-  cata = templates("whisper them."),
-  mop = templates("whisper them."),
+  retail = templates("send the order there.", ""),
+  forever = templates("whisper them.", CITY_TAIL),
+  era = templates("whisper them.", CITY_TAIL),
+  tbc = templates("whisper them.", CITY_TAIL),
+  wrath = templates("whisper them.", CITY_TAIL),
+  cata = templates("whisper them.", CITY_TAIL),
+  mop = templates("whisper them.", CITY_TAIL),
 }
 
 ns.Constants = Constants

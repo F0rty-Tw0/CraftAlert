@@ -5,6 +5,7 @@ end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
+local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
 local Defaults = ns.Defaults or require("CraftAlert.Persistence.Defaults")
 local Greeting = ns.Greeting or require("CraftAlert.Model.Greeting")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
@@ -123,8 +124,15 @@ function PageGreetings.Create(parent)
     end
   end
   Controls.Section(column, Localization.Text("Templates"))
+  -- Spec §10 C4: {city} is empty on Retail, so only the other flavors are told about it.
   Controls.Note(column):SetText(
-    Localization.Text("Placeholders: {item} the recipe, {crafter} the character who crafts it, {profession} its profession, {customer} the buyer.")
+    FlavorCompat.isRetail
+        and Localization.Text(
+          "Placeholders: {item} the recipe, {crafter} the character who crafts it, {profession} its profession, {customer} the buyer."
+        )
+      or Localization.Text(
+        'Placeholders: {item} the recipe, {crafter} the character who crafts it, {profession} its profession, {customer} the buyer, {city} "I\'m in <capital>." while you stand in one.'
+      )
   )
   for _, template in ipairs(TEMPLATES) do
     local input
