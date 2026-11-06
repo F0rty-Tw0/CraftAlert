@@ -4,6 +4,8 @@ Player-friendly release notes for Craft Alert.
 
 ## [Unreleased]
 
+- Fixed: Clicking an alert on the Whisper Messenger button to send your greeting no longer opens the messenger when its "Auto-open on outgoing whisper" option is off. Needs the latest Whisper Messenger.
+
 ## [1.0.2] - 2026-11-06
 
 - WoW: Forever and Classic: while you stand in a capital, a request that names only another capital ("LF enchanter in Org" when you're in Undercity) no longer alerts. Short names like org, uc, tb, sw or if count after "in", "at", "to", "from", "near" or "@"; full city names count anywhere. Turn it off with "Hide askers in another capital" in Settings → General.
