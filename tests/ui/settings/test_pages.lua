@@ -175,6 +175,34 @@ local function testChannelsPerFlavor()
   end, "no visible row")
 end
 
+-- Spec §5: "Hide askers in another capital" sits in Matching on Forever and the Classic flavors,
+-- bound to hideOtherCities with nothing to rebuild (ScanGate reads it per line); never on Retail.
+-- isRetail is computed at load, so the fixture sets it beside flavorKey.
+local OTHER_CITY = "Hide askers in another capital"
+local function testOtherCityToggle()
+  for _, flavor in ipairs({ "forever", "era" }) do
+    local ns, db, refreshes = SettingsFixture.load({
+      before = function(chain)
+        chain.FlavorCompat.flavorKey = flavor
+        chain.FlavorCompat.isRetail = false
+        chain.FlavorCompat.isForever = flavor == "forever"
+        chain.FlavorCompat.isClassic = flavor ~= "forever"
+      end,
+    })
+    open(ns, "General")
+    take(refreshes)
+    Assert.equal(row(OTHER_CITY).input:GetChecked(), true, flavor .. ": on by default")
+    Widgets.click(row(OTHER_CITY).input)
+    Assert.equal(db.settings.hideOtherCities, false, flavor)
+    Assert.same(take(refreshes), {}, flavor .. ": no rebuild or evaluate")
+  end
+  local ns = SettingsFixture.load()
+  open(ns, "General")
+  Assert.raises(function()
+    row(OTHER_CITY)
+  end, "no visible row")
+end
+
 local function testAlertsPage()
   local ns, db, refreshes, calls = SettingsFixture.load()
   local settings = db.settings
@@ -344,6 +372,7 @@ return function()
   testNavHighlight()
   testGeneralPage()
   testChannelsPerFlavor()
+  testOtherCityToggle()
   testAlertsPage()
   testAlertsPageNeedsNoWindow()
   testGreetingsPage()

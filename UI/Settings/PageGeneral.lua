@@ -18,7 +18,9 @@ local Controls = ns.SettingsControls or require("CraftAlert.UI.Settings.Controls
 -- exists" (saved as onlyResting) re-evaluate the scan gate
 -- (§6.1); channels, profession-word alerts and unbound items rebuild the index (§6.2), and a
 -- channel also re-evaluates the gate, which owns the registered chat events. A channel the
--- flavor does not have is not shown (§6.1).
+-- flavor does not have is not shown (§6.1). "Hide askers in another capital" (hideOtherCities,
+-- other-capital spec §5) shows on Forever and the Classic flavors only; ScanGate reads it per
+-- matched line, so it needs no rebuild or evaluate.
 local PageGeneral = { id = "general", title = Localization.Text("General") }
 
 local function settings()
@@ -38,6 +40,9 @@ local function rebuild(reason)
     Index.RequestRebuild(reason)
   end
 end
+
+-- For a toggle read where it is used: BoundToggle calls its `after` on every click.
+local function nothing() end
 
 local function rebuildChannels()
   Index.RequestRebuild("channels")
@@ -94,6 +99,15 @@ function PageGeneral.Create(parent)
     rebuild("includeUnbound"),
     "Also alerts for items that are not bound, such as materials, potions and gems. Off, those recipes never alert, muted or not."
   )
+  if not FlavorCompat.isRetail then
+    toggle(
+      "Hide askers in another capital",
+      settings,
+      "hideOtherCities",
+      nothing,
+      'Hides a request that names another capital than the one you stand in, such as "LF BS in Org" while you are in Undercity. Out in the world nothing is hidden.'
+    )
+  end
   return { Refresh = refresh }
 end
 

@@ -135,6 +135,21 @@ return function()
   local soundTip = "The sound played with each new lead. Play tries the chosen one; None is silent."
   Assert.same(hover(play).lines, { "Alert sound", soundTip })
 
+  -- Forever and Classic only: the other-capital toggle and its tip.
+  local OTHER_CITY = {
+    "General",
+    "Hide askers in another capital",
+    'Hides a request that names another capital than the one you stand in, such as "LF BS in Org" while you are in Undercity. Out in the world nothing is hidden.',
+  }
+  ns = SettingsFixture.load({
+    before = function(chain)
+      chain.FlavorCompat.flavorKey = "forever"
+      chain.FlavorCompat.isRetail = false
+      chain.FlavorCompat.isForever = true
+    end,
+  })
+  check(ns, OTHER_CITY)
+
   ns = SettingsFixture.load({ db = CraftersFixture.crafters })
   for _, entry in ipairs(CRAFTERS) do
     check(ns, entry)
