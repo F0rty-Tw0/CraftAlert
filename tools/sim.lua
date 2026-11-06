@@ -111,7 +111,20 @@ local Sim = {}
 Sim.lastNs = nil
 
 -- Flags taking exactly one value; the parser checks the value where it is not free text.
-local ONE_VALUE = { "--flavor", "--db", "--sender", "--class", "--cmd", "--click", "--afk", "--resting", "--map", "--import", "--craftscan" }
+local ONE_VALUE = {
+  "--flavor",
+  "--db",
+  "--sender",
+  "--class",
+  "--cmd",
+  "--click",
+  "--afk",
+  "--resting",
+  "--map",
+  "--zone",
+  "--import",
+  "--craftscan",
+}
 
 local function isOneValueFlag(flag)
   for _, name in ipairs(ONE_VALUE) do
@@ -147,6 +160,8 @@ local function acceptOption(plan, flag, value)
       return "error: --map takes a uiMapID"
     end
     plan.steps[#plan.steps + 1] = { kind = "map", id = id }
+  elseif flag == "--zone" then
+    plan.steps[#plan.steps + 1] = { kind = "zone", name = value }
   elseif flag == "--sender" then
     plan.steps[#plan.steps + 1] = { kind = "sender", name = value }
   elseif flag == "--class" then
@@ -312,6 +327,10 @@ local function newContext(plan, out)
       return ctx.map
     end,
   })
+  -- The --zone name the client reports for that map (the {city} greeting tag reads it).
+  Wow.stub("GetRealZoneText", function()
+    return ctx.zone
+  end)
   -- The --class sender (STEPS.class) of the line in flight; any other GUID has no class.
   Wow.stub("GetPlayerInfoByGUID", function(guid)
     if ctx.class and guid == SIM_CLASS_GUID then
@@ -628,6 +647,11 @@ end
 -- --map ID: the player's uiMapID from here on (the other-capital filter reads it per line).
 function STEPS.map(ctx, step)
   ctx.map = step.id
+end
+
+-- --zone NAME: GetRealZoneText from here on; set it with --map, the client reports both.
+function STEPS.zone(ctx, step)
+  ctx.zone = step.name
 end
 
 function STEPS.resting(ctx, step)

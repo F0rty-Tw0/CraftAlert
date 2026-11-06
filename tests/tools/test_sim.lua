@@ -416,6 +416,20 @@ return function()
     "lead: new",
   })
 
+  -- --zone is GetRealZoneText: on Forever in Undercity the greeting ends with the {city}
+  -- sentence; without --zone the zone is unknown and the sentence is left out.
+  local function greeting(argv)
+    for _, line in ipairs(Sim.Run(argv)) do
+      if string.find(line, "^greeting: ") then
+        return line
+      end
+    end
+  end
+  local inCity = greeting({ "--flavor", "forever", "--map", "1458", "--zone", "Undercity", "LF plate belt" })
+  assert(string.find(inCity, " I'm in Undercity%.$"), inCity)
+  local noZone = greeting({ "--flavor", "forever", "--map", "1458", "LF plate belt" })
+  assert(not string.find(noZone, "I'm in", 1, true), noZone)
+
   -- The default fixture is the account DB before any module touches it.
   Sim.Run({})
   local db = rawget(_G, "CraftAlertDB")
