@@ -44,6 +44,7 @@ Model/WordGroups.lua
 Model/RealmTag.lua
 Model/Index.lua
 Model/Matcher.lua
+Model/CityMention.lua
 Model/MainCrafter.lua
 Model/CrafterRank.lua
 Model/Leads.lua

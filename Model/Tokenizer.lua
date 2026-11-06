@@ -29,6 +29,7 @@ local WORD = "[a-z0-9'\128-\255A-Z]+"
 local WORD_CAPTURE = "(" .. WORD .. ")" -- find hands back the token: no sub call per token
 local SPACES = "^%s*" -- anchored, so BreakBefore reads only the gap between two tokens
 local HYPHEN_SPACES = "^%-?%s*" -- always matches: one optional hyphen, then spaces
+local AT_GAP = "^%s*@%s*" -- one `@` between optional spaces (AtBefore)
 local ITEM_LINK = "^|hitem:(%d+)"
 local ENCHANT_LINK = "^|henchant:(%d*)"
 local ANY_LINK = "^|h%a+:"
@@ -57,6 +58,7 @@ Tokenizer.itemIDs = itemIDs
 Tokenizer.linkNames = linkNames
 Tokenizer.linkIDs = linkIDs
 Tokenizer.linkTails = linkTails
+Tokenizer.tokenCount = 0
 Tokenizer.itemCount = 0
 Tokenizer.linkNameCount = 0
 
@@ -190,6 +192,7 @@ local function finish()
     linkNames[k], linkIDs[k], linkTails[k] = nil, nil, nil
   end
   lastCount, lastItems, lastNames = count, items, names
+  Tokenizer.tokenCount = count
   Tokenizer.itemCount = items
   Tokenizer.linkNameCount = names
 end
@@ -264,6 +267,17 @@ function Tokenizer.BreakBefore(k, hyphenJoins)
     _, gapEnd = find(line, HYPHEN_SPACES, gapEnd + 1)
   end
   return gapEnd + 1 < starts[k]
+end
+
+-- City mention "LF ench @SW": whether the only non-space text between token k - 1 (or the line
+-- start, for k = 1) and token k of the last line is one `@`.
+function Tokenizer.AtBefore(k)
+  if k < 1 or k > count then
+    return false
+  end
+  local gapStart = k == 1 and 1 or starts[k - 1] + #tokens[k - 1]
+  local _, gapEnd = find(line, AT_GAP, gapStart)
+  return gapEnd ~= nil and gapEnd + 1 == starts[k]
 end
 
 ns.Tokenizer = Tokenizer

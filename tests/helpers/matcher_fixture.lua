@@ -37,6 +37,7 @@ local MODULES = {
   "Model.WordGroups",
   "Model.Index",
   "Model.Matcher",
+  "Model.CityMention", -- after Tokenizer: it reads the buffers of the fresh Tokenizer the Matcher fills
   "Persistence.Defaults",
 }
 

@@ -100,6 +100,59 @@ local function secretOnly(ns, secret)
   end
 end
 
+-- Delivers one Trade line from Bob with the player on `mapID` (C_Map stubbed) and the
+-- hideOtherCities setting at `hide` (nil keeps the default). The real Matcher tokenizes the line,
+-- so a buffer the filter reads after Match is the one that line left. → Leads.OnMatch calls, lastStop.
+local function otherCityRow(flavor, mapID, text, hide)
+  local ns, db = setup(flavor)
+  if hide ~= nil then
+    db.settings.hideOtherCities = hide
+  end
+  Wow.stub("C_Map", {
+    GetBestMapForUnit = function()
+      return mapID
+    end,
+  })
+  start(ns, db)
+  local calls = 0
+  local onMatch = ns.Leads.OnMatch
+  ns.Leads.OnMatch = function(...)
+    calls = calls + 1
+    return onMatch(...)
+  end
+  fireChannel(text, "Bob-Draenor", 2, nil)
+  ns.Leads.OnMatch = onMatch
+  return calls, ns.Matcher.lastStop
+end
+
+-- Spec §6: a matched line naming only another capital is dropped before Leads, on Forever and
+-- Classic, with the setting on, while the player stands in a capital (1458 Undercity, 1454
+-- Orgrimmar, 1415 a field zone). Every other cell reaches Leads.
+local function testOtherCity()
+  local ORG = "LF thick plate belt in org"
+  local rows = {
+    { "retail", 1458, ORG, nil, 1, "Retail never filters" },
+    { "forever", 1458, ORG, false, 1, "setting off" },
+    { "forever", 1415, ORG, nil, 1, "not in a capital" },
+    { "forever", nil, ORG, nil, 1, "map unknown" },
+    { "forever", 1454, ORG, nil, 1, "own capital" },
+    { "forever", 1458, "LF thick plate belt in org or uc", nil, 1, "own capital named too" },
+    { "forever", 1458, "LF thick plate belt", nil, 1, "no capital named" },
+    { "forever", 1458, ORG, nil, 0, "another capital: dropped" },
+    { "tbc", 1458, ORG, nil, 0, "Classic too" },
+  }
+  for _, row in ipairs(rows) do
+    local flavor, mapID, text, hide, expected, label = unpack(row)
+    local calls, stop = otherCityRow(flavor, mapID, text, hide)
+    Assert.equal(calls, expected, label)
+    if expected == 0 then
+      Assert.equal(stop, "otherCity", label)
+    else
+      Assert.equal(stop, "match", label)
+    end
+  end
+end
+
 return function()
   -- ChannelKey owns the event-to-channel mapping: zone channel IDs for CHAT_MSG_CHANNEL (never
   -- the base name), one event each for guild and communities, nil for anything else.
@@ -472,4 +525,6 @@ return function()
 
   -- Whisper events are not the scan's business.
   Assert.falsy(Wow.frames[1]:IsEventRegistered(WHISPER))
+
+  testOtherCity()
 end

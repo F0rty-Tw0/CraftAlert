@@ -122,6 +122,7 @@ local STOP_WORDS = {
   blocker = "No match: it reads like a crafter's ad, or has a blocked word",
   nomatch = "No match: nothing in it that you can craft. An alt on another realm is off until turned on in Settings > Crafters",
   noIndex = "No match: the word list is not built yet, try /reload",
+  otherCity = "No alert: the line names another capital (Hide askers in another capital is on)",
 }
 
 -- The result line for a Matcher stop reason; a code without words is shown as itself.

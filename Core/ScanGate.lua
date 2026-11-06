@@ -10,6 +10,7 @@ local EventRouter = ns.EventRouter or require("CraftAlert.Core.EventRouter")
 local PlayerName = ns.PlayerName or require("CraftAlert.Core.PlayerName")
 local Index = ns.Index or require("CraftAlert.Model.Index")
 local Matcher = ns.Matcher or require("CraftAlert.Model.Matcher")
+local CityMention = ns.CityMention or require("CraftAlert.Model.CityMention")
 local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local ProfessionList = ns.ProfessionList or require("CraftAlert.Professions.ProfessionList")
 local Status = ns.Status or require("CraftAlert.Core.Status")
@@ -101,6 +102,15 @@ function ScanGate.HandleChat(event, text, sender, _, _, _, _, zoneChannelID, _, 
   local result = Matcher.Match(key, text, sender, guid)
   if result == nil then
     return
+  end
+  -- Other-capital filter (spec R1-R5): Forever and Classic share Trade across a faction's
+  -- capitals. Read only on matched lines; CityMention reads the tokens Match just left.
+  if not FlavorCompat.isRetail and db and db.settings.hideOtherCities then
+    local own = CityMention.ForMap(FlavorCompat.PlayerMapID())
+    if own and CityMention.OnlyOther(own) then
+      Matcher.lastStop = "otherCity"
+      return
+    end
   end
   Leads.OnMatch(result, Normalize(sender), text, key, guid)
 end
