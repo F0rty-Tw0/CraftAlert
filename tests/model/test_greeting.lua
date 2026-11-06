@@ -232,4 +232,6 @@ return function()
   foreverSettings.templates.item = " Hi!  I can craft {item}. "
   standIn(1458, "Undercity")
   Assert.equal(forever.Build(cityLead, foreverSettings), " Hi!  I can craft " .. LINK .. ". ", "Forever, no {city}: spacing kept")
+  foreverSettings.templates.item = "Hi!  {city}"
+  Assert.equal(forever.Build(cityLead, foreverSettings), "Hi! I'm in Undercity.", "in a capital: spaces tidied too")
 end
