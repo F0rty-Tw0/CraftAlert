@@ -181,7 +181,10 @@ local function testPreviewClick()
   Wow.clock.gettime = 51 -- looked at it for a second
   wm.preview.CraftAlert.onClick()
   Assert.equal(#UiFixture.callsTo(calls, "chat"), 1, "greeting sent")
-  Assert.same(wm.callsTo("OpenConversation"), { { "OpenConversation", lead.customer } }, "sent: the chat opens, no draft")
+  local opened = wm.callsTo("OpenConversation")
+  Assert.same({ #opened, opened[1][2], opened[1][3] }, { 1, lead.customer, nil }, "sent: the chat opens, no draft")
+  -- WM opens it only as far as the player's "Auto-open on outgoing whisper" allows.
+  Assert.same(opened[1][4], { afterSend = true }, "marked as after a send")
   Assert.equal(ns.WhisperBridge.VisibleLead(), nil, "click clears the remembered preview")
   -- clicked at once: the look rule refuses, the greeting is a draft and nothing else opens
   local ns2, _, calls2, _, wm2 = boot()

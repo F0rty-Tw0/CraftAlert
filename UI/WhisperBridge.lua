@@ -72,6 +72,8 @@ end
 
 -- Every call into WM's API after Activate: a raise counts as a refusal (false), so a broken WM
 -- never costs the player the Blizzard fallback or the rest of a handler.
+local AFTER_SEND = { afterSend = true }
+
 local function ask(name, ...)
   local ok, result = pcall(api[name], ...)
   return ok and result
@@ -243,8 +245,10 @@ local function previewFor(lead, entry)
       local action = ClickRouter.Handle("LeftButton", lead, entry.shownAt)
       -- Only a greeting this click sent: otherwise Greet opened the draft already, and a test
       -- lead (dry run) has no customer to open.
+      -- afterSend: WM opens the chat only as far as its "Auto-open on outgoing whisper" allows
+      -- (an older WM ignores it and opens as before).
       if action == "greet" and lead.greeted and not wasGreeted and not lead.test then
-        ask("OpenConversation", GreetAction.Target(lead))
+        ask("OpenConversation", GreetAction.Target(lead), nil, AFTER_SEND)
       end
       if shown == entry then
         shown = nil

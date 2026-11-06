@@ -72,7 +72,8 @@ local function testPreviewClickRows()
   -- plain click, looked: chat sent AND OpenConversation(target) with no draft
   local ns, lead, calls, wm = clicked(function() end, 51)
   Assert.equal(#UiFixture.callsTo(calls, "chat"), 1)
-  Assert.same(wm.callsTo("OpenConversation"), { { "OpenConversation", lead.customer } })
+  local opened = wm.callsTo("OpenConversation")
+  Assert.same({ #opened, opened[1][2], opened[1][4] }, { 1, lead.customer, { afterSend = true } })
   Assert.same(UiFixture.callsTo(calls, "prefill"), {}, "Blizzard's box stays closed")
   Assert.equal(ns.WhisperBridge.VisibleLead(), nil, "the preview is cleared")
   -- plain click, refused by the look rule: the greeting is the draft, no chat call
@@ -172,7 +173,8 @@ local function testGreetWhilePanelShownOpensChat()
   ns.WhisperBridge.ShowLead(lead)
   Wow.clock.gettime = 51
   wm.preview.CraftAlert.onClick()
-  Assert.same(wm.callsTo("OpenConversation"), { { "OpenConversation", target }, { "OpenConversation", target } })
+  local opened = wm.callsTo("OpenConversation")
+  Assert.same({ #opened, opened[1][2], opened[2][2], opened[2][4] }, { 2, target, target, { afterSend = true } })
 end
 
 -- "/ca, Toggle keybind" and "/ca config".
