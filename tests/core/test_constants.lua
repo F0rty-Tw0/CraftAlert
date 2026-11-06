@@ -21,10 +21,12 @@ return function()
     Assert.truthy(flavor.channels.trade, key .. " has Trade")
     Assert.truthy(flavor.channels.general, key .. " has General")
 
+    -- Spec §10 C3: every non-Retail default ends in " {city}" (all four kinds); Retail has none.
+    local tail = key == "retail" and "" or " {city}"
     local templates = Constants.templates[key]
-    Assert.equal(templates.item, "Hi! I can craft {item}.")
-    Assert.equal(templates.profession, "Hi! I have {profession}, what do you need?")
-    Assert.equal(templates.altProfession, "Hi! My alt {crafter} has {profession}, what do you need?")
+    Assert.equal(templates.item, "Hi! I can craft {item}." .. tail, key)
+    Assert.equal(templates.profession, "Hi! I have {profession}, what do you need?" .. tail, key)
+    Assert.equal(templates.altProfession, "Hi! My alt {crafter} has {profession}, what do you need?" .. tail, key)
   end
 
   -- flavor-choices.md: Retail and Forever learn through NEW_RECIPE_LEARNED, Classic through the system message.
@@ -52,7 +54,7 @@ return function()
   -- §7.4: only Retail has crafting orders to send an alt's customer to.
   Assert.equal(Constants.templates.retail.altItem, "Hi! My alt {crafter} can craft {item}, send the order there.")
   for _, key in ipairs({ "forever", "era", "tbc", "wrath", "cata", "mop" }) do
-    Assert.equal(Constants.templates[key].altItem, "Hi! My alt {crafter} can craft {item}, whisper them.", key)
+    Assert.equal(Constants.templates[key].altItem, "Hi! My alt {crafter} can craft {item}, whisper them. {city}", key)
   end
 
   -- §6.3 default word lists and §6.4 ambiguous slot words.
