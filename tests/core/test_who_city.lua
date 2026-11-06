@@ -26,9 +26,9 @@ local function setup(flavor, opts)
     GetWhoToUi = function()
       return opts.whoToUi or false
     end,
-    SetWhoToUi = function(value)
+    SetWhoToUi = not opts.noSetWhoToUi and function(value)
       table.insert(env.whoToUi, value)
-    end,
+    end or nil,
     GetNumWhoResults = function()
       return #env.results
     end,
@@ -214,6 +214,11 @@ local function testGuards()
   Assert.equal(env.WhoCity.TryFor(newLead(env, 7, "Bob-Realm")), false, "no C_Timer.NewTimer")
   Assert.same({ env.sent, env.setWho, env.whoToUi }, { {}, {}, {} }, "blocked before any change")
 
+  -- A lead without a customer name sends nothing and leaves no flight behind.
+  env = setup()
+  Assert.equal(env.WhoCity.TryFor(newLead(env, 7, nil)), false, "no customer")
+  Assert.equal(env.WhoCity.TryFor(newLead(env, 8, "Bob-Realm")), true, "the next lead still sends")
+
   -- In flight: a second lead waits.
   env = setup()
   env.WhoCity.TryFor(newLead(env, 7, "Bob-Realm"))
@@ -241,6 +246,11 @@ local function testInit()
   env = setup()
   env.WhoCity.Init()
   Assert.equal(env.hooks, 1, "hooked once")
+
+  -- Without SetWhoToUi the Who window could not be kept shut: no hook, so no sends.
+  env = setup("forever", { noSetWhoToUi = true })
+  Assert.equal(env.hooks, 0, "no SetWhoToUi: no hook")
+  Assert.equal(env.WhoCity.TryFor(newLead(env, 7, "Bob-Realm")), false, "no SetWhoToUi: no send")
 end
 
 return function()

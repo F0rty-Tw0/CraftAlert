@@ -65,7 +65,7 @@ local function startClient(db, slots, flavor)
   end
   Wow.stub("C_ChatInfo", { SendAddonMessage = record("addon"), SendChatMessage = record("chat") })
   Wow.stub("ChatFrameUtil", { SendTellWithMessage = record("prefill"), SendTell = record("empty") })
-  Wow.stub("C_FriendList", { SendWho = function() end })
+  Wow.stub("C_FriendList", { SendWho = function() end, SetWhoToUi = function() end })
   Wow.stub("SlashCmdList", {})
   Wow.stub("UISpecialFrames", {})
   Wow.stub("IsResting", function()

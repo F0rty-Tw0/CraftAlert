@@ -132,7 +132,7 @@ function WhoCity.Init()
   end
   local api = _G["C_FriendList"]
   local hook = _G["hooksecurefunc"]
-  if type(api) ~= "table" or type(api.SendWho) ~= "function" or type(hook) ~= "function" then
+  if type(api) ~= "table" or type(api.SendWho) ~= "function" or type(api.SetWhoToUi) ~= "function" or type(hook) ~= "function" then
     return
   end
   hook(api, "SendWho", onSendWho)
@@ -172,7 +172,7 @@ end
 -- The lead row's left click (UI/LeadRow.lua). → whether a query was sent; when not, the click
 -- just selects. A send that raises marks the lead "failed" and cleans up at once.
 function WhoCity.TryFor(lead)
-  if not hooked or lead == nil then
+  if not hooked or lead == nil or type(lead.customer) ~= "string" then
     return false
   end
   local state = lead.whoState
