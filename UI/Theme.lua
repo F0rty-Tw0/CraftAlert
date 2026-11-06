@@ -20,6 +20,8 @@ Theme.COLORS = {
   greeted = { 0.12, 0.72, 0.96, 1.0 },
   replied = { 0.30, 0.82, 0.40, 1.0 },
   warning = { 0.90, 0.72, 0.20, 1.0 },
+  -- The details card's "in <zone>" when the asker stands in another capital (spec §9 B9).
+  danger = { 1.0, 0.25, 0.25, 1.0 },
   -- Blizzard's HIGHLIGHT_FONT_COLOR, NORMAL_FONT_COLOR, GRAY_FONT_COLOR and GREEN_FONT_COLOR (the
   -- tooltips' instruction lines), for colour codes and texts.
   white = { 1.0, 1.0, 1.0, 1.0 },

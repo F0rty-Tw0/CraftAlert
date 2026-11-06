@@ -5,6 +5,7 @@ end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
+local CityMention = ns.CityMention or require("CraftAlert.Model.CityMention")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
 local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
@@ -65,11 +66,38 @@ function DetailsHeader.LineOne(lead)
   return table.concat(parts, SEPARATOR)
 end
 
--- Line 2: "Channel · HH:MM", the time alone for a lead without a channel.
+-- Whether `zone` is a capital other than the one the player stands in (spec §9 B9; the
+-- hideOtherCities setting does not apply). The player out of a capital: false.
+local function inOtherCapital(zone)
+  local theirs = CityMention.ForZoneName(zone)
+  if theirs == nil then
+    return false
+  end
+  local own = CityMention.ForMap(FlavorCompat.PlayerMapID())
+  return own ~= nil and own ~= theirs
+end
+
+-- Spec §9 B9: the asker's /who answer (Core/WhoCity.lua), or nil when failed or never asked.
+local function whoText(lead)
+  local state = lead.whoState
+  if state == "pending" then
+    return Localization.Text("Looking up…")
+  elseif state == "none" then
+    return Localization.Text("not found by /who")
+  elseif state ~= "done" or type(lead.whoZone) ~= "string" then
+    return nil
+  end
+  local text = Localization.Text("in %s", lead.whoZone)
+  return inOtherCapital(lead.whoZone) and FrameKit.ThemeCode(text, Theme.COLORS.danger) or text
+end
+
+-- Line 2: "Channel · HH:MM", the time alone for a lead without a channel, then the /who answer.
 function DetailsHeader.LineTwo(lead)
   local at = _G["date"]("%H:%M", lead.time)
   local channel = LeadText.Channel(lead)
-  return channel and (channel .. SEPARATOR .. at) or at
+  local line = channel and (channel .. SEPARATOR .. at) or at
+  local who = whoText(lead)
+  return who and (line .. SEPARATOR .. who) or line
 end
 
 -- The crafter's short name in the class saved for them, white when none is; nil without a crafter.

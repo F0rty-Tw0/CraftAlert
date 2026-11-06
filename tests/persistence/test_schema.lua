@@ -427,6 +427,11 @@ local function testLeadFieldTypes()
     },
   })
   Assert.same({ keyed.leads[1].recipeKey, keyed.leads[2].recipeKey }, { "belt", 9001 })
+  -- Spec §9 B8: whoState and whoZone are live only; a save that still holds them loses them.
+  local who = Schema.Validate({
+    leads = { { id = 1, customer = "A-Realm", crafter = "Me-Realm", time = 10, whoState = "done", whoZone = "Orgrimmar" } },
+  })
+  Assert.same(who.leads[1], { id = 1, customer = "A-Realm", crafter = "Me-Realm", time = 10 }, "who fields dropped")
 end
 
 -- Every field Model/Leads.lua writes survives a /reload: leads built by the real Leads.OnMatch

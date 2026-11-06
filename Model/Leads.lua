@@ -293,12 +293,13 @@ local function dropTest(list)
   end
 end
 
--- Spec §4.4 rule 8, small saved data: a lead's `crafters` list is live only, so it leaves every
--- lead just before the client writes CraftAlertDB (PLAYER_LOGOUT, also on /reload). Schema still
--- drops it from a save written before this.
+-- Spec §4.4 rule 8, small saved data: a lead's `crafters` list and its /who fields (spec §9 B8)
+-- are live only, so they leave every lead just before the client writes CraftAlertDB
+-- (PLAYER_LOGOUT, also on /reload). Schema still drops them from a save written before this.
 local function dropLiveFields()
   for i = 1, #leads do
-    leads[i].crafters = nil
+    local lead = leads[i]
+    lead.crafters, lead.whoState, lead.whoZone = nil, nil, nil
   end
 end
 
@@ -535,6 +536,19 @@ function Leads.MarkReplied(id)
   end
   lead.replied = true
   fire("replied", lead)
+  fire("change")
+  return true
+end
+
+-- Spec §9 B8: the asker's /who lookup (Core/WhoCity.lua). `state` is "pending", "done", "none" or
+-- "failed"; `zone` is the /who area on "done", else nil. Live only (dropLiveFields). → whether
+-- the lead exists.
+function Leads.SetWho(id, state, zone)
+  local lead = find(id)
+  if lead == nil then
+    return false
+  end
+  lead.whoState, lead.whoZone = state, zone
   fire("change")
   return true
 end

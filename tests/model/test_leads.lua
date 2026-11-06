@@ -521,7 +521,26 @@ local function testDismissAll()
   Assert.equal(seen.change, 1, "no leads: no event")
 end
 
+-- Spec §9 B8: SetWho stores the /who state and zone with one "change"; an unknown id fires
+-- nothing. Both fields are live only: they leave the lead at logout.
+local function testSetWho()
+  local ns, db = setup()
+  local Leads = ns.Leads
+  local lead = newLead(ns, "LF plate belt")
+  local seen = listen(Leads)
+  Assert.equal(Leads.SetWho(lead.id, "pending", nil), true)
+  Assert.same({ lead.whoState, lead.whoZone, seen.change }, { "pending", nil, 1 })
+  Assert.equal(Leads.SetWho(lead.id, "done", "Orgrimmar"), true)
+  Assert.same({ lead.whoState, lead.whoZone, seen.change }, { "done", "Orgrimmar", 2 })
+  Assert.equal(Leads.SetWho(9999, "done", "Orgrimmar"), false, "unknown id")
+  Assert.equal(seen.change, 2, "unknown id: no event")
+  Wow.fireEvent("PLAYER_LOGOUT")
+  Assert.equal(db.leads[1], lead)
+  Assert.same({ lead.whoState, lead.whoZone }, { nil, nil }, "live only")
+end
+
 return function()
+  testSetWho()
   testDismissAll()
   testDismissedFlag()
   testLinkArrivesLater()

@@ -71,6 +71,7 @@ Professions/LearnWatcher.lua
 Persistence/CraftScanImport.lua
 Core/Status.lua
 Core/ScanGate.lua
+Core/WhoCity.lua
 UI/Theme.lua
 UI/PanelLook.lua
 UI/FrameKit.lua
