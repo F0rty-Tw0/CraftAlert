@@ -366,7 +366,8 @@ local function testPlayerMapID()
   Assert.equal(FlavorCompat.PlayerMapID(), nil, "no C_Map")
   Wow.stub("C_Map", {})
   Assert.equal(FlavorCompat.PlayerMapID(), nil, "no GetBestMapForUnit")
-  local id = 1458
+  ---@type any
+  local id = 1458 -- what the stub returns: a number, nil, a secret or a string
   Wow.stub("C_Map", {
     GetBestMapForUnit = function(unit)
       Assert.equal(unit, "player")
