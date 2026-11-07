@@ -35,6 +35,9 @@ function LeadRowPaint.SetUnreadSource(fn)
   unreadOf = fn
 end
 
+-- ChatTypeInfo's whisper colour, refilled at each paint; Read copies it into the paint's fields.
+local WHISPER_PINK = { 0, 0, 0, 1 }
+
 -- Whisper pink, read at paint time (the player can recolour the whisper chat type).
 local function whisperPink()
   local info = _G["ChatTypeInfo"]
@@ -42,7 +45,9 @@ local function whisperPink()
   if type(whisper) ~= "table" then
     return FALLBACK_PINK
   end
-  return { whisper.r, whisper.g, whisper.b, 1 }
+  WHISPER_PINK[1], WHISPER_PINK[2], WHISPER_PINK[3] = whisper.r, whisper.g, whisper.b
+
+  return WHISPER_PINK
 end
 
 -- The dot's colour, first match wins: pink while the customer has an unread whisper, gold while
@@ -61,7 +66,8 @@ local function iconOf(lead)
   return itemIcon or FrameKit.ProfessionIcon(lead.prof) or Theme.ICON
 end
 
--- Fills `out` with what a row shows for `lead` now; `out.dot` is the dot's colour table.
+-- Fills `out` with what a row shows for `lead` now; `out.dot` is the dot's colour table, shared and
+-- good until the next Read (the dot fields keep its values).
 function LeadRowPaint.Read(lead, out)
   out.icon = iconOf(lead)
   local dot = dotColor(lead)

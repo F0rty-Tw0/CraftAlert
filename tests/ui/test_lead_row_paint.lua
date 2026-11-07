@@ -94,6 +94,20 @@ local function testReplyAloneRepaints()
   Assert.equal(row.repliedTag:IsShown(), true)
 end
 
+-- The whisper pink is read from ChatTypeInfo at each paint into one table, never a new one.
+local function testWhisperPinkBuildsNoTable()
+  local ns, _, lead = load()
+  ns.LeadRowPaint.SetUnreadSource(function()
+    return 1
+  end)
+  Wow.stub("ChatTypeInfo", { WHISPER = { r = 1, g = 0.5, b = 0.9 } })
+  local first, second = {}, {}
+  ns.LeadRowPaint.Read(lead, first)
+  _G["ChatTypeInfo"].WHISPER.b = 0.8
+  ns.LeadRowPaint.Read(lead, second)
+  Assert.same({ rawequal(first.dot, second.dot), first.dotB, second.dot }, { true, 0.9, { 1, 0.5, 0.8, 1 } })
+end
+
 -- A cleared row shows and repaints on the next Show; the second line's colour follows the
 -- selection, set only when it changes.
 local function testClearRepaints()
@@ -116,6 +130,7 @@ return function()
   testClassColourArrives()
   testChangedFieldsRepaint()
   testReplyAloneRepaints()
+  testWhisperPinkBuildsNoTable()
   testClearRepaints()
   Wow.reset()
 end
