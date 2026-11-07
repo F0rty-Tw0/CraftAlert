@@ -208,6 +208,19 @@ local function testDragFrameWithSplitRefreshesOnce()
   Assert.equal(refreshes(), 1)
 end
 
+-- A refresh between a size event and the frame's end (a lead change, WM's unread count) does not
+-- decide; the frame's end still decides the host's new mode.
+local function testRefreshMidFrameStillDecidesAtTheFrameEnd()
+  local ns, _, _, wm = boot()
+  local calls = spyNarrow(ns)
+  local host = showWith(wm, 700)
+  host:SetSize(400, 400)
+  Widgets.fire(host, "OnSizeChanged", 400, 400)
+  ns.BridgePanel.Refresh()
+  Widgets.nextFrame()
+  Assert.same(calls, { true })
+end
+
 return function()
   testBuildOptsInToCompact()
   testRegisteredPanelCarriesCompact()
@@ -220,5 +233,6 @@ return function()
   testSplitCappedAtHostLessDetails()
   testSplitBeforeTheFrameEndsSeesTheNewMode()
   testDragFrameWithSplitRefreshesOnce()
+  testRefreshMidFrameStillDecidesAtTheFrameEnd()
   Wow.reset()
 end
