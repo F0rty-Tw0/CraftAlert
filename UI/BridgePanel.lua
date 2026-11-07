@@ -12,6 +12,7 @@ local PanelLook = ns.PanelLook or require("CraftAlert.UI.PanelLook")
 local LedgerStrip = ns.LedgerStrip or require("CraftAlert.UI.LedgerStrip")
 local SettingsGear = ns.SettingsGear or require("CraftAlert.UI.SettingsGear")
 local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.SettingsPane")
+local HostLift = ns.HostLift or require("CraftAlert.UI.HostLift")
 
 -- Spec C.2, C.4: the leads in WhisperMessenger's panel. The RegisterPanel table the bridge hands
 -- over (UI/WhisperBridge.lua) and the split view WM's host frame shows: built once per host, sent
@@ -22,7 +23,7 @@ local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.Settings
 -- Mark all read marks them all seen at once. The table opts in to WM's narrow window (`compact`;
 -- an older WM drops the unknown field, so the window still widens and the page shows the split view).
 -- A host too narrow for both panes shows the leads' List or Details screen, one at a time
--- (LeadsView.SetNarrow); every show starts on the List.
+-- (LeadsView.SetNarrow), lifted over WM's divider (UI/HostLift.lua); every show starts on the List.
 local BridgePanel = {}
 
 local max = math.max
@@ -31,10 +32,6 @@ local min = math.min
 -- WM's CONTENT_MIN_WIDTH and CONTACTS_MIN_WIDTH (UI/Theme/Layout.lua:12-13, WM): the details keep
 -- at least 340 px of the host, the list takes the rest between 180 and the standalone 260.
 local DETAILS_MIN_WIDTH = 340
--- The settings pane's levels above the host: over WM's divider handle, which sits 50 above the
--- contacts pane, a sibling of the host (UI/MessengerWindow/LayoutBuilder/ContactsSection.lua:115-121
--- and UI/Theme/Layout.lua:17, WM), so its line never draws over the settings.
-local SETTINGS_LIFT = 60
 -- A host narrower than the list's minimum plus the details' minimum cannot show both: the narrow
 -- page (one pane at a time) takes over.
 local NARROW_BELOW = Theme.LAYOUT.LIST_MIN_WIDTH + DETAILS_MIN_WIDTH
@@ -87,6 +84,7 @@ local function navWidth()
 end
 
 -- Tells the view whenever the host crosses the narrow threshold; a host not laid out yet (0) is wide.
+-- On every run (a new host that starts wide never crosses), narrow screens lift over WM's divider.
 local function decide()
   local width = currentHost:GetWidth()
   local isNarrow = width > 0 and width < NARROW_BELOW
@@ -94,6 +92,7 @@ local function decide()
     narrow = isNarrow
     LeadsView.SetNarrow(view, isNarrow)
   end
+  HostLift.Apply(view.frame, currentHost, isNarrow)
 end
 
 local function refresh()
@@ -122,7 +121,7 @@ end
 
 local function enterSettings()
   -- First: attaching to a new host runs the previous owner's showLeads, which must not undo the rest.
-  SettingsPane.Attach(view.parent, enterLeads, showLeads, SETTINGS_LIFT)
+  SettingsPane.Attach(view.parent, enterLeads, showLeads, HostLift.LIFT)
   SettingsPane.ApplyLook(look)
   mode = "settings"
   LeadsView.Clear(view)

@@ -124,6 +124,7 @@ UI/Settings/CrafterOptions.lua
 UI/Settings/PageCrafters.lua
 UI/Settings/PageLinked.lua
 UI/Settings/PageTest.lua
+UI/HostLift.lua
 UI/BridgePanel.lua
 UI/BridgeInfo.lua
 UI/WhisperBridge.lua

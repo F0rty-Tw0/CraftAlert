@@ -88,6 +88,7 @@ local UI = {
   "UI.Settings.PageCrafters",
   "UI.Settings.PageLinked",
   "UI.Settings.PageTest",
+  "UI.HostLift",
   "UI.BridgePanel",
   "UI.BridgeInfo",
   "UI.WhisperBridge",
