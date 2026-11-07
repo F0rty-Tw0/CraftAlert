@@ -39,6 +39,7 @@ end
 local function resize(host, width)
   host:SetSize(width, 400)
   Widgets.fire(host, "OnSizeChanged", width, 400)
+  Widgets.nextFrame() -- the panel lays out on the next frame
 end
 
 -- Every show starts on the List: scrolled to the top, nothing selected, nothing marked seen.

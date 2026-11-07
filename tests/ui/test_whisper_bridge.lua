@@ -586,10 +586,12 @@ local function testPanelHostRules()
   local before = laidOut
   host:SetSize(700, 400)
   Widgets.fire(host, "OnSizeChanged", 700, 400)
+  Widgets.nextFrame() -- the panel lays out on the next frame
   Assert.truthy(laidOut > before, "a resize of the shown host lays the view out again")
   wm.hidePanel("CraftAlert")
   before = laidOut
   Widgets.fire(host, "OnSizeChanged", 700, 400)
+  Widgets.nextFrame() -- the panel lays out on the next frame
   Assert.equal(laidOut, before, "a hidden panel is left alone")
 end
 

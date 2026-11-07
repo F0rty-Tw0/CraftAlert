@@ -32,6 +32,7 @@ end
 local function resize(host, width)
   host:SetSize(width, 400)
   Widgets.fire(host, "OnSizeChanged")
+  Widgets.nextFrame() -- the panel lays out on the next frame
 end
 
 local function openSettings(host)

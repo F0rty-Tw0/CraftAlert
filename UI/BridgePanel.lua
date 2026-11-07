@@ -15,6 +15,7 @@ local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.Settings
 local HostLift = ns.HostLift or require("CraftAlert.UI.HostLift")
 local BridgeWidths = ns.BridgeWidths or require("CraftAlert.UI.BridgeWidths")
 local ScreenSlide = ns.ScreenSlide or require("CraftAlert.UI.ScreenSlide")
+local NextFrame = ns.NextFrame or require("CraftAlert.UI.NextFrame")
 
 -- Spec C.2, C.4: the leads in WhisperMessenger's panel. The RegisterPanel table the bridge hands
 -- over (UI/WhisperBridge.lua) and the split view WM's host frame shows: built once per host, sent
@@ -38,6 +39,8 @@ local mode = "list" -- "list" | "settings"; the settings pane replaces the view 
 local splitWidth = nil -- WM's divider position from onSplit; nil until it calls, reset by a new host
 local narrow = false -- whether LeadsView was last told the host is narrow; a new host starts wide
 local look = PanelLook.NATIVE -- WM's look as read at the last show; the settings pane paints with it too
+---@type table
+local resizeClock = nil -- NextFrame clock on the current host: one layout per frame of size events
 
 -- Leads keeps its leads in an instance, where the addon shows none (spec C.3).
 local function visibleLeads()
@@ -129,9 +132,10 @@ local function build(host)
     getListWidth = listWidth,
   })
   placeLedger()
+  -- A drag fires size events in bursts: the host's size at the next frame is laid out once.
   -- Settings open here follow the host's mode too; in "list" mode the pane may be the standalone
   -- window's, so it is left alone.
-  host:HookScript("OnSizeChanged", function()
+  local clock = NextFrame.New(host, function()
     if panelShown and view.parent == host then
       decide()
       if mode == "settings" then
@@ -139,6 +143,12 @@ local function build(host)
         SettingsPane.SetNavWidth(navWidth())
       end
       refresh()
+    end
+  end)
+  resizeClock = clock
+  host:HookScript("OnSizeChanged", function()
+    if panelShown and view.parent == host then
+      NextFrame.Request(clock)
     end
   end)
 end
@@ -160,9 +170,13 @@ local function onShow(host)
   panelShown = true
 end
 
--- A slide in flight ends here, not only through its parent's hide (UI/ScreenSlide.lua).
+-- A slide in flight ends here, not only through its parent's hide (UI/ScreenSlide.lua); a pending
+-- resize layout is dropped (the next show lays out).
 local function onHide()
   ScreenSlide.FinishNow()
+  if resizeClock then
+    NextFrame.Cancel(resizeClock)
+  end
   panelShown = false
 end
 

@@ -58,6 +58,7 @@ local UI = {
   "UI.LedgerStrip",
   "UI.ClearAllLink",
   "UI.ScreenSlide",
+  "UI.NextFrame",
   "UI.LeadsScreens",
   "UI.LeadsView",
   "UI.WindowSize",

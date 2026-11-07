@@ -360,6 +360,7 @@ local function testCountsEndBeforeLink()
   check("narrow")
   host:SetSize(600, 400)
   Widgets.fire(host, "OnSizeChanged")
+  Widgets.nextFrame() -- the panel lays out on the next frame
   check("wide")
 end
 
@@ -385,6 +386,7 @@ local function testNameCutAtHeaderInset()
   Assert.truthy(narrowWidth > 0 and narrowWidth < 102, "the name is cut")
   host:SetSize(600, 400) -- the list takes 260, the details 339
   Widgets.fire(host, "OnSizeChanged")
+  Widgets.nextFrame() -- the panel lays out on the next frame
   check(339, "wide")
   Assert.truthy(details.name:GetWidth() > narrowWidth, "the host's width change refits the name")
 end

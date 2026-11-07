@@ -50,6 +50,7 @@ end
 local function resize(host, width)
   host:SetSize(width, 400)
   Widgets.fire(host, "OnSizeChanged", width, 400)
+  Widgets.nextFrame() -- the panel lays out on the next frame
 end
 
 -- Every LeadsView.SetNarrow(view, narrow) call, in order: calls[i] = narrow.
@@ -104,6 +105,54 @@ local function testHiddenPanelIsLeftAlone()
   Assert.same(calls, { true })
 end
 
+-- LeadsView.Refresh calls from now on; → count().
+local function countRefreshes(ns)
+  local count, refresh = 0, ns.LeadsView.Refresh
+  ns.LeadsView.Refresh = function(...)
+    count = count + 1
+    return refresh(...)
+  end
+  return function()
+    return count
+  end
+end
+
+-- Size events in one frame (a drag): nothing is laid out until the frame ends, then the host's last
+-- size once, through one refresh. Narrow -> wide -> narrow in one frame stays narrow.
+local function testBurstLaysOutTheLastSizeOnce()
+  local ns, _, _, wm = boot()
+  local calls = spyNarrow(ns)
+  local host = showWith(wm, 360)
+  local refreshes = countRefreshes(ns)
+  for _, width in ipairs({ 600, 360, 450, 600, 380 }) do
+    host:SetSize(width, 400)
+    Widgets.fire(host, "OnSizeChanged", width, 400)
+  end
+  Assert.same({ calls, refreshes() }, { { true }, 0 }, "nothing before the frame ends")
+  Widgets.nextFrame()
+  Assert.same({ calls, refreshes() }, { { true }, 1 }, "one refresh, still narrow")
+  host:SetSize(600, 400)
+  Widgets.fire(host, "OnSizeChanged", 600, 400)
+  Widgets.fire(host, "OnSizeChanged", 600, 400)
+  Widgets.nextFrame()
+  Assert.same({ calls, refreshes() }, { { true, false }, 2 }, "the next frame's burst ends wide")
+end
+
+-- A hide drops a pending layout: nothing is laid out while hidden, and after the next show (which
+-- lays out the host as it is then) no stale one follows.
+local function testHideDropsPendingLayout()
+  local ns, _, _, wm = boot()
+  local calls = spyNarrow(ns)
+  local host = showWith(wm, 600)
+  host:SetSize(360, 400)
+  Widgets.fire(host, "OnSizeChanged", 360, 400)
+  wm.hidePanel("CraftAlert")
+  local refreshes = countRefreshes(ns)
+  wm.showPanel("CraftAlert", host)
+  Widgets.nextFrame()
+  Assert.same({ calls, refreshes() }, { { true }, 1 }, "the show's layout only")
+end
+
 -- Review Focus 3: old WM (no `compact` support). onShow runs before WM widens the window, so the
 -- first decision is narrow; the host then widens and the size event restores today's split view
 -- with the newest lead selected and seen.
@@ -140,6 +189,8 @@ return function()
   testThreshold()
   testSizeChangedRedecides()
   testHiddenPanelIsLeftAlone()
+  testBurstLaysOutTheLastSizeOnce()
+  testHideDropsPendingLayout()
   testOldWmNarrowThenWide()
   testSplitCappedAtHostLessDetails()
   Wow.reset()

@@ -94,6 +94,7 @@ UI/LeadsList.lua
 UI/LedgerStrip.lua
 UI/ClearAllLink.lua
 UI/ScreenSlide.lua
+UI/NextFrame.lua
 UI/LeadsScreens.lua
 UI/LeadsView.lua
 UI/WindowSize.lua

@@ -11,6 +11,8 @@
 --   Widgets.texts(frame, frames)    the shown texts under frame (itself and its descendants
 --                                   among `frames`, usually Wow.frames), in creation order
 --   Widgets.fire(frame, name, ...)  runs the `name` script, then its HookScript hooks
+--   Widgets.nextFrame()             the client draws one frame: every playing animation group that
+--                                   lasts at most Widgets.FRAME seconds finishes; longer ones play on
 --   Widgets.LINE_HEIGHT, Widgets.CHAR_WIDTH   the fake font metrics GetStringHeight and
 --                                   GetStringWidth measure with
 -- A frame made with a template name gets that template's fake (tests/helpers/templates.lua).
@@ -22,6 +24,7 @@ Widgets.mouse = {}
 
 Widgets.LINE_HEIGHT = 12
 Widgets.CHAR_WIDTH = 6
+Widgets.FRAME = 1 / 60
 
 -- What a stub texture records, for tests that read it back; the client's Texture has no such fields.
 ---@class TextureSpy: Texture
@@ -49,6 +52,22 @@ local function newAnimation(kind)
       end
     end,
   })
+end
+
+-- Every group the fake made, for nextFrame; weak, so a dropped frame takes its groups along.
+local groups = setmetatable({}, { __mode = "k" })
+
+-- The longest duration set on the group's animations; 0 when none was set.
+local function groupDuration(group)
+  local longest = 0
+  for _, animation in ipairs(group.animations) do
+    for _, call in ipairs(rawget(animation, "calls")) do
+      if call[1] == "SetDuration" and call[2] > longest then
+        longest = call[2]
+      end
+    end
+  end
+  return longest
 end
 
 local function runGroupScript(group, scriptName)
@@ -189,7 +208,9 @@ local function addRegion(region)
   end
 
   function region:CreateAnimationGroup()
-    return newAnimationGroup()
+    local group = newAnimationGroup()
+    groups[group] = true
+    return group
   end
 end
 
@@ -692,6 +713,18 @@ function Widgets.fire(frame, scriptName, ...)
   end
   for _, hook in ipairs(frame.hooks[scriptName] or {}) do
     hook(frame, ...)
+  end
+end
+
+function Widgets.nextFrame()
+  local ending = {}
+  for group in pairs(groups) do
+    if group.playing and groupDuration(group) <= Widgets.FRAME then
+      ending[#ending + 1] = group
+    end
+  end
+  for _, group in ipairs(ending) do
+    group:Finish()
   end
 end
 
