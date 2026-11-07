@@ -177,7 +177,19 @@ end
 local function testEmptyToLeadsIsInstant()
   local ns, view = open(0)
   ns.LeadsView.Refresh(view, { UiFixture.lead(1) })
-  Assert.same({ ns.ScreenSlide.IsSliding(), shown(view) }, { false, { true, false } })
+  Assert.same({ ns.ScreenSlide.IsSliding(), shown(view), view.empty:IsShown() }, { false, { true, false }, false })
+end
+
+-- The last lead leaving the Details slides back to the List, which holds the empty text.
+local function testLastLeadLeavingSlidesToTheEmptyList()
+  local ns, view = open(1)
+  openRow(view, 1)
+  settle(ns, view)
+  ns.Leads.Dismiss(1)
+  refresh(ns, view)
+  Assert.same({ ns.LeadsView.Screen(view), ns.ScreenSlide.IsSliding() }, { "list", true })
+  settle(ns, view)
+  Assert.same({ shown(view), view.empty:IsVisible() }, { { true, false }, true })
 end
 
 return function()
@@ -191,5 +203,6 @@ return function()
   testShownLeadLeavingSlidesBack()
   testResetAndWidthCrossingsAreInstant()
   testEmptyToLeadsIsInstant()
+  testLastLeadLeavingSlidesToTheEmptyList()
   Wow.reset()
 end

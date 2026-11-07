@@ -9,7 +9,8 @@ local ScrollBar = ns.ScrollBar or require("CraftAlert.UI.ScrollBar")
 
 -- Spec A.3: the list half of the split view (UI/LeadsView.lua). 48 px rows (UI/LeadRow.lua) in
 -- the list pane, newest first from the scroll offset, as many as the host's height fits (the
--- empty text is the view's, in the details pane). Rows and the scroll bar (UI/ScrollBar.lua,
+-- empty text is the view's, in the details pane, or over this one while narrow). Rows and the
+-- scroll bar (UI/ScrollBar.lua,
 -- scroll bars spec §3) sit above the pane's inset art; the bar shows only while more leads than
 -- fit, and its width and SCROLLBAR_GAP are kept free right of full rows either way. Icon-only rows
 -- (WM's rail) hide the bar; the wheel still scrolls them.

@@ -239,13 +239,39 @@ local function testLedgerAndClearAllPlacement()
   Assert.equal(strip.extraInset, 0)
 end
 
--- No leads on the List: the empty text shows (details pane), not a blank page.
+-- No leads on the List: the List stays, its pane holding the empty text (not a blank page); a lead
+-- swaps the text for its row.
 local function testEmptyListSaysSo()
   local ns, view = open(0)
   Assert.equal(ns.LeadsView.Screen(view), "list")
-  Assert.same({ view.empty:IsShown(), view.detailsPane:IsShown(), view.listPane:IsShown() }, { true, true, false })
+  Assert.same({ view.listPane:IsShown(), view.detailsPane:IsShown() }, { true, false })
+  Assert.same({ view.empty:GetParent(), view.empty:IsVisible() }, { view.listPane, true })
+  local inset = ns.Theme.LAYOUT.PANE_PADDING
+  Assert.same(view.empty.text.points, {
+    { "LEFT", view.listPane, "LEFT", inset, 0 },
+    { "RIGHT", view.listPane, "RIGHT", -inset, 0 },
+  })
   ns.LeadsView.Refresh(view, { UiFixture.lead(1) })
-  Assert.same({ view.empty:IsShown(), view.detailsPane:IsShown(), view.listPane:IsShown() }, { false, false, true })
+  Assert.same({ view.empty:IsShown(), view.listPane:IsShown(), view.detailsPane:IsShown() }, { false, true, false })
+end
+
+-- The empty text follows the mode: the details pane while wide, the list pane while narrow.
+local function testEmptyTextMovesWithTheMode()
+  local ns, view, size = open(0)
+  widen(ns, view, size)
+  Assert.same({ view.empty:GetParent(), view.empty:GetFrameLevel(), view.empty:IsVisible() }, {
+    view.detailsPane,
+    view.detailsPane:GetFrameLevel() + 2,
+    true,
+  })
+  size.listWidth = WIDTH
+  ns.LeadsView.SetNarrow(view, true)
+  refresh(ns, view)
+  Assert.same({ view.empty:GetParent(), view.empty:GetFrameLevel(), view.empty:IsVisible() }, {
+    view.listPane,
+    view.listPane:GetFrameLevel() + 2,
+    true,
+  })
 end
 
 return function()
@@ -265,5 +291,6 @@ return function()
   testNarrowingGoesToListAndClearsTheSelection()
   testLedgerAndClearAllPlacement()
   testEmptyListSaysSo()
+  testEmptyTextMovesWithTheMode()
   Wow.reset()
 end

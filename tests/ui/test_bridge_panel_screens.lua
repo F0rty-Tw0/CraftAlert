@@ -116,11 +116,26 @@ local function testSplitIsIgnoredWhileNarrow()
   Assert.equal(captured.view.listPane:GetWidth(), 220, "wide: the stored split")
 end
 
+-- Paused with no leads, narrow: the List stays, saying why it is empty (as the wide split view's
+-- list pane stays beside the text).
+local function testPausedEmptyStaysOnTheList()
+  local ns, _, _, wm = boot({ leads = 0 })
+  ns.ScanGate.State = function()
+    return { active = false, reason = "noTrade", channels = {}, recipeCount = 4, crafterCount = 2 }
+  end
+  local captured = capture(ns)
+  showWith(wm, 360)
+  local view = captured.view
+  Assert.same({ ns.LeadsView.Screen(view), view.listPane:IsShown(), view.detailsPane:IsShown() }, { "list", true, false })
+  Assert.same({ view.empty:IsVisible(), view.empty.text:GetText() }, { true, "Paused — no Trade chat here" })
+end
+
 return function()
   testShowStartsOnTheList()
   testBadgeSurvivesListRefreshes()
   testTopRowIsNilOnDetails()
   testGrowingKeepsTheDetailsLeadElseSelectsNewest()
   testSplitIsIgnoredWhileNarrow()
+  testPausedEmptyStaysOnTheList()
   Wow.reset()
 end

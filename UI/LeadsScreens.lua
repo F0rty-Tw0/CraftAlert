@@ -10,15 +10,29 @@ local LeadDetails = ns.LeadDetails or require("CraftAlert.UI.LeadDetails")
 
 -- Phone-style slide spec: where the panes of a LeadsView (UI/LeadsView.lua) sit, and which show.
 -- Wide, the split view: the list pane at the left, the details right of it past the 1 px divider,
--- "Clear all" in the band over the list and the ledger counts right of the list. Narrow (a host
--- too small for both panes), one screen at a time over the full width under the ledger line: the
--- List or the Details. The ledger line spans the host, its counts from the left edge, "Clear all"
--- left of the strip's right control and the counts cut before it.
+-- "Clear all" in the band over the list and the ledger counts right of the list, the empty text on
+-- the details. Narrow (a host too small for both panes), one screen at a time over the full width
+-- under the ledger line: the List (the empty text on it while there are no leads) or the Details.
+-- The ledger line spans the host, its counts from the left edge, "Clear all" left of the strip's
+-- right control and the counts cut before it.
 local LeadsScreens = {}
 
--- Re-anchors the details pane, "Clear all" and the ledger text for the view's narrow flag; runs
--- when the view crosses between narrow and wide. A slide in flight ends first: its end restores
--- the anchors saved at its start, which would undo these.
+-- The empty text's frame over all of `pane`, at the details' level above it, the text centred
+-- across it.
+local function placeEmpty(empty, pane)
+  local padding = Theme.LAYOUT.PANE_PADDING
+  empty:SetParent(pane)
+  empty:ClearAllPoints()
+  empty:SetAllPoints(pane)
+  empty:SetFrameLevel(pane:GetFrameLevel() + 2)
+  empty.text:ClearAllPoints()
+  empty.text:SetPoint("LEFT", pane, "LEFT", padding, 0)
+  empty.text:SetPoint("RIGHT", pane, "RIGHT", -padding, 0)
+end
+
+-- Re-anchors the details pane, "Clear all", the ledger text and the empty text for the view's
+-- narrow flag; runs when the view crosses between narrow and wide. A slide in flight ends first:
+-- its end restores the anchors saved at its start, which would undo these.
 function LeadsScreens.Anchor(view)
   ScreenSlide.FinishNow()
   local padding = Theme.LAYOUT.PADDING
@@ -30,12 +44,14 @@ function LeadsScreens.Anchor(view)
     clearAll:SetPoint("BOTTOMRIGHT", strip, "BOTTOMRIGHT", -(strip.rightInset or padding), 0)
     LedgerStrip.SetLeftEdge(strip, nil)
     LedgerStrip.SetExtraInset(strip, clearAll:GetWidth() + padding)
+    placeEmpty(view.empty, view.listPane)
   else
     -- off-scale: the 1 px divider between the panes.
     pane:SetPoint("TOPLEFT", view.listPane, "TOPRIGHT", 1, 0)
     clearAll:SetPoint("BOTTOMRIGHT", view.listPane, "TOPRIGHT", -padding, 0)
     LedgerStrip.SetLeftEdge(strip, view.listPane)
     LedgerStrip.SetExtraInset(strip, 0)
+    placeEmpty(view.empty, pane)
   end
   pane:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
 end
@@ -60,10 +76,10 @@ local function detailsLeft(view)
   return view.onDetailsLeft
 end
 
--- Shows the panes the screen needs. Wide: both and the divider. Narrow: the List's pane, or the
--- details pane on the Details and on a List with no leads (it holds the empty text); no divider.
+-- Shows the panes the screen needs. Wide: both and the divider. Narrow: the List's pane (with no
+-- leads it holds the empty text), or the details pane on the Details; no divider.
 -- Narrow, a change of screen (List <-> Details) slides (UI/ScreenSlide.lua) when a pane was shown
--- before; the first paint and the empty text coming or going swap at once. view.shownPane and
+-- before; the first paint swaps at once. view.shownPane and
 -- view.shownScreen remember what the last call showed (nil: nothing yet, or wide), so a refresh on
 -- the same pane leaves a slide in flight alone. While the Details slide out to the List,
 -- view.details.leaving is set and their lead stays painted until the slide ends. view.screen, not
@@ -77,7 +93,7 @@ function LeadsScreens.Apply(view)
     return
   end
   view.divider:Hide()
-  local want = (view.screen == "list" and #view.leads > 0) and "list" or "details"
+  local want = view.screen == "list" and "list" or "details"
   local changed = view.shownScreen ~= view.screen
   view.shownScreen = view.screen
   if want == view.shownPane then

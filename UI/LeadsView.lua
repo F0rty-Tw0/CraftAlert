@@ -20,7 +20,8 @@ local LeadsScreens = ns.LeadsScreens or require("CraftAlert.UI.LeadsScreens")
 -- window's content frame, or a WhisperMessenger panel host). The ledger line (UI/LedgerStrip.lua,
 -- spec §8) across the top, "Clear all" at its right (UI/ClearAllLink.lua); under it the list pane (UI/LeadsList.lua) on the left, the details
 -- pane (UI/LeadDetails.lua) of the selected lead on the right, a 1 px divider between them; with
--- no leads the details pane says so (the list may be WM's icon rail, too narrow for the text). Each pane paints its atlas behind an InsetFrameTemplate art frame, as
+-- no leads the details pane says so (the list may be WM's icon rail, too narrow for the text;
+-- narrow, the List's pane says so). Each pane paints its atlas behind an InsetFrameTemplate art frame, as
 -- WhisperMessenger's panes do (RetailChrome.lua:56-58,70,85-88, WM). The selection follows the
 -- lead by id across refreshes; the root frame takes the mouse wheel and scrolls the list, as does
 -- a drag of the list's bar. In a narrow host (SetNarrow, phone-style slide spec) one screen shows
@@ -30,14 +31,10 @@ local LeadsView = {}
 
 local floor = math.floor
 
--- A frame over the whole pane, at the details' level, holding the centred, wrapping text.
+-- A frame holding the centred, wrapping text; LeadsScreens.Anchor lays it over its pane.
 local function createEmpty(pane)
   local empty = _G["CreateFrame"]("Frame", nil, pane)
-  empty:SetAllPoints(pane)
-  empty:SetFrameLevel(pane:GetFrameLevel() + 2)
   local text = FrameKit.Wrapped(empty, Theme.FONTS.body, Theme.COLORS.textSecondary)
-  text:SetPoint("LEFT", pane, "LEFT", Theme.LAYOUT.PANE_PADDING, 0)
-  text:SetPoint("RIGHT", pane, "RIGHT", -Theme.LAYOUT.PANE_PADDING, 0)
   text:SetJustifyH("CENTER")
   text:SetText(Localization.Text("No leads right now. Requests you can craft show up here."))
   empty.text = text
@@ -45,7 +42,7 @@ local function createEmpty(pane)
   return empty
 end
 
--- Why the details pane is empty: the paused line when the addon is not listening, else the plain
+-- Why there are no leads: the paused line when the addon is not listening, else the plain
 -- text (while listening, "Listening in Trade — ..." would not explain an empty list).
 local function emptyText()
   local state = ScanGate.State()
@@ -160,10 +157,9 @@ function LeadsView.New(parent, opts)
   view.listPane:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -Theme.LAYOUT.LEDGER_HEIGHT)
   view.listPane:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
   -- In the band over the list, at its right (in the strip: it hides with it, in an instance); the
-  -- counts start right of the list. LeadsScreens.Anchor places it and the details pane.
+  -- counts start right of the list. LeadsScreens.Anchor places it, the details pane and the empty text.
   view.clearAll = ClearAllLink.Build(view.strip)
   view.detailsPane = FrameKit.InsetPane(frame, Theme.ART.WIDE_PANEL_BACKGROUND)
-  LeadsScreens.Anchor(view)
   view.divider = FrameKit.Divider(frame, view.listPane)
   view.list = LeadsList.New(view.listPane, function(row)
     view.selectedId = row.lead.id
@@ -178,6 +174,7 @@ function LeadsView.New(parent, opts)
   view.details = LeadDetails.New(view.detailsPane)
   view.details.frame:SetFrameLevel(view.detailsPane:GetFrameLevel() + 2)
   view.empty = createEmpty(view.detailsPane)
+  LeadsScreens.Anchor(view)
   LeadsView.Layout(view)
   return view
 end
