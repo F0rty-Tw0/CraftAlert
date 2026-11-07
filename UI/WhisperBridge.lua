@@ -70,10 +70,11 @@ local function isUsable(candidate)
   return true
 end
 
--- Every call into WM's API after Activate: a raise counts as a refusal (false), so a broken WM
--- never costs the player the Blizzard fallback or the rest of a handler.
+-- OpenConversation's options after a whisper went out: WM opens only if its outgoing auto-open allows.
 local AFTER_SEND = { afterSend = true }
 
+-- Every call into WM's API after Activate: a raise counts as a refusal (false), so a broken WM
+-- never costs the player the Blizzard fallback or the rest of a handler.
 local function ask(name, ...)
   local ok, result = pcall(api[name], ...)
   return ok and result
