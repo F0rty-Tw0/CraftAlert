@@ -115,13 +115,14 @@ function LeadsView.Refresh(view, leads)
   if #leads == 0 then
     view.empty.text:SetText(emptyText())
   end
-  if selected then
-    LeadDetails.Show(view.details, selected)
-  else
-    LeadDetails.Clear(view.details)
-  end
+  -- The screens first: a slide's start ends the one before it, whose end may empty the details.
   if view.narrow then
     LeadsScreens.Apply(view)
+  end
+  if selected then
+    LeadDetails.Show(view.details, selected)
+  elseif not view.detailsLeaving then
+    LeadDetails.Clear(view.details)
   end
 end
 

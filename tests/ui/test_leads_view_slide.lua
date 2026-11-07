@@ -82,6 +82,30 @@ local function testBackSlidesToList()
   Assert.same({ shown(view), view.list.offset, view.selectedId }, { { true, false }, 2 })
 end
 
+-- Back: the leaving Details keep their lead until the slide ends, then empty.
+local function testBackSlidesOutTheShownDetails()
+  local ns, view = open(3)
+  openRow(view, 2)
+  settle(ns, view)
+  local lead = view.details.lead
+  ns.LeadsView.Back(view)
+  refresh(ns, view)
+  Assert.same({ view.details.frame:IsShown(), view.details.lead == lead }, { true, true }, "mid-slide")
+  settle(ns, view)
+  Assert.same({ view.details.frame:IsShown(), view.details.lead }, { false }, "after")
+end
+
+-- A row clicked while the Details slide out opens that row's lead; the old slide's end empties nothing.
+local function testRowClickMidBackShowsTheClickedLead()
+  local ns, view = open(3)
+  openRow(view, 2)
+  settle(ns, view)
+  ns.LeadsView.Back(view)
+  openRow(view, 3)
+  settle(ns, view)
+  Assert.same({ view.details.frame:IsShown(), view.details.lead == view.leads[3] }, { true, true })
+end
+
 -- Review Focus 1: no top row during or after the slide to Details; the List counts again on return.
 local function testNoTopRowDuringOrAfterTheSlideToDetails()
   local ns, view = open(3)
@@ -146,6 +170,8 @@ end
 return function()
   testRowClickSlidesToDetails()
   testBackSlidesToList()
+  testBackSlidesOutTheShownDetails()
+  testRowClickMidBackShowsTheClickedLead()
   testNoTopRowDuringOrAfterTheSlideToDetails()
   testRefreshMidSlideKeepsIt()
   testShownLeadLeavingSlidesBack()

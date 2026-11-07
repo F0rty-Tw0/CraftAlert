@@ -6,6 +6,7 @@ end
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local LedgerStrip = ns.LedgerStrip or require("CraftAlert.UI.LedgerStrip")
 local ScreenSlide = ns.ScreenSlide or require("CraftAlert.UI.ScreenSlide")
+local LeadDetails = ns.LeadDetails or require("CraftAlert.UI.LeadDetails")
 
 -- Phone-style slide spec: where the panes of a LeadsView (UI/LeadsView.lua) sit, and which show.
 -- Wide, the split view: the list pane at the left, the details right of it past the 1 px divider,
@@ -46,13 +47,27 @@ function LeadsScreens.Reset(view)
   view.shownPane, view.shownScreen = nil, nil
 end
 
+-- The end of a slide from the Details to the List (made once per view): the details empty only
+-- now, so the leaving screen keeps its lead.
+local function detailsLeft(view)
+  if view.onDetailsLeft == nil then
+    view.onDetailsLeft = function()
+      view.detailsLeaving = false
+      LeadDetails.Clear(view.details)
+    end
+  end
+
+  return view.onDetailsLeft
+end
+
 -- Shows the panes the screen needs. Wide: both and the divider. Narrow: the List's pane, or the
 -- details pane on the Details and on a List with no leads (it holds the empty text); no divider.
 -- Narrow, a change of screen (List <-> Details) slides (UI/ScreenSlide.lua) when a pane was shown
 -- before; the first paint and the empty text coming or going swap at once. view.shownPane and
 -- view.shownScreen remember what the last call showed (nil: nothing yet, or wide), so a refresh on
--- the same pane leaves a slide in flight alone. view.screen, not LeadsView.Screen: LeadsView loads
--- after this module.
+-- the same pane leaves a slide in flight alone. While the Details slide out to the List,
+-- view.detailsLeaving is set and their lead stays painted until the slide ends. view.screen, not
+-- LeadsView.Screen: LeadsView loads after this module.
 function LeadsScreens.Apply(view)
   if not view.narrow then
     LeadsScreens.Reset(view)
@@ -75,7 +90,9 @@ function LeadsScreens.Apply(view)
     wantPane, otherPane = view.listPane, view.detailsPane
   end
   if slide then
-    ScreenSlide.Show(otherPane, wantPane, want == "details" and 1 or -1)
+    local toList = want == "list"
+    ScreenSlide.Show(otherPane, wantPane, toList and -1 or 1, toList and detailsLeft(view) or nil)
+    view.detailsLeaving = toList and ScreenSlide.IsSliding()
     return
   end
   ScreenSlide.FinishNow()
