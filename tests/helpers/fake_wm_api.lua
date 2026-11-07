@@ -14,8 +14,9 @@
 --                                            (false) and wm.raise.IsAnimationEnabled. opts.without models an older WM
 --   wm.compact                             what IsCompactWindow answers (default false; true: WM's compact
 --                                            window). Like IsAnimationEnabled it is not recorded in wm.calls;
---                                            it honours wm.refuse.IsCompactWindow (false) and wm.raise.IsCompactWindow
---   wm.preview[key]                       the preview table while shown (ShowPreview sets it, HidePreview clears it)
+--                                            it honours wm.refuse.IsCompactWindow (false) and wm.raise.IsCompactWindow.
+--                                            opts.without models an older WM
+--   wm.preview[key]                        the preview table while shown (ShowPreview sets it, HidePreview clears it)
 --   wm.registered                          { { key, panel }, ... }; wm.panels[key] = a copy of the panel's
 --                                            fields taken at RegisterPanel, as WM's copyPanel does
 --   wm.shown[key]                          IsPanelShown

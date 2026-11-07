@@ -110,7 +110,7 @@ local function testOlderWmFollowsTheWidth()
   Assert.same(look(ns2, view2), LIST, "300")
 end
 
--- Review Focus 2: a raising call is the width rule, with no Lua error.
+-- Row "raise": a raising call is the width rule, with no Lua error.
 local function testRaisingCallFollowsTheWidth()
   local ns, wm = boot()
   wm.compact = true
@@ -120,7 +120,7 @@ local function testRaisingCallFollowsTheWidth()
   Assert.same(look(ns, captured.view), SPLIT)
 end
 
--- Review Focus 3: the answer is read at every show. The same host, so a read-once panel keeps its
+-- Event onShow: the answer is read at every show. The same host, so a read-once panel keeps its
 -- first answer (a new host would rebuild and hide that).
 local function testAnswerIsReadAtEveryShow()
   local ns, wm = boot()
