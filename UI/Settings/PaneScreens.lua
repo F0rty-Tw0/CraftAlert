@@ -5,6 +5,7 @@ end
 
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local PageHeader = ns.PageHeader or require("CraftAlert.UI.Settings.PageHeader")
+local ScreenSlide = ns.ScreenSlide or require("CraftAlert.UI.ScreenSlide")
 
 -- The settings pane's (SettingsPane.lua) two layouts. Wide: the split, the nav left of the page
 -- pane. Narrow: one screen at a time, the nav or the page pane, each filling the pane, the page
@@ -57,14 +58,28 @@ end
 
 -- The one place that shows or hides the panes. Wide: both, the selected page's nav button marked.
 -- Narrow: the nav alone with no button marked (pane.screen "nav"), or the page pane under its
--- header titled `title` ("page").
-function PaneScreens.Apply(pane, narrow, title)
+-- header titled `title` ("page"). With `slide`, a change of narrow screen slides (UI/ScreenSlide.lua);
+-- every other call ends a slide in flight and swaps at once. pane.shownScreen is the narrow screen
+-- last applied (nil: wide). A page sliding out keeps its header; the hidden pane carries it until
+-- the next call sets it.
+function PaneScreens.Apply(pane, narrow, title, slide)
   local split = not narrow
   local onPage = narrow and pane.screen == "page"
-  pane.nav:SetShown(split or pane.screen == "nav")
-  pane.right:SetShown(split or onPage)
+  if slide and narrow and pane.shownScreen ~= nil and pane.shownScreen ~= pane.screen then
+    if onPage then
+      pane.header:Show()
+      ScreenSlide.Show(pane.nav, pane.right, 1)
+    else
+      ScreenSlide.Show(pane.right, pane.nav, -1)
+    end
+  else
+    ScreenSlide.FinishNow()
+    pane.nav:SetShown(split or pane.screen == "nav")
+    pane.right:SetShown(split or onPage)
+    pane.header:SetShown(onPage)
+  end
+  pane.shownScreen = narrow and pane.screen or nil
   pane.divider:SetShown(split)
-  pane.header:SetShown(onPage)
   if onPage then
     pane.header.title:SetText(title)
   end

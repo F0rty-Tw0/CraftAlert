@@ -57,14 +57,16 @@ local function createContent(page)
   return entry
 end
 
-local function applyScreen()
+-- `slide`: a narrow change of screen slides (the nav button and the header's arrow); Show, Attach,
+-- SetNarrow and the split swap at once.
+local function applyScreen(slide)
   local page = pageById(pane.selected)
-  PaneScreens.Apply(pane, narrow, page and page.title)
+  PaneScreens.Apply(pane, narrow, page and page.title, slide)
 end
 
 -- Narrow, the page's screen comes up before the page shows and refreshes, as wide shows it in a
 -- shown pane.
-local function showPage(id)
+local function showPage(id, slide)
   local page = pageById(id)
   if page == nil then
     return
@@ -77,7 +79,7 @@ local function showPage(id)
   if narrow then
     pane.screen = "page"
   end
-  applyScreen()
+  applyScreen(slide)
   entry.frame:Show()
   entry.view.Refresh()
 end
@@ -100,7 +102,7 @@ local function addNavButton(page, index)
   button.selected:Hide()
   RowArt.ApplyLook(button.hover, button.selected, lastLook, nil)
   button:SetScript("OnClick", function()
-    showPage(page.id)
+    showPage(page.id, true)
   end)
   pane.buttons[page.id] = button
 end
@@ -128,7 +130,7 @@ local function build(host)
   pane.navWidth, pane.screen = layout.LIST_WIDTH, "nav"
   PaneScreens.AddHeader(pane, function()
     pane.screen = "nav"
-    applyScreen()
+    applyScreen(true)
   end)
   for _, name in ipairs(BUILT_IN) do
     pages[#pages + 1] = ns[name] or require("CraftAlert.UI.Settings." .. name)
