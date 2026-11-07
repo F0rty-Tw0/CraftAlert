@@ -27,7 +27,8 @@ local NextFrame = ns.NextFrame or require("CraftAlert.UI.NextFrame")
 -- an older WM drops the unknown field, so the window still widens and the page shows the split view).
 -- A host too narrow for both panes shows one screen at a time, lifted over WM's divider
 -- (UI/HostLift.lua): the leads' List or Details (LeadsView.SetNarrow), or the settings' nav or a
--- page (SettingsPane.SetNarrow); every show starts on the List.
+-- page (SettingsPane.SetNarrow); every show starts on the List. When WM says its window is compact
+-- (WhisperBridge.IsCompactWindow, read at every show), the host is narrow at any width.
 local BridgePanel = {}
 
 ---@type table
@@ -39,6 +40,7 @@ local mode = "list" -- "list" | "settings"; the settings pane replaces the view 
 local splitWidth = nil -- WM's divider position from onSplit; nil until it calls, reset by a new host
 local narrow = false -- whether LeadsView was last told the host is narrow; a new host starts wide
 local look = PanelLook.NATIVE -- WM's look as read at the last show; the settings pane paints with it too
+local compactWindow = false -- whether WM's window was compact at the last show; read at every show
 ---@type table
 local resizeClock = nil -- NextFrame clock on the current host: one layout per frame of size events
 -- The host size and split last decided at (a list-mode decide is always laid out): WM's split in a
@@ -62,10 +64,11 @@ local function navWidth()
   return BridgeWidths.Nav(currentHost:GetWidth(), splitWidth)
 end
 
--- Tells the view whenever the host crosses the narrow threshold; a host not laid out yet (0) is wide.
+-- Tells the view whenever the host crosses the narrow threshold; a host not laid out yet (0) is wide,
+-- unless WM's window is compact: then every width is narrow.
 -- On every run (a new host that starts wide never crosses), narrow screens lift over WM's divider.
 local function decide()
-  local isNarrow = BridgeWidths.IsNarrow(currentHost:GetWidth())
+  local isNarrow = compactWindow or BridgeWidths.IsNarrow(currentHost:GetWidth())
   if isNarrow ~= narrow then
     narrow = isNarrow
     LeadsView.SetNarrow(view, isNarrow)
@@ -173,7 +176,9 @@ local function onShow(host)
     enterLeads()
   end
   -- Resolved here: WhisperBridge loads after this module and requires it.
-  look = (ns.WhisperBridge or require("CraftAlert.UI.WhisperBridge")).Look()
+  local bridge = ns.WhisperBridge or require("CraftAlert.UI.WhisperBridge")
+  look = bridge.Look()
+  compactWindow = bridge.IsCompactWindow()
   LeadsView.ApplyLook(view, look)
   decide()
   LeadsView.ResetTop(view)
