@@ -81,6 +81,19 @@ local function testChangedFieldsRepaint()
   Assert.equal(row.greetedIcon:IsShown(), true, "greeted mark")
 end
 
+-- A reply alone repaints the replied tag; an unread whisper holds the dot pink, so nothing else
+-- the row shows changes.
+local function testReplyAloneRepaints()
+  local ns, row, lead = load()
+  ns.LeadRowPaint.SetUnreadSource(function()
+    return 1
+  end)
+  ns.LeadRow.Show(row, lead)
+  lead.replied = true
+  ns.LeadRow.Show(row, lead)
+  Assert.equal(row.repliedTag:IsShown(), true)
+end
+
 -- A cleared row shows and repaints on the next Show; the second line's colour follows the
 -- selection, set only when it changes.
 local function testClearRepaints()
@@ -102,6 +115,7 @@ return function()
   testAgeFollowsTheClock()
   testClassColourArrives()
   testChangedFieldsRepaint()
+  testReplyAloneRepaints()
   testClearRepaints()
   Wow.reset()
 end
