@@ -24,8 +24,13 @@ for target in "${ALL_TARGETS[@]}"; do
     TARGETS+=("$target")
   fi
 done
-# Sibling checkout whose .tools/ holds luacheck and lua-language-server
-FALLBACK_TOOLS="../WhisperMessenger/.tools"
+# Folders searched for the tools, nearest first: this checkout, the main checkout
+# (differs when this is a linked worktree, which has no .tools/ of its own), then
+# the sibling WhisperMessenger checkout. Resolved from git's common dir, not the
+# current folder, so a worktree finds the same tools as the main checkout.
+MAIN_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$PWD/.git")")"
+FALLBACK_TOOLS="$MAIN_ROOT/../WhisperMessenger/.tools"
+TOOL_DIRS=(.tools "$MAIN_ROOT/.tools" "$FALLBACK_TOOLS")
 
 find_command() {
   local name="$1"
@@ -64,8 +69,19 @@ first_executable() {
   return 1
 }
 
+# Echo the first <tool dir>/<relative path> that is executable, or nothing.
+find_tool() {
+  for dir in "${TOOL_DIRS[@]}"; do
+    if [[ -x "$dir/$1" ]]; then
+      printf '%s\n' "$dir/$1"
+      return 0
+    fi
+  done
+  return 1
+}
+
 STYLUA_CMD=""
-if STYLUA_CMD="$(first_executable .tools/stylua/stylua.exe)"; then
+if STYLUA_CMD="$(find_tool stylua/stylua.exe)"; then
   :
 elif STYLUA_CMD="$(find_command stylua)"; then
   :
@@ -78,7 +94,7 @@ fi
 LUACHECK_CMD=""
 # Prefer the bare exe: the hererocks-generated luacheck.bat is a bash script
 # with a .bat extension and does not run under cmd.exe on Windows.
-if LUACHECK_CMD="$(first_executable .tools/luacheck.exe "$FALLBACK_TOOLS/luacheck.exe")"; then
+if LUACHECK_CMD="$(find_tool luacheck.exe)"; then
   :
 elif LUACHECK_CMD="$(find_command luacheck)"; then
   :
@@ -87,7 +103,7 @@ else
 fi
 
 LUALS_CMD=""
-if LUALS_CMD="$(first_executable .tools/lua-language-server/bin/lua-language-server.exe "$FALLBACK_TOOLS/lua-language-server/bin/lua-language-server.exe")"; then
+if LUALS_CMD="$(find_tool lua-language-server/bin/lua-language-server.exe)"; then
   :
 elif LUALS_CMD="$(find_command lua-language-server)"; then
   :
@@ -100,9 +116,9 @@ fi
 # the WoW type names the code uses. Get them once (core.longpaths for Windows):
 #   git -c core.longpaths=true clone --depth 1 https://github.com/Ketho/vscode-wow-api .tools/vscode-wow-api
 WOW_API=""
-for candidate in .tools/vscode-wow-api/Annotations/Core "$FALLBACK_TOOLS/vscode-wow-api/Annotations/Core"; do
-  if [[ -d "$candidate" ]]; then
-    WOW_API="$candidate"
+for dir in "${TOOL_DIRS[@]}"; do
+  if [[ -d "$dir/vscode-wow-api/Annotations/Core" ]]; then
+    WOW_API="$dir/vscode-wow-api/Annotations/Core"
     break
   fi
 done
