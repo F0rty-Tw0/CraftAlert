@@ -19,7 +19,10 @@ local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.Settings
 -- shown, painted in WM's look, read at every show (UI/PanelLook.lua). A "Settings" link at the
 -- ledger line's right swaps the view for the settings pane inside the host (Back returns; the mode
 -- is not saved, so every show starts on the leads). The tab's badge counts the unseen leads; WM's
--- Mark all read marks them all seen at once.
+-- Mark all read marks them all seen at once. The table opts in to WM's narrow window (`compact`;
+-- an older WM drops the unknown field, so the window still widens and the page shows the split view).
+-- A host too narrow for both panes shows the leads' List or Details screen, one at a time
+-- (LeadsView.SetNarrow); every show starts on the List.
 local BridgePanel = {}
 
 local max = math.max
@@ -32,6 +35,9 @@ local DETAILS_MIN_WIDTH = 340
 -- contacts pane, a sibling of the host (UI/MessengerWindow/LayoutBuilder/ContactsSection.lua:115-121
 -- and UI/Theme/Layout.lua:17, WM), so its line never draws over the settings.
 local SETTINGS_LIFT = 60
+-- A host narrower than the list's minimum plus the details' minimum cannot show both: the narrow
+-- page (one pane at a time) takes over.
+local NARROW_BELOW = Theme.LAYOUT.LIST_MIN_WIDTH + DETAILS_MIN_WIDTH
 
 ---@type table
 local view = nil -- the LeadsView in the current host, nil until the first show
@@ -40,6 +46,7 @@ local currentHost = nil -- set before the view is built: LeadsView.New lays out 
 local panelShown = false
 local mode = "list" -- "list" | "settings"; the settings pane replaces the view in the host
 local splitWidth = nil -- WM's divider position from onSplit; nil until it calls, reset by a new host
+local narrow = false -- whether LeadsView was last told the host is narrow; a new host starts wide
 local look = PanelLook.NATIVE -- WM's look as read at the last show; the settings pane paints with it too
 
 -- Leads keeps its leads in an instance, where the addon shows none (spec C.3).
@@ -50,18 +57,43 @@ local function visibleLeads()
   return Leads.List()
 end
 
--- The list's width in the host: WM's divider once it called onSplit, else what the host leaves the
--- details, between the minimum and the standalone window's.
-local function listWidth()
+-- WM's divider once it called onSplit, else what the host leaves the details, between the minimum
+-- and the standalone window's.
+local function splitOrClamp()
   if splitWidth ~= nil then
     return splitWidth
   end
   return min(Theme.LAYOUT.LIST_WIDTH, max(Theme.LAYOUT.LIST_MIN_WIDTH, currentHost:GetWidth() - DETAILS_MIN_WIDTH))
 end
 
+-- The list's width in the host: the divider, kept clear of the details' minimum (WM's phone window
+-- resized past the narrow threshold sends a split of about its full width); the rail is under the cap.
+-- Narrow, the List is the whole host and the divider is ignored (kept for when the host widens).
+local function listWidth()
+  if narrow then
+    return currentHost:GetWidth()
+  end
+  local width = splitOrClamp()
+  local hostWidth = currentHost:GetWidth()
+  if splitWidth ~= nil and hostWidth > 0 then
+    return min(width, hostWidth - DETAILS_MIN_WIDTH)
+  end
+  return width
+end
+
 -- The settings nav keeps its minimum when WM's divider snaps to the rail.
 local function navWidth()
-  return max(listWidth(), Theme.LAYOUT.LIST_MIN_WIDTH)
+  return max(splitOrClamp(), Theme.LAYOUT.LIST_MIN_WIDTH)
+end
+
+-- Tells the view whenever the host crosses the narrow threshold; a host not laid out yet (0) is wide.
+local function decide()
+  local width = currentHost:GetWidth()
+  local isNarrow = width > 0 and width < NARROW_BELOW
+  if isNarrow ~= narrow then
+    narrow = isNarrow
+    LeadsView.SetNarrow(view, isNarrow)
+  end
 end
 
 local function refresh()
@@ -114,6 +146,7 @@ end
 local function build(host)
   currentHost = host
   splitWidth = nil
+  narrow = false
   view = LeadsView.New(host, {
     getHeight = function()
       return host:GetHeight()
@@ -123,6 +156,7 @@ local function build(host)
   placeLedger()
   host:HookScript("OnSizeChanged", function()
     if panelShown and view.parent == host then
+      decide()
       refresh()
     end
   end)
@@ -138,6 +172,7 @@ local function onShow(host)
   -- Resolved here: WhisperBridge loads after this module and requires it.
   look = (ns.WhisperBridge or require("CraftAlert.UI.WhisperBridge")).Look()
   LeadsView.ApplyLook(view, look)
+  decide()
   LeadsView.ResetTop(view)
   LeadsView.Clear(view)
   refresh()

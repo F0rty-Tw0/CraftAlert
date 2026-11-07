@@ -13,6 +13,8 @@ local LedgerStrip = ns.LedgerStrip or require("CraftAlert.UI.LedgerStrip")
 local ClearAllLink = ns.ClearAllLink or require("CraftAlert.UI.ClearAllLink")
 local ScanGate = ns.ScanGate or require("CraftAlert.Core.ScanGate")
 local Status = ns.Status or require("CraftAlert.Core.Status")
+local ScrollView = ns.ScrollView or require("CraftAlert.UI.ScrollView")
+local LeadsScreens = ns.LeadsScreens or require("CraftAlert.UI.LeadsScreens")
 
 -- Spec A.2, A.6, assumption 2: the leads split view, built into any parent frame (the leads
 -- window's content frame, or a WhisperMessenger panel host). The ledger line (UI/LedgerStrip.lua,
@@ -21,7 +23,9 @@ local Status = ns.Status or require("CraftAlert.Core.Status")
 -- no leads the details pane says so (the list may be WM's icon rail, too narrow for the text). Each pane paints its atlas behind an InsetFrameTemplate art frame, as
 -- WhisperMessenger's panes do (RetailChrome.lua:56-58,70,85-88, WM). The selection follows the
 -- lead by id across refreshes; the root frame takes the mouse wheel and scrolls the list, as does
--- a drag of the list's bar.
+-- a drag of the list's bar. In a narrow host (SetNarrow, phone-style slide spec) one screen shows
+-- at a time (UI/LeadsScreens.lua): the List, nothing selected, nothing marked seen; a row's click
+-- opens its Details, which Back leaves for the List again.
 local LeadsView = {}
 
 local floor = math.floor
@@ -74,11 +78,30 @@ local function pick(view, leads)
   return leads[positionOf(view.leads, id)] or leads[#leads]
 end
 
+-- Narrow: the List selects nothing; the Details keep their lead by id, and go back to the List
+-- when it left (no jump to another lead).
+local function selectNarrow(view, leads)
+  if view.screen ~= "details" then
+    return nil
+  end
+  local position = positionOf(leads, view.selectedId)
+  if position then
+    return leads[position]
+  end
+  view.screen = "list"
+  return nil
+end
+
 -- Re-reads `leads` (newest first) into the list and the details of the selected lead, which is
 -- seen first (the badge's count drops, and its row paints without the unseen dot), and the ledger
 -- line. The list gets the height under that line.
 function LeadsView.Refresh(view, leads)
-  local selected = pick(view, leads)
+  local selected
+  if view.narrow then
+    selected = selectNarrow(view, leads)
+  else
+    selected = pick(view, leads)
+  end
   view.selectedId = selected and selected.id
   view.leads = leads
   if selected then
@@ -97,10 +120,18 @@ function LeadsView.Refresh(view, leads)
   else
     LeadDetails.Clear(view.details)
   end
+  if view.narrow then
+    LeadsScreens.Apply(view)
+  end
 end
 
--- Scrolls by `delta` wheel notches (positive = up); the refresh clamps the offset.
+-- Scrolls by `delta` wheel notches (positive = up); the refresh clamps the offset. On the narrow
+-- Details the details body scrolls instead, never the hidden list.
 function LeadsView.Scroll(view, delta)
+  if view.screen == "details" then
+    ScrollView.Wheel(view.details.scroll, delta)
+    return
+  end
   view.list.offset = view.list.offset - delta
   LeadsView.Refresh(view, view.leads)
 end
@@ -109,7 +140,7 @@ end
 -- the view's own frames, which may read 0 on the first open); opts.getListWidth(): the list
 -- pane's width.
 function LeadsView.New(parent, opts)
-  local view = { parent = parent, getHeight = opts.getHeight, getListWidth = opts.getListWidth, leads = {} }
+  local view = { parent = parent, getHeight = opts.getHeight, getListWidth = opts.getListWidth, leads = {}, narrow = false }
   local frame = _G["CreateFrame"]("Frame", nil, parent)
   frame:SetAllPoints(parent)
   frame:EnableMouseWheel(true)
@@ -122,17 +153,16 @@ function LeadsView.New(parent, opts)
   view.listPane:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -Theme.LAYOUT.LEDGER_HEIGHT)
   view.listPane:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
   -- In the band over the list, at its right (in the strip: it hides with it, in an instance); the
-  -- counts start right of the list.
+  -- counts start right of the list. LeadsScreens.Anchor places it and the details pane.
   view.clearAll = ClearAllLink.Build(view.strip)
-  view.clearAll:SetPoint("BOTTOMRIGHT", view.listPane, "TOPRIGHT", -Theme.LAYOUT.PADDING, 0)
-  LedgerStrip.SetLeftEdge(view.strip, view.listPane)
   view.detailsPane = FrameKit.InsetPane(frame, Theme.ART.WIDE_PANEL_BACKGROUND)
-  -- off-scale: the 1 px divider between the panes.
-  view.detailsPane:SetPoint("TOPLEFT", view.listPane, "TOPRIGHT", 1, 0)
-  view.detailsPane:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
+  LeadsScreens.Anchor(view)
   view.divider = FrameKit.Divider(frame, view.listPane)
   view.list = LeadsList.New(view.listPane, function(row)
     view.selectedId = row.lead.id
+    if view.narrow then
+      view.screen = "details"
+    end
     LeadsView.Refresh(view, view.leads)
   end, function(value)
     view.list.offset = floor(value + 0.5)
@@ -157,19 +187,31 @@ end
 
 -- Re-reads the list width; the details get the rest of the parent (0 wide: not known yet). A list
 -- narrower than the minimum (WM's divider on its rail) is icon-only, and "Clear all" hides when the
--- band over the list cannot hold it.
+-- band over the list cannot hold it. Narrow: full-size rows whatever the width, "Clear all" on the
+-- ledger line, the details as wide as the parent.
 function LeadsView.Layout(view)
   local listWidth = view.getListWidth()
+  if view.narrow then
+    view.listPane:SetWidth(listWidth)
+    LeadsList.SetCompact(view.list, false)
+    view.clearAll:Show()
+    LeadDetails.Layout(view.details, view.parent:GetWidth())
+    return
+  end
   view.listPane:SetWidth(listWidth)
   view.clearAll:SetShown(listWidth >= view.clearAll:GetWidth() + 2 * Theme.LAYOUT.PADDING)
   LeadsList.SetCompact(view.list, listWidth < Theme.LAYOUT.LIST_MIN_WIDTH)
   LeadDetails.Layout(view.details, view.parent:GetWidth() - listWidth - 1)
 end
 
--- Back to the top with nothing selected: the next refresh selects the newest lead.
+-- Back to the top with nothing selected: the next refresh selects the newest lead (narrow: on
+-- the List).
 function LeadsView.ResetTop(view)
   view.list.offset = 0
   view.selectedId = nil
+  if view.narrow then
+    view.screen = "list"
+  end
 end
 
 -- Empties the rows, the details and the empty text, so the next refresh shows each lead afresh
@@ -187,6 +229,42 @@ end
 function LeadsView.Selected(view)
   local position = positionOf(view.leads, view.selectedId)
   return position and view.leads[position]
+end
+
+-- BridgePanel calls it when its host crosses the narrow threshold; the caller lays out and
+-- refreshes after. To narrow: the List, nothing selected. To wide:
+-- a lead shown in the Details stays selected, else the next refresh selects the newest.
+function LeadsView.SetNarrow(view, narrow)
+  if narrow == view.narrow then
+    return
+  end
+  if narrow then
+    view.screen = "list"
+    view.selectedId = nil
+  else
+    if view.screen ~= "details" then
+      view.selectedId = nil
+    end
+    view.screen = nil
+  end
+  view.narrow = narrow
+  LeadsScreens.Anchor(view)
+  LeadsScreens.Apply(view)
+end
+
+-- "split" while wide, else the narrow screen: "list" or "details".
+function LeadsView.Screen(view)
+  return view.narrow and view.screen or "split"
+end
+
+-- Narrow Details to the List, at the same scroll offset, nothing selected; a no-op elsewhere.
+function LeadsView.Back(view)
+  if view.screen ~= "details" then
+    return
+  end
+  view.screen = "list"
+  view.selectedId = nil
+  LeadsView.Refresh(view, view.leads)
 end
 
 ns.LeadsView = LeadsView

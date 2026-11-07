@@ -155,12 +155,12 @@ function LedgerStrip.New(parent, host)
 end
 
 -- The text from PADDING right of `strip.leftEdge`'s right (the strip's own left when unset) to
--- `strip.rightInset` before the strip's right. The edge (a frame whose top is the strip's
--- bottom) gives the box's bottom-left and the strip its top-right: the text box is the band, its
--- line centred in it; a LEFT anchor on the edge would take the edge's vertical centre.
+-- `strip.rightInset` plus `strip.extraInset` before the strip's right. The edge (a frame whose top
+-- is the strip's bottom) gives the box's bottom-left and the strip its top-right: the text box is
+-- the band, its line centred in it; a LEFT anchor on the edge would take the edge's vertical centre.
 local function placeText(strip)
   local padding = Theme.LAYOUT.PADDING
-  local edge, right = strip.leftEdge, -(strip.rightInset or padding)
+  local edge, right = strip.leftEdge, -((strip.rightInset or padding) + (strip.extraInset or 0))
   strip.text:ClearAllPoints()
   strip.text:SetJustifyV("MIDDLE")
   if edge then
@@ -175,6 +175,13 @@ end
 -- Ends the strip text `inset` px before the strip's right, clear of a control placed there.
 function LedgerStrip.SetRightInset(strip, inset)
   strip.rightInset = inset
+  placeText(strip)
+end
+
+-- Ends the strip text `extra` px further in than the right inset, clear of a second control placed
+-- left of the first (the narrow leads page's "Clear all").
+function LedgerStrip.SetExtraInset(strip, extra)
+  strip.extraInset = extra
   placeText(strip)
 end
 

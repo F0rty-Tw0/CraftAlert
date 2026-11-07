@@ -233,8 +233,8 @@ local function testNoSplitKeepsTheClamp()
   local captured = capture(ns)
   showWith(wm, 600)
   Assert.same({ splitOf(captured.view) }, { 260, 260 }, "600 - 340 -> 260")
-  showWith(wm, 500)
-  Assert.same({ splitOf(captured.view) }, { 180, 180 }, "500 - 340 -> 180")
+  showWith(wm, 520)
+  Assert.same({ splitOf(captured.view) }, { 180, 180 }, "520 - 340 -> 180")
 end
 
 local function testSplitFromAnotherHostIsIgnored()
@@ -369,7 +369,8 @@ local function testNameCutAtHeaderInset()
   local Layout = require("tests.helpers.layout")
   local ns, _, _, wm = boot()
   local captured = capture(ns)
-  local host = showWith(wm, 340) -- the list takes 180, the details 340 - 180 - 1 = 159
+  local host = showWith(wm, 159) -- narrow: the Details are the whole host, 159
+  Widgets.click(captured.view.list.rows[1], "LeftButton")
   local details = captured.view.details
   details.lead.customer = "Telchiness-Kazzak"
   local function check(width, message)

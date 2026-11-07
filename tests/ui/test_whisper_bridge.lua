@@ -420,8 +420,8 @@ local function testPanel()
   Assert.same({ ns.WhisperBridge.VisibleLead() }, { ns.Leads.Latest(), 50 }, "the view followed the change")
   wm.hidePanel("CraftAlert")
   Assert.equal(ns.WhisperBridge.VisibleLead(), nil, "hidden panel shows nothing")
-  -- width clamp: 480 - 340 = 140 -> 180; 700 - 340 = 360 -> 260
-  Assert.same({ listWidthFor(480), listWidthFor(700) }, { 180, 260 })
+  -- narrow (480) takes the host's width; the clamp: 520 - 340 = 180, 700 - 340 = 360 -> 260
+  Assert.same({ listWidthFor(480), listWidthFor(520), listWidthFor(700) }, { 480, 180, 260 })
   -- the gear opens Settings inside the panel's host, not the own window
   local current = newHost(600)
   wm.showPanel("CraftAlert", current)

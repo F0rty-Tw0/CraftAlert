@@ -52,6 +52,11 @@ function ScrollView.ScrollTo(view, offset)
   view.frame:EnableMouseWheel(range > 0)
 end
 
+-- Scrolls by `delta` wheel notches (positive = up), STEP px each.
+function ScrollView.Wheel(view, delta)
+  ScrollView.ScrollTo(view, view.frame:GetVerticalScroll() - delta * STEP)
+end
+
 local function sync(view)
   ScrollView.ScrollTo(view, view.frame:GetVerticalScroll())
 end
@@ -92,7 +97,7 @@ function ScrollView.Create(box, content)
   frame:SetScrollChild(content)
   view.content = content
   frame:SetScript("OnMouseWheel", function(_, delta)
-    ScrollView.ScrollTo(view, frame:GetVerticalScroll() - delta * STEP)
+    ScrollView.Wheel(view, delta)
   end)
   _G["hooksecurefunc"](content, "SetHeight", function()
     sync(view)
