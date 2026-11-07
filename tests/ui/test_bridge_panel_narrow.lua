@@ -183,6 +183,18 @@ local function testSplitCappedAtHostLessDetails()
   Assert.equal(captured.view.listPane:GetWidth(), 260, "a later split is capped too")
 end
 
+-- WM's relayout calls onSplit in the frame of the size event, before the panel's own layout: the
+-- split lays out the host's new mode, the narrow List over the whole host.
+local function testSplitBeforeTheFrameEndsSeesTheNewMode()
+  local ns, _, _, wm = boot()
+  local captured = capture(ns)
+  local host = showWith(wm, 600, 260)
+  host:SetSize(330, 400)
+  Widgets.fire(host, "OnSizeChanged", 330, 400)
+  wm.split("CraftAlert", 300)
+  Assert.same({ ns.LeadsView.Screen(captured.view), captured.view.listPane:GetWidth() }, { "list", 330 })
+end
+
 return function()
   testBuildOptsInToCompact()
   testRegisteredPanelCarriesCompact()
@@ -193,5 +205,6 @@ return function()
   testHideDropsPendingLayout()
   testOldWmNarrowThenWide()
   testSplitCappedAtHostLessDetails()
+  testSplitBeforeTheFrameEndsSeesTheNewMode()
   Wow.reset()
 end

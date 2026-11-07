@@ -182,7 +182,8 @@ end
 
 -- WM's divider moved (after onShow and on every relayout): the list takes `width`, the settings nav
 -- follows. Another host's call, or one before the first show, changes nothing; a width that is not
--- a number keeps the fallback.
+-- a number keeps the fallback. WM calls it from its relayout, in the frame of the host's size event
+-- and before the resize clock, so the leads re-decide the host's mode first.
 local function onSplit(host, width)
   if view == nil or view.parent ~= host then
     return
@@ -191,6 +192,7 @@ local function onSplit(host, width)
   if mode == "settings" then
     SettingsPane.SetNavWidth(navWidth())
   elseif panelShown then
+    decide()
     refresh()
   end
 end
