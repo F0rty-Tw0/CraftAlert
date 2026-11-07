@@ -210,9 +210,9 @@ local function testNavWidthInWm()
   Widgets.click(linkOf(wide))
   local _, nav = backOf(wide)
   Assert.equal(nav:GetWidth(), 260)
-  local narrow = showWith(wm, 500) -- 500 - 340 = 160 -> 180
-  Widgets.click(linkOf(narrow))
-  _, nav = backOf(narrow)
+  local rail = showWith(wm, 600, 100) -- onSplit 100 -> the nav keeps its 180 minimum
+  Widgets.click(linkOf(rail))
+  _, nav = backOf(rail)
   Assert.equal(nav:GetWidth(), 180)
 end
 

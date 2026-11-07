@@ -22,8 +22,9 @@ local HostLift = ns.HostLift or require("CraftAlert.UI.HostLift")
 -- is not saved, so every show starts on the leads). The tab's badge counts the unseen leads; WM's
 -- Mark all read marks them all seen at once. The table opts in to WM's narrow window (`compact`;
 -- an older WM drops the unknown field, so the window still widens and the page shows the split view).
--- A host too narrow for both panes shows the leads' List or Details screen, one at a time
--- (LeadsView.SetNarrow), lifted over WM's divider (UI/HostLift.lua); every show starts on the List.
+-- A host too narrow for both panes shows one screen at a time, lifted over WM's divider
+-- (UI/HostLift.lua): the leads' List or Details (LeadsView.SetNarrow), or the settings' nav or a
+-- page (SettingsPane.SetNarrow); every show starts on the List.
 local BridgePanel = {}
 
 local max = math.max
@@ -119,13 +120,17 @@ local function enterLeads()
   showLeads()
 end
 
+-- The pane takes the host's mode (narrow: the nav first); narrow Details go back to the List first,
+-- so Back to leads, or the instance gate, lands on it.
 local function enterSettings()
-  -- First: attaching to a new host runs the previous owner's showLeads, which must not undo the rest.
+  LeadsView.Back(view)
+  -- Attaching to a new host runs the previous owner's showLeads, which must not undo the rest.
   SettingsPane.Attach(view.parent, enterLeads, showLeads, HostLift.LIFT)
   SettingsPane.ApplyLook(look)
   mode = "settings"
   LeadsView.Clear(view)
   view.frame:Hide()
+  SettingsPane.SetNarrow(narrow)
   SettingsPane.SetNavWidth(navWidth())
   SettingsPane.Show()
 end
@@ -153,9 +158,15 @@ local function build(host)
     getListWidth = listWidth,
   })
   placeLedger()
+  -- Settings open here follow the host's mode too; in "list" mode the pane may be the standalone
+  -- window's, so it is left alone.
   host:HookScript("OnSizeChanged", function()
     if panelShown and view.parent == host then
       decide()
+      if mode == "settings" then
+        SettingsPane.SetNarrow(narrow)
+        SettingsPane.SetNavWidth(navWidth())
+      end
       refresh()
     end
   end)
