@@ -26,6 +26,11 @@ local function fill(c)
   return { { "TOPLEFT", c, "TOPLEFT", 0, 0 }, { "BOTTOMRIGHT", c, "BOTTOMRIGHT", 0, 0 } }
 end
 
+-- The page pane's split anchors: right of the nav past the 1 px divider.
+local function split(nav, c)
+  return { { "TOPLEFT", nav, "TOPRIGHT", 1, 0 }, { "BOTTOMRIGHT", c, "BOTTOMRIGHT", 0, 0 } }
+end
+
 -- The client ends the slide: each frame's group finishes.
 local function settle(ns, ...)
   for _, frame in ipairs({ ... }) do
@@ -60,7 +65,7 @@ end
 
 -- Show starts on the nav without a slide; hiding the pane mid-slide and widening end it.
 local function testShowAndWidthCrossingsAreInstant()
-  local ns, nav, _, right = open(true)
+  local ns, nav, container, right = open(true)
   pick("Alerts")
   ns.SettingsPane.Hide()
   ns.SettingsPane.Show()
@@ -68,6 +73,21 @@ local function testShowAndWidthCrossingsAreInstant()
   pick("Alerts")
   ns.SettingsPane.SetNarrow(false)
   Assert.same({ ns.ScreenSlide.IsSliding(), ns.SettingsPane.Screen() }, { false, "split" })
+  Assert.same(right.points, split(nav, container), "the page sits right of the nav after widening mid-slide")
+end
+
+-- Widening while the nav slides back in leaves the nav on its two split anchors.
+local function testWideningMidSlideToTheNavKeepsTheSplit()
+  local ns, nav, container, right = open(true)
+  pick("Alerts")
+  settle(ns, nav, right)
+  Widgets.click(assert(SettingsFixture.pageHeader(), "no page header").back)
+  ns.SettingsPane.SetNarrow(false)
+  Assert.same(nav.points, {
+    { "TOPLEFT", container, "TOPLEFT", 0, 0 },
+    { "BOTTOMLEFT", container, "BOTTOMLEFT", 0, 0 },
+  }, "the nav at the left after widening mid-slide")
+  Assert.same(right.points, split(nav, container))
 end
 
 local function testWideNeverAnimates()
@@ -80,6 +100,7 @@ return function()
   testNavButtonSlidesToThePage()
   testHeaderArrowSlidesBack()
   testShowAndWidthCrossingsAreInstant()
+  testWideningMidSlideToTheNavKeepsTheSplit()
   testWideNeverAnimates()
   Wow.reset()
 end

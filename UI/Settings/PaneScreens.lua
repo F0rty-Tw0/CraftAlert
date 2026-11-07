@@ -25,7 +25,10 @@ function PaneScreens.PlaceBox(pane, box, narrow)
 end
 
 -- Anchors both panes and every built page's box for the mode. Wide, the nav is pane.navWidth wide.
+-- A slide in flight ends first: its end restores the anchors saved at its start, which would undo
+-- these.
 function PaneScreens.Anchor(pane, narrow)
+  ScreenSlide.FinishNow()
   local container, nav, right = pane.container, pane.nav, pane.right
   nav:ClearAllPoints()
   right:ClearAllPoints()
