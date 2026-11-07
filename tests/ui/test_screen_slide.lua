@@ -208,6 +208,50 @@ local function testNothingIsCreatedPerSlide()
   Assert.same({ made, #Wow.frames }, { 2, frames })
 end
 
+-- A source that answers false makes Show the instant swap: onDone runs, no group, anchors untouched.
+local function testEnabledSourceFalseSwapsAtOnce()
+  local S, parent, from, to = rig()
+  S.SetEnabledSource(function()
+    return false
+  end)
+  local done, onDone = counter()
+  S.Show(from, to, 1, onDone)
+  Assert.same({ S.IsSliding(), from:IsShown(), to:IsShown(), done.count }, { false, false, true, 1 })
+  Assert.falsy(parent.clipsChildren, "no clip")
+  Assert.equal(S.Group(to), nil, "no group")
+  Assert.same(to.points, rest(parent), "anchors untouched")
+end
+
+local function testEnabledSourceTrueStillSlides()
+  local S, _, from, to = rig()
+  S.SetEnabledSource(function()
+    return true
+  end)
+  S.Show(from, to, 1)
+  Assert.equal(S.IsSliding(), true)
+  finish(S, from, to)
+end
+
+-- Read at every Show: false, then true, then cleared.
+local function testEnabledSourceIsReadAtEachShow()
+  local S, _, from, to = rig()
+  local box = { on = false }
+  S.SetEnabledSource(function()
+    return box.on
+  end)
+  S.Show(from, to, 1)
+  Assert.equal(S.IsSliding(), false, "off: snap")
+  box.on = true
+  S.Show(to, from, -1)
+  Assert.equal(S.IsSliding(), true, "on: slide")
+  finish(S, to, from)
+  box.on = false
+  S.SetEnabledSource(nil)
+  S.Show(from, to, 1)
+  Assert.equal(S.IsSliding(), true, "cleared: slide")
+  finish(S, from, to)
+end
+
 return function()
   testForwardSlideEndsAtRest()
   testBackwardSlideMirrors()
@@ -218,5 +262,8 @@ return function()
   testSecondShowFinishesTheFirst()
   testInstantFallbacks()
   testNothingIsCreatedPerSlide()
+  testEnabledSourceFalseSwapsAtOnce()
+  testEnabledSourceTrueStillSlides()
+  testEnabledSourceIsReadAtEachShow()
   Wow.reset()
 end

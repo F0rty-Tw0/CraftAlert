@@ -7,12 +7,16 @@ end
 -- their shared parent. The clock is an engine Translation animation (SetSmoothing "OUT" is the
 -- ease-out), because rule 1 of the design spec bans OnUpdate scripts. The parent clips only while
 -- a slide runs, so pop-ups inside the screens are never cut at rest. Without a clip API, a laid
--- out and visible parent, or simple anchors on the entering screen, the swap is instant.
+-- out and visible parent, simple anchors on the entering screen, or an enabled source answering
+-- false, the swap is instant.
 local ScreenSlide = {}
 
 ScreenSlide.SLIDE_SECONDS = 0.20
 
 local MAX_POINTS = 2
+
+-- Set by the bridge (WhisperMessenger's Window animation); nil slides always.
+local enabledSource = nil
 
 local groups = setmetatable({}, { __mode = "k" })
 local translations = setmetatable({}, { __mode = "k" })
@@ -106,6 +110,9 @@ local function onParentHide(parent)
 end
 
 local function canSlide(from, to, parent)
+  if enabledSource and enabledSource() == false then
+    return false
+  end
   if ScreenSlide.SLIDE_SECONDS <= 0 or parent == nil or from:GetParent() ~= parent then
     return false
   end
@@ -118,6 +125,10 @@ local function canSlide(from, to, parent)
   local count = to:GetNumPoints()
 
   return count > 0 and count <= MAX_POINTS
+end
+
+function ScreenSlide.SetEnabledSource(fn)
+  enabledSource = fn
 end
 
 function ScreenSlide.IsSliding()
