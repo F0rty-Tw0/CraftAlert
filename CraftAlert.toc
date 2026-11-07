@@ -86,6 +86,7 @@ UI/CardBody.lua
 UI/MainCrafterMenu.lua
 UI/CardTipText.lua
 UI/RowArt.lua
+UI/LeadRowPaint.lua
 UI/LeadRow.lua
 UI/DetailsBody.lua
 UI/DetailsHeader.lua

@@ -5,15 +5,14 @@ end
 
 local Localization = ns.Localization or require("CraftAlert.Core.Localization")
 local FlavorCompat = ns.FlavorCompat or require("CraftAlert.Core.FlavorCompat")
-local Leads = ns.Leads or require("CraftAlert.Model.Leads")
 local WhoCity = ns.WhoCity or require("CraftAlert.Core.WhoCity")
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 local FrameKit = ns.FrameKit or require("CraftAlert.UI.FrameKit")
-local LeadText = ns.LeadText or require("CraftAlert.UI.LeadText")
 local ClickRouter = ns.ClickRouter or require("CraftAlert.UI.ClickRouter")
 local Tooltip = ns.Tooltip or require("CraftAlert.UI.Tooltip")
 local CardTipText = ns.CardTipText or require("CraftAlert.UI.CardTipText")
 local RowArt = ns.RowArt or require("CraftAlert.UI.RowArt")
+local LeadRowPaint = ns.LeadRowPaint or require("CraftAlert.UI.LeadRowPaint")
 
 -- Spec A.3: one 48 px row of the leads list pane, WhisperMessenger's contact-row layout
 -- (UI/ContactsList/RowView.lua:67-118, WM). The item or profession icon, the customer in class
@@ -31,12 +30,6 @@ local RowArt = ns.RowArt or require("CraftAlert.UI.RowArt")
 -- carries its lead and the GetTime() at which that lead appeared in it (§7.5 rule 3).
 local LeadRow = {}
 
-local select = select
-local type = type
-
--- Whisper pink for a lead whose customer has an unread whisper, when ChatTypeInfo has no WHISPER.
-local FALLBACK_PINK = { 1, 0.5, 1, 1 }
-
 -- WM's row numbers: EDGE from the row's sides, ICON_GAP after the icon, MARK_GAP between the marks
 -- and before the second line's end, NAME_GAP between the name and the age.
 -- off-scale: the row's edge, the icon gap and the name gap are WhisperMessenger's row numbers.
@@ -48,33 +41,10 @@ local function now()
   return _G["GetTime"]()
 end
 
----@type fun(lead: table): number|nil
-local unreadOf = nil -- WhisperMessenger's unread count of a lead's customer; nil: none known
-
 -- `fn(lead) -> integer` says how many whispers of the lead's customer the player has not read in
 -- WhisperMessenger (WhisperBridge.Activate sets it); nil clears it.
 function LeadRow.SetUnreadSource(fn)
-  unreadOf = fn
-end
-
--- Whisper pink, read at paint time (the player can recolour the whisper chat type).
-local function whisperPink()
-  local info = _G["ChatTypeInfo"]
-  local whisper = type(info) == "table" and info.WHISPER
-  if type(whisper) ~= "table" then
-    return FALLBACK_PINK
-  end
-  return { whisper.r, whisper.g, whisper.b, 1 }
-end
-
--- The dot's colour, first match wins: pink while the customer has an unread whisper, gold while
--- the lead is unseen and ungreeted, else the details header's state colour.
-local function dotColor(lead)
-  local unread = unreadOf and unreadOf(lead)
-  if type(unread) == "number" and unread >= 1 then
-    return whisperPink()
-  end
-  return Leads.IsUnseen(lead) and Theme.COLORS.gold or select(2, LeadText.State(lead))
+  LeadRowPaint.SetUnreadSource(fn)
 end
 
 -- Whether the row shows the tooltip: one another frame owns is never rewritten (nor hidden:
@@ -189,12 +159,6 @@ function LeadRow.Create(parent, index, onSelect)
   return row
 end
 
--- The item's icon, else the profession's, else the addon's.
-local function iconOf(lead)
-  local itemIcon = type(lead.itemID) == "number" and select(5, FlavorCompat.GetItemInfoInstant(lead.itemID))
-  return itemIcon or FrameKit.ProfessionIcon(lead.prof) or Theme.ICON
-end
-
 -- The greeted check outermost, the replied tag left of it; the second line ends MARK_GAP short of
 -- whichever marks show. A compact row shows neither.
 local function placeMarks(row, lead)
@@ -215,23 +179,33 @@ local function placeMarks(row, lead)
   row.what:SetPoint("RIGHT", row, "RIGHT", -(EDGE + marksWidth), 0)
 end
 
--- Shows `lead` in the row; a lead new to the row counts as shown from now. A chat tooltip the row
--- shows is rebuilt for it (a refresh, a wheel scroll, a new chat line).
+local scratch = {} -- LeadRowPaint.Read's table for the next Show; swapped with the row's on a repaint
+
+-- Paints `paint` (a LeadRowPaint.Read table for the row's lead) into the row and shows it.
+local function repaint(row, paint)
+  row.icon:SetTexture(paint.icon)
+  RowArt.PaintDot(row.dot, paint.dot)
+  row.name:SetText(paint.name)
+  row.name:SetTextColor(paint.nameR, paint.nameG, paint.nameB, 1)
+  row.age:SetText(paint.age)
+  row.what:SetText(paint.what)
+  placeMarks(row, row.lead)
+  row:Show()
+end
+
+-- Shows `lead` in the row; a lead new to the row counts as shown from now. A shown row whose paint
+-- would not change (UI/LeadRowPaint.lua) is left as it is. A chat tooltip the row shows is rebuilt
+-- for it (a refresh, a wheel scroll, a new chat line).
 function LeadRow.Show(row, lead)
   if row.lead ~= lead then
     row.shownAt = now()
   end
   row.lead = lead
-  row.icon:SetTexture(iconOf(lead))
-  RowArt.PaintDot(row.dot, dotColor(lead))
-  row.name:SetText(LeadText.Customer(lead))
-  -- A customer of unknown class: white on the row (spec D6).
-  local r, g, b = FrameKit.ClassRGB(FrameKit.GuidClassColor(lead.guid), Theme.COLORS.white)
-  row.name:SetTextColor(r, g, b, 1)
-  row.age:SetText(LeadText.Age(_G["time"]() - lead.time))
-  row.what:SetText(LeadText.What(lead))
-  placeMarks(row, lead)
-  row:Show()
+  LeadRowPaint.Read(lead, scratch)
+  if not (row:IsShown() and LeadRowPaint.Same(row.painted, scratch)) then
+    row.painted, scratch = scratch, row.painted or {}
+    repaint(row, row.painted)
+  end
   if ownsTip(row) then
     showChat(row)
   end
@@ -258,7 +232,8 @@ end
 
 -- Called on every row at each list refresh, so the hover changes only with the selection: the
 -- click that selects a hovered row drops its hover at once; a row deselected under the cursor
--- fades it back in. The second line's colour is set every time: Clear hides the selection alone.
+-- fades it back in. The second line's colour is set only when it changes (`row.whatSelected`):
+-- nothing else colours that line, and Clear hides the selection alone.
 function LeadRow.SetSelected(row, selected)
   if row.selected:IsShown() ~= selected then
     row.selected:SetShown(selected)
@@ -268,6 +243,10 @@ function LeadRow.SetSelected(row, selected)
       RowArt.Hover(row.hover, true)
     end
   end
+  if row.whatSelected == selected then
+    return
+  end
+  row.whatSelected = selected
   local color = selected and Theme.COLORS.white or Theme.COLORS.textSecondary
   row.what:SetTextColor(color[1], color[2], color[3], color[4])
 end

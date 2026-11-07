@@ -50,6 +50,7 @@ local UI = {
   "UI.CardBody",
   "UI.MainCrafterMenu",
   "UI.CardTipText",
+  "UI.LeadRowPaint",
   "UI.LeadRow",
   "UI.DetailsBody",
   "UI.DetailsHeader",
