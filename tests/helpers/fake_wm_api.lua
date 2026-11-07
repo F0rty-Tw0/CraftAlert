@@ -9,6 +9,9 @@
 --   wm.raise[name] = true                  that function records the call, then raises
 --   wm.look                                what GetLook answers (nil: no look); GetLook is not recorded in
 --                                            wm.calls, and honours wm.refuse.GetLook (false) and wm.raise.GetLook
+--   wm.animation                           what IsAnimationEnabled answers (default true; false: off). Like GetLook
+--                                            it is not recorded in wm.calls; it honours wm.refuse.IsAnimationEnabled
+--                                            (false) and wm.raise.IsAnimationEnabled. opts.without models an older WM
 --   wm.preview[key]                        the preview table while shown (ShowPreview sets it, HidePreview clears it)
 --   wm.registered                          { { key, panel }, ... }; wm.panels[key] = a copy of the panel's
 --                                            fields taken at RegisterPanel, as WM's copyPanel does
@@ -70,6 +73,7 @@ function FakeWm.install(opts)
     tips = {},
     badgeRefreshes = 0,
     unread = {},
+    animation = true,
   }
   ---@type table<string, any>
   local api = { version = opts.version or 1 }
@@ -218,6 +222,16 @@ function FakeWm.install(opts)
       return false
     end
     return wm.look
+  end
+
+  api.IsAnimationEnabled = function()
+    if wm.raise.IsAnimationEnabled then
+      error("WhisperMessengerAPI.IsAnimationEnabled raised")
+    end
+    if wm.refuse.IsAnimationEnabled then
+      return false
+    end
+    return wm.animation ~= false
   end
 
   for _, name in ipairs(opts.without or {}) do

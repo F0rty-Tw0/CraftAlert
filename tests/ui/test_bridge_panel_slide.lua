@@ -7,9 +7,9 @@ local SettingsFixture = require("tests.helpers.settings_fixture")
 
 -- Phone-style slide spec through WM's panel: a slide never shows a top row, and hiding the panel,
 -- the Settings link or a width crossing ends one in flight.
-local function boot(opts)
+local function boot(opts, fakeOpts)
   local ns, db, calls = UiFixture.load(opts or { leads = 3 })
-  local _, wm = FakeWm.install()
+  local _, wm = FakeWm.install(fakeOpts)
   ns.WhisperBridge.Activate()
   return ns, db, calls, wm
 end
@@ -117,11 +117,90 @@ local function testWideHostNeverAnimates()
   Assert.same({ ns.ScreenSlide.IsSliding(), ns.ScreenSlide.Group(captured.view.listPane) }, { false })
 end
 
+-- A 360-wide panel with the leads view captured and sized (the fake does not size all-points frames).
+local function narrowView(ns, wm)
+  local captured = capture(ns)
+  showWith(wm, 360)
+  captured.view.frame:SetSize(360, 400)
+  return captured.view
+end
+
+local function state(ns, view)
+  return { ns.LeadsView.Screen(view), ns.ScreenSlide.IsSliding(), view.listPane:IsShown(), view.detailsPane:IsShown() }
+end
+
+local function testAnimationOffSwapsAtOnce()
+  local ns, _, _, wm = boot({ leads = 3 })
+  wm.animation = false
+  local view = narrowView(ns, wm)
+  Widgets.click(view.list.rows[2], "LeftButton")
+  Assert.same(state(ns, view), { "details", false, false, true })
+  Assert.equal(ns.ScreenSlide.Group(view.detailsPane), nil, "no group")
+end
+
+-- Read at every navigation: off snaps, flipped on slides back.
+local function testAnimationSwitchIsReadLive()
+  local ns, _, _, wm = boot({ leads = 3 })
+  wm.animation = false
+  local view = narrowView(ns, wm)
+  Widgets.click(view.list.rows[2], "LeftButton")
+  wm.animation = true
+  Widgets.click(view.details.back)
+  Assert.same(state(ns, view), { "list", true, true, true })
+  ns.ScreenSlide.FinishNow()
+end
+
+-- A raising call counts as off (ask turns a raise into false).
+local function testRaisingAnimationCallSnaps()
+  local ns, _, _, wm = boot({ leads = 3 })
+  wm.raise.IsAnimationEnabled = true
+  local view = narrowView(ns, wm)
+  Widgets.click(view.list.rows[2], "LeftButton")
+  Assert.same(state(ns, view), { "details", false, false, true })
+end
+
+-- Older WM without the call: no source is set, the slide runs as before.
+local function testOlderWmWithoutTheCallStillSlides()
+  local ns, _, _, wm = boot({ leads = 3 }, { without = { "IsAnimationEnabled" } })
+  local view = narrowView(ns, wm)
+  Widgets.click(view.list.rows[2], "LeftButton")
+  Assert.same(state(ns, view), { "details", true, true, true })
+  ns.ScreenSlide.FinishNow()
+end
+
+-- Bridge inactive (WM refuses the panel): the source is never set, so the slide runs even though
+-- the fake WM says animation is off.
+local function testInactiveBridgeLeavesSlidesOn()
+  local ns = UiFixture.load({ leads = 3 })
+  local _, wm = FakeWm.install()
+  wm.animation = false
+  wm.refuse.RegisterPanel = true
+  Assert.equal(ns.WhisperBridge.Activate(), false)
+  local parent = _G["CreateFrame"]("Frame", nil, _G["UIParent"])
+  parent:SetSize(360, 400)
+  local function screen()
+    local frame = _G["CreateFrame"]("Frame", nil, parent)
+    frame:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -20)
+    frame:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
+    return frame
+  end
+  local from, to = screen(), screen()
+  to:Hide()
+  ns.ScreenSlide.Show(from, to, 1)
+  Assert.equal(ns.ScreenSlide.IsSliding(), true)
+  ns.ScreenSlide.FinishNow()
+end
+
 return function()
   testNoTopRowAtAnyPointOfTheSlide()
   testPanelHideMidSlideFinishesIt()
   testSettingsLinkMidSlideEndsIt()
   testBackMidSlideReversesCleanly()
   testWideHostNeverAnimates()
+  testAnimationOffSwapsAtOnce()
+  testAnimationSwitchIsReadLive()
+  testRaisingAnimationCallSnaps()
+  testOlderWmWithoutTheCallStillSlides()
+  testInactiveBridgeLeavesSlidesOn()
   Wow.reset()
 end

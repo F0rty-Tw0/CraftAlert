@@ -15,6 +15,7 @@ local AlertToast = ns.AlertToast or require("CraftAlert.UI.AlertToast")
 local LeadsWindow = ns.LeadsWindow or require("CraftAlert.UI.LeadsWindow")
 local Launcher = ns.Launcher or require("CraftAlert.UI.Launcher")
 local LeadRow = ns.LeadRow or require("CraftAlert.UI.LeadRow")
+local ScreenSlide = ns.ScreenSlide or require("CraftAlert.UI.ScreenSlide")
 local PanelLook = ns.PanelLook or require("CraftAlert.UI.PanelLook")
 local BridgePanel = ns.BridgePanel or require("CraftAlert.UI.BridgePanel")
 local BridgeInfo = ns.BridgeInfo or require("CraftAlert.UI.BridgeInfo")
@@ -199,6 +200,12 @@ function WhisperBridge.Activate()
     return false
   end
   api, active = candidate, true
+  -- Older WM has no IsAnimationEnabled: no source, pages slide as before. A raise answers false.
+  if type(candidate.IsAnimationEnabled) == "function" then
+    ScreenSlide.SetEnabledSource(function()
+      return ask("IsAnimationEnabled")
+    end)
+  end
   if countsUnread then
     LeadRow.SetUnreadSource(unreadOf)
   end
