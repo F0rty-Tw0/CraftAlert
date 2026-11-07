@@ -41,9 +41,8 @@ local narrow = false -- whether LeadsView was last told the host is narrow; a ne
 local look = PanelLook.NATIVE -- WM's look as read at the last show; the settings pane paints with it too
 ---@type table
 local resizeClock = nil -- NextFrame clock on the current host: one layout per frame of size events
--- The host size and split the host's mode was last decided at (a layout follows every decide in
--- "list" mode): WM's split in a drag frame decides and lays out the new size before the frame ends,
--- so the clock skips a second, identical pass. A refresh alone (a lead change) records nothing.
+-- The host size and split last decided at (a list-mode decide is always laid out): WM's split in a
+-- drag frame lays out the new size before the frame ends, so the clock skips the same pass again.
 local laidWidth, laidHeight, laidSplit = nil, nil, nil
 
 -- Leads keeps its leads in an instance, where the addon shows none (spec C.3).
@@ -78,6 +77,10 @@ end
 local function refresh()
   if mode == "settings" then
     return
+  end
+  -- Laid out at a size not decided: the record no longer says how the leads are laid out.
+  if laidWidth ~= currentHost:GetWidth() or laidHeight ~= currentHost:GetHeight() then
+    laidWidth = nil
   end
   LeadsView.Layout(view)
   LeadsView.Refresh(view, visibleLeads())

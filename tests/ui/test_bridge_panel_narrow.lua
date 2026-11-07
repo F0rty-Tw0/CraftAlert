@@ -221,6 +221,21 @@ local function testRefreshMidFrameStillDecidesAtTheFrameEnd()
   Assert.same(calls, { true })
 end
 
+-- A refresh at another size, then the host back to the size last decided, in one frame: the frame's
+-- end lays the host out again at that size.
+local function testRefreshAtAnotherSizeThenBackLaysOutAgain()
+  local ns, _, _, wm = boot()
+  local captured = capture(ns)
+  local host = showWith(wm, 700, 260)
+  host:SetSize(560, 400)
+  Widgets.fire(host, "OnSizeChanged", 560, 400)
+  ns.BridgePanel.Refresh()
+  host:SetSize(700, 400)
+  Widgets.fire(host, "OnSizeChanged", 700, 400)
+  Widgets.nextFrame()
+  Assert.equal(captured.view.listPane:GetWidth(), 260)
+end
+
 return function()
   testBuildOptsInToCompact()
   testRegisteredPanelCarriesCompact()
@@ -234,5 +249,6 @@ return function()
   testSplitBeforeTheFrameEndsSeesTheNewMode()
   testDragFrameWithSplitRefreshesOnce()
   testRefreshMidFrameStillDecidesAtTheFrameEnd()
+  testRefreshAtAnotherSizeThenBackLaysOutAgain()
   Wow.reset()
 end
