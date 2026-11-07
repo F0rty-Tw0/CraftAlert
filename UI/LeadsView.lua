@@ -121,7 +121,7 @@ function LeadsView.Refresh(view, leads)
   end
   if selected then
     LeadDetails.Show(view.details, selected)
-  elseif not view.detailsLeaving then
+  elseif not view.details.leaving then
     LeadDetails.Clear(view.details)
   end
 end

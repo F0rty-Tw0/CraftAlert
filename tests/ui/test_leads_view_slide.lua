@@ -8,7 +8,7 @@ local UiFixture = require("tests.helpers.ui_fixture")
 local WIDTH, HEIGHT = 360, 496
 
 local function open(count)
-  local ns = UiFixture.load({ leads = count })
+  local ns, _, calls = UiFixture.load({ leads = count })
   local host = _G["CreateFrame"]("Frame", nil, _G["UIParent"])
   host:SetSize(WIDTH, HEIGHT)
   local view = ns.LeadsView.New(host, {
@@ -24,7 +24,7 @@ local function open(count)
   ns.LeadsView.SetNarrow(view, true)
   ns.LeadsView.Layout(view)
   ns.LeadsView.Refresh(view, ns.Leads.List())
-  return ns, view
+  return ns, view, calls
 end
 
 local function refresh(ns, view)
@@ -93,6 +93,19 @@ local function testBackSlidesOutTheShownDetails()
   Assert.same({ view.details.frame:IsShown(), view.details.lead == lead }, { true, true }, "mid-slide")
   settle(ns, view)
   Assert.same({ view.details.frame:IsShown(), view.details.lead }, { false }, "after")
+end
+
+-- The leaving Details' buttons do nothing: Greet mid-Back sends nothing and Dismiss keeps the lead.
+local function testLeavingDetailsButtonsDoNothing()
+  local ns, view, calls = open(3)
+  openRow(view, 2)
+  settle(ns, view)
+  Wow.clock.gettime = 60
+  ns.LeadsView.Back(view)
+  local sent = #calls
+  Widgets.click(view.details.buttons.greet)
+  Widgets.click(view.details.buttons.dismiss)
+  Assert.same({ #calls - sent, #ns.Leads.List() }, { 0, 3 })
 end
 
 -- A row clicked while the Details slide out opens that row's lead; the old slide's end empties nothing.
@@ -171,6 +184,7 @@ return function()
   testRowClickSlidesToDetails()
   testBackSlidesToList()
   testBackSlidesOutTheShownDetails()
+  testLeavingDetailsButtonsDoNothing()
   testRowClickMidBackShowsTheClickedLead()
   testNoTopRowDuringOrAfterTheSlideToDetails()
   testRefreshMidSlideKeepsIt()

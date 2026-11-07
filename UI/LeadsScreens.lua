@@ -52,7 +52,7 @@ end
 local function detailsLeft(view)
   if view.onDetailsLeft == nil then
     view.onDetailsLeft = function()
-      view.detailsLeaving = false
+      view.details.leaving = false
       LeadDetails.Clear(view.details)
     end
   end
@@ -66,7 +66,7 @@ end
 -- before; the first paint and the empty text coming or going swap at once. view.shownPane and
 -- view.shownScreen remember what the last call showed (nil: nothing yet, or wide), so a refresh on
 -- the same pane leaves a slide in flight alone. While the Details slide out to the List,
--- view.detailsLeaving is set and their lead stays painted until the slide ends. view.screen, not
+-- view.details.leaving is set and their lead stays painted until the slide ends. view.screen, not
 -- LeadsView.Screen: LeadsView loads after this module.
 function LeadsScreens.Apply(view)
   if not view.narrow then
@@ -92,7 +92,7 @@ function LeadsScreens.Apply(view)
   if slide then
     local toList = want == "list"
     ScreenSlide.Show(otherPane, wantPane, toList and -1 or 1, toList and detailsLeft(view) or nil)
-    view.detailsLeaving = toList and ScreenSlide.IsSliding()
+    view.details.leaving = toList and ScreenSlide.IsSliding()
     return
   end
   ScreenSlide.FinishNow()

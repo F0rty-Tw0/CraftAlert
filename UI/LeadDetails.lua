@@ -22,7 +22,9 @@ local ScrollBar = ns.ScrollBar or require("CraftAlert.UI.ScrollBar")
 -- back to its top for each new lead. The strip, the body and the body's two bubbles each hover
 -- their links (LinkHover); tooltip zones lie over the customer and, while it holds no link, the
 -- strip. The pane carries the GetTime() at which its lead became the shown one, and the buttons
--- run the look rule on it (§7.5 rule 3).
+-- run the look rule on it (§7.5 rule 3). While details.leaving is set (the pane sliding out,
+-- UI/LeadsScreens.lua) the buttons do nothing: the lead is still painted but no longer the
+-- selected one.
 local LeadDetails = {}
 
 local min = math.min
@@ -95,7 +97,7 @@ local function createButton(details, action, previous)
   button:SetText(Localization.Text(action.label))
   button:RegisterForClicks("LeftButtonUp")
   button:SetScript("OnClick", function()
-    if details.lead then
+    if details.lead and not details.leaving then
       action.run(details)
     end
   end)
