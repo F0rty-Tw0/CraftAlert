@@ -12,6 +12,10 @@
 --   wm.animation                           what IsAnimationEnabled answers (default true; false: off). Like GetLook
 --                                            it is not recorded in wm.calls; it honours wm.refuse.IsAnimationEnabled
 --                                            (false) and wm.raise.IsAnimationEnabled. opts.without models an older WM
+--   wm.compact                             what IsCompactWindow answers (default false; true: WM's compact
+--                                            window). Like IsAnimationEnabled it is not recorded in wm.calls;
+--                                            it honours wm.refuse.IsCompactWindow (false) and wm.raise.IsCompactWindow.
+--                                            opts.without models an older WM
 --   wm.preview[key]                        the preview table while shown (ShowPreview sets it, HidePreview clears it)
 --   wm.registered                          { { key, panel }, ... }; wm.panels[key] = a copy of the panel's
 --                                            fields taken at RegisterPanel, as WM's copyPanel does
@@ -74,6 +78,7 @@ function FakeWm.install(opts)
     badgeRefreshes = 0,
     unread = {},
     animation = true,
+    compact = false,
   }
   ---@type table<string, any>
   local api = { version = opts.version or 1 }
@@ -232,6 +237,16 @@ function FakeWm.install(opts)
       return false
     end
     return wm.animation ~= false
+  end
+
+  api.IsCompactWindow = function()
+    if wm.raise.IsCompactWindow then
+      error("WhisperMessengerAPI.IsCompactWindow raised")
+    end
+    if wm.refuse.IsCompactWindow then
+      return false
+    end
+    return wm.compact == true
   end
 
   for _, name in ipairs(opts.without or {}) do
