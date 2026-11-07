@@ -4,7 +4,7 @@ local UiFixture = require("tests.helpers.ui_fixture")
 local FakeWm = require("tests.helpers.fake_wm_api")
 local Widgets = require("tests.helpers.widgets")
 
--- Phone-style slide spec: Craft Alert opts in to WM's narrow window and decides narrow vs wide from
+-- Compact-window slide spec: Craft Alert opts in to WM's narrow window and decides narrow vs wide from
 -- its host's width (narrow below LIST_MIN_WIDTH + DETAILS_MIN_WIDTH = 520).
 local function boot(opts)
   local ns, db, calls = UiFixture.load(opts or { leads = 3 })
@@ -170,7 +170,7 @@ local function testOldWmNarrowThenWide()
   Assert.equal(view.listPane:GetWidth(), 260, "the list is back to the clamp")
 end
 
--- Wide host: the list takes at most host width - 340 (WM's phone window resized past 520 sends a
+-- Wide host: the list takes at most host width - 340 (WM's compact window resized past 520 sends a
 -- split of about its full width); the rail below the cap is kept.
 local function testSplitCappedAtHostLessDetails()
   local ns, _, _, wm = boot()

@@ -3,7 +3,7 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
--- Phone-style slide spec: how Craft Alert's frames stack in WhisperMessenger's host frame. Lifted,
+-- Compact-window slide spec: how Craft Alert's frames stack in WhisperMessenger's host frame. Lifted,
 -- a frame sits LIFT levels above the host: over WM's divider handle, which sits 50 above the
 -- contacts pane, a sibling of the host (UI/MessengerWindow/LayoutBuilder/ContactsSection.lua:115-121
 -- and UI/Theme/Layout.lua:17, WM), so its line never draws over the frame; it takes the mouse, so

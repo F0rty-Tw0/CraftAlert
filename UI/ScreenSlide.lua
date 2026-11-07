@@ -3,7 +3,7 @@ if type(ns) ~= "table" then
   ns = {}
 end
 
--- Phone-style slide spec: one narrow screen slides out while the next slides in, both inside
+-- Compact-window slide spec: one narrow screen slides out while the next slides in, both inside
 -- their shared parent. The clock is an engine Translation animation (SetSmoothing "OUT" is the
 -- ease-out), because rule 1 of the design spec bans OnUpdate scripts. The parent clips only while
 -- a slide runs, so pop-ups inside the screens are never cut at rest. Without a clip API, a laid

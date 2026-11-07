@@ -3,7 +3,7 @@ local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 
--- Phone-style slide spec: the narrow nav <-> page changes slide (UI/ScreenSlide.lua); Show, width
+-- Compact-window slide spec: the narrow nav <-> page changes slide (UI/ScreenSlide.lua); Show, width
 -- crossings and the wide pane swap at once.
 local function open(narrow)
   local ns = SettingsFixture.load()
