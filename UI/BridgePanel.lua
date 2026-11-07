@@ -192,6 +192,7 @@ function BridgePanel.Build()
     onSplit = onSplit,
     badge = badge,
     onMarkAllRead = markAllRead,
+    compact = true,
   }
 end
 
