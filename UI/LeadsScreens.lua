@@ -16,8 +16,10 @@ local ScreenSlide = ns.ScreenSlide or require("CraftAlert.UI.ScreenSlide")
 local LeadsScreens = {}
 
 -- Re-anchors the details pane, "Clear all" and the ledger text for the view's narrow flag; runs
--- when the view crosses between narrow and wide.
+-- when the view crosses between narrow and wide. A slide in flight ends first: its end restores
+-- the anchors saved at its start, which would undo these.
 function LeadsScreens.Anchor(view)
+  ScreenSlide.FinishNow()
   local padding = Theme.LAYOUT.PADDING
   local parent, strip, pane, clearAll = view.parent, view.strip, view.detailsPane, view.clearAll
   pane:ClearAllPoints()

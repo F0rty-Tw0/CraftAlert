@@ -130,6 +130,10 @@ local function testResetAndWidthCrossingsAreInstant()
     { false, "split", { true, true }, false },
     "widening mid-slide"
   )
+  Assert.same(view.detailsPane.points, {
+    { "TOPLEFT", view.listPane, "TOPRIGHT", 1, 0 },
+    { "BOTTOMRIGHT", view.parent, "BOTTOMRIGHT", 0, 0 },
+  }, "the details sit right of the list after widening mid-slide")
 end
 
 -- A lead arriving on an empty List swaps the empty text for the list at once.

@@ -245,7 +245,7 @@ end
 -- BridgePanel calls it when its host crosses the narrow threshold; the caller lays out and
 -- refreshes after. To narrow: the List, nothing selected, the details' back arrow on (Back). To wide:
 -- the arrow off; a lead shown in the Details stays selected, else the next refresh selects the newest.
--- Either way the screens swap at once, ending any slide (LeadsScreens.Apply's wide branch).
+-- Either way any slide ends before the re-anchoring (LeadsScreens.Anchor), and the screens swap at once.
 function LeadsView.SetNarrow(view, narrow)
   if narrow == view.narrow then
     return
