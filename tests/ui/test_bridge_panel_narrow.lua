@@ -195,6 +195,19 @@ local function testSplitBeforeTheFrameEndsSeesTheNewMode()
   Assert.same({ ns.LeadsView.Screen(captured.view), captured.view.listPane:GetWidth() }, { "list", 330 })
 end
 
+-- A WM drag frame: the host's new size, WM's relayout split (same divider), the host's size event.
+-- The split already laid out that size, so the frame's end does not refresh it again.
+local function testDragFrameWithSplitRefreshesOnce()
+  local ns, _, _, wm = boot()
+  local host = showWith(wm, 700, 260)
+  local refreshes = countRefreshes(ns)
+  host:SetSize(701, 400)
+  wm.split("CraftAlert", 260)
+  Widgets.fire(host, "OnSizeChanged", 701, 400)
+  Widgets.nextFrame()
+  Assert.equal(refreshes(), 1)
+end
+
 return function()
   testBuildOptsInToCompact()
   testRegisteredPanelCarriesCompact()
@@ -206,5 +219,6 @@ return function()
   testOldWmNarrowThenWide()
   testSplitCappedAtHostLessDetails()
   testSplitBeforeTheFrameEndsSeesTheNewMode()
+  testDragFrameWithSplitRefreshesOnce()
   Wow.reset()
 end

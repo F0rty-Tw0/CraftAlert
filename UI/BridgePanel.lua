@@ -41,6 +41,9 @@ local narrow = false -- whether LeadsView was last told the host is narrow; a ne
 local look = PanelLook.NATIVE -- WM's look as read at the last show; the settings pane paints with it too
 ---@type table
 local resizeClock = nil -- NextFrame clock on the current host: one layout per frame of size events
+-- The host size and split the leads were last laid out at: WM's split in a drag frame lays out the
+-- new size before the frame ends, so the clock skips a second, identical layout.
+local laidWidth, laidHeight, laidSplit = nil, nil, nil
 
 -- Leads keeps its leads in an instance, where the addon shows none (spec C.3).
 local function visibleLeads()
@@ -74,8 +77,13 @@ local function refresh()
   if mode == "settings" then
     return
   end
+  laidWidth, laidHeight, laidSplit = currentHost:GetWidth(), currentHost:GetHeight(), splitWidth
   LeadsView.Layout(view)
   LeadsView.Refresh(view, visibleLeads())
+end
+
+local function laidOutAsIs()
+  return mode == "list" and laidWidth == currentHost:GetWidth() and laidHeight == currentHost:GetHeight() and laidSplit == splitWidth
 end
 
 -- The leads' look, without touching the pane: also the fallback when another host takes the pane,
@@ -136,7 +144,7 @@ local function build(host)
   -- Settings open here follow the host's mode too; in "list" mode the pane may be the standalone
   -- window's, so it is left alone.
   local clock = NextFrame.New(host, function()
-    if panelShown and view.parent == host then
+    if panelShown and view.parent == host and not laidOutAsIs() then
       decide()
       if mode == "settings" then
         SettingsPane.SetNarrow(narrow)
