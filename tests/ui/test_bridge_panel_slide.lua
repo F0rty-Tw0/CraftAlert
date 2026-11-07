@@ -5,7 +5,7 @@ local UiFixture = require("tests.helpers.ui_fixture")
 local FakeWm = require("tests.helpers.fake_wm_api")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 
--- Phone-style slide spec through WM's panel: a slide never shows a top row, and hiding the panel,
+-- Compact-window slide spec through WM's panel: a slide never shows a top row, and hiding the panel,
 -- the Settings link or a width crossing ends one in flight.
 local function boot(opts, fakeOpts)
   local ns, db, calls = UiFixture.load(opts or { leads = 3 })

@@ -104,7 +104,7 @@ local function testHeaderArrowReturnsToNav()
     { "nav", true, false, 0 },
     "the arrow goes to the nav, not out of settings"
   )
-  Assert.equal(SettingsFixture.navButton("Alerts").selected:IsShown(), false, "no row looks picked on the phone nav")
+  Assert.equal(SettingsFixture.navButton("Alerts").selected:IsShown(), false, "no row looks picked on the narrow nav")
 end
 
 local function testBackToLeadsStillRunsOnBack()

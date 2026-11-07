@@ -3,7 +3,7 @@ local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 
--- Phone-style slide spec: the narrow List <-> Details changes slide (UI/ScreenSlide.lua); every
+-- Compact-window slide spec: the narrow List <-> Details changes slide (UI/ScreenSlide.lua); every
 -- other change is the instant swap.
 local WIDTH, HEIGHT = 360, 496
 

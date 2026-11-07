@@ -24,7 +24,7 @@ local LeadsScreens = ns.LeadsScreens or require("CraftAlert.UI.LeadsScreens")
 -- narrow, the List's pane says so). Each pane paints its atlas behind an InsetFrameTemplate art frame, as
 -- WhisperMessenger's panes do (RetailChrome.lua:56-58,70,85-88, WM). The selection follows the
 -- lead by id across refreshes; the root frame takes the mouse wheel and scrolls the list, as does
--- a drag of the list's bar. In a narrow host (SetNarrow, phone-style slide spec) one screen shows
+-- a drag of the list's bar. In a narrow host (SetNarrow, compact-window slide spec) one screen shows
 -- at a time (UI/LeadsScreens.lua): the List, nothing selected, nothing marked seen; a row's click
 -- opens its Details, which Back leaves for the List again.
 local LeadsView = {}

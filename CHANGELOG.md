@@ -7,7 +7,7 @@ Player-friendly release notes for Craft Alert.
 - Fixed: in Whisper Messenger's narrow window, the lead list no longer hides leads behind its background.
 - With Whisper Messenger's Window animation turned off, Craft Alert's pages in the Whisper Messenger window no longer slide. Needs the latest Whisper Messenger.
 - Fixed: Clicking an alert on the Whisper Messenger button to send your greeting no longer opens the messenger when its "Auto-open on outgoing whisper" option is off. Needs the latest Whisper Messenger.
-- In WhisperMessenger's phone-style window, Craft Alert's page now fits the narrow window: tap a lead to see its details, and use the back arrow to return.
+- In WhisperMessenger's compact window, Craft Alert's page now fits the narrow window: tap a lead to see its details, and use the back arrow to return.
 
 ## [1.0.2] - 2026-11-06
 
