@@ -129,13 +129,18 @@ local function addRegion(region)
     self.points = { { "ALL", target } }
   end
 
-  -- The first anchor, as the client reports it: point, relativeTo, relativePoint, x, y.
-  function region:GetPoint()
-    local first = self.points[1]
-    if first == nil then
+  -- The index-th anchor (default 1), as the client reports it: point, relativeTo, relativePoint,
+  -- x, y.
+  function region:GetPoint(index)
+    local anchor = self.points[index or 1]
+    if anchor == nil then
       return nil
     end
-    return first[1], first[2], first[3], first[4], first[5]
+    return anchor[1], anchor[2], anchor[3], anchor[4], anchor[5]
+  end
+
+  function region:GetNumPoints()
+    return #self.points
   end
 
   function region:SetSize(width, height)
