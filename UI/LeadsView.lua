@@ -198,14 +198,13 @@ end
 -- ledger line, the details as wide as the parent.
 function LeadsView.Layout(view)
   local listWidth = view.getListWidth()
+  view.listPane:SetWidth(listWidth)
   if view.narrow then
-    view.listPane:SetWidth(listWidth)
     LeadsList.SetCompact(view.list, false)
     view.clearAll:Show()
     LeadDetails.Layout(view.details, view.parent:GetWidth())
     return
   end
-  view.listPane:SetWidth(listWidth)
   view.clearAll:SetShown(listWidth >= view.clearAll:GetWidth() + 2 * Theme.LAYOUT.PADDING)
   LeadsList.SetCompact(view.list, listWidth < Theme.LAYOUT.LIST_MIN_WIDTH)
   LeadDetails.Layout(view.details, view.parent:GetWidth() - listWidth - 1)
