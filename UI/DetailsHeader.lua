@@ -37,6 +37,10 @@ local NAME_SIZE = 17
 -- off-scale: text leading, kept as is.
 local LINE_GAP = -3
 local NAME_LEFT = Theme.LAYOUT.DETAILS_PADDING + Theme.LAYOUT.HEADER_ICON_SIZE + ICON_GAP
+-- The narrow Details' back arrow: BACK_SIZE square, BACK_LEFT in from the header's left; the icon
+-- and the name move right by BACK_SIZE while it shows.
+local BACK_SIZE = Theme.LAYOUT.SPACE.XXL
+local BACK_LEFT = Theme.LAYOUT.SPACE.S
 local SEPARATOR = " · "
 -- The strip's text wraps to at most STRIP_LINES lines.
 local STRIP_LINES = 2
@@ -213,15 +217,55 @@ function DetailsHeader.ApplyLook(details, look)
 end
 
 -- Cuts the name with an ellipsis so it ends details.rightInset before the header's right edge.
--- Run when the width, the inset or the name changes. The name is as wide as its text first, so
--- the client measures it uncut (an unset width is 0, so the cut keeps at least 1).
+-- Run when the width, the inset, the back arrow or the name changes. The name is as wide as its
+-- text first, so the client measures it uncut (an unset width is 0, so the cut keeps at least 1).
 function DetailsHeader.FitName(details)
   local name = details.name
   name:SetWidth(0)
   if details.width <= 0 then
     return
   end
-  name:SetWidth(max(1, min(name:GetStringWidth(), details.width - NAME_LEFT - details.rightInset)))
+  local room = details.width - NAME_LEFT - details.leftShift - details.rightInset
+  name:SetWidth(max(1, min(name:GetStringWidth(), room)))
+end
+
+-- The arrow: the shared back art (normal + additive highlight, as the settings gear's), no text,
+-- no tooltip. A click runs details.onBack while one is set.
+local function createBack(details)
+  local art = Theme.ART
+  local back = _G["CreateFrame"]("Button", nil, details.header)
+  back:SetSize(BACK_SIZE, BACK_SIZE)
+  back:SetPoint("LEFT", details.header, "LEFT", BACK_LEFT, 0)
+  back:RegisterForClicks("LeftButtonUp")
+  back.normal = back:CreateTexture(nil, "ARTWORK")
+  FrameKit.Art(back.normal, art.BACK_ATLAS, art.BACK_FILE)
+  back:SetNormalTexture(back.normal)
+  back.highlight = back:CreateTexture(nil, "HIGHLIGHT")
+  FrameKit.Art(back.highlight, art.BACK_ATLAS, art.BACK_FILE, "ADD")
+  back:SetHighlightTexture(back.highlight)
+  back:SetScript("OnClick", function()
+    if details.onBack then
+      details.onBack()
+    end
+  end)
+  details.back = back
+end
+
+-- A back arrow at the header's left that runs onBack(), the icon and the name moved right of it;
+-- nil hides it and puts them back. The arrow is built on the first non-nil call, then reused.
+-- The caller fits the name after.
+function DetailsHeader.SetBack(details, onBack)
+  details.onBack = onBack
+  if onBack and not details.back then
+    createBack(details)
+  end
+  if details.back then
+    details.back:SetShown(onBack ~= nil)
+  end
+  details.leftShift = onBack and BACK_SIZE or 0
+  local header, shift = details.header, details.leftShift
+  details.icon:SetPoint("LEFT", header, "LEFT", Theme.LAYOUT.DETAILS_PADDING + shift, 0)
+  details.name:SetPoint("TOPLEFT", header, "TOPLEFT", NAME_LEFT + shift, NAME_TOP)
 end
 
 -- Wraps the strip's text at the pane's width less the padding on each side, to STRIP_LINES lines

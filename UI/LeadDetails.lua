@@ -134,7 +134,7 @@ end
 
 -- The pane inside `parent`, covering it, empty until Show.
 function LeadDetails.New(parent)
-  local details = { width = 0, rightInset = Theme.LAYOUT.DETAILS_PADDING }
+  local details = { width = 0, rightInset = Theme.LAYOUT.DETAILS_PADDING, leftShift = 0 }
   local frame = _G["CreateFrame"]("Frame", nil, parent)
   frame:SetAllPoints(parent)
   details.frame = frame
@@ -196,6 +196,13 @@ function LeadDetails.SetRightInset(details, inset)
   for _, line in ipairs({ details.lineOne, details.lineTwo }) do
     line:SetPoint("RIGHT", details.header, "RIGHT", -inset, 0)
   end
+  DetailsHeader.FitName(details)
+end
+
+-- A texture-only back arrow at the header's left that runs onBack() (the narrow Details' way back
+-- to the list), the icon and the name moved right of it; nil hides it and restores the header.
+function LeadDetails.SetBack(details, onBack)
+  DetailsHeader.SetBack(details, onBack)
   DetailsHeader.FitName(details)
 end
 

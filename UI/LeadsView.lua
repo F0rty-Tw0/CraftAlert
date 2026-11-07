@@ -232,8 +232,8 @@ function LeadsView.Selected(view)
 end
 
 -- BridgePanel calls it when its host crosses the narrow threshold; the caller lays out and
--- refreshes after. To narrow: the List, nothing selected. To wide:
--- a lead shown in the Details stays selected, else the next refresh selects the newest.
+-- refreshes after. To narrow: the List, nothing selected, the details' back arrow on (Back). To wide:
+-- the arrow off; a lead shown in the Details stays selected, else the next refresh selects the newest.
 function LeadsView.SetNarrow(view, narrow)
   if narrow == view.narrow then
     return
@@ -248,6 +248,9 @@ function LeadsView.SetNarrow(view, narrow)
     view.screen = nil
   end
   view.narrow = narrow
+  LeadDetails.SetBack(view.details, narrow and function()
+    LeadsView.Back(view)
+  end or nil)
   LeadsScreens.Anchor(view)
   LeadsScreens.Apply(view)
 end
