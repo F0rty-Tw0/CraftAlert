@@ -13,6 +13,8 @@ local LedgerStrip = ns.LedgerStrip or require("CraftAlert.UI.LedgerStrip")
 local SettingsGear = ns.SettingsGear or require("CraftAlert.UI.SettingsGear")
 local SettingsPane = ns.SettingsPane or require("CraftAlert.UI.Settings.SettingsPane")
 local HostLift = ns.HostLift or require("CraftAlert.UI.HostLift")
+local BridgeWidths = ns.BridgeWidths or require("CraftAlert.UI.BridgeWidths")
+local ScreenSlide = ns.ScreenSlide or require("CraftAlert.UI.ScreenSlide")
 
 -- Spec C.2, C.4: the leads in WhisperMessenger's panel. The RegisterPanel table the bridge hands
 -- over (UI/WhisperBridge.lua) and the split view WM's host frame shows: built once per host, sent
@@ -26,16 +28,6 @@ local HostLift = ns.HostLift or require("CraftAlert.UI.HostLift")
 -- (UI/HostLift.lua): the leads' List or Details (LeadsView.SetNarrow), or the settings' nav or a
 -- page (SettingsPane.SetNarrow); every show starts on the List.
 local BridgePanel = {}
-
-local max = math.max
-local min = math.min
-
--- WM's CONTENT_MIN_WIDTH and CONTACTS_MIN_WIDTH (UI/Theme/Layout.lua:12-13, WM): the details keep
--- at least 340 px of the host, the list takes the rest between 180 and the standalone 260.
-local DETAILS_MIN_WIDTH = 340
--- A host narrower than the list's minimum plus the details' minimum cannot show both: the narrow
--- page (one pane at a time) takes over.
-local NARROW_BELOW = Theme.LAYOUT.LIST_MIN_WIDTH + DETAILS_MIN_WIDTH
 
 ---@type table
 local view = nil -- the LeadsView in the current host, nil until the first show
@@ -55,40 +47,19 @@ local function visibleLeads()
   return Leads.List()
 end
 
--- WM's divider once it called onSplit, else what the host leaves the details, between the minimum
--- and the standalone window's.
-local function splitOrClamp()
-  if splitWidth ~= nil then
-    return splitWidth
-  end
-  return min(Theme.LAYOUT.LIST_WIDTH, max(Theme.LAYOUT.LIST_MIN_WIDTH, currentHost:GetWidth() - DETAILS_MIN_WIDTH))
-end
-
--- The list's width in the host: the divider, kept clear of the details' minimum (WM's phone window
--- resized past the narrow threshold sends a split of about its full width); the rail is under the cap.
--- Narrow, the List is the whole host and the divider is ignored (kept for when the host widens).
+-- The pane widths in the current host (UI/BridgeWidths.lua).
 local function listWidth()
-  if narrow then
-    return currentHost:GetWidth()
-  end
-  local width = splitOrClamp()
-  local hostWidth = currentHost:GetWidth()
-  if splitWidth ~= nil and hostWidth > 0 then
-    return min(width, hostWidth - DETAILS_MIN_WIDTH)
-  end
-  return width
+  return BridgeWidths.List(currentHost:GetWidth(), splitWidth, narrow)
 end
 
--- The settings nav keeps its minimum when WM's divider snaps to the rail.
 local function navWidth()
-  return max(splitOrClamp(), Theme.LAYOUT.LIST_MIN_WIDTH)
+  return BridgeWidths.Nav(currentHost:GetWidth(), splitWidth)
 end
 
 -- Tells the view whenever the host crosses the narrow threshold; a host not laid out yet (0) is wide.
 -- On every run (a new host that starts wide never crosses), narrow screens lift over WM's divider.
 local function decide()
-  local width = currentHost:GetWidth()
-  local isNarrow = width > 0 and width < NARROW_BELOW
+  local isNarrow = BridgeWidths.IsNarrow(currentHost:GetWidth())
   if isNarrow ~= narrow then
     narrow = isNarrow
     LeadsView.SetNarrow(view, isNarrow)
@@ -189,7 +160,9 @@ local function onShow(host)
   panelShown = true
 end
 
+-- A slide in flight ends here, not only through its parent's hide (UI/ScreenSlide.lua).
 local function onHide()
+  ScreenSlide.FinishNow()
   panelShown = false
 end
 

@@ -92,6 +92,7 @@ local UI = {
   "UI.Settings.PageLinked",
   "UI.Settings.PageTest",
   "UI.HostLift",
+  "UI.BridgeWidths",
   "UI.BridgePanel",
   "UI.BridgeInfo",
   "UI.WhisperBridge",
