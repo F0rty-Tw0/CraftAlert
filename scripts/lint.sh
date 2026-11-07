@@ -154,7 +154,7 @@ if [[ -n "$LUACHECK_CMD" ]]; then
     EXIT_CODE=1
   fi
 else
-  echo "FAIL: luacheck not found (looked in .tools/ and $FALLBACK_TOOLS)"
+  echo "FAIL: luacheck not found (looked in ${TOOL_DIRS[*]} and PATH)"
   EXIT_CODE=1
 fi
 
