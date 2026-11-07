@@ -5,6 +5,7 @@ Player-friendly release notes for Craft Alert.
 ## [Unreleased]
 
 - Fixed: Clicking an alert on the Whisper Messenger button to send your greeting no longer opens the messenger when its "Auto-open on outgoing whisper" option is off. Needs the latest Whisper Messenger.
+- In WhisperMessenger's phone-style window, Craft Alert's page now fits the narrow window: tap a lead to see its details, and use the back arrow to return.
 
 ## [1.0.2] - 2026-11-06
 
