@@ -9,6 +9,7 @@
 --   SettingsFixture.row("Lead timeout").input              -- the shown control with that label
 --   SettingsFixture.take(refreshes)                        -- what was triggered since last take
 --   SettingsFixture.pageBar(box)                           -- the scroll bar of a page's box
+--   SettingsFixture.pageHeader()                           -- the narrow page's back-arrow header
 local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
@@ -117,6 +118,16 @@ function SettingsFixture.button(parent, label)
     end
   end
   error("no visible button " .. label)
+end
+
+-- The narrow page's header (UI/Settings/PageHeader.lua), nil before the pane is built.
+function SettingsFixture.pageHeader()
+  for _, frame in ipairs(Wow.frames) do
+    if frame.pageHeader then
+      return frame
+    end
+  end
+  return nil
 end
 
 -- The scroll bar of the page whose box is `box` (UI/ScrollView.lua puts it on the box).

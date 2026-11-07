@@ -62,6 +62,8 @@ local UI = {
   "UI.WindowSize",
   "UI.GhostResize",
   "UI.SettingsGear",
+  "UI.Settings.PageHeader",
+  "UI.Settings.PaneScreens",
   "UI.Settings.SettingsPane",
   "UI.LeadsWindow",
   "UI.LauncherArt",

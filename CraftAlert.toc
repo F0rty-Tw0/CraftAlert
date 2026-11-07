@@ -98,6 +98,8 @@ UI/LeadsView.lua
 UI/WindowSize.lua
 UI/GhostResize.lua
 UI/SettingsGear.lua
+UI/Settings/PageHeader.lua
+UI/Settings/PaneScreens.lua
 UI/Settings/SettingsPane.lua
 UI/LeadsWindow.lua
 UI/LauncherArt.lua
