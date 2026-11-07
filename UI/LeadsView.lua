@@ -125,14 +125,20 @@ function LeadsView.Refresh(view, leads)
   end
 end
 
--- Scrolls by `delta` wheel notches (positive = up); the refresh clamps the offset. On the narrow
--- Details the details body scrolls instead, never the hidden list.
+-- Scrolls by `delta` wheel notches (positive = up), clamped; a notch that moves nothing (the top
+-- or the end) repaints nothing. On the narrow Details the details body scrolls instead, never the
+-- hidden list.
 function LeadsView.Scroll(view, delta)
   if view.screen == "details" then
     ScrollView.Wheel(view.details.scroll, delta)
     return
   end
-  view.list.offset = view.list.offset - delta
+  local fit = LeadsList.Fit(view.getHeight() - Theme.LAYOUT.LEDGER_HEIGHT)
+  local target = LeadsList.ClampOffset(view.list.offset - delta, #view.leads, fit)
+  if target == view.list.offset then
+    return
+  end
+  view.list.offset = target
   LeadsView.Refresh(view, view.leads)
 end
 

@@ -96,11 +96,16 @@ function LeadsList.ApplyLook(list, look)
   ScrollBar.ApplyLook(list.bar, look)
 end
 
+-- `offset` kept in 0 .. the leads out of view (`count` leads, `fit` rows).
+function LeadsList.ClampOffset(offset, count, fit)
+  return max(0, min(offset, count - fit))
+end
+
 -- Re-reads `leads` (newest first) into the rows from the scroll offset, at most `fit` of them;
 -- the row of the lead with id `selectedId` shows the selected mark. The bar's range is the leads
 -- out of view.
 function LeadsList.Refresh(list, leads, fit, selectedId)
-  list.offset = max(0, min(list.offset, #leads - fit))
+  list.offset = LeadsList.ClampOffset(list.offset, #leads, fit)
   -- Bounded by the leads, not the height: a huge saved height must not loop for ever.
   local shown = max(0, min(fit, #leads - list.offset))
   for index = 1, max(shown, #list.rows) do
