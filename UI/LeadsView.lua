@@ -205,8 +205,9 @@ function LeadsView.Layout(view)
 end
 
 -- Back to the top with nothing selected: the next refresh selects the newest lead (narrow: on
--- the List).
+-- the List, at once, ending any slide).
 function LeadsView.ResetTop(view)
+  LeadsScreens.Reset(view)
   view.list.offset = 0
   view.selectedId = nil
   if view.narrow then
@@ -222,7 +223,11 @@ function LeadsView.Clear(view)
   view.empty:Hide()
 end
 
+-- None on the narrow Details: while the slide to it runs, the list's rows are still shown.
 function LeadsView.TopRow(view)
+  if LeadsView.Screen(view) == "details" then
+    return nil
+  end
   return LeadsList.TopRow(view.list)
 end
 
@@ -234,6 +239,7 @@ end
 -- BridgePanel calls it when its host crosses the narrow threshold; the caller lays out and
 -- refreshes after. To narrow: the List, nothing selected, the details' back arrow on (Back). To wide:
 -- the arrow off; a lead shown in the Details stays selected, else the next refresh selects the newest.
+-- Either way the screens swap at once, ending any slide (LeadsScreens.Apply's wide branch).
 function LeadsView.SetNarrow(view, narrow)
   if narrow == view.narrow then
     return
