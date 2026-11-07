@@ -89,6 +89,15 @@ function WhisperBridge.Look()
   return PanelLook.FromWM(ask("GetLook"))
 end
 
+-- Whether WM's window is compact (one screen at any width), asked on every call like Look().
+-- Anything but a true answer (older WM, refusal, raise) → false, so the width rule decides.
+function WhisperBridge.IsCompactWindow()
+  if api == nil or type(api.IsCompactWindow) ~= "function" then
+    return false
+  end
+  return ask("IsCompactWindow") == true
+end
+
 -- /ca config: the panel on settings. Shown in settings → closes it (as the own window does); shown
 -- on the leads → settings; hidden → opens it, then settings (WM runs onShow inside ShowPanel).
 -- → whether WM answered; false leaves /ca config to the own window.

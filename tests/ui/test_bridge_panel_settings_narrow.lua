@@ -5,7 +5,7 @@ local UiFixture = require("tests.helpers.ui_fixture")
 local FakeWm = require("tests.helpers.fake_wm_api")
 local SettingsFixture = require("tests.helpers.settings_fixture")
 
--- Phone-style slide spec, settings rows: in a narrow host BridgePanel puts the settings pane in
+-- Compact-window slide spec, settings rows: in a narrow host BridgePanel puts the settings pane in
 -- narrow mode (nav, then a page under a back-arrow header) and keeps its mode equal to the host's
 -- across width changes.
 local function boot()

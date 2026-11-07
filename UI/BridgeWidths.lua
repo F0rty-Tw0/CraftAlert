@@ -5,7 +5,7 @@ end
 
 local Theme = ns.Theme or require("CraftAlert.UI.Theme")
 
--- Phone-style slide spec: the widths BridgePanel (UI/BridgePanel.lua) gives its panes in WM's
+-- Compact-window slide spec: the widths BridgePanel (UI/BridgePanel.lua) gives its panes in WM's
 -- host. `hostWidth` is the host's (0 before it is laid out), `splitWidth` WM's divider position
 -- from onSplit (nil until WM calls it).
 local BridgeWidths = {}
@@ -34,7 +34,7 @@ local function splitOrClamp(hostWidth, splitWidth)
   return min(Theme.LAYOUT.LIST_WIDTH, max(Theme.LAYOUT.LIST_MIN_WIDTH, hostWidth - DETAILS_MIN_WIDTH))
 end
 
--- The list's width in the host: the divider, kept clear of the details' minimum (WM's phone window
+-- The list's width in the host: the divider, kept clear of the details' minimum (WM's compact window
 -- resized past the narrow threshold sends a split of about its full width); the rail is under the cap.
 -- Narrow, the List is the whole host and the divider is ignored (kept for when the host widens).
 -- Never below 0, even for a host under the details' minimum that is not yet known to be narrow.

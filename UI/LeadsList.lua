@@ -20,6 +20,8 @@ local floor = math.floor
 local max = math.max
 local min = math.min
 
+local ROWS_ABOVE_PANE = 2
+
 -- The rows that fit `height` (the host's, never the pane's own: it may read 0 on the first open),
 -- PANE_PADDING above the first row and below the last.
 function LeadsList.Fit(height)
@@ -36,6 +38,20 @@ local function placeRow(list, row, index)
   row:ClearAllPoints()
   row:SetPoint("TOPLEFT", pane, "TOPLEFT", layout.LIST_ROW_INSET, -top)
   row:SetPoint("TOPRIGHT", pane, "TOPRIGHT", -right, -top)
+end
+
+-- The rows and the bar sit two levels above the pane as it is now: a narrow WhisperMessenger
+-- window lifts the host, and the pane with it, after the list was built.
+local function syncLevel(list)
+  local level = list.pane:GetFrameLevel() + ROWS_ABOVE_PANE
+  if level == list.level then
+    return
+  end
+  list.level = level
+  list.bar:SetFrameLevel(level)
+  for _, row in ipairs(list.rows) do
+    row:SetFrameLevel(level)
+  end
 end
 
 local function rowAt(list, index)
@@ -67,7 +83,7 @@ end
 -- The list in `pane`: no rows yet, scrolled to the top. onSelect(row): a row was left-clicked;
 -- onScroll(value): the bar was dragged to `value` rows from the top.
 function LeadsList.New(pane, onSelect, onScroll)
-  local level = pane:GetFrameLevel() + 2
+  local level = pane:GetFrameLevel() + ROWS_ABOVE_PANE
   return {
     pane = pane,
     rows = {},
@@ -106,6 +122,7 @@ end
 -- the row of the lead with id `selectedId` shows the selected mark. The bar's range is the leads
 -- out of view.
 function LeadsList.Refresh(list, leads, fit, selectedId)
+  syncLevel(list)
   list.offset = LeadsList.ClampOffset(list.offset, #leads, fit)
   -- Bounded by the leads, not the height: a huge saved height must not loop for ever.
   local shown = max(0, min(fit, #leads - list.offset))

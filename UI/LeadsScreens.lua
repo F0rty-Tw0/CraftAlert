@@ -8,7 +8,7 @@ local LedgerStrip = ns.LedgerStrip or require("CraftAlert.UI.LedgerStrip")
 local ScreenSlide = ns.ScreenSlide or require("CraftAlert.UI.ScreenSlide")
 local LeadDetails = ns.LeadDetails or require("CraftAlert.UI.LeadDetails")
 
--- Phone-style slide spec: where the panes of a LeadsView (UI/LeadsView.lua) sit, and which show.
+-- Compact-window slide spec: where the panes of a LeadsView (UI/LeadsView.lua) sit, and which show.
 -- Wide, the split view: the list pane at the left, the details right of it past the 1 px divider,
 -- "Clear all" in the band over the list and the ledger counts right of the list, the empty text on
 -- the details. Narrow (a host too small for both panes), one screen at a time over the full width

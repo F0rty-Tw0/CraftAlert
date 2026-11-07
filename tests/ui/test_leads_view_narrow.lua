@@ -3,7 +3,7 @@ local Wow = require("tests.helpers.wow")
 local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 
--- Phone-style slide spec: LeadsView in a narrow host shows the List or the Details, one at a time.
+-- Compact-window slide spec: LeadsView in a narrow host shows the List or the Details, one at a time.
 local WIDTH, HEIGHT, PADDING = 360, 496, 8
 
 -- A narrow view over `count` leads (ids 1..count, the list newest first), on its List.

@@ -4,7 +4,7 @@ local Widgets = require("tests.helpers.widgets")
 local UiFixture = require("tests.helpers.ui_fixture")
 local FakeWm = require("tests.helpers.fake_wm_api")
 
--- Phone-style slide spec: the leads' List and Details screens through the real panel in a narrow host.
+-- Compact-window slide spec: the leads' List and Details screens through the real panel in a narrow host.
 local function boot(opts)
   local ns, db, calls = UiFixture.load(opts or { leads = 3 })
   local _, wm = FakeWm.install()
