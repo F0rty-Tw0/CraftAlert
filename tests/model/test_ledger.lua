@@ -78,6 +78,11 @@ local function testDaysAndWeek()
   Assert.same(ns.Ledger.Today(), counters(0, 0, 0), "a new day")
   ns.Ledger.Add("filled")
   Assert.same(db.ledger["2026-10-28"], counters(0, 0, 0, 1))
+  Assert.same({ ns.Ledger.TodayCounts() }, { 0, 0, 0, 1 }, "today's counters, no table")
+  Wow.clock.time = NOON
+  Assert.same({ ns.Ledger.TodayCounts() }, { 1, 0, 0, 0 })
+  Wow.clock.time = NOON - 5 * DAY
+  Assert.same({ ns.Ledger.TodayCounts() }, { 0, 0, 0, 0 }, "a day without a record")
   Wow.clock.time = NOON
   local week = ns.Ledger.LastDays(7)
   Assert.equal(#week, 7)

@@ -113,13 +113,19 @@ local function showTooltip(strip)
   tooltip:Show()
 end
 
--- Re-reads today's counters; hides the strip in an instance.
+-- Re-reads today's counters; hides the strip in an instance. The line is rebuilt only when a
+-- counter differs from the ones it shows (`strip.painted`): the text depends on nothing else.
 function LedgerStrip.Refresh(strip)
   if FlavorCompat.InInstance() then
     strip:Hide()
     return
   end
-  strip.text:SetText(stripLine(Ledger.Today()))
+  local seen, greeted, replied, filled = Ledger.TodayCounts()
+  local painted = strip.painted
+  if painted.seen ~= seen or painted.greeted ~= greeted or painted.replied ~= replied or painted.filled ~= filled then
+    painted.seen, painted.greeted, painted.replied, painted.filled = seen, greeted, replied, filled
+    strip.text:SetText(stripLine(painted))
+  end
   strip:Show()
 end
 
@@ -146,6 +152,7 @@ function LedgerStrip.New(parent, host)
   -- Both sides, one line (FrameKit.Text turns word wrap off): a narrow host cuts the text short.
   strip.text:SetPoint("LEFT", strip, "LEFT", layout.PADDING, 0)
   strip.text:SetPoint("RIGHT", strip, "RIGHT", -layout.PADDING, 0)
+  strip.painted = {} -- the counters the text shows; none yet
   strips[host] = strip
   if not subscribed then
     subscribed = true

@@ -51,18 +51,30 @@ function Ledger.Add(field)
   EventRouter.CallAll(listeners)
 end
 
--- A copy of `key`'s counters, zeros for a day without a record.
-local function read(key)
+-- `key`'s counters as seen, greeted, replied, filled; zeros for a day without a record.
+local function counts(key)
   local day = db and db.ledger[key]
-  local counters = zeros()
-  if day then
-    counters.seen, counters.greeted, counters.replied, counters.filled = day.seen, day.greeted, day.replied, day.filled
+  if day == nil then
+    return 0, 0, 0, 0
   end
+  return day.seen, day.greeted, day.replied, day.filled
+end
+
+-- A copy of `key`'s counters.
+local function read(key)
+  local counters = zeros()
+  counters.seen, counters.greeted, counters.replied, counters.filled = counts(key)
   return counters
 end
 
 function Ledger.Today()
   return read(dayKey(now()))
+end
+
+-- Today's counters as seen, greeted, replied, filled, with no table made: the ledger line reads
+-- them on every refresh.
+function Ledger.TodayCounts()
+  return counts(dayKey(now()))
 end
 
 -- Today first, then the `count` - 1 days before it; each entry carries its `day` key. Days are

@@ -116,6 +116,21 @@ local function testRepaintsOnAdd()
   Assert.equal(view.strip.text:GetText(), "|cffffd100Today|r  " .. counts(ns.Theme.COLORS, 2))
 end
 
+-- The line is rebuilt only when a counter changed: a refresh at the same counters leaves it, and
+-- a new day (counters back to zero) repaints it.
+local function testRepaintsOnlyChangedCounters()
+  local ns, view = open()
+  local strip = view.strip
+  local before = strip.text:GetText()
+  strip.text:SetText("kept")
+  ns.LedgerStrip.Refresh(strip)
+  Assert.equal(strip.text:GetText(), "kept", "same counters: the text is not set again")
+  strip.text:SetText(before)
+  Wow.clock.time = NOON + 24 * 60 * 60
+  ns.LedgerStrip.Refresh(strip)
+  Assert.equal(strip.text:GetText(), "|cffffd100Today|r  0 seen · 0 greeted · 0 replied · 0 filled", "a new day")
+end
+
 -- WhisperMessenger's panel builds a new view when its host changes: one strip per host repaints,
 -- the newest, so the repaint list does not grow with every build.
 local function testOneStripPerHost()
@@ -207,6 +222,7 @@ return function()
   testLayout()
   testTodayLine()
   testRepaintsOnAdd()
+  testRepaintsOnlyChangedCounters()
   testOneStripPerHost()
   testTooltip()
   testHiddenInInstance()
