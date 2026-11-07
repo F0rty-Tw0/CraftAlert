@@ -236,6 +236,18 @@ local function testRefreshAtAnotherSizeThenBackLaysOutAgain()
   Assert.equal(captured.view.listPane:GetWidth(), 260)
 end
 
+-- A vertical drag: the host grows taller at the same width and WM sends no split; the frame's end
+-- still lays the new height out.
+local function testHeightOnlyResizeLaysOut()
+  local ns, _, _, wm = boot()
+  local host = showWith(wm, 700, 260)
+  local refreshes = countRefreshes(ns)
+  host:SetSize(700, 520)
+  Widgets.fire(host, "OnSizeChanged", 700, 520)
+  Widgets.nextFrame()
+  Assert.equal(refreshes(), 1)
+end
+
 return function()
   testBuildOptsInToCompact()
   testRegisteredPanelCarriesCompact()
@@ -250,5 +262,6 @@ return function()
   testDragFrameWithSplitRefreshesOnce()
   testRefreshMidFrameStillDecidesAtTheFrameEnd()
   testRefreshAtAnotherSizeThenBackLaysOutAgain()
+  testHeightOnlyResizeLaysOut()
   Wow.reset()
 end
