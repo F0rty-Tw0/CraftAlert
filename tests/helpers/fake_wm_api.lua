@@ -275,7 +275,7 @@ function FakeWm.install(opts)
     api.Connect = function(name)
       wm.connects[#wm.connects + 1] = name
       if handles[name] == nil then
-        local handle = { version = 1 }
+        local handle = {}
         for key, value in pairs(api) do
           if type(value) == "function" and key ~= "Connect" then
             handle[key] = function(...)
@@ -284,6 +284,7 @@ function FakeWm.install(opts)
             end
           end
         end
+        handle.version = 1
         handles[name] = handle
       end
       return handles[name]

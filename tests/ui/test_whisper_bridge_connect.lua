@@ -58,11 +58,12 @@ local function testConnectFallsBack()
 
   local ns, api, wm = boot({ connect = true })
   local real = api.Connect
-  api.Connect = function(name)
+  local function withoutShowPreview(name)
     local handle = real(name)
     handle.ShowPreview = nil
     return handle
   end
+  api.Connect = withoutShowPreview
   Assert.equal(ns.WhisperBridge.Activate(), true, "handle missing ShowPreview")
   Assert.equal(#wm.callsTo("RegisterPanel"), 1)
   Assert.equal(#wm.handleCalls, 0, "handle missing ShowPreview: shared table used")
