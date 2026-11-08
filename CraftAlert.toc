@@ -15,7 +15,7 @@
 ## Author: F0rty_tw0
 ## Category: Chat
 ## IconTexture: Interface\AddOns\CraftAlert\Media\Icon
-## Version: v1.0.3
+## Version: v1.0.4
 ## X-Curse-Project-ID: 1773207
 ## SavedVariables: CraftAlertDB
 

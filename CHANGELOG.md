@@ -4,6 +4,8 @@ Player-friendly release notes for Craft Alert.
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-08
+
 - With the latest Whisper Messenger, Craft Alert now appears by name in its "Allow addon integration" list, with its own checkbox. Needs the latest Whisper Messenger.
 - Fixed: in Whisper Messenger's narrow window, the lead list no longer hides leads behind its background.
 - With the latest Whisper Messenger, Craft Alert's page stays on one screen while the window is compact, even if you drag it wider.
