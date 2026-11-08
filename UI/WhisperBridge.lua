@@ -48,7 +48,7 @@ local REQUIRED = {
 }
 
 ---@type table
-local api = nil -- _G.WhisperMessengerAPI once Activate accepted it
+local api = nil -- WM's API (the Connect handle, else _G.WhisperMessengerAPI) once Activate accepted it
 local active = nil -- nil until Activate ran, then whether it activated
 ---@type table|nil
 local shown = nil -- { lead, shownAt } of the preview on WM's widget, nil when none
@@ -185,6 +185,20 @@ local function onUnreadChanged()
   LeadsWindow.Refresh()
 end
 
+-- Names Craft Alert to WM so it gets its own row and tick (spec Unit 12): → WM's handle for
+-- "CraftAlert" when the shared table has Connect and the handle is usable, else the shared table
+-- itself (an older WM, or a Connect that raises or answers wrongly).
+local function connect(candidate)
+  if type(candidate.Connect) ~= "function" then
+    return candidate
+  end
+  local ok, handle = pcall(candidate.Connect, KEY)
+  if ok and isUsable(handle) then
+    return handle
+  end
+  return candidate
+end
+
 -- Activates once per session (spec C.2): → whether the bridge is on. A second call returns the
 -- first answer and wires nothing again. RegisterPanel, the one call out, comes before the wiring:
 -- a raise or a false answer (WM refuses, e.g. the key is taken) leaves CraftAlert standalone.
@@ -197,20 +211,21 @@ function WhisperBridge.Activate()
     active = false
     return false
   end
+  local chosen = connect(candidate)
   local panel = BridgePanel.Build()
   -- An older WM has no GetUnreadCount: no unread callback, no pink dots. The callback goes on the
   -- panel before RegisterPanel: WM copies the panel once and never reads it again.
-  local countsUnread = type(candidate.GetUnreadCount) == "function"
+  local countsUnread = type(chosen.GetUnreadCount) == "function"
   if countsUnread then
     panel.onUnreadChanged = onUnreadChanged
   end
-  if candidate.RegisterPanel(KEY, panel) ~= true then
+  if chosen.RegisterPanel(KEY, panel) ~= true then
     active = false
     return false
   end
-  api, active = candidate, true
+  api, active = chosen, true
   -- Older WM has no IsAnimationEnabled: no source, pages slide as before. A raise answers false.
-  if type(candidate.IsAnimationEnabled) == "function" then
+  if type(chosen.IsAnimationEnabled) == "function" then
     ScreenSlide.SetEnabledSource(function()
       return ask("IsAnimationEnabled")
     end)

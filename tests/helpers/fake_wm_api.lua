@@ -3,6 +3,11 @@
 --   local api, wm = FakeWm.install(opts)   -- Wow.stub("WhisperMessengerAPI", api)
 --   opts.version                           default 1
 --   opts.without = { "ShowPreview" }       leaves those functions out of the API
+--   opts.connect = true                    installs api.Connect(name) -> one handle per name ({ version = 1 } plus a
+--                                            forwarder per function key of api, built on first call, so opts.without applies)
+--   wm.connects                            names Connect was called with, in order (only with opts.connect)
+--   wm.handleCalls                         { name, args... } per call made through a handle (GetLook etc. included);
+--                                            wm.handleCallsTo(name) filters it. Forwarded calls also land in wm.calls
 --   wm.calls                               every call in order, { name, args... } (RegisterPanel included)
 --   wm.callsTo(name)                       those entries
 --   wm.refuse[name] = true                 that function records the call, changes nothing, returns false
@@ -251,6 +256,39 @@ function FakeWm.install(opts)
 
   for _, name in ipairs(opts.without or {}) do
     api[name] = nil
+  end
+
+  if opts.connect then
+    wm.connects = {}
+    wm.handleCalls = {}
+    local handles = {}
+    function wm.handleCallsTo(name)
+      local found = {}
+      for _, call in ipairs(wm.handleCalls) do
+        if call[1] == name then
+          found[#found + 1] = call
+        end
+      end
+      return found
+    end
+    -- Built at call time, after the `without` loop, so removed keys are missing from the handle too.
+    api.Connect = function(name)
+      wm.connects[#wm.connects + 1] = name
+      if handles[name] == nil then
+        local handle = {}
+        for key, value in pairs(api) do
+          if type(value) == "function" and key ~= "Connect" then
+            handle[key] = function(...)
+              wm.handleCalls[#wm.handleCalls + 1] = { key, ... }
+              return api[key](...)
+            end
+          end
+        end
+        handle.version = 1
+        handles[name] = handle
+      end
+      return handles[name]
+    end
   end
   Wow.stub("WhisperMessengerAPI", api)
   return api, wm
