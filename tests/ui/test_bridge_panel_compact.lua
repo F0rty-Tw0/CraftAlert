@@ -93,21 +93,30 @@ local function testCompactNarrowHostIsNarrow()
 end
 
 -- Rows "regular | 600 split, 300 narrow, 0 split": the width rule as before.
-local function testRegularWindowFollowsTheWidth()
+local function testRegularWideHostIsSplit()
   local ns, view = run(false, 600)
-  Assert.same(look(ns, view), SPLIT, "600")
-  local ns2, view2 = run(false, 300)
-  Assert.same(look(ns2, view2), LIST, "300")
-  local ns3, view3 = run(false, 0)
-  Assert.same(look(ns3, view3), SPLIT, "0")
+  Assert.same(look(ns, view), SPLIT)
+end
+
+local function testRegularNarrowHostIsList()
+  local ns, view = run(false, 300)
+  Assert.same(look(ns, view), LIST)
+end
+
+local function testRegularUnlaidHostIsSplit()
+  local ns, view = run(false, 0)
+  Assert.same(look(ns, view), SPLIT)
 end
 
 -- Row "older WM (no call)": the width rule, though the fake WM would say compact.
-local function testOlderWmFollowsTheWidth()
+local function testOlderWmWideHostIsSplit()
   local ns, view = run(true, 600, { without = { "IsCompactWindow" } })
-  Assert.same(look(ns, view), SPLIT, "600")
-  local ns2, view2 = run(true, 300, { without = { "IsCompactWindow" } })
-  Assert.same(look(ns2, view2), LIST, "300")
+  Assert.same(look(ns, view), SPLIT)
+end
+
+local function testOlderWmNarrowHostIsList()
+  local ns, view = run(true, 300, { without = { "IsCompactWindow" } })
+  Assert.same(look(ns, view), LIST)
 end
 
 -- Row "raise": a raising call is the width rule, with no Lua error.
@@ -115,6 +124,16 @@ local function testRaisingCallFollowsTheWidth()
   local ns, wm = boot()
   wm.compact = true
   wm.raise.IsCompactWindow = true
+  local captured = capture(ns)
+  showWith(wm, 600)
+  Assert.same(look(ns, captured.view), SPLIT)
+end
+
+-- Row "refuse": a refused call is the width rule too.
+local function testRefusedCallFollowsTheWidth()
+  local ns, wm = boot()
+  wm.compact = true
+  wm.refuse.IsCompactWindow = true
   local captured = capture(ns)
   showWith(wm, 600)
   Assert.same(look(ns, captured.view), SPLIT)
@@ -162,9 +181,13 @@ return function()
   testCompactWideHostShowsTheListAlone()
   testCompactUnlaidHostIsNarrowAtOnce()
   testCompactNarrowHostIsNarrow()
-  testRegularWindowFollowsTheWidth()
-  testOlderWmFollowsTheWidth()
+  testRegularWideHostIsSplit()
+  testRegularNarrowHostIsList()
+  testRegularUnlaidHostIsSplit()
+  testOlderWmWideHostIsSplit()
+  testOlderWmNarrowHostIsList()
   testRaisingCallFollowsTheWidth()
+  testRefusedCallFollowsTheWidth()
   testAnswerIsReadAtEveryShow()
   testCompactHostStaysNarrowWhenDraggedWider()
   testCompactWideHostOpensSettingsOnTheNav()
