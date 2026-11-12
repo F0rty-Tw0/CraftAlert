@@ -122,6 +122,8 @@ local function testShowLeadPreview()
     { ns.PlayerName.Display(lead.customer), "LF plate belt", "You have Blacksmithing", nil }
   )
   Assert.equal(preview.pulse, true, "a new lead pulses WM's widget (spec 7)")
+  -- WM sends its quiet /who for this name first in the click, before onClick greets.
+  Assert.equal(preview.who, ns.GreetAction.Target(lead), "WM looks up the customer")
   Assert.equal(#UiFixture.callsTo(calls, "sound"), 1)
   Assert.equal(#UiFixture.callsTo(calls, "flash"), 1)
   Assert.equal(rawget(_G, "CraftAlertToast"), nil, "no own toast")
@@ -667,6 +669,7 @@ local function testPreviewClickOpensOnce()
   local test = ns2.Leads.Latest()
   test.test = true
   ns2.WhisperBridge.ShowLead(test)
+  Assert.equal(wm2.preview.CraftAlert.who, nil, "test lead: no /who either")
   Wow.clock.gettime = 51
   wm2.preview.CraftAlert.onClick()
   Assert.same({ #wm2.callsTo("OpenConversation"), #UiFixture.callsTo(calls2, "chat") }, { 0, 0 }, "test lead: dry run only")
