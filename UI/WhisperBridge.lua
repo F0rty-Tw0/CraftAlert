@@ -264,12 +264,15 @@ end
 
 -- Three rows on WM's widget: the customer, their chat line (the item when the line is empty), and
 -- who of yours can craft it (`detail`, an alt's name class-coloured; a WM without the field ignores it).
+-- `who`: WM sends its quiet /who for the customer first in the click, before onClick greets (the
+-- game blocks it after a whisper went out). A test lead is a dry run: no lookup.
 local function previewFor(lead, entry)
   local message = LeadText.Message(lead)
   return {
     sender = PlayerName.Display(lead.customer),
     text = message ~= "" and message or LeadText.What(lead),
     detail = LeadText.CrafterLine(lead),
+    who = not lead.test and GreetAction.Target(lead) or nil,
     classTag = FlavorCompat.ClassOf(lead.guid),
     pulse = true,
     onClick = function()
