@@ -4,6 +4,8 @@ Player-friendly release notes for Craft Alert.
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-11-12
+
 - Clicking a lead's alert on the Whisper Messenger button now also looks up the customer, so their level, class and zone show in the chat. Needs the latest Whisper Messenger.
 
 ## [1.0.4] - 2026-11-08
